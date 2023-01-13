@@ -1,19 +1,12 @@
 # \#AzureSandbox - terraform-azurerm-mssql
 
+## Architecture
+
 ![mssql-diagram](./mssql-diagram.drawio.svg)
-
-## Contents
-
-* [Overview](#overview)
-* [Before you start](#before-you-start)
-* [Getting started](#getting-started)
-* [Smoke testing](#smoke-testing)
-* [Documentation](#documentation)
-* [Next steps](#next-steps)
 
 ## Overview
 
-This configuration implements a [PaaS](https://azure.microsoft.com/en-us/overview/what-is-paas/) database hosted in [Azure SQL Database](https://docs.microsoft.com/en-us/azure/azure-sql/database/sql-database-paas-overview) with a private endpoint implemented using [PrivateLink](https://docs.microsoft.com/en-us/azure/azure-sql/database/private-endpoint-overview).
+This configuration implements a [PaaS](https://azure.microsoft.com/overview/what-is-paas/) database hosted in [Azure SQL Database](https://learn.microsoft.com/azure/azure-sql/database/sql-database-paas-overview) with a private endpoint implemented using [PrivateLink](https://learn.microsoft.com/azure/azure-sql/database/private-endpoint-overview).
 
 Activity | Estimated time required
 --- | ---
@@ -191,9 +184,9 @@ The configuration for these resources can be found in [020-mssql.tf](./020-mssql
 
 Resource name (ARM) | Notes
 --- | ---
-azurerm_mssql_server.mssql_server_01 (mssql-xxxxxxxxxxxxxxxx) | An [Azure SQL Database logical server](https://docs.microsoft.com/en-us/azure/azure-sql/database/logical-servers) for hosting databases.
-azurerm_mssql_database.mssql_database_01 | A [single database](https://docs.microsoft.com/en-us/azure/azure-sql/database/single-database-overview) named *testdb* for testing connectivity.
-azurerm_private_endpoint.mssql_server_01 | A private endpoint for connecting to [Azure SQL Database using PrivateLink](https://docs.microsoft.com/en-us/azure/azure-sql/database/private-endpoint-overview)
+azurerm_mssql_server.mssql_server_01 (mssql-xxxxxxxxxxxxxxxx) | An [Azure SQL Database logical server](https://learn.microsoft.com/azure/azure-sql/database/logical-servers) for hosting databases.
+azurerm_mssql_database.mssql_database_01 | A [single database](https://learn.microsoft.com/azure/azure-sql/database/single-database-overview) named *testdb* for testing connectivity.
+azurerm_private_endpoint.mssql_server_01 | A private endpoint for connecting to [Azure SQL Database using PrivateLink](https://learn.microsoft.com/azure/azure-sql/database/private-endpoint-overview)
 azurerm_private_dns_a_record.sql_server_01 | A DNS A record for resolving DNS queries to *azurerm_mssql_server.mssql_server_01* using PrivateLink. This resource has a dependency on the *azurerm_private_dns_zone.database_windows_net* resource.
 
 ## Next steps

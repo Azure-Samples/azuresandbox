@@ -1,22 +1,15 @@
-# \#AzureSandbox - terraform-azurerm-vwan  
+# \#AzureSandbox - terraform-azurerm-vwan
+
+## Architecture
 
 ![vnet-shared-diagram](./vwan-diagram.drawio.svg)
 
-## Contents
-
-* [Overview](#overview)
-* [Before you start](#before-you-start)
-* [Getting started](#getting-started)
-* [Smoke testing](#smoke-testing)
-* [Documentation](#documentation)
-* [Next steps](#next-steps)
-
 ## Overview
 
-This configuration implements an [Azure Virtual WAN](https://docs.microsoft.com/en-us/azure/virtual-wan/virtual-wan-about) to connect /#AzureSandbox to remote users using [User VPN (point-to-site) connections](https://docs.microsoft.com/en-us/azure/virtual-wan/virtual-wan-about#uservpn), including:
+This configuration implements an [Azure Virtual WAN](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about) to connect /#AzureSandbox to remote users using [User VPN (point-to-site) connections](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#uservpn), including:
 
-* A [virtual wan](https://docs.microsoft.com/en-us/azure/virtual-wan/virtual-wan-about#resources).
-* A [virtual wan hub](https://docs.microsoft.com/en-us/azure/virtual-wan/virtual-wan-about#resources) with pre-configured [hub virtual network connections](https://docs.microsoft.com/en-us/azure/virtual-wan/virtual-wan-about#resources) with [terraform-azurerm-vnet-shared](./terraform-azurerm-vnet-shared/) and [terraform-azurerm-vnet-app](./terraform-azurerm-vnet-app/). The hub is also pre-configured for [User VPN (point-to-site) connections](https://docs.microsoft.com/en-us/azure/virtual-wan/virtual-wan-about#uservpn).
+* A [virtual wan](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#resources).
+* A [virtual wan hub](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#resources) with pre-configured [hub virtual network connections](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#resources) with [terraform-azurerm-vnet-shared](./terraform-azurerm-vnet-shared/) and [terraform-azurerm-vnet-app](./terraform-azurerm-vnet-app/). The hub is also pre-configured for [User VPN (point-to-site) connections](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#uservpn).
 
 Activity | Estimated time required
 --- | ---
@@ -224,7 +217,7 @@ Use the following sections to test user VPN (point-to-site) connectivity to priv
     * Options:
       * Encrypt connection: disabled
   * Note: **Windows Authentication cannot be used** because your client machine is not domain joined to the `mysandbox.local` domain.
-  * Note: **Encryption must be disabled** because your client machine does not trust the `mysandbox.local` domain. See [SSL Security Error with Data Source](https://powerbi.microsoft.com/en-us/blog/ssl-security-error-with-data-source) for more details. IPSEC encryption is enabled at the network layer for the user (point-to-site) VPN connection.
+  * Note: **Encryption must be disabled** because your client machine does not trust the `mysandbox.local` domain. See [SSL Security Error with Data Source](https://powerbi.microsoft.com/blog/ssl-security-error-with-data-source) for more details. IPSEC encryption is enabled at the network layer for the user (point-to-site) VPN connection.
 * Expand the *Databases* tab and verify you can see *testdb*.
 * Navigate to *File* > *Exit*.
 
@@ -299,14 +292,14 @@ The configuration for these resources can be found in [020-network.tf](./020-net
 
 Resource name (ARM) | Notes
 --- | ---
-azurerm_virtual_wan.vwan_01 (vwan-xxxxxxxxxxxxxxxx-01)| [Virtual wan](https://docs.microsoft.com/en-us/azure/virtual-wan/virtual-wan-about) to connect the shared services and application virtual networks to remote users.
-azurerm_virtual_hub.vwan_01_hub_01 (vhub-xxxxxxxxxxxxxxxx-01) | [Virtual WAN hub](https://docs.microsoft.com/en-us/azure/virtual-wan/virtual-wan-about#resources) associated with the virtual wan.
-azurerm_virtual_hub_connection.vwan_01_hub_01_connections["vnet-shared-01"] | [Hub virtual network connection](https://docs.microsoft.com/en-us/azure/virtual-wan/virtual-wan-about#resources) to *azurerm_virtual_network.vnet_shared_01*.
-azurerm_virtual_hub_connection.vwan_01_hub_01_connections["vnet-app-01"] | [Hub virtual network connection](https://docs.microsoft.com/en-us/azure/virtual-wan/virtual-wan-about#resources) to *azurerm_virtual_network.vnet_app_01*.
-azurerm_point_to_site_vpn_gateway.point_to_site_vpn_gateway_01 | Enables [User VPN (point-to-site) connections](https://docs.microsoft.com/en-us/azure/virtual-wan/virtual-wan-about#uservpn). See below for more details.
+azurerm_virtual_wan.vwan_01 (vwan-xxxxxxxxxxxxxxxx-01)| [Virtual wan](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about) to connect the shared services and application virtual networks to remote users.
+azurerm_virtual_hub.vwan_01_hub_01 (vhub-xxxxxxxxxxxxxxxx-01) | [Virtual WAN hub](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#resources) associated with the virtual wan.
+azurerm_virtual_hub_connection.vwan_01_hub_01_connections["vnet-shared-01"] | [Hub virtual network connection](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#resources) to *azurerm_virtual_network.vnet_shared_01*.
+azurerm_virtual_hub_connection.vwan_01_hub_01_connections["vnet-app-01"] | [Hub virtual network connection](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#resources) to *azurerm_virtual_network.vnet_app_01*.
+azurerm_point_to_site_vpn_gateway.point_to_site_vpn_gateway_01 | Enables [User VPN (point-to-site) connections](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#uservpn). See below for more details.
 azurerm_vpn_server_configuration.vpn_server_configuration_01 | Defines the parameters for remote clients to connect to *azurerm_point_to_site_vpn_gateway.point_to_site_vpn_gateway_01*. See below for more details.
 
-[User VPN (point-to-site) connections](https://docs.microsoft.com/en-us/azure/virtual-wan/virtual-wan-about#uservpn) are enabled by generating a self-signed certificate in the client environment and using it to authenticate with a point-to-site VPN gateway provisioned in a [Virtual WAN hub](https://docs.microsoft.com/en-us/azure/virtual-wan/virtual-wan-about#resources) that is connected to both the shared services and application virtual networks used in \#AzureSandbox.
+[User VPN (point-to-site) connections](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#uservpn) are enabled by generating a self-signed certificate in the client environment and using it to authenticate with a point-to-site VPN gateway provisioned in a [Virtual WAN hub](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#resources) that is connected to both the shared services and application virtual networks used in \#AzureSandbox.
 
 ## Next steps
 

@@ -1,19 +1,12 @@
 # \#AzureSandbox - terraform-azurerm-mysql
 
+## Architecture
+
 ![mysql-diagram](./mysql-diagram.drawio.svg)
-
-## Contents
-
-* [Overview](#overview)
-* [Before you start](#before-you-start)
-* [Getting started](#getting-started)
-* [Smoke testing](#smoke-testing)
-* [Documentation](#documentation)
-* [Next steps](#next-steps)
 
 ## Overview
 
-This configuration implements a [PaaS](https://azure.microsoft.com/en-us/overview/what-is-paas/) database hosted in [Azure Database for MySQL - Flexible Server](https://docs.microsoft.com/en-us/azure/mysql/flexible-server/overview) with a private endpoint implemented using [subnet delegation](https://docs.microsoft.com/en-us/azure/virtual-network/subnet-delegation-overview)..
+This configuration implements a [PaaS](https://azure.microsoft.com/overview/what-is-paas/) database hosted in [Azure Database for MySQL - Flexible Server](https://learn.microsoft.com/azure/mysql/flexible-server/overview) with a private endpoint implemented using [subnet delegation](https://learn.microsoft.com/azure/virtual-network/subnet-delegation-overview)..
 
 Activity | Estimated time required
 --- | ---
@@ -135,7 +128,7 @@ The configuration for these resources can be found in [020-mysql.tf](./020-mysql
 
 Resource name (ARM) | Notes
 --- | ---
-azurerm_mysql_flexible_server.mysql_server_01 (mysql-xxxxxxxxxxxxxxxx) | An [Azure Database for MySQL - Flexible Server](https://docs.microsoft.com/en-us/azure/mysql/flexible-server/overview) for hosting databases. Note that a private endpoint is automatically created during provisioning and a corresponding DNS A record is automatically added to the corresponding private DNS zone.
+azurerm_mysql_flexible_server.mysql_server_01 (mysql-xxxxxxxxxxxxxxxx) | An [Azure Database for MySQL - Flexible Server](https://learn.microsoft.com/azure/mysql/flexible-server/overview) for hosting databases. Note that a private endpoint is automatically created during provisioning and a corresponding DNS A record is automatically added to the corresponding private DNS zone.
 azurerm_mysql_flexible_database.mysql_database_01 | A MySQL Database named *testdb* for testing connectivity.
 
 ## Next steps

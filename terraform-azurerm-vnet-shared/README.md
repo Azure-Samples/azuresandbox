@@ -1,4 +1,6 @@
-# #AzureSandbox - terraform-azurerm-vnet-shared  
+# #AzureSandbox - terraform-azurerm-vnet-shared
+
+## Architecture
 
 ![vnet-shared-diagram](./vnet-shared-diagram.drawio.svg)
 
@@ -15,14 +17,14 @@
 
 This configuration implements a virtual network with shared services used by all the configurations including:
 
-* A [resource group](https://docs.microsoft.com/en-us/azure/azure-glossary-cloud-terminology#resource-group) which contains all resources.
-* A [key vault](https://docs.microsoft.com/en-us/azure/key-vault/general/overview) for managing secrets.
-* A [log analytics workspace](https://docs.microsoft.com/en-us/azure/azure-monitor/data-platform#collect-monitoring-data) for log data and metrics.
-* A [storage account](https://docs.microsoft.com/en-us/azure/azure-glossary-cloud-terminology#storage-account) for blob storage.
-* An [automation account](https://docs.microsoft.com/en-us/azure/automation/automation-intro) for configuration management.
-* A [virtual network](https://docs.microsoft.com/en-us/azure/azure-glossary-cloud-terminology#vnet) for hosting [virtual machines](https://docs.microsoft.com/en-us/azure/azure-glossary-cloud-terminology#vm).
-* A [bastion](https://docs.microsoft.com/en-us/azure/bastion/bastion-overview) for secure RDP and SSH access to virtual machines.
-* A Windows Server [virtual machine](https://docs.microsoft.com/en-us/azure/azure-glossary-cloud-terminology#vm) running [Active Directory Domain Services](https://docs.microsoft.com/en-us/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview) with a pre-configured domain and DNS server.
+* A [resource group](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#resource-group) which contains all resources.
+* A [key vault](https://learn.microsoft.com/azure/key-vault/general/overview) for managing secrets.
+* A [log analytics workspace](https://learn.microsoft.com/azure/azure-monitor/data-platform#collect-monitoring-data) for log data and metrics.
+* A [storage account](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#storage-account) for blob storage.
+* An [automation account](https://learn.microsoft.com/azure/automation/automation-intro) for configuration management.
+* A [virtual network](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vnet) for hosting [virtual machines](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm).
+* A [bastion](https://learn.microsoft.com/azure/bastion/bastion-overview) for secure RDP and SSH access to virtual machines.
+* A Windows Server [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) running [Active Directory Domain Services](https://learn.microsoft.com/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview) with a pre-configured domain and DNS server.
 
 Activity | Estimated time required
 --- | ---
@@ -94,7 +96,7 @@ This section describes how to provision this configuration using default setting
   * When prompted for *arm_client_id*, use the *appId* for the service principal created by the subscription owner.
   * When prompted for *resource_group_name* use a custom value if there are other sandbox users using the same subscription.
   * When prompted for *adminuser*, the default is *bootstrapadmin*.
-    * *Important*: If you use a custom value, avoid using [restricted usernames](https://docs.microsoft.com/en-us/azure/virtual-machines/windows/faq#what-are-the-username-requirements-when-creating-a-vm-).
+    * *Important*: If you use a custom value, avoid using [restricted usernames](https://learn.microsoft.com/azure/virtual-machines/windows/faq#what-are-the-username-requirements-when-creating-a-vm-).
   * When prompted for *skip_admin_password_gen*, accept the default which is `no`.
     * *Important*: A strong password will be generated for you and stored in the *adminpassword* key vault secret.
 * Apply the Terraform configuration.
@@ -160,7 +162,7 @@ The bootstrap script [bootstrap.sh](./bootstrap.sh) is used to initialize variab
 * Creates a new resource group with the default name *rg-sandbox-01* used by all the configurations.
 * Creates a storage account with a randomly generated 15-character name like *stxxxxxxxxxxxxx*.
   * The name is limited to 15 characters for compatibility with Active Directory Domain Services.
-  * A new *scripts* container is created for configurations that leverage the Custom Script Extension for [Windows](https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/custom-script-windows) or [Linux](https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/custom-script-linux).
+  * A new *scripts* container is created for configurations that leverage the Custom Script Extension for [Windows](https://learn.microsoft.com/azure/virtual-machines/extensions/custom-script-windows) or [Linux](https://learn.microsoft.com/azure/virtual-machines/extensions/custom-script-linux).
 * Creates a key vault with a randomly generated name like *kv-xxxxxxxxxxxxxxx*.
   * The permission model is set to *Vault access policy*. *Azure role-based access control* is not used to ensure that sandbox users only require a *Contributor* Azure RBAC role assignment in order to complete the configurations.
   * Secrets are created that are used by all configurations. Note these secrets are static and will need to be manually updated if the values change.
@@ -192,7 +194,7 @@ azurerm_log_analytics_workspace.log_analytics_workspace_01 (log&#x2011;xxxxxxxxx
 random_id.log_analytics_workspace_01_name | Used to generate a random unique name for *azurerm_log_analytics_workspace.log_analytics_workspace_01*.
 azurerm_key_vault_secret.log_analytics_workspace_01_primary_shared_key | Secret used to access *azurerm_log_analytics_workspace.log_analytics_workspace_01*.
 
-The log analytics workspace is for use with services like [Azure Monitor](https://docs.microsoft.com/en-us/azure/azure-monitor/overview) and [Azure Security Center](https://docs.microsoft.com/en-us/azure/security-center/security-center-introduction).
+The log analytics workspace is for use with services like [Azure Monitor](https://learn.microsoft.com/azure/azure-monitor/overview) and [Azure Security Center](https://learn.microsoft.com/azure/security-center/security-center-introduction).
 
 #### Azure Automation Account
 
@@ -203,20 +205,20 @@ Resource name (ARM) | Notes
 azurerm_automation_account.automation_account_01 (auto&#x2011;a9866e235174ab6a&#x2011;01) | See below.
 random_id.automation_account_01_name | Used to generate a random unique name for *azurerm_automation_account.automation_account_01*
 
-This configuration makes extensive use of [Azure Automation State Configuration (DSC)](https://docs.microsoft.com/en-us/azure/automation/automation-dsc-overview) to configure virtual machines using Terraform [Provisioners](https://www.terraform.io/docs/language/resources/provisioners/syntax.html).
+This configuration makes extensive use of [Azure Automation State Configuration (DSC)](https://learn.microsoft.com/azure/automation/automation-dsc-overview) to configure virtual machines using Terraform [Provisioners](https://www.terraform.io/docs/language/resources/provisioners/syntax.html).
 
 * [configure-automation.ps1](./configure-automation.ps1): This script is run by a provisioner in the *azurerm_automation_account.automation_account_01* resource and does the following:
-  * Configures [Azure Automation shared resources](https://docs.microsoft.com/en-us/azure/automation/automation-intro#shared-resources) including:
-    * [Modules](https://docs.microsoft.com/en-us/azure/automation/shared-resources/modules)
+  * Configures [Azure Automation shared resources](https://learn.microsoft.com/azure/automation/automation-intro#shared-resources) including:
+    * [Modules](https://learn.microsoft.com/azure/automation/shared-resources/modules)
       * Existing modules are updated to the most recent release where possible.
       * Imports new modules including the following:
         * [ActiveDirectoryDsc](https://github.com/dsccommunity/ActiveDirectoryDsc)
-    * Bootstraps [Variables](https://docs.microsoft.com/en-us/azure/automation/shared-resources/variables)
-    * Bootstraps [Credentials](https://docs.microsoft.com/en-us/azure/automation/shared-resources/credentials)
-  * Configures [Azure Automation State Configuration (DSC)](https://docs.microsoft.com/en-us/azure/automation/automation-dsc-overview) which is used to configure Windows Server virtual machines used in the configurations.
-    * Imports [DSC Configurations](https://docs.microsoft.com/en-us/azure/automation/automation-dsc-getting-started#create-a-dsc-configuration) used in this configuration.
-      * [LabDomainConfig.ps1](./LabDomainConfig.ps1): configure a Windows Server virtual machine as an [Active Directory Domain Services](https://docs.microsoft.com/en-us/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview) [Domain Controller](https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc786438(v=ws.10)).
-    * [Compiles DSC Configurations](https://docs.microsoft.com/en-us/azure/automation/automation-dsc-compile) so they can be used later to [Register a VM to be managed by State Configuration](https://docs.microsoft.com/en-us/azure/automation/tutorial-configure-servers-desired-state#register-a-vm-to-be-managed-by-state-configuration).
+    * Bootstraps [Variables](https://learn.microsoft.com/azure/automation/shared-resources/variables)
+    * Bootstraps [Credentials](https://learn.microsoft.com/azure/automation/shared-resources/credentials)
+  * Configures [Azure Automation State Configuration (DSC)](https://learn.microsoft.com/azure/automation/automation-dsc-overview) which is used to configure Windows Server virtual machines used in the configurations.
+    * Imports [DSC Configurations](https://learn.microsoft.com/azure/automation/automation-dsc-getting-started#create-a-dsc-configuration) used in this configuration.
+      * [LabDomainConfig.ps1](./LabDomainConfig.ps1): configure a Windows Server virtual machine as an [Active Directory Domain Services](https://learn.microsoft.com/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview) [Domain Controller](https://learn.microsoft.com/previous-versions/windows/it-pro/windows-server-2003/cc786438(v=ws.10)).
+    * [Compiles DSC Configurations](https://learn.microsoft.com/azure/automation/automation-dsc-compile) so they can be used later to [Register a VM to be managed by State Configuration](https://learn.microsoft.com/azure/automation/tutorial-configure-servers-desired-state#register-a-vm-to-be-managed-by-state-configuration).
 
 #### Network resources
 
@@ -224,8 +226,8 @@ The configuration for these resources can be found in [040-network.tf](./040-net
 
 Resource name (ARM) | Notes
 --- | ---
-azurerm_virtual_network.vnet_shared_01 (vnet&#x2011;shared&#x2011;01) | By default this virtual network is configured with an address space of `10.1.0.0/16` and is configured with DNS server addresses of `10.1.1.4` (the private ip for *azurerm_windows_virtual_machine.vm_adds*) and [168.63.129.16](https://docs.microsoft.com/en-us/azure/virtual-network/what-is-ip-address-168-63-129-16).
-azurerm_subnet.vnet_shared_01_subnets["AzureBastionSubnet"] | The default address prefix for this subnet is 10.1.0.0/27 which includes the private ip addresses for *azurerm_bastion_host.bastion_host_01*. A network security group is associated with this subnet and is configured according to [Working with NSG access and Azure Bastion](https://docs.microsoft.com/en-us/azure/bastion/bastion-nsg).
+azurerm_virtual_network.vnet_shared_01 (vnet&#x2011;shared&#x2011;01) | By default this virtual network is configured with an address space of `10.1.0.0/16` and is configured with DNS server addresses of `10.1.1.4` (the private ip for *azurerm_windows_virtual_machine.vm_adds*) and [168.63.129.16](https://learn.microsoft.com/azure/virtual-network/what-is-ip-address-168-63-129-16).
+azurerm_subnet.vnet_shared_01_subnets["AzureBastionSubnet"] | The default address prefix for this subnet is 10.1.0.0/27 which includes the private ip addresses for *azurerm_bastion_host.bastion_host_01*. A network security group is associated with this subnet and is configured according to [Working with NSG access and Azure Bastion](https://learn.microsoft.com/azure/bastion/bastion-nsg).
 azurerm_subnet.vnet_shared_01_subnets["snet-adds-01"] | The default address prefix for this subnet is 10.1.1.0/24 which includes the private ip address for *azurerm_windows_virtual_machine.vm_adds*. A network security group is associated with this subnet that permits ingress and egress from virtual networks, and egress to the Internet.
 azurerm_bastion_host.bastion_host_01 (bst&#x2011;xxxxxxxxxxxxxxxx&#x2011;1) | Used for secure RDP and SSH access to VMs.
 random_id.bastion_host_01_name | Used to generate a random name for *azurerm_bastion_host.bastion_host_01*.
@@ -238,13 +240,13 @@ The configuration for these resources can be found in [050-vm-adds.tf](./050-vm-
 
 Resource name (ARM) | Notes
 --- | ---
-azurerm_windows_virtual_machine.vm_adds (adds1) | By default, provisions a [Standard_B2s](https://docs.microsoft.com/en-us/azure/virtual-machines/sizes-b-series-burstable) virtual machine for use as a domain controller and dns server. See below for more information.
+azurerm_windows_virtual_machine.vm_adds (adds1) | By default, provisions a [Standard_B2s](https://learn.microsoft.com/azure/virtual-machines/sizes-b-series-burstable) virtual machine for use as a domain controller and dns server. See below for more information.
 azurerm_network_interface.vm_adds_nic_01 (nic&#x2011;adds1&#x2011;1) | The configured subnet is *azurerm_subnet.vnet_shared_01_subnets["snet-adds-01"]*.
 
-This Windows Server VM is used as an [Active Directory Domain Services](https://docs.microsoft.com/en-us/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview) [Domain Controller](https://docs.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc786438(v=ws.10)) and a DNS Server running in Active Directory-integrated mode.
+This Windows Server VM is used as an [Active Directory Domain Services](https://learn.microsoft.com/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview) [Domain Controller](https://learn.microsoft.com/previous-versions/windows/it-pro/windows-server-2003/cc786438(v=ws.10)) and a DNS Server running in Active Directory-integrated mode.
 
 * Guest OS: Windows Server 2022 Datacenter Core
-* By default the [Patch orchestration mode](https://docs.microsoft.com/en-us/azure/virtual-machines/automatic-vm-guest-patching#patch-orchestration-modes) is set to `AutomaticByPlatform`.
+* By default the [Patch orchestration mode](https://learn.microsoft.com/azure/virtual-machines/automatic-vm-guest-patching#patch-orchestration-modes) is set to `AutomaticByPlatform`.
 * *admin_username* and *admin_password* are configured using the key vault secrets *adminuser* and *adminpassword*.
 * This resource has a dependency on *azurerm_automation_account.automation_account_01*.
 * This resource is configured using a [provisioner](https://www.terraform.io/docs/language/resources/provisioners/syntax.html) that runs [aadsc-register-node.ps1](./aadsc-register-node.ps1) which registers the node with *azurerm_automation_account.automation_account_01* and applies the configuration [LabDomainConfig](./LabDomainConfig.ps1) which includes the following:
@@ -254,8 +256,8 @@ This Windows Server VM is used as an [Active Directory Domain Services](https://
     * The forest functional level is set to `WinThreshhold`
     * A DNS Server is automatically configured
       * Server configuration
-        * Forwarder: [168.63.129.16](https://docs.microsoft.com/en-us/azure/virtual-network/what-is-ip-address-168-63-129-16).
-          * Note: This ensures that any DNS queries that can't be resolved by the DNS server are forwarded to the Azure recursive resolver as per [Name resolution for resources in Azure virtual networks](https://docs.microsoft.com/en-us/azure/virtual-network/virtual-networks-name-resolution-for-vms-and-role-instances).
+        * Forwarder: [168.63.129.16](https://learn.microsoft.com/azure/virtual-network/what-is-ip-address-168-63-129-16).
+          * Note: This ensures that any DNS queries that can't be resolved by the DNS server are forwarded to the Azure recursive resolver as per [Name resolution for resources in Azure virtual networks](https://learn.microsoft.com/azure/virtual-network/virtual-networks-name-resolution-for-vms-and-role-instances).
       * *mysandbox.local* DNS forward lookup zone configuration
         * Zone type: Primary / Active Directory-Integrated
         * Dynamic updates: Secure only
