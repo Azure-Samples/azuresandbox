@@ -1,13 +1,29 @@
-## [project-title] Changelog
+# #AzureSandbox Changelog
 
-<a name="x.y.z"></a>
-# x.y.z (yyyy-mm-dd)
+## 2.4.2 (2023-01-14)
 
-*Features*
-* ...
+Features:
 
-*Bug Fixes*
-* ...
+- This release contains documentation updates and no new functionality.
 
-*Breaking Changes*
-* ...
+Bug Fixes:
+
+- N/A
+
+Breaking Changes:
+
+- N/A
+
+## 2.4.1 (2023-01-13)
+
+Features:
+
+- This release contains no new functionality and is the first release of code migrated from [doherty100/azuresandbox](https://github.com/doherty100/azuresandbox/releases/tag/v2.4.0).
+
+Bug Fixes:
+
+- N/A
+
+Breaking Changes:
+
+- N/A
