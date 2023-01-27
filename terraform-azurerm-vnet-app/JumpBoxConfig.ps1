@@ -36,6 +36,18 @@ configuration JumpBoxConfig {
             DependsOn = '[xDSCDomainjoin]JoinDomain' 
         }
 
+        WindowsFeature 'RSAT-Clustering-Mgmt' {
+            Name = 'RSAT-Clustering-Mgmt'
+            Ensure = 'Present'
+            DependsOn = '[xDSCDomainjoin]JoinDomain' 
+        }
+
+        WindowsFeature 'RSAT-Clustering-PowerShell' {
+            Name = 'RSAT-Clustering-PowerShell'
+            Ensure = 'Present'
+            DependsOn = '[xDSCDomainjoin]JoinDomain' 
+        }
+
         ADGroup 'JumpBoxes' {
             GroupName = 'JumpBoxes'
             GroupScope = 'Global'
