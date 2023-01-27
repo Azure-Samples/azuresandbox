@@ -19,7 +19,7 @@ This repository contains a collection of inter-dependent [cloud computing](https
   * [PowerShell Core](https://learn.microsoft.com/powershell/scripting/whats-new/what-s-new-in-powershell-71?view=powershell-7.1)
   * [PowerShell 5.1](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-5.1) for Windows Server configuration.
 * [Terraform](https://www.terraform.io/intro/index.html#what-is-terraform-) v1.3.7 for [Infrastructure as Code](https://en.wikipedia.org/wiki/Infrastructure_as_code) (IaC).
-  * [Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs) (azuerrm) v3.39.1
+  * [Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs) (azuerrm) v3.41.0
   * [cloud-init Provider](https://registry.terraform.io/providers/hashicorp/cloudinit/latest/docs) (cloudinit) v2.2.0
   * [Random Provider](https://registry.terraform.io/providers/hashicorp/random/latest/docs) (random) v3.4.3
 
@@ -360,7 +360,9 @@ Application | snet-mysql-01 | TBD | TBD | TBD | TBD
 This section documents known issues with these configurations that should be addressed prior to real world usage.
 
 * Configuration management
-  * *Terraform*: For simplicity, these configurations store [State](https://www.terraform.io/language/state) in a local file named `terraform.tfstate`. For production use, state should be managed in a secure, encrypted [Backend](https://www.terraform.io/language/state/backends) such as [azurerm](https://www.terraform.io/language/settings/backends/azurerm).
+  * *Terraform*
+    * For simplicity, these configurations store [State](https://www.terraform.io/language/state) in a local file named `terraform.tfstate`. For production use, state should be managed in a secure, encrypted [Backend](https://www.terraform.io/language/state/backends) such as [azurerm](https://www.terraform.io/language/settings/backends/azurerm).
+    * There is a [known issue](https://github.com/hashicorp/terraform-provider-azurerm/issues/2977) that causes Terraform plan or apply operations to fail after provisioning an Azure Files share behind a private endpoint. If this is blocking you from applying changes you can [Target Resources](https://developer.hashicorp.com/terraform/tutorials/state/resource-targeting) to work around it.
   * *Windows Server*: This configuration uses [Azure Automation State Configuration (DSC)](https://learn.microsoft.com/azure/automation/automation-dsc-overview) for configuring the Windows Server virtual machines, which will be replaced by [Azure Automanage Machine Configuration](https://learn.microsoft.com/azure/governance/machine-configuration/overview). This configuration will be updated to the new implementation in a future release.
     * *configure-automation.ps1*: The performance of this script could be improved by using multi-threading to run Azure Automation operations in parallel.
     * There is a [known issue](https://github.com/dsccommunity/SqlServerDsc/issues/1816) with SQL Server 2022 on Windows Server 2022 which increases deployment time due to initial failures applying configurations.

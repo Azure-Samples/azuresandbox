@@ -290,6 +290,8 @@ This Windows Server VM is used as a jumpbox for development and remote server ad
     * Active Directory Administrative Center (RSAT-AD-AdminCenter)
     * AD DS Snap-Ins and Command-Line Tools (RSAT-ADDS-Tools)
     * DNS Server Tools (RSAT-DNS-Server)
+    * Failover Cluster Management Tools (RSAT-Clustering-Mgmt)
+    * Failover Cluster Module for for Windows PowerShell (RSAT-Clustering-PowerShell)
   * The following software packages are pre-installed using [Chocolatey](https://chocolatey.org/why-chocolatey):
     * [az.powershell](https://community.chocolatey.org/packages/az.powershell)
     * [vscode](https://community.chocolatey.org/packages/vscode)
