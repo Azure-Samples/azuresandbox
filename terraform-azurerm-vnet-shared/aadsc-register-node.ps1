@@ -27,10 +27,6 @@ param (
     [string]$DscConfigurationName
 )
 
-#region constants
-$MaxDscAttempts = 180
-#endregion
-
 #region functions
 function Write-Log {
     param( [string] $msg)
@@ -119,7 +115,6 @@ function Register-DscNode {
     Write-Log "Registering DSC node '$VirtualMachineName' with node configuration '$nodeConfigName'..."
     Write-Log "Warning, this process can take several minutes and the VM will be rebooted..."
 
-    # Note: VM Extension may initially report errors but service will continue to attempt to apply configuration
     Register-AzAutomationDscNode `
         -ResourceGroupName $ResourceGroupName `
         -AutomationAccountName $AutomationAccountName `
@@ -131,43 +126,8 @@ function Register-DscNode {
         -ConfigurationMode 'ApplyOnly' `
         -AllowModuleOverwrite $false `
         -RebootNodeIfNeeded $true `
-        -ActionAfterReboot 'ContinueConfiguration'
-
-    $i = 0
-    do {
-        $i++        
-
-        Start-Sleep 10
-        try {
-            $dscNodes = Get-AzAutomationDscNode `
-                -ResourceGroupName $ResourceGroupName `
-                -AutomationAccountName $AutomationAccountName `
-                -Name $VirtualMachineName `
-                -ErrorAction Stop
-        }
-        catch {
-            Exit-WithError $_
-        }
-
-        if ($null -eq $dscNodes) {
-            Exit-WithError "Unable to find DSC node registration for virtual machine '$VirtualMachineName'..."
-        }
-
-        if ($dscNodes.Count -gt 1) {
-            Exit-WithError "'$($dscNodes.Count)' DSC node registrations for virtual machine '$VirtualMachineName' detected..."
-        }
-
-        $jobStatus = $dscNodes.Status
-        Write-Log "DSC registration status for virtual machine '$VirtualMachineName' is '$jobStatus' (attempt $i of $MaxDscAttempts)..."
-
-        if ($jobStatus -eq "Compliant" ) {
-            break
-        }
-    } while ($i -lt $MaxDscAttempts)
-
-    if ($jobStatus -ne 'Compliant') {
-        Exit-WithError "DSC node '$VirtualMachineName' is not compliant..."
-    }    
+        -ActionAfterReboot 'ContinueConfiguration' `
+        -ErrorAction SilentlyContinue
 }
 #endregion
 
