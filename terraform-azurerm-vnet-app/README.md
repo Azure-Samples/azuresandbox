@@ -67,8 +67,6 @@ This section describes how to provision this configuration using default setting
 
   `Apply complete! Resources: 43 added, 0 changed, 0 destroyed.`
 
-  *Note*: The script `aadsc-register-node-ps1` may report errors, but implements retry logic to ensure that Azure Automation Desired State Configuration node registration succeeds up to a maximum of 180 attempts.
-
 * Inspect `terraform.tfstate`.
 
   ```bash
@@ -83,10 +81,17 @@ This section describes how to provision this configuration using default setting
 
 The following sections provide guided smoke testing of each resource provisioned in this configuration, and should be completed in the order indicated.
 
-* [Windows Server jumpbox VM smoke testing](#windows-server-jumpbox-vm-smoke-testing)
+* [Jumpbox smoke testing](#jumpbox-smoke-testing)
 * [Azure Files smoke testing](#azure-files-smoke-testing)
 
-### Windows Server jumpbox VM smoke testing
+### Jumpbox smoke testing
+
+* Verify *jumpwin1* node configuration is compliant.
+  * Wait for 15 minutes to proceed to allow time for DSC configurations to complete.
+  * From the client environment, navigate to *portal.azure.com* > *Automation Accounts* > *auto-xxxxxxxxxxxxxxxx-01* > *Configuration Management* > *State configuration (DSC)*.
+  * Refresh the data on the *Nodes* tab and verify that all nodes are compliant.
+  * Review the data in the *Configurations* and *Compiled configurations* tabs as well.
+  * Note: *jumplinux1* is not configured using cloud-init, not Azure Automation DSC and is therefore not shown in the *Nodes* tab.
 
 * From the client environment, navigate to *portal.azure.com* > *Virtual machines* > *jumpwin1*
   * Click *Connect*, select the *Bastion* tab, then click *Use Bastion*
@@ -97,9 +102,6 @@ The following sections provide guided smoke testing of each resource provisioned
 * From *jumpwin1*, disable Server Manager
   * Navigate to *Server Manager* > *Manage* > *Server Manager Properties* and enable *Do not start Server Manager automatically at logon*
   * Close Server Manager
-
-* From *jumpwin1*, Configure default browser
-  * Navigate to *Settings* > *Apps* > *Default Apps* and set the default browser to *Microsoft Edge*.
 
 * From *jumpwin1*, inspect the *mysandbox.local* Active Directory domain
   * Navigate to *Start* > *Windows Administrative Tools* > *Active Directory Users and Computers*.
@@ -113,7 +115,7 @@ The following sections provide guided smoke testing of each resource provisioned
   * Click on *adds1* in the left pane, then double-click on *Forwarders* in the right pane.
     * Verify that [168.63.129.16](https://learn.microsoft.com/azure/virtual-network/what-is-ip-address-168-63-129-16) is listed. This ensures that the DNS server will forward any DNS queries it cannot resolve to the Azure Recursive DNS resolver.
     * Click *Cancel*.
-  * Navigate to *adds1* > *Forward Lookup Zones* > *mysandbox.local* and verify that there are *Host (A)* records for *adds1*, *jumpwin1*, *jumplinux1* and *mssqlwin1*.
+  * Navigate to *adds1* > *Forward Lookup Zones* > *mysandbox.local* and verify that there are *Host (A)* records for *adds1*, *jumpwin1* and *jumplinux1*.
 
 * From *jumpwin1*, configure [Visual Studio Code](https://aka.ms/vscode) to do remote development on *jumplinux1*
   * Navigate to *Start* > *Visual Studio Code* > *Visual Studio Code*.

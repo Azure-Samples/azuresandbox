@@ -199,7 +199,11 @@ Note the Bash scripts used in the configurations were developed and tested using
 
 Now that the client environment has been configured, here's how to clone a copy of this repo and start working with the latest release of code.
 
-```lang-bash
+```bash
+# Run this command on cloudshell clients only
+cd clouddrive
+
+# Run these commands on all clients, including cloudshell 
 git clone https://github.com/Azure-Samples/azuresandbox
 cd azuresandbox
 latestTag=$(git describe --tags $(git rev-list --tags --max-count=1))

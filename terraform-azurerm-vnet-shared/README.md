@@ -119,8 +119,6 @@ This section describes how to provision this configuration using default setting
 
   `Apply complete! Resources: 29 added, 0 changed, 0 destroyed.`
 
-  *Note*: The script `aadsc-register-node-ps1` may report errors, but implements retry logic to ensure that Azure Automation Desired State Configuration node registration succeeds up to a maximum of 180 attempts.
-
 * Inspect `terraform.tfstate`.
 
   ```bash
@@ -137,13 +135,14 @@ This section describes how to provision this configuration using default setting
   * Key vault
     * Navigate to *portal.azure.com* > *Key vaults* > *kv-xxxxxxxxxxxxxxx* > *Objects* > *Secrets* > *adminpassword* > *CURRENT VERSION* > *00000000-0000-0000-0000-000000000000* > *Show Secret Value*
     * Make a note of the *Secret value*. This is a strong password associated with the *adminuser* key vault secret. Together these credentials are used to set up initial administrative access to resources in \#AzureSandbox.
-  * AD DS Domain Controller VM (adds1)
-    * Navigate to *portal.azure.com* > *Automation Accounts* > *auto-xxxxxxxxxxxxxxxx-01* > *Configuration Management* > *State configuration (DSC)*.
-    * Refresh the data on the *Nodes* tab and verify that all nodes are compliant.
-    * Review the data in the *Configurations* and *Compiled configurations* tabs as well.
   * Bastion host
     * Navigate to *portal.azure.com* > *Bastions* > *bst-xxxxxxxxxxxxxxxx-1*.
     * Review the information in the *Overview* section.
+* Verify *adds1* node configuration is compliant.
+  * Wait for 15 minutes to proceed to allow time for DSC configurations to complete.
+  * From the client environment, navigate to *portal.azure.com* > *Automation Accounts* > *auto-xxxxxxxxxxxxxxxx-01* > *Configuration Management* > *State configuration (DSC)*.
+  * Refresh the data on the *Nodes* tab and verify that all nodes are compliant.
+  * Review the data in the *Configurations* and *Compiled configurations* tabs as well.
 
 ## Documentation
 
