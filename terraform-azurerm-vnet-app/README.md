@@ -104,7 +104,7 @@ The following sections provide guided smoke testing of each resource provisioned
 * From *jumpwin1*, inspect the *mysandbox.local* Active Directory domain
   * Navigate to *Start* > *Windows Administrative Tools* > *Active Directory Users and Computers*.
   * Navigate to *mysandbox.local* and verify that a computer account exists in the root for the storage account, e.g. *stxxxxxxxxxxx*.
-  * Navigate to *mysandbox.local* > *Computers* and verify that *jumpwin1*, *jumplinux1* and *mssqlwin1* are listed.
+  * Navigate to *mysandbox.local* > *Computers* and verify that *jumpwin1* and *jumplinux1* are listed.
   * Navigate to *mysandbox.local* > *Domain Controllers* and verify that *adds1* is listed.
 
 * From *jumpwin1*, inspect the *mysandbox.local* DNS zone

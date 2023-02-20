@@ -53,13 +53,13 @@ This section describes how to provision this configuration using default setting
 * Open a Bash terminal in your client environment and execute the following commands.
 
   ```bash
-  # Log out of Azure and clear cached credentials
+  # Log out of Azure and clear cached credentials (skip if using cloudshell)
   az logout
 
-  # Clear cached credentials
+  # Clear cached credentials (skip if using cloudshell)
   az account clear
 
-  # Log into Azure
+  # Log into Azure (skip if using cloudshell)
   az login
   ```
 
