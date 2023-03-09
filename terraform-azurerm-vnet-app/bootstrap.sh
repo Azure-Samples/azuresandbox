@@ -67,19 +67,19 @@ read -e -i $default_skip_ssh_key_gen                    -p "Skip SSH key generat
 read -e -i $default_vm_jumpbox_win_name                 -p "Windows jumpbox virtual machine name (vm_jumpbox_win_name) ------------: " vm_jumpbox_win_name
 read -e -i $default_storage_share_name                  -p "Azure Files share name (storage_share_name) ---------------------------: " storage_share_name
 
-application_subnet_name=${application_subnet_name:-default_application_subnet_name}
-database_subnet_name=${database_subnet_name:-default_database_subnet_name}
-privatelink_subnet_name=${privatelink_subnet_name:-default_privatelink_subnet_name}
+application_subnet_name=${application_subnet_name:-$default_application_subnet_name}
+database_subnet_name=${database_subnet_name:-$default_database_subnet_name}
+privatelink_subnet_name=${privatelink_subnet_name:-$default_privatelink_subnet_name}
 skip_ssh_key_gen=${skip_ssh_key_gen:-$default_skip_ssh_key_gen}
-storage_share_name=${storage_share_name:-default_storage_share_name}
-subnet_application_address_prefix=${subnet_application_address_prefix:-default_subnet_application_address_prefix}
-subnet_database_address_prefix=${subnet_database_address_prefix:-default_subnet_database_address_prefix}
-subnet_privatelink_address_prefix=${subnet_privatelink_address_prefix:-default_subnet_privatelink_address_prefix}
-subnet_mysql_address_prefix=${subnet_mysql_address_prefix:-default_subnet_mysql_address_prefix}
-vm_jumpbox_linux_name=${vm_jumpbox_linux_name:-default_vm_jumpbox_linux_name}
-vm_jumpbox_win_name=${vm_jumpbox_win_name:-default_vm_jumpbox_win_name}
+storage_share_name=${storage_share_name:-$default_storage_share_name}
+subnet_application_address_prefix=${subnet_application_address_prefix:-$default_subnet_application_address_prefix}
+subnet_database_address_prefix=${subnet_database_address_prefix:-$default_subnet_database_address_prefix}
+subnet_privatelink_address_prefix=${subnet_privatelink_address_prefix:-$default_subnet_privatelink_address_prefix}
+subnet_mysql_address_prefix=${subnet_mysql_address_prefix:-$default_subnet_mysql_address_prefix}
+vm_jumpbox_linux_name=${vm_jumpbox_linux_name:-$default_vm_jumpbox_linux_name}
+vm_jumpbox_win_name=${vm_jumpbox_win_name:-$default_vm_jumpbox_win_name}
 vnet_name=${vnet_name:=$default_vnet_name}
-vnet_address_space=${vnet_address_space:-default_vnet_address_space}
+vnet_address_space=${vnet_address_space:-$default_vnet_address_space}
 
 # Validate TF_VAR_arm_client_secret
 if [ -z "$TF_VAR_arm_client_secret" ]

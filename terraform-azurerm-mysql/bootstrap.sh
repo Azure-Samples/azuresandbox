@@ -49,7 +49,7 @@ vnet_app_01_subnets=$(terraform output -json -state=$state_file vnet_app_01_subn
 # User input
 read -e -i $default_mysql_database_name -p "Azure MySql Database name (mysql_database_name) -: " mysql_database_name
 
-mysql_database_name=${mysql_database_name:-default_mysql_database_name}
+mysql_database_name=${mysql_database_name:-$default_mysql_database_name}
 
 # Validate TF_VAR_arm_client_secret
 if [ -z "$TF_VAR_arm_client_secret" ]

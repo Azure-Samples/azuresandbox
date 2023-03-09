@@ -145,8 +145,8 @@ read -e -i $default_admin_username                            -p "'adminuser' ke
 read -e -i $default_skip_admin_password_gen                   -p "Skip 'adminpassword' key vault secret generation (skip_admin_password_gen) yes/no ? -: " skip_admin_password_gen
 
 # Validate user input
-aad_tenant_id=${aad_tenant_id:-default_aad_tenant_id}
-adds_domain_name=${adds_domain_name:-default_adds_domain_name}
+aad_tenant_id=${aad_tenant_id:-$default_aad_tenant_id}
+adds_domain_name=${adds_domain_name:-$default_adds_domain_name}
 admin_password_secret=${admin_password_secret:-$default_admin_password_secret}
 admin_username=${admin_username:-$default_admin_username}
 admin_username_secret=${admin_username_secret:-$default_admin_username_secret}
@@ -158,11 +158,11 @@ owner_object_id=${owner_object_id:-$default_owner_object_id}
 project=${project:-$default_project}
 resource_group_name=${resource_group_name:-$default_resource_group_name}
 skip_admin_password_gen=${skip_admin_password_gen:-$default_skip_admin_password_gen}
-subnet_adds_address_prefix=${subnet_adds_address_prefix:-default_subnet_adds_address_prefix}
-subnet_AzureBastionSubnet_address_prefix=${subnet_AzureBastionSubnet_address_prefix:-default_subnet_AzureBastionSubnet_address_prefix}
+subnet_adds_address_prefix=${subnet_adds_address_prefix:-$default_subnet_adds_address_prefix}
+subnet_AzureBastionSubnet_address_prefix=${subnet_AzureBastionSubnet_address_prefix:-$default_subnet_AzureBastionSubnet_address_prefix}
 subscription_id=${subscription_id:-$default_subscription_id}
-vm_adds_name=${vm_adds_name:-default_vm_adds_name}
-vnet_address_space=${vnet_address_space:-default_vnet_address_space}
+vm_adds_name=${vm_adds_name:-$default_vm_adds_name}
+vnet_address_space=${vnet_address_space:-$default_vnet_address_space}
 vnet_name=${vnet_name:=$default_vnet_name}
 
 # Validate arm_client_id

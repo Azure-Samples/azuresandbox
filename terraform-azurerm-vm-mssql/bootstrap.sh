@@ -55,7 +55,7 @@ vnet_app_01_subnets=$(terraform output -json -state=$state_file vnet_app_01_subn
 # User input
 read -e -i $default_vm_mssql_win_name -p "SQL Server virtual machine name (vm_mssql_win_name) -: " vm_mssql_win_name
 
-vm_mssql_win_name=${vm_mssql_win_name:-default_vm_mssql_win_name}
+vm_mssql_win_name=${vm_mssql_win_name:-$default_vm_mssql_win_name}
 
 # Validate TF_VAR_arm_client_secret
 if [ -z "$TF_VAR_arm_client_secret" ]
