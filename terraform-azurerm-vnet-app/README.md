@@ -400,4 +400,4 @@ vnet_app_01_subnets | Contains all the subnet definitions from this configuratio
 
 ## Next steps
 
-Move on to the next configuration [terraform-azurerm-vm-mssql](../terraform-azurerm-vm-mssql).
+Move on to the next configuration [terraform-azurerm-vm-devops](../terraform-azurerm-vm-devops).
