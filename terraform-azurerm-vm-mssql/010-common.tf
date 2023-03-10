@@ -2,12 +2,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "=3.46.0"
-    }
-
-    random = {
-      source  = "hashicorp/random"
-      version = "=3.4.3"
+      version = "=3.47.0"
     }
   }
 }
@@ -20,8 +15,6 @@ provider "azurerm" {
   client_secret   = var.arm_client_secret
   tenant_id       = var.aad_tenant_id
 }
-
-provider "random" {}
 
 # Secrets
 data "azurerm_key_vault_secret" "adminpassword" {
