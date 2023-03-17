@@ -18,8 +18,8 @@ This repository contains a collection of inter-dependent [cloud computing](https
 * [PowerShell](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-7.1)
   * [PowerShell Core](https://learn.microsoft.com/powershell/scripting/whats-new/what-s-new-in-powershell-71?view=powershell-7.1)
   * [PowerShell 5.1](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-5.1) for Windows Server configuration.
-* [Terraform](https://www.terraform.io/intro/index.html#what-is-terraform-) v1.4.0 for [Infrastructure as Code](https://en.wikipedia.org/wiki/Infrastructure_as_code) (IaC).
-  * [Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs) (azuerrm) v3.47.0
+* [Terraform](https://www.terraform.io/intro/index.html#what-is-terraform-) v1.4.2 for [Infrastructure as Code](https://en.wikipedia.org/wiki/Infrastructure_as_code) (IaC).
+  * [Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs) (azuerrm) v3.48.0
   * [cloud-init Provider](https://registry.terraform.io/providers/hashicorp/cloudinit/latest/docs) (cloudinit) v2.2.0
   * [Random Provider](https://registry.terraform.io/providers/hashicorp/random/latest/docs) (random) v3.4.3
 
@@ -385,6 +385,7 @@ This section documents known issues with these configurations that should be add
     * *Data integrity*: The current design hosts the AD DS domain forest data on the OS Drive which is counter to  best practices as described in [Deploy AD DS in an Azure virtual network](https://learn.microsoft.com/azure/architecture/reference-architectures/identity/adds-extend-domain) which recommends hosting them on a separate data dr*ive with different cache settings.
 * Storage
   * *Azure Storage*: For simplicity, this configuration uses the [Authorize with Shared Key](https://learn.microsoft.com/rest/api/storageservices/authorize-with-shared-key) approach for [Authorizing access to data in Azure Storage](https://learn.microsoft.com/azure/storage/common/authorize-data-access?toc=/azure/storage/blobs/toc.json). For production environments, consider using [shared access signatures](https://learn.microsoft.com/azure/storage/common/storage-sas-overview?toc=/azure/storage/blobs/toc.json) instead.
+    * There is a [known issue](https://github.com/hashicorp/terraform-provider-azurerm/issues/2977) when attempting to apply Terraform plans against Azure Storage containers that sit behind a firewall such as a private endpoint. This may prevent the ability to apply changes to configurations that contain this type of dependency, such as [terraform-azurerm-vnet-app](./terraform-azurerm-vnet-app/). To work around this you use [Resource Targeting](https://www.hashicorp.com/blog/resource-targeting-in-terraform) to avoid issues with storage containers.
   * *Standard SSD vs. Premium SSD*: By default, this configuration uses Standard SSD for SQL Server data and log disks instead of Premium SSD for reduced cost. Production deployments should use Premium SSD as per best practices.
 * Networking
   * *azurerm_subnet.vnet_shared_01_subnets["snet-adds-01"]*: This subnet is protected by an NSG as per best practices described in described in [Deploy AD DS in an Azure virtual network](https://learn.microsoft.com/azure/architecture/reference-architectures/identity/adds-extend-domain), however the network security rules permit ingress and egress from the Virtual Network on all ports to allow for flexibility in the configurations. Production implementations of this subnet should follow the guidance in [How to configure a firewall for Active Directory domains and trusts](https://learn.microsoft.com/troubleshoot/windows-server/identity/config-firewall-for-ad-domains-and-trusts).
