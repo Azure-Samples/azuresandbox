@@ -11,7 +11,7 @@ resource "azurerm_windows_virtual_machine" "vm_devops_win" {
   admin_username           = data.azurerm_key_vault_secret.adminuser.value
   admin_password           = data.azurerm_key_vault_secret.adminpassword.value
   network_interface_ids    = [azurerm_network_interface.vm_devops_win_nic[each.key].id]
-  enable_automatic_updates = false
+  enable_automatic_updates = true
   patch_mode               = "AutomaticByPlatform"
   tags                     = var.tags
 
