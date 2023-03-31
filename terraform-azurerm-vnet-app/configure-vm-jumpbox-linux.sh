@@ -159,6 +159,9 @@ printf "Restarting '$servicename'...\n" >> $log_file
 sudo systemctl restart $servicename &>> $log_file
 printdiv
 
+# Install pyjwt 
+pip3 install --upgrade pyjwt
+
 # Exit
 printf "Exiting '$0'...\n" >> $log_file
 printf "Timestamp: $(date +"%Y-%m-%d %H:%M:%S.%N %Z")...\n" >> $log_file
