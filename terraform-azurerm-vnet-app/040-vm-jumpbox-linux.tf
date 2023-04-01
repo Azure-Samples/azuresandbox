@@ -14,6 +14,12 @@ data "cloudinit_config" "vm_jumpbox_linux" {
     content      = file("${path.root}/configure-vm-jumpbox-linux.sh")
     filename     = "configure-vm-jumpbox-linux.sh"
   }
+
+  part {
+    content_type = "text/x-shellscript"
+    content      = file("${path.root}/configure-powershell.ps1")
+    filename     = "configure-powershell.ps1"
+  }
 }
 
 # Linux virtual machine
