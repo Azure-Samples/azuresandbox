@@ -1,5 +1,14 @@
 # #AzureSandbox
 
+**Contents**
+* [Architecture](#architecture)
+* [Overview](#overview)
+* [Sandbox index](#sandbox-index)
+* [Prerequisites](#prerequisites)
+* [Getting started](#getting-started)
+* [Next steps](#next-steps)
+* [Known issues](#known-issues)
+
 ## Architecture
 
 ![diagram](./diagram.drawio.svg)
@@ -53,6 +62,12 @@ This repo was created by [Roger Doherty](https://www.linkedin.com/in/roger-doher
 * [terraform-azurerm-vwan](./terraform-azurerm-vwan/) includes the following:
   * A [virtual wan](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#resources).
   * A [virtual wan hub](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#resources) with pre-configured [hub virtual network connections](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#resources) with [terraform-azurerm-vnet-shared](./terraform-azurerm-vnet-shared/) and [terraform-azurerm-vnet-app](./terraform-azurerm-vnet-app/). The hub is also pre-configured for [User VPN (point-to-site) connections](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#uservpn).
+* extras
+  * [terraform-azurerm-rg-devops](./extras/terraform-azurerm-rg-devops/) includes the following:
+    * A [resource group](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#resource-group) which contains DevOps environment resources.
+    * A [key vault](https://learn.microsoft.com/azure/key-vault/general/overview) for managing secrets.
+    * A [storage account](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#storage-account) for use as a [Terraform azurerm backend](https://developer.hashicorp.com/terraform/language/settings/backends/azurerm).
+    * A Linux [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) for use as a DevOps agent.
 
 ## Prerequisites
 
@@ -162,9 +177,9 @@ Windows 11 users can use [WSL](https://learn.microsoft.com/windows/wsl/about) wh
     pip3 install --upgrade pyjwt
     ```
 
-  * VS Code extensions for WSL
+  * VS Code extensions for [Developing in WSL](https://code.visualstudio.com/docs/remote/wsl)
     * [Remote - WSL](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-wsl)
-    * [Terraform](https://marketplace.visualstudio.com/items?itemName=mauve.terraform)
+    * [HashiCorp Terraform](https://marketplace.visualstudio.com/items?itemName=HashiCorp.terraform)
     * [PowerShell](https://marketplace.visualstudio.com/items?itemName=ms-vscode.PowerShell)
 
 #### Linux / macOS

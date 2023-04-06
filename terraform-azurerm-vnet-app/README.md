@@ -1,5 +1,15 @@
 # \#AzureSandbox - terraform-azurerm-vnet-app
 
+**Contents**
+
+* [Architecture](#architecture)
+* [Overview](#overview)
+* [Before you start](#before-you-start)
+* [Getting started](#getting-started)
+* [Smoke testing](#smoke-testing)
+* [Documentation](#documentation)
+* [Next steps](#next-steps)
+
 ## Architecture
 
 ![vnet-app-diagram](./vnet-app-diagram.drawio.svg)
@@ -247,7 +257,7 @@ Configuration of [Azure Automation State Configuration (DSC)](https://learn.micr
     * [JumpBoxConfig.ps1](./JumpBoxConfig.ps1): domain joins a Windows Server virtual machine and adds it to a `JumpBoxes` security group, then and configures it as jumpbox.
   * [Compiles DSC Configurations](https://learn.microsoft.com/azure/automation/automation-dsc-compile) so they can be used later to [Register a VM to be managed by State Configuration](https://learn.microsoft.com/azure/automation/tutorial-configure-servers-desired-state#register-a-vm-to-be-managed-by-state-configuration).
 
-### Terraform Resources
+### Terraform resources
 
 This section lists the resources included in this configuration.
 
@@ -327,8 +337,9 @@ This Linux VM is used as a jumpbox for development and remote administration.
   * [configure-vm-jumpbox-linux.yaml](./configure-vm-jumpbox-linux.yaml) is [Cloud Config Data](https://cloudinit.readthedocs.io/en/latest/topics/format.html#cloud-config-data) used to configure the VM.
     * The following packages are installed:
       * [Azure CLI](https://learn.microsoft.com/cli/azure/what-is-azure-cli?view=azure-cli-latest)
-      * [PowerShell Core](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-7.1)
+      * [PowerShell](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-7.1)
       * [Terraform](https://www.terraform.io/intro/index.html#what-is-terraform-)
+      * [python3-pip](https://pypi.org/project/pip/)
       * [jp](https://packages.ubuntu.com/focal/jp)
       * [Kerberos](https://kerberos.org/software/mixenvkerberos.pdf) packages required to AD domain join a Linux host and enable dynamic DNS (DDNS) registration.
         * [krb5-user](https://packages.ubuntu.com/focal/krb5-user)
@@ -341,7 +352,7 @@ This Linux VM is used as a jumpbox for development and remote administration.
         * [ntpdate](https://packages.ubuntu.com/focal/ntpdate)
         * [realmd](https://packages.ubuntu.com/focal/realmd)
         * [adcli](https://packages.ubuntu.com/focal/adcli)
-    * Package update and upgrades are performed.
+    * Package updates are performed.
     * The VM is rebooted if necessary.
   * [configure-vm-jumpbox-linux.sh](./configure-vm-jumpbox-linux.sh) is a [User-Data Script](https://cloudinit.readthedocs.io/en/latest/topics/format.html#user-data-script) used to configure the VM.
     * Runtime values are retrieved using [Instance Metadata](https://cloudinit.readthedocs.io/en/latest/topics/instancedata.html#instance-metadata)
@@ -372,6 +383,8 @@ This Linux VM is used as a jumpbox for development and remote administration.
           * Logins are permitted.
           * Sudo privileges are granted.
       * SSH server is configured for logins using Active Directory accounts.
+      * [pyjwt](https://pyjwt.readthedocs.io/en/latest/) Python package is installed.
+  * [configure-powershell.ps1](./configure-powershell.ps1) is a [User-Data Script](https://cloudinit.readthedocs.io/en/latest/topics/format.html#user-data-script) that installs [Azure PowerShell](https://learn.microsoft.com/en-us/powershell/azure/what-is-azure-powershell?view=azps-9.5.0)
 
 #### Storage resources
 

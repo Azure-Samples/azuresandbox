@@ -1,5 +1,15 @@
 # \#AzureSandbox - terraform-azurerm-vm-devops
 
+**Contents**
+
+* [Architecture](#architecture)
+* [Overview](#overview)
+* [Before you start](#before-you-start)
+* [Getting started](#getting-started)
+* [Smoke testing](#smoke-testing)
+* [Documentation](#documentation)
+* [Next steps](#next-steps)
+
 ## Architecture
 
 ![vm-devops-diagram](./vm-devops-diagram.drawio.svg)

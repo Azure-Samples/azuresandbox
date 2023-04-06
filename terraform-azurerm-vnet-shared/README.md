@@ -1,17 +1,18 @@
 # #AzureSandbox - terraform-azurerm-vnet-shared
 
-## Architecture
+**Contents**
 
-![vnet-shared-diagram](./vnet-shared-diagram.drawio.svg)
-
-## Contents
-
+* [Architecture](#architecture)
 * [Overview](#overview)
 * [Before you start](#before-you-start)
 * [Getting started](#getting-started)
 * [Smoke testing](#smoke-testing)
 * [Documentation](#documentation)
 * [Next steps](#next-steps)
+
+## Architecture
+
+![vnet-shared-diagram](./vnet-shared-diagram.drawio.svg)
 
 ## Overview
 
