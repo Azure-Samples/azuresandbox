@@ -121,50 +121,24 @@ Before you begin, familiarity with the following topics will be helpful when wor
 
 ---
 
-Each sandbox user must select and configure a client environment in advance. A variety of options are available and are detailed in this section.
+\#AzureSandbox automation scripts are written in Linux [Bash](https://en.wikipedia.org/wiki/Bash_(Unix_shell)) and Linux [PowerShell](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-linux?view=powershell-7.3). In order to deploy \#AzureSandbox you will need to configure a Linux client environment to execute these scripts. Detailed guidance is provided for users who are unfamiliar with Linux. Three different client environment options are described in this section, including:
 
-#### Cloud shell
+* [Windows Subsystem for Linux](#windows-subsystem-for-linux) (preferred for completing smoke testing)
+* [Azure Cloud Shell](#azure-cloud-shell) (zero configuration required but not optimal for serious use)
+* [Linux / MacOS](#linux--macos)
 
-Azure [cloud shell](https://aka.ms/cloudshell) is a free pre-configured cloud hosted container with a full complement of [tools](https://learn.microsoft.com/azure/cloud-shell/features#tools) needed to use \#AzureSandbox. This option will be preferred for users who do not wish to install any software and don't mind a web based command line user experience. Review the following content to get started:
+#### Windows Subsystem for Linux
 
-* [Bash in Azure Cloud Shell](https://learn.microsoft.com/azure/cloud-shell/quickstart)
-* [Persist files in Azure Cloud Shell](https://learn.microsoft.com/azure/cloud-shell/persisting-shell-storage)
-* [Using the Azure Cloud Shell editor](https://learn.microsoft.com/azure/cloud-shell/using-cloud-shell-editor)
+Windows users can use [WSL](https://learn.microsoft.com/windows/wsl/about) which supports a [variety of Linux distributions](https://learn.microsoft.com/en-us/windows/wsl/basic-commands#list-available-linux-distributions). The current default distribution `Ubuntu 22.04 LTS (Jammy Jellyfish)` is recommended. 
 
-*Warning:* Cloud shell containers are ephemeral. Anything not saved in `~/clouddrive` will not be retained when your cloud shell session ends. Also, cloud shell sessions expire. This can interrupt a long running process.
-
-#### Windows 11 with WSL
-
-Windows 11 users can use [WSL](https://learn.microsoft.com/windows/wsl/about) which supports a [variety of Linux distributions](https://learn.microsoft.com/windows/wsl/install-win10#install-your-linux-distribution-of-choice). Here is a sample configuration preferred by the author:
-
-* Windows 11 prerequisites
-  * [Install Linux on Windows with WSL](https://learn.microsoft.com/windows/wsl/install)
-  * [Ubuntu 20.04 LTS (Focal Fossa)](https://www.microsoft.com/store/productId/9N6SVWS3RX71)
-  * [Visual Studio Code on Windows](https://code.visualstudio.com/docs/setup/windows)
-  * [SQL Server Management Studio](https://learn.microsoft.com/sql/ssms/download-sql-server-management-studio-ssms?view=sql-server-ver15)
-  * [Azure Data Studio](https://learn.microsoft.com/sql/azure-data-studio/download-azure-data-studio?view=sql-server-ver16)
-  * [MySQL Workbench](https://www.mysql.com/products/workbench/)
-  * [Azure VPN Client](https://www.microsoft.com/store/productId/9NP355QT2SQB)
-* WSL prerequisites
-  * [Install the Azure CLI on Linux | apt (Ubuntu, Debian)](https://learn.microsoft.com/cli/azure/install-azure-cli-linux?pivots=apt)
-  * [Install Terraform](https://learn.hashicorp.com/tutorials/terraform/install-cli#install-terraform)
-    * Refer to the *Linux* tab then choose the *Ubuntu/Debian* tab.
-    * Note: Skip the [Quick start tutorial](https://learn.hashicorp.com/tutorials/terraform/install-cli#quick-start-tutorial).
-  * [Installing PowerShell on Linux | Ubuntu 20.04](https://learn.microsoft.com/powershell/scripting/install/installing-powershell-core-on-linux?view=powershell-7.1#ubuntu-2004)
-    * After installation, run [configure-powershell.ps1](./configure-powershell.ps1) to install [Azure PowerShell](https://learn.microsoft.com/powershell/azure/what-is-azure-powershell):
-
-      From bash:
-
-      ```bash
-      sudo pwsh
-      ```
-
-      From PowerShell Core:
-
-      ```powershell
-      ./configure-powershell.ps1
-      ```
-  
+* Windows prerequisites
+  * Install [Visual Studio Code on Windows](https://code.visualstudio.com/docs/setup/windows)
+  * Optional Windows software
+    * Install [SQL Server Management Studio with Azure Data Studio](https://learn.microsoft.com/sql/ssms/download-sql-server-management-studio-ssms?view=sql-server-ver15) if you plan to complete smoke testing for either [terraform-azurerm-vm-mssql](./terraform-azurerm-vm-mssql/) or [terraform-azurerm-mssql](./terraform-azurerm-mssql/).
+    * Install [MySQL Workbench](https://www.mysql.com/products/workbench/) if you plan to complete smoke testing for [terraform-azurerm-mysql](./terraform-azurerm-mysql/)
+    * [Azure VPN Client](https://www.microsoft.com/store/productId/9NP355QT2SQB) if you plan to complete smoke testing for [terraform-azurerm-vwan](./terraform-azurerm-vwan/).
+* Pre-requisites for [Developing in WSL](https://code.visualstudio.com/docs/remote/wsl)
+  * [Install Linux on Windows with WSL](https://learn.microsoft.com/windows/wsl/install). The current default distribution `Ubuntu 22.04 LTS (Jammy Jellyfish)` is recommended.
   * Install [pip3](https://pip.pypa.io/en/stable/) Python library package manager.
   
     ```bash
@@ -176,11 +150,36 @@ Windows 11 users can use [WSL](https://learn.microsoft.com/windows/wsl/about) wh
     ```bash
     pip3 install --upgrade pyjwt
     ```
+  * [Install WSL VS Code Extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-wsl) 
+  * [Install the Azure CLI on Linux | apt (Ubuntu, Debian)](https://learn.microsoft.com/cli/azure/install-azure-cli-linux?pivots=apt)
+  * [Install Terraform | Linux | Ubuntu/Debian](https://learn.hashicorp.com/tutorials/terraform/install-cli#install-terraform). Completing the `Quick start tutorial` is not required.
+    * Install the [HashiCorp Terraform](https://marketplace.visualstudio.com/items?itemName=HashiCorp.terraform) VS Code Extension.
+  * [Install PowerShell on Ubuntu](https://learn.microsoft.com/en-us/powershell/scripting/install/install-ubuntu?view=powershell-7.3)
+    * Install the [PowerShell](https://marketplace.visualstudio.com/items?itemName=ms-vscode.PowerShell) VS Code extension.
+    * Download and run [configure-powershell.ps1](./configure-powershell.ps1) using `sudo`. This script [Azure PowerShell](https://learn.microsoft.com/powershell/azure/what-is-azure-powershell).
 
-  * VS Code extensions for [Developing in WSL](https://code.visualstudio.com/docs/remote/wsl)
-    * [Remote - WSL](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-wsl)
-    * [HashiCorp Terraform](https://marketplace.visualstudio.com/items?itemName=HashiCorp.terraform)
-    * [PowerShell](https://marketplace.visualstudio.com/items?itemName=ms-vscode.PowerShell)
+      From Bash:
+      
+      ```bash
+      wget https://github.com/Azure-Samples/azuresandbox/blob/main/configure-powershell.ps1
+      sudo pwsh
+      ```
+
+      From PowerShell:
+
+      ```powershell
+      ./configure-powershell.ps1
+      ```
+
+#### Azure Cloud Shell
+
+[Azure Cloud Shell](https://aka.ms/cloudshell) is a free pre-configured cloud hosted container with a full complement of [tools](https://learn.microsoft.com/azure/cloud-shell/features#tools) needed to use \#AzureSandbox. This option will be preferred for users who do not wish to install any software and don't mind a web based command line user experience. Review the following content to get started:
+
+* [Bash in Azure Cloud Shell](https://learn.microsoft.com/azure/cloud-shell/quickstart)
+* [Persist files in Azure Cloud Shell](https://learn.microsoft.com/azure/cloud-shell/persisting-shell-storage)
+* [Using the Azure Cloud Shell editor](https://learn.microsoft.com/azure/cloud-shell/using-cloud-shell-editor)
+
+*Warning:* Cloud shell containers are ephemeral. Anything not saved in `~/clouddrive` will not be retained when your cloud shell session ends. Also, cloud shell sessions expire. This can interrupt a long running process.
 
 #### Linux / macOS
 
