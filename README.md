@@ -142,6 +142,7 @@ Windows users can use [WSL](https://learn.microsoft.com/windows/wsl/about) which
   * Install [pip3](https://pip.pypa.io/en/stable/) Python library package manager.
   
     ```bash
+    sudo apt update
     sudo apt install python3-pip
     ```
   
