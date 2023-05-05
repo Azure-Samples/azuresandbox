@@ -129,48 +129,42 @@ Before you begin, familiarity with the following topics will be helpful when wor
 
 #### Windows Subsystem for Linux
 
-Windows users can use [WSL](https://learn.microsoft.com/windows/wsl/about) which supports a [variety of Linux distributions](https://learn.microsoft.com/en-us/windows/wsl/basic-commands#list-available-linux-distributions). The current default distribution `Ubuntu 22.04 LTS (Jammy Jellyfish)` is recommended. 
+Windows users can use [WSL](https://learn.microsoft.com/windows/wsl/about) which supports a [variety of Linux distributions](https://learn.microsoft.com/en-us/windows/wsl/basic-commands#list-available-linux-distributions). The current default distribution `Ubuntu 22.04 LTS (Jammy Jellyfish)` is recommended. Please note these instructions may vary for different Linux releases and/or distributions.
 
 * Windows prerequisites
   * Install [Visual Studio Code on Windows](https://code.visualstudio.com/docs/setup/windows)
   * Optional Windows software
     * Install [SQL Server Management Studio with Azure Data Studio](https://learn.microsoft.com/sql/ssms/download-sql-server-management-studio-ssms?view=sql-server-ver15) if you plan to complete smoke testing for either [terraform-azurerm-vm-mssql](./terraform-azurerm-vm-mssql/) or [terraform-azurerm-mssql](./terraform-azurerm-mssql/).
     * Install [MySQL Workbench](https://www.mysql.com/products/workbench/) if you plan to complete smoke testing for [terraform-azurerm-mysql](./terraform-azurerm-mysql/)
-    * [Azure VPN Client](https://www.microsoft.com/store/productId/9NP355QT2SQB) if you plan to complete smoke testing for [terraform-azurerm-vwan](./terraform-azurerm-vwan/).
-* Pre-requisites for [Developing in WSL](https://code.visualstudio.com/docs/remote/wsl)
+    * Install [Azure VPN Client](https://www.microsoft.com/store/productId/9NP355QT2SQB) if you plan to complete smoke testing for [terraform-azurerm-vwan](./terraform-azurerm-vwan/).
+* Linux prerequisites
   * [Install Linux on Windows with WSL](https://learn.microsoft.com/windows/wsl/install). The current default distribution `Ubuntu 22.04 LTS (Jammy Jellyfish)` is recommended.
-  * Install [pip3](https://pip.pypa.io/en/stable/) Python library package manager.
+  * Install [pip3](https://pip.pypa.io/en/stable/) Python library package manager and the [PyJWT](https://pyjwt.readthedocs.io/en/latest/) Python library. This is used to determine the id of the security principal for the currently signed in Azure CLI user.
   
     ```bash
+    # Install the must recent PyJWT Python library
     sudo apt update
     sudo apt install python3-pip
-    ```
-  
-  * Install [PyJWT](https://pyjwt.readthedocs.io/en/latest/) Python library. This is used to determine the id of the security principal for the currently signed in Azure CLI user.
-
-    ```bash
     pip3 install --upgrade pyjwt
     ```
-  * [Install WSL VS Code Extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-wsl) 
+
   * [Install the Azure CLI on Linux | apt (Ubuntu, Debian)](https://learn.microsoft.com/cli/azure/install-azure-cli-linux?pivots=apt)
-  * [Install Terraform | Linux | Ubuntu/Debian](https://learn.hashicorp.com/tutorials/terraform/install-cli#install-terraform). Completing the `Quick start tutorial` is not required.
-    * Install the [HashiCorp Terraform](https://marketplace.visualstudio.com/items?itemName=HashiCorp.terraform) VS Code Extension.
+  * [Install Terraform | Linux | Ubuntu/Debian](https://learn.hashicorp.com/tutorials/terraform/install-cli#install-terraform). Note: it is not necessary to complete the `Quick start tutorial`.
   * [Install PowerShell on Ubuntu](https://learn.microsoft.com/en-us/powershell/scripting/install/install-ubuntu?view=powershell-7.3)
-    * Install the [PowerShell](https://marketplace.visualstudio.com/items?itemName=ms-vscode.PowerShell) VS Code extension.
-    * Download and run [configure-powershell.ps1](./configure-powershell.ps1) using `sudo`. This script [Azure PowerShell](https://learn.microsoft.com/powershell/azure/what-is-azure-powershell).
+    * Once PowerShell is installed follow these steps to configure it.
 
-      From Bash:
-      
       ```bash
-      wget https://github.com/Azure-Samples/azuresandbox/blob/main/configure-powershell.ps1
-      sudo pwsh
+      # Download and execute PowerShell configuration script
+      wget https://raw.githubusercontent.com/Azure-Samples/azuresandbox/main/configure-powershell.ps1
+      chmod 755 configure-powershell.ps1
+      sudo ./configure-powershell.ps1
       ```
 
-      From PowerShell:
-
-      ```powershell
-      ./configure-powershell.ps1
-      ```
+* Configure VS Code for [Remote development in WSL](https://code.visualstudio.com/docs/remote/wsl-tutorial)
+  * Launch VS Code
+  * [Install WSL VS Code Extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-wsl). 
+  * Install the [HashiCorp Terraform](https://marketplace.visualstudio.com/items?itemName=HashiCorp.terraform) VS Code Extension in WSL.
+  * Install the [PowerShell](https://marketplace.visualstudio.com/items?itemName=ms-vscode.PowerShell) VS Code extension in WSL.
 
 #### Azure Cloud Shell
 
