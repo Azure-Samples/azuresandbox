@@ -375,6 +375,9 @@ Application | snet-mysql-01 | TBD | TBD | TBD | TBD
 
 This section documents known issues with these configurations that should be addressed prior to real world usage.
 
+* Client environment
+  * If you are experiencing difficulties with WSL, see [Troubleshooting Windows Subsystem for Linux](https://learn.microsoft.com/en-us/windows/wsl/troubleshooting).
+  * Some users may not be able to use [Windows subsystem for Linux](#windows-subsystem-for-linux) due to lack of administrative access to their computer or other issues. In these cases consider using [terraform-azurerm-rg-devops](./extras/terraform-azurerm-rg-devops/) and [VS Code remote development over SSH](#vs-code-remote-development-over-ssh) as an alternative.
 * Configuration management
   * *Terraform*
     * For simplicity, these configurations store [State](https://www.terraform.io/language/state) in a local file named `terraform.tfstate`. For production use, state should be managed in a secure, encrypted [Backend](https://www.terraform.io/language/state/backends) such as [azurerm](https://www.terraform.io/language/settings/backends/azurerm).
