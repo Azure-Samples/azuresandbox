@@ -52,7 +52,6 @@ This repo was created by [Roger Doherty](https://www.linkedin.com/in/roger-doher
   * A Windows Server [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) for use as a jumpbox.
   * A Linux [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) for use as a jumpbox.
   * A [PaaS](https://azure.microsoft.com/overview/what-is-paas/) SMB file share hosted in [Azure Files](https://learn.microsoft.com/azure/storage/files/storage-files-introduction) with a private endpoint implemented using [PrivateLink](https://learn.microsoft.com/azure/storage/common/storage-private-endpoints).
-* [terraform-azurerm-vm-devops](./terraform-azurerm-vm-devops/) implements a collection of identical [IaaS](https://azure.microsoft.com/overview/what-is-iaas/) [virtual machines](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) designed to be used as DevOps agents by [Azure Pipelines](https://learn.microsoft.com/azure/devops/pipelines/get-started/what-is-azure-pipelines?view=azure-devops) or [Github Actions](https://docs.github.com/en/actions).
 * [terraform-azurerm-vm-mssql](./terraform-azurerm-vm-mssql/) includes the following:
   * An [IaaS](https://azure.microsoft.com/overview/what-is-iaas/) database server [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) based on the [SQL Server virtual machines in Azure](https://learn.microsoft.com/azure/azure-sql/virtual-machines/windows/sql-server-on-azure-vm-iaas-what-is-overview#payasyougo) offering.
 * [terraform-azurerm-msssql](./terraform-azurerm-mssql/) includes the following:
@@ -68,6 +67,7 @@ This repo was created by [Roger Doherty](https://www.linkedin.com/in/roger-doher
     * A [key vault](https://learn.microsoft.com/azure/key-vault/general/overview) for managing secrets.
     * A [storage account](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#storage-account) for use as a [Terraform azurerm backend](https://developer.hashicorp.com/terraform/language/settings/backends/azurerm).
     * A Linux [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) for use as a DevOps agent.
+  * [terraform-azurerm-vm-devops](./terraform-azurerm-vm-devops/) implements a collection of identical [IaaS](https://azure.microsoft.com/overview/what-is-iaas/) [virtual machines](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) designed to be used as DevOps agents by [Azure Pipelines](https://learn.microsoft.com/azure/devops/pipelines/get-started/what-is-azure-pipelines?view=azure-devops) or [Github Actions](https://docs.github.com/en/actions).
 
 ## Prerequisites
 
@@ -277,7 +277,6 @@ Apply the configurations in the following order:
 
 1. [terraform-azurerm-vnet-shared](./terraform-azurerm-vnet-shared/) implements a virtual network with shared services used by all the configurations.
 1. [terraform-azurerm-vnet-app](./terraform-azurerm-vnet-app/) implements an application virtual network with pre-configured Windows Server and Linux jumpboxes.
-1. [terraform-azurerm-vm-devops](./terraform-azurerm-vm-devops/) implements a collection of identical DevOps agents.
 1. [terraform-azurerm-vm-mssql](./terraform-azurerm-vm-mssql/) (optional) implements an [IaaS](https://azure.microsoft.com/overview/what-is-iaas/) database server [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) based on the [SQL Server virtual machines in Azure](https://learn.microsoft.com/azure/azure-sql/virtual-machines/windows/sql-server-on-azure-vm-iaas-what-is-overview#payasyougo) offering.
 1. [terraform-azurerm-mssql](./terraform-azurerm-mssql/) (optional) implements a [PaaS](https://azure.microsoft.com/overview/what-is-paas/) database hosted in [Azure SQL Database](https://learn.microsoft.com/azure/azure-sql/database/sql-database-paas-overview) with a private endpoint implemented using [PrivateLink](https://learn.microsoft.com/azure/azure-sql/database/private-endpoint-overview).
 1. [terraform-azurerm-mysql](./terraform-azurerm-mysql/) (optional) implements a [PaaS](https://azure.microsoft.com/overview/what-is-paas/) database hosted in [Azure Database for MySQL - Flexible Server](https://learn.microsoft.com/azure/mysql/flexible-server/overview) with a private endpoint implemented using [subnet delegation](https://learn.microsoft.com/azure/virtual-network/subnet-delegation-overview).
@@ -291,7 +290,6 @@ While a default sandbox deployment is fine for testing, it may not work with an 
 1. [terraform-azurerm-mysql](./terraform-azurerm-mysql/)
 1. [terraform-azurerm-mssql](./terraform-azurerm-mssql/)
 1. [terraform-azurerm-vm-mssql](./terraform-azurerm-vm-mssql/)
-1. [terraform-azurerm-vm-devops](./terraform-azurerm-vm-devops/)
 1. [terraform-azurerm-vnet-app](./terraform-azurerm-vnet-app/)
 1. [terraform-azurerm-vnet-shared](./terraform-azurerm-vnet-shared/). Note: Resources provisioned by `bootstrap.sh` must be deleted manually.
 

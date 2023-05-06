@@ -153,7 +153,3 @@ azurerm_network_interface . vm_devops_win_nic["devopswin1"] (nic&#x2011;devopswi
     * [svn](https://community.chocolatey.org/packages/svn)
 * Note that no [Azure Pipelines agents](https://learn.microsoft.com/azure/devops/pipelines/agents/agents?view=azure-devops&tabs=browser) are installed due to dependencies on Azure DevOps.
 * Note that no [Self-hosted runners](https://docs.github.com/en/actions/hosting-your-own-runners/about-self-hosted-runners) are installed doe to dependencies on GitHub Actions.
-
-## Next steps
-
-Move on to the next configuration [terraform-azurerm-vm-mssql](../terraform-azurerm-vm-mssql).
