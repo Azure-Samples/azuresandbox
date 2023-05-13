@@ -1,6 +1,7 @@
 # #AzureSandbox
 
-**Contents**
+## Contents
+
 * [Architecture](#architecture)
 * [Overview](#overview)
 * [Sandbox index](#sandbox-index)
@@ -162,7 +163,7 @@ Windows users can use [WSL](https://learn.microsoft.com/windows/wsl/about) which
 
 * Configure VS Code for [Remote development in WSL](https://code.visualstudio.com/docs/remote/wsl-tutorial) ([Step-By-Step Video](https://youtu.be/01Qnw2r-SJE))
   * Launch VS Code
-  * [Install WSL VS Code Extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-wsl). 
+  * [Install WSL VS Code Extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-wsl).
   * Install the [HashiCorp Terraform](https://marketplace.visualstudio.com/items?itemName=HashiCorp.terraform) VS Code Extension in WSL.
   * Install the [PowerShell](https://marketplace.visualstudio.com/items?itemName=ms-vscode.PowerShell) VS Code extension in WSL.
 
@@ -375,7 +376,7 @@ This section documents known issues with these configurations that should be add
 
 * Client environment
   * If you are experiencing difficulties with WSL, see [Troubleshooting Windows Subsystem for Linux](https://learn.microsoft.com/en-us/windows/wsl/troubleshooting).
-  * Some users may not be able to use [Windows subsystem for Linux](#windows-subsystem-for-linux) due to lack of administrative access to their computer or other issues. In these cases consider using [terraform-azurerm-rg-devops](./extras/terraform-azurerm-rg-devops/) and [VS Code remote development over SSH](#vs-code-remote-development-over-ssh) as an alternative.
+  * Some users may not be able to use [Windows subsystem for Linux](#windows-subsystem-for-linux) due to lack of administrative access to their computer or other issues. In these cases consider using [terraform-azurerm-rg-devops](./extras/terraform-azurerm-rg-devops/) and [VS Code remote development over SSH](https://code.visualstudio.com/docs/remote/ssh) as an alternative.
 * Configuration management
   * *Terraform*
     * For simplicity, these configurations store [State](https://www.terraform.io/language/state) in a local file named `terraform.tfstate`. For production use, state should be managed in a secure, encrypted [Backend](https://www.terraform.io/language/state/backends) such as [azurerm](https://www.terraform.io/language/settings/backends/azurerm).
@@ -389,7 +390,7 @@ This section documents known issues with these configurations that should be add
   * *Authentication*: These configurations use a service principal to authenticate with Azure which requires a client secret to be shared. This is due to the requirement that sandbox users be limited to a *Contributor* Azure RBAC role assignment which is not authorized to do Azure RBAC role assignments. Production environments should consider using [managed identities](https://learn.microsoft.com/azure/active-directory/managed-identities-azure-resources/overview) instead of service principals which eliminates the need to share secrets.
     * *SQL Server Authentication*: By default this configuration uses mixed mode authentication. Production deployments should use Windows integrated authentication as per best practices.
     * *Point-to-site VPN gateway authentication*: This configuration uses self-signed certificates for simplicity. Production environments should use certificates generated from a root certificate authority.
-  * *Credentials*: For simplicity, these configurations use a single set of user defined credentials when an administrator account is required to provision or configure resources. In production environments these credentials would be different and follow the principal of least privilege for better security. Some user defined credentials may cause failures due to differences in how various resources implement restricted administrator user names and password complexity requirements.
+  * *Credentials*: For simplicity, these configurations use a single set of user defined credentials when an administrator account is required to provision or configure resources. In production environments these credentials would be different and follow the principal of least privilege for better security. Some user defined credentials may cause failures due to differences in how various resources implement restricted administrator user names and password complexity requirements. Note that the default password expiration policy for Active Directory is 42 days which will require the password for `bootstrapadmin@mysandbox.local` to be changed. It is reccomended that you update the related `adminpassword` secret in key vault when changing the password as this does not happen automatically.
   * *Active Directory Domain Services*: A pre-configured AD domain controller *azurerm_windows_virtual_machine.vm_adds* is provisioned.
     * *High availability*: The current design uses a single VM for AD DS which is counter to best practices as described in [Deploy AD DS in an Azure virtual network](https://learn.microsoft.com/azure/architecture/reference-architectures/identity/adds-extend-domain) which recommends a pair of VMs in an Availability Set.
     * *Data integrity*: The current design hosts the AD DS domain forest data on the OS Drive which is counter to  best practices as described in [Deploy AD DS in an Azure virtual network](https://learn.microsoft.com/azure/architecture/reference-architectures/identity/adds-extend-domain) which recommends hosting them on a separate data dr*ive with different cache settings.
