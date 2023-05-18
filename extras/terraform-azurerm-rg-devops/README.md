@@ -1,6 +1,6 @@
 # \#AzureSandbox extras - terraform-azurerm-rg-devops
 
-**Contents**
+## Contents
 
 * [Overview](#overview)
 * [Before you start](#before-you-start)
@@ -27,9 +27,9 @@ Smoke testing | ~ 15 minutes
 ## Before you start
 
 * A suitable client environment must be configured in order to provision this configuration. See [Configure client environment](../../README.md/#configure-client-environment) for more information.
-* This configuration requires that a subnet be provisioned in advance on the same subscription with connectivity to your private network. The resource id for this subnet must be obtained in advance using the following format: 
+* This configuration requires that a subnet be provisioned in advance on the same subscription with connectivity to your private network. The resource id for this subnet must be obtained in advance using the following format:
 
-    ```
+    ```text
     /subscriptions/SomeSubscriptionGuid
         /resourcegroups/SomeResourceGroupName
             /providers/Microsoft.Network/virtualNetworks/SomeVirtualNetworkName
@@ -37,7 +37,6 @@ Smoke testing | ~ 15 minutes
     ```
 
     **Note:** Line feeds and indents are included here for readability only and should be removed.
-
 
 ## Getting started
 
@@ -103,12 +102,12 @@ The following sections provide guided smoke testing of each resource provisioned
 ### Connect using SSH
 
 * Locate the virtual machine `jumplinux1` in the Azure portal.
-    * Start the virtual machine if it is not currently running.
-    * Make a note of the private IP address which will be referred to subsequently as `PrivateIPAddress`
+  * Start the virtual machine if it is not currently running.
+  * Make a note of the private IP address which will be referred to subsequently as `PrivateIPAddress`
 * Configure SSH identity file on SSH client
-    * Copy the the value of the secret `bootstrapadmin-ssh-key-private` in key vault. 
-    * Paste the secret value into a new text file.
-    * Save the new text file as `C:\Users\YourUserName\.ssh\bootstrapadmin-ssh-key-private.txt`.
+  * Copy the the value of the secret `bootstrapadmin-ssh-key-private` in key vault.
+  * Paste the secret value into a new text file.
+  * Save the new text file as `C:\Users\YourUserName\.ssh\bootstrapadmin-ssh-key-private.txt`.
 * Open a PowerShell command prompt and execute the following commands:
 
     ```powershell
@@ -144,47 +143,48 @@ The following sections provide guided smoke testing of each resource provisioned
 * Launch VS Code
 * Install the [Remote-SSH](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-ssh) extension.
 * Navigate to *View > Command Palette...* and enter `Remote-SSH: Add New SSH Host`
-    * When prompted for *Enter SSH Connection Command* enter `ssh bootstrapadmin@PrivateIPAddress`
-    * When promoted for *Enter SSH configuration file to update* select `C:\Users\YourUserName\.ssh\config`.
+  * When prompted for *Enter SSH Connection Command* enter `ssh bootstrapadmin@PrivateIPAddress`
+  * When promoted for *Enter SSH configuration file to update* select `C:\Users\YourUserName\.ssh\config`.
 * Navigate to *View > Command Palette...* and enter `Remote-SSH: Open SSH Configuration File...`
-    * When prompted for *Select SSH configuration file to update* select `C:\Users\YourUserName\.ssh\config`.
-    * Edit the configuration file as follows:
+  * When prompted for *Select SSH configuration file to update* select `C:\Users\YourUserName\.ssh\config`.
+  * Edit the configuration file as follows:
 
-        ```text
-        Host jumplinux1
-            HostName PrivateIPAddress
-            User bootstrapadmin
-            IdentityFile C:\\Users\\YourUserName\\.ssh\\bootstrapadmin-ssh-key-private.txt
-        ```
+    ```text
+    Host jumplinux1
+        HostName PrivateIPAddress
+        User bootstrapadmin
+        IdentityFile C:\\Users\\YourUserName\\.ssh\\bootstrapadmin-ssh-key-private.txt
+    ```
 
     * Save the modified configuration file.
 * Navigate to *View > Command Palette...* and enter `Remote-SSH: Connect to Host...`.
-    * Choose `jumplinux1` from the list.
-    * When prompted for *Select the platform of the remote host "jumplinux1"* choose `Linux`
+  * Choose `jumplinux1` from the list.
+  * When prompted for *Select the platform of the remote host "jumplinux1"* choose `Linux`
     * When prompted for *Enter passphrase for ssh key* enter the value of the `adminpassword` secret
 * Navigate to *View > Explorer* and click `Open Folder`
-    * Choose the default folder `/home/bootstrapadmin/`
-    * When prompted for *Enter passphrase for ssh key* enter the value of the `adminpassword` secret in key vault
+  * Choose the default folder `/home/bootstrapadmin/`
+  * When prompted for *Enter passphrase for ssh key* enter the value of the `adminpassword` secret in key vault
     * When prompted for *Do you trust the authors of the files in this folder?* enable the checkbox `Trust the authors of all files in the parent folder 'home'` and click `Yes, I trust the authors`.
 * Navigate to *View > Terminal*
-    * Execute the following commands:
+  * Execute the following commands:
 
-        ```bash
-        # Verify Azure CLI is installed
-        az --version
-        
-        # Verify Terraform is installed
-        terraform --version
-        
-        # Verify PowerShell is installed
-        pwsh --version
-        
-        # Verify Azure PowerShell modules are installed
-        pwsh 0 -c "Get-Module -ListAvailable"
-        ```
+    ```bash
+    # Verify Azure CLI is installed
+    az --version
+
+    # Verify Terraform is installed
+    terraform --version
+
+    # Verify PowerShell is installed
+    pwsh --version
+
+    # Verify Azure PowerShell modules are installed
+    pwsh 0 -c "Get-Module -ListAvailable"
+    ```
+
 * Install any additional VS Code extensions required for [Remote development over SSH](https://code.visualstudio.com/docs/remote/ssh-tutorial).
-    * [HashiCorp Terraform](https://marketplace.visualstudio.com/items?itemName=HashiCorp.terraform)
-    * [PowerShell](https://marketplace.visualstudio.com/items?itemName=ms-vscode.PowerShell) 
+  * [HashiCorp Terraform](https://marketplace.visualstudio.com/items?itemName=HashiCorp.terraform)
+  * [PowerShell](https://marketplace.visualstudio.com/items?itemName=ms-vscode.PowerShell)
 
 ## Documentation
 
@@ -197,14 +197,14 @@ This configuration uses the script [bootstrap.sh](./bootstrap.sh) to create a `t
 * User is prompted for input.
 * An existing resource group is located or a new resource group is created
 * Key vault operations
-    * An existing key vault is located or a new key vault is created.
-    * A Key vault access policy for managing secrets is set for to the security principal logged into the Azure CLI.
-    * An `adminusername` secret is created with the default value "bootstrapadmin".
-    * A strong password is generated.
-    * An `adminpassword` secret is created with the value set to the generated strong password.
-    * An SSH public/private key pair is generated
-    * A `bootstrapadmin-ssh-key-public` is created with the value set to the public SSH key.
-    * A `bootstrapadmin-ssh-key-private` is created with the value set to the private SSH key.
+  * An existing key vault is located or a new key vault is created.
+  * A Key vault access policy for managing secrets is set for to the security principal logged into the Azure CLI.
+  * An `adminusername` secret is created with the default value "bootstrapadmin".
+  * A strong password is generated.
+  * An `adminpassword` secret is created with the value set to the generated strong password.
+  * An SSH public/private key pair is generated
+  * A `bootstrapadmin-ssh-key-public` is created with the value set to the public SSH key.
+  * A `bootstrapadmin-ssh-key-private` is created with the value set to the private SSH key.
 * A `terraform.tfvars` file is generated.
 
 ### Terraform resources
@@ -253,7 +253,7 @@ This Linux virtual machine is a stripped down down version of [jumplinux1](../..
       * `ARM_USE_MSI=true`
       * `ARM_TENANT_ID=00000000-0000-0000-0000-000000000000`
   * [install-pyjwt.sh](./install-pyjwt.sh) is a [User-Data Script](https://cloudinit.readthedocs.io/en/latest/topics/format.html#user-data-script) used to configure the VM.
-      * [pyjwt](https://pyjwt.readthedocs.io/en/latest/) Python package is installed.
+    * [pyjwt](https://pyjwt.readthedocs.io/en/latest/) Python package is installed.
   * [configure-powershell.ps1](./configure-powershell.ps1) is a [User-Data Script](https://cloudinit.readthedocs.io/en/latest/topics/format.html#user-data-script) that installs [Azure PowerShell](https://learn.microsoft.com/en-us/powershell/azure/what-is-azure-powershell?view=azps-9.5.0)
 
 ### Additional use cases
@@ -265,57 +265,57 @@ This Linux virtual machine is a stripped down down version of [jumplinux1](../..
 This section describes DevOps security best practices for development and deployment of Terraform configurations using [jumplinux1](#linux-jumpbox-vm), and in particular how to avoid the use of shared secrets via managed identities.
 
 * Configure role assignments for [Managed identities](https://learn.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview).
-    * Add an Azure RBAC `Contributor` role assignment for the system-assigned managed identity associated with [jumplinux1](#linux-jumpbox-vm) to the appropriate Azure subscriptions.  
-    * If use of service principals is required for a specific configuration, add an Azure Active Directory `DirectoryReader` role assignment for the system-assigned managed identity associated with [jumplinux1](#linux-jumpbox-vm). 
+  * Add an Azure RBAC `Contributor` role assignment for the system-assigned managed identity associated with [jumplinux1](#linux-jumpbox-vm) to the appropriate Azure subscriptions.  
+  * If use of service principals is required for a specific configuration, add an Azure Active Directory `DirectoryReader` role assignment for the system-assigned managed identity associated with [jumplinux1](#linux-jumpbox-vm).
 * Authenticate using managed identities
-    * **Azure CLI**: Use `az login --identity` to [Sign in with a managed identity](https://learn.microsoft.com/en-us/cli/azure/authenticate-azure-cli#sign-in-with-a-managed-identity). 
-    * **PowerShell**: Use `Connect-AzAccount -Identity` to [Sign in with a managed identity](https://learn.microsoft.com/en-us/powershell/azure/authenticate-azureps?view=azps-9.5.0#sign-in-using-a-managed-identity).
-    * Update your Terraform configurations to support [Authenticating using Managed Identity](https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/guides/managed_service_identity).
-        * Note that `jumplinux1` is pre-configured with the Terraform environment variables `ARM_USE_MSI=true` and `ARM_TENANT_ID=00000000-0000-0000-0000-000000000000` to authenticate using a managed identity.
+  * **Azure CLI**: Use `az login --identity` to [Sign in with a managed identity](https://learn.microsoft.com/en-us/cli/azure/authenticate-azure-cli#sign-in-with-a-managed-identity).
+  * **PowerShell**: Use `Connect-AzAccount -Identity` to [Sign in with a managed identity](https://learn.microsoft.com/en-us/powershell/azure/authenticate-azureps?view=azps-9.5.0#sign-in-using-a-managed-identity).
+  * Update your Terraform configurations to support [Authenticating using Managed Identity](https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/guides/managed_service_identity).
+    * Note that `jumplinux1` is pre-configured with the Terraform environment variables `ARM_USE_MSI=true` and `ARM_TENANT_ID=00000000-0000-0000-0000-000000000000` to authenticate using a managed identity.
 * [Store Terraform state in Azure Storage](https://learn.microsoft.com/en-us/azure/developer/terraform/store-state-in-azure-storage?tabs=azure-cli)
-    * `azurerm_storage_account.st_tfm` is pre-configured with a container `azurerm_storage_container.container_tfstate`.
-    * Note this configuration does not use a Terraform state backend to avoid circular dependencies. Once you have provisioned this configuration, you can begin using `azurerm_storage_container.container_tfstate` as a Terraform state backend for other configurations.
-    * The following configuration demonstrates how to use managed identities to authenticate with a Terraform backend hosted in Azure Storage.
-      * Set up environment variables to instruct Terraform azurerm provider to use managed identities
+  * `azurerm_storage_account.st_tfm` is pre-configured with a container `azurerm_storage_container.container_tfstate`.
+  * Note this configuration does not use a Terraform state backend to avoid circular dependencies. Once you have provisioned this configuration, you can begin using `azurerm_storage_container.container_tfstate` as a Terraform state backend for other configurations.
+  * The following configuration demonstrates how to use managed identities to authenticate with a Terraform backend hosted in Azure Storage.
+    * Set up environment variables to instruct Terraform azurerm provider to use managed identities
 
-      ```bash
-      # Ensure 
-      export ARM_USE_MSI=true
-      export ARM_TENANT_ID=00000000-0000-0000-0000-000000000000
-      ```
+    ```bash
+    # Ensure 
+    export ARM_USE_MSI=true
+    export ARM_TENANT_ID=00000000-0000-0000-0000-000000000000
+    ```
 
-      * Write Terraform configuration to use Terraform azurerm backend for state and authenticate with managed identity.
+    * Write Terraform configuration to use Terraform azurerm backend for state and authenticate with managed identity.
 
-      ```hcl
-      terraform {
-        required_providers {
-          azurerm = {
-            source = "hashicorp/azurerm"
-            version = "=3.55.0"
-          }
-        }
-      
-        # Configure state backend to use managed identities
-        backend "azurerm" {
-          resource_group_name  = "rg-devops-tf"
-          storage_account_name = "stxxxxxxxxxxxxxxxx"
-          container_name       = "tfstate"
-          key                  = "terraform.tfstate"
-          use_msi              = true
-          subscription_id      = "00000000-0000-0000-0000-000000000000"
+    ```hcl
+    terraform {
+      required_providers {
+        azurerm = {
+          source = "hashicorp/azurerm"
+          version = "=3.56.0"
         }
       }
-
-      provider "azurerm" {
-        features {}
-        subscription_id = "00000000-0000-0000-0000-000000000000"
+    
+      # Configure state backend to use managed identities
+      backend "azurerm" {
+        resource_group_name  = "rg-devops-tf"
+        storage_account_name = "stxxxxxxxxxxxxxxxx"
+        container_name       = "tfstate"
+        key                  = "terraform.tfstate"
+        use_msi              = true
+        subscription_id      = "00000000-0000-0000-0000-000000000000"
       }
+    }
 
-      resource "azurerm_resource_group" "state-demo-secure" {
-        name     = "state-demo"
-        location = "eastus"
-      }
-      ```
+    provider "azurerm" {
+      features {}
+      subscription_id = "00000000-0000-0000-0000-000000000000"
+    }
+
+    resource "azurerm_resource_group" "state-demo-secure" {
+      name     = "state-demo"
+      location = "eastus"
+    }
+    ```
 
 **Note**: See [Use GitHub Actions to connect to Azure](https://learn.microsoft.com/en-us/azure/developer/github/connect-from-azure?tabs=azure-portal%2Cwindows) to use OpenID Connect and federated credentials to authenticate. This is ideal for applying Terraform configurations in DevOps pipelines.
 
