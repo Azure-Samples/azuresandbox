@@ -208,7 +208,7 @@ Note the Bash scripts used in the configurations were developed and tested using
 
 ## Next steps
 
-Now that the client environment has been configured, here's how to clone a copy of this repo and start working with the latest release of code.
+Now that the client environment has been configured, here's how to clone a copy of this repo and start working with the latest release of code ([Step-By-Step Video](https://youtu.be/EtNrzs4ZCvM)).
 
 ```bash
 # Run this command on cloudshell clients only
