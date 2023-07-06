@@ -188,7 +188,7 @@ azurerm_log_analytics_workspace.log_analytics_workspace_01 (log&#x2011;xxxxxxxxx
 random_id.log_analytics_workspace_01_name | Used to generate a random unique name for *azurerm_log_analytics_workspace.log_analytics_workspace_01*.
 azurerm_key_vault_secret.log_analytics_workspace_01_primary_shared_key | Secret used to access *azurerm_log_analytics_workspace.log_analytics_workspace_01*.
 
-The log analytics workspace is for use with services like [Azure Monitor](https://learn.microsoft.com/azure/azure-monitor/overview) and [Azure Security Center](https://learn.microsoft.com/azure/security-center/security-center-introduction).
+The log analytics workspace is for use with services like [Azure Monitor](https://learn.microsoft.com/azure/azure-monitor/overview) and [Microsoft Defender for Cloud](https://learn.microsoft.com/azure/defender-for-cloud/defender-for-cloud-introduction).
 
 #### Azure Automation Account
 
