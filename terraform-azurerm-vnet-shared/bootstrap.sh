@@ -102,7 +102,6 @@ default_owner_object_id=$(az account get-access-token --query accessToken --outp
 default_aad_tenant_id=$(az account show --query tenantId --output tsv)
 
 # Initialize constants
-admin_certificate_name='admincert'
 admin_password_secret='adminpassword'
 admin_username_secret='adminuser'
 arm_client_id=''
@@ -112,7 +111,7 @@ storage_container_name='scripts'
 # Initialize user defaults
 default_adds_domain_name="mysandbox.local"
 default_admin_username="bootstrapadmin"
-default_costcenter="10177772"
+default_costcenter="mycostcenter"
 default_dns_server="10.1.1.4"
 default_environment="dev"
 default_location="eastus"
