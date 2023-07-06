@@ -1,6 +1,6 @@
 # #AzureSandbox - terraform-azurerm-vnet-shared
 
-**Contents**
+## Contents
 
 * [Architecture](#architecture)
 * [Overview](#overview)
@@ -16,7 +16,7 @@
 
 ## Overview
 
-This configuration implements a virtual network with shared services used by all the configurations including:
+This configuration implements a virtual network with shared services used by all the configurations including ([Step-By-Step Video](https://youtu.be/tYSnlPy-oJc)):
 
 * A [resource group](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#resource-group) which contains all resources.
 * A [key vault](https://learn.microsoft.com/azure/key-vault/general/overview) for managing secrets.
@@ -35,7 +35,7 @@ Smoke testing | ~5 minutes
 
 ## Before you start
 
-Before you start, make sure you have completed the following steps:
+Before you start, make sure you have completed the following steps ([Step-By-Step Video](https://youtu.be/Es4I8NAM318)):
 
 * All [Prerequisites](../README.md#Prerequisites) must be completed.
   * The Azure subscription owner must create a service principal with a *Contributor* Azure RBAC role assignment in advance.
@@ -49,7 +49,7 @@ Before you start, make sure you have completed the following steps:
 
 ## Getting started
 
-This section describes how to provision this configuration using default settings.
+This section describes how to provision this configuration using default settings ([Step-By-Step Video](https://youtu.be/CaRT0LMrmKc)).
 
 * Open a Bash terminal in your client environment and execute the following commands.
 
@@ -132,7 +132,7 @@ This section describes how to provision this configuration using default setting
 
 ## Smoke testing
 
-* Explore your newly provisioned resources in the Azure portal.
+* Explore your newly provisioned resources in the Azure portal ([Step-By-Step Video](https://youtu.be/gxO9oKoitQ0)).
   * Key vault
     * Navigate to *portal.azure.com* > *Key vaults* > *kv-xxxxxxxxxxxxxxx* > *Objects* > *Secrets* > *adminpassword* > *CURRENT VERSION* > *00000000-0000-0000-0000-000000000000* > *Show Secret Value*
     * Make a note of the *Secret value*. This is a strong password associated with the *adminuser* key vault secret. Together these credentials are used to set up initial administrative access to resources in \#AzureSandbox.
@@ -151,7 +151,7 @@ This section provides additional information on various aspects of this configur
 
 ### Bootstrap script
 
-The bootstrap script [bootstrap.sh](./bootstrap.sh) is used to initialize variables and to ensure that all dependencies are in place for the Terraform configuration to be applied. In most real world projects, Terraform configurations will need to reference resources that are not being managed by Terraform because they already exist. It is also sometimes necessary to provision resources in advance to avoid circular dependencies in your Terraform configurations. For this reason, this configuration provisions several resources in advance using [bootstrap.sh](./bootstrap.sh).
+The bootstrap script [bootstrap.sh](./bootstrap.sh) is used to initialize variables and to ensure that all dependencies are in place for the Terraform configuration to be applied. In most real world projects, Terraform configurations will need to reference resources that are not being managed by Terraform because they already exist. It is also sometimes necessary to provision resources in advance to avoid circular dependencies in your Terraform configurations. For this reason, this configuration provisions several resources in advance using [bootstrap.sh](./bootstrap.sh) ([Step-By-Step Video](https://youtu.be/metxR0TXEeE)).
 
 [bootstrap.sh](./bootstrap.sh) performs the following operations:
 
@@ -176,7 +176,7 @@ The script is idempotent and can be run multiple times even after the Terraform 
 
 ### Terraform Resources
 
-This section lists the resources included in the Terraform configurations in this configuration.
+This section lists the resources included in the Terraform configurations in this configuration ([Step-By-Step Video](https://youtu.be/skfxxsOTEuY)).
 
 #### Log Analytics Workspace
 
