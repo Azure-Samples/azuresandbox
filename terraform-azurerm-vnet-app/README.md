@@ -1,6 +1,6 @@
 # \#AzureSandbox - terraform-azurerm-vnet-app
 
-**Contents**
+## Contents
 
 * [Architecture](#architecture)
 * [Overview](#overview)
@@ -16,7 +16,7 @@
 
 ## Overview
 
-This configuration implements a virtual network for applications including:
+This configuration implements a virtual network for applications including ([Step-By-Step Video](https://youtu.be/J7jK-dxiFrA)):
 
 * A [virtual network](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vnet) for hosting for hosting [virtual machines](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) and private endpoints implemented using [PrivateLink](https://learn.microsoft.com/azure/azure-sql/database/private-endpoint-overview). [Virtual network peering](https://learn.microsoft.com/azure/virtual-network/virtual-network-peering-overview) with [terraform-azurerm-vnet-shared](./terraform-azurerm-vnet-shared/) is automatically configured.
 * A Windows Server [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) for use as a jumpbox.
@@ -37,7 +37,7 @@ The following configurations must be deployed first before starting:
 
 ## Getting started
 
-This section describes how to provision this configuration using default settings.
+This section describes how to provision this configuration using default settings ([Step-By-Step Video](https://youtu.be/seV-fT8QcO8)).
 
 * Change the working directory.
 
@@ -89,7 +89,7 @@ This section describes how to provision this configuration using default setting
 
 ## Smoke testing
 
-The following sections provide guided smoke testing of each resource provisioned in this configuration, and should be completed in the order indicated.
+The following sections provide guided smoke testing of each resource provisioned in this configuration, and should be completed in the order indicated ([Step-By-Step Video](https://youtu.be/YkojLAi-Op8)).
 
 * [Jumpbox smoke testing](#jumpbox-smoke-testing)
 * [Azure Files smoke testing](#azure-files-smoke-testing)
@@ -105,7 +105,7 @@ The following sections provide guided smoke testing of each resource provisioned
 
 * From the client environment, navigate to *portal.azure.com* > *Virtual machines* > *jumpwin1*
   * Click *Connect*, select the *Bastion* tab, then click *Use Bastion*
-  * For *username* enter the UPN of the domain admin, which by default is *bootstrapadmin@mysandbox.local*.
+  * For *username* enter the UPN of the domain admin, which by default is *<bootstrapadmin@mysandbox.local>*.
   * For *password* use the value of the *adminpassword* secret in key vault.
   * Click *Connect*
 
@@ -220,7 +220,7 @@ This section provides additional information on various aspects of this configur
 
 ### Bootstrap script
 
-This configuration uses the script [bootstrap.sh](./bootstrap.sh) to create a *terraform.tfvars* file for generating and applying Terraform plans. For simplified deployment, several runtime defaults are initialized using output variables stored in the *terraform.tfstate* file associated with the [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared) configuration, including:
+This configuration uses the script [bootstrap.sh](./bootstrap.sh) to create a *terraform.tfvars* file for generating and applying Terraform plans ([Step-By-Step Video](https://youtu.be/EHxb01H4XSs)). For simplified deployment, several runtime defaults are initialized using output variables stored in the *terraform.tfstate* file associated with the [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared) configuration, including:
 
 Output variable | Sample value
 --- | ---
@@ -263,7 +263,7 @@ This section lists the resources included in this configuration.
 
 #### Network resources
 
-The configuration for these resources can be found in [020-network.tf](./020-network.tf). Some resources are pre-provisioned for use in other configurations.
+The configuration for these resources can be found in [020-network.tf](./020-network.tf). Some resources are pre-provisioned for use in other configurations ([Step-By-Step Video](https://youtu.be/5nxck-NXfk4)).
 
 Resource name (ARM) | Configuration(s) | Notes
 --- | --- | ---
@@ -282,7 +282,7 @@ azurerm_private_dns_zone_virtual_network_link . private_dns_zone_virtual_network
 
 #### Windows Server Jumpbox VM
 
-The configuration for these resources can be found in [030-vm-jumpbox-win.tf](./030-vm-jumpbox-win.tf).
+The configuration for these resources can be found in [030-vm-jumpbox-win.tf](./030-vm-jumpbox-win.tf) ([Step-By-Step Video](https://youtu.be/J-Zz8EOCyi4)).
 
 Resource name (ARM) | Notes
 --- | ---
@@ -317,7 +317,7 @@ This Windows Server VM is used as a jumpbox for development and remote server ad
 
 #### Linux Jumpbox VM
 
-The configuration for these resources can be found in [040-vm-jumpbox-linux.tf](./040-vm-jumpbox-linux.tf).
+The configuration for these resources can be found in [040-vm-jumpbox-linux.tf](./040-vm-jumpbox-linux.tf) ([Step-By-Step Video](https://youtu.be/ZeQx0SZV29E)).
 
 Resource name (ARM) | Notes
 --- | ---
@@ -388,7 +388,7 @@ This Linux VM is used as a jumpbox for development and remote administration.
 
 #### Storage resources
 
-The configuration for these resources can be found in [070-storage-share.tf](./070-storage-share.tf).
+The configuration for these resources can be found in [070-storage-share.tf](./070-storage-share.tf) ([Step-By-Step Video](https://youtu.be/2-HwFEsIDJI)).
 
 Resource name (ARM) | Notes
 --- | ---
