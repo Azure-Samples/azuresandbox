@@ -95,10 +95,36 @@ then
   usage
 fi
 
+# Get key vault secrets
+admin_username_secret_noquotes=${admin_username_secret:1:-1}
+key_vault_name_noquotes=${key_vault_name:1:-1}
+printf "Getting secret '$admin_username_secret_noquotes' from key vault '$key_vault_name_noquotes'...\n"
+admin_username=$(az keyvault secret show --vault-name $key_vault_name_noquotes --name $admin_username_secret_noquotes --query value --output tsv)
+
+if [ -n "$admin_username" ]
+then 
+  printf "The value of secret '$admin_username_secret_noquotes' is '$admin_username'...\n"
+else
+  printf "Unable to determine the value of secret '$admin_username_secret_noquotes'...\n"
+  usage
+fi
+
+admin_password_secret_noquotes=${admin_password_secret:1:-1}
+printf "Getting secret '$admin_password_secret_noquotes' from key vault '$key_vault_name_noquotes'...\n"
+admin_password=$(az keyvault secret show --vault-name $key_vault_name_noquotes --name $admin_password_secret_noquotes --query value --output tsv)
+
+if [ -n "$admin_password" ]
+then 
+  printf "The length of secret '$admin_password_secret_noquotes' is '${#admin_password}'...\n"
+else
+  printf "Unable to determine the value of secret '$admin_password_secret_noquotes'...\n"
+  usage
+fi
+
 # Generate SSH keys
 if [ "$skip_ssh_key_gen" = 'no' ]
 then
-  printf "Gnerating SSH keys...\n"
+  printf "Generating SSH keys...\n"
   echo -e 'y' | ssh-keygen -m PEM -t rsa -b 4096 -C "$admin_username" -f sshkeytemp -N "$admin_password" 
 fi
 
@@ -117,20 +143,7 @@ fi
 ssh_public_key_secret_value=$(cat sshkeytemp.pub)
 ssh_private_key_secret_value=$(cat sshkeytemp)
 
-# Bootstrap key vault secrets
-admin_username_secret_noquotes=${admin_username_secret:1:-1}
-key_vault_name_noquotes=${key_vault_name:1:-1}
-printf "Getting secret '$admin_username_secret_noquotes' from key vault '$key_vault_name_noquotes'...\n"
-admin_username=$(az keyvault secret show --vault-name $key_vault_name_noquotes --name $admin_username_secret_noquotes --query value --output tsv)
-
-if [ -n "$admin_username" ]
-then 
-  printf "The value of secret '$admin_username_secret_noquotes' is '$admin_username'...\n"
-else
-  printf "Unable to determine the value of secret '$admin_username_secret_noquotes'...\n"
-  usage
-fi
-
+# Create secrets for SSH keys
 ssh_public_key_secret_name="$admin_username-ssh-key-public"
 ssh_private_key_secret_name="$admin_username-ssh-key-private"
 
