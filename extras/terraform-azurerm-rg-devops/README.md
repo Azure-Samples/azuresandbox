@@ -179,7 +179,7 @@ The following sections provide guided smoke testing of each resource provisioned
     pwsh --version
 
     # Verify Azure PowerShell modules are installed
-    pwsh 0 -c "Get-Module -ListAvailable"
+    pwsh -c "Get-Module -ListAvailable"
     ```
 
 * Install any additional VS Code extensions required for [Remote development over SSH](https://code.visualstudio.com/docs/remote/ssh-tutorial).
@@ -234,7 +234,7 @@ azurerm_key_vault_access_policy.vm_jumpbox_linux_secrets_reader | Allows the VM 
 
 This Linux virtual machine is a stripped down down version of [jumplinux1](../../terraform-azurerm-vnet-app/README.md#linux-jumpbox-vm) from `#AzureSandbox` that can be used as a DevOps agent on your private network. The biggest difference is that it is not domain joined or registered with your private DNS, so SSH public key authentication to a private IP address is used for connectivity.
 
-* Guest OS: Ubuntu 20.04 LTS (Focal Fossa)
+* Guest OS: Ubuntu 22.04 LTS (Jammy Jellyfish)
 * By default the [patch orchestration mode](https://learn.microsoft.com/azure/virtual-machines/automatic-vm-guest-patching#patch-orchestration-modes) is set to `AutomaticByPlatform`.
 * A system assigned [managed identity](https://learn.microsoft.com/azure/active-directory/managed-identities-azure-resources/overview) is configured by default for use in DevOps related identity and access management scenarios.
 * Custom tags are added which can be used by [cloud-init](https://learn.microsoft.com/azure/virtual-machines/linux/using-cloud-init#:~:text=%20There%20are%20two%20stages%20to%20making%20cloud-init,is%20already%20configured%20to%20use%20cloud-init.%20More%20) [User-Data Scripts](https://cloudinit.readthedocs.io/en/latest/topics/format.html#user-data-script).
