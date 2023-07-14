@@ -106,7 +106,7 @@ apt:
         -----END PGP PUBLIC KEY BLOCK-----
       filename: hashicorp.list
     powershell:
-      source: 'deb https://packages.microsoft.com/ubuntu/20.04/prod $RELEASE main'
+      source: 'deb https://packages.microsoft.com/ubuntu/22.04/prod $RELEASE main'
       key: |
         -----BEGIN PGP PUBLIC KEY BLOCK-----
         Version: GnuPG v1.4.7 (GNU/Linux)
