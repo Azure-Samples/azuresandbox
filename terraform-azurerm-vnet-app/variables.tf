@@ -123,7 +123,7 @@ variable "tags" {
 variable "vm_jumpbox_linux_image_offer" {
   type        = string
   description = "The offer type of the virtual machine image used to create the VM"
-  default     = "0001-com-ubuntu-server-focal"
+  default     = "0001-com-ubuntu-server-jammy"
 }
 
 variable "vm_jumpbox_linux_image_publisher" {
@@ -135,7 +135,7 @@ variable "vm_jumpbox_linux_image_publisher" {
 variable "vm_jumpbox_linux_image_sku" {
   type        = string
   description = "The sku of the virtual machine image used to create the VM"
-  default     = "20_04-lts-gen2"
+  default     = "22_04-lts-gen2"
 }
 
 variable "vm_jumpbox_linux_image_version" {

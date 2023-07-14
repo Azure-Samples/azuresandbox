@@ -327,7 +327,7 @@ azurerm_key_vault_access_policy.vm_jumpbox_linux_secrets_get | Allows the VM to 
 
 This Linux VM is used as a jumpbox for development and remote administration.
 
-* Guest OS: Ubuntu 20.04 LTS (Focal Fossa)
+* Guest OS: Ubuntu 22.04 LTS (Jammy Jellyfish)
 * By default the [patch orchestration mode](https://learn.microsoft.com/azure/virtual-machines/automatic-vm-guest-patching#patch-orchestration-modes) is set to `AutomaticByPlatform`.
 * A system assigned [managed identity](https://learn.microsoft.com/azure/active-directory/managed-identities-azure-resources/overview) is configured by default for use in DevOps related identity and access management scenarios.
 * Custom tags are added which are used by [cloud-init](https://learn.microsoft.com/azure/virtual-machines/linux/using-cloud-init#:~:text=%20There%20are%20two%20stages%20to%20making%20cloud-init,is%20already%20configured%20to%20use%20cloud-init.%20More%20) [User-Data Scripts](https://cloudinit.readthedocs.io/en/latest/topics/format.html#user-data-script) to configure the virtual machine.
