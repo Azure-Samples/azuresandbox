@@ -35,6 +35,8 @@ The following configurations must be deployed first before starting:
 
 * [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared)
 
+This configuration requires that the virtual machine *adds1* is running and available. You may experience failures if *adds1* is stopped or becomes unavailable during provisioning. It's a good idea to wait 30 minutes before attempting to provision this configuration to allow *adds1* adequate time to complete any post-provisioning patching and/or reboots.
+
 ## Getting started
 
 This section describes how to provision this configuration using default settings ([Step-By-Step Video](https://youtu.be/seV-fT8QcO8)).
