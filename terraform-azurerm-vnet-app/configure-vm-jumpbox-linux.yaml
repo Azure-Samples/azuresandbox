@@ -1,6 +1,8 @@
 #cloud-config
 
-# Note: This code has been tested on Ubuntu 20.04 LTS (Focal Fossa) and will not work on other Linux distros
+# Note: This code has been tested on Ubuntu 22.04 LTS (Jammy Jellyfish) and will not work on other Linux distros
+
+package_update: true
 
 merge_how:
  - name: list
@@ -128,7 +130,6 @@ apt:
         =J6gs
         -----END PGP PUBLIC KEY BLOCK-----
       filename: microsoft-prod.list
-package_update: true
 packages:
   - azure-cli
   - terraform

@@ -337,6 +337,7 @@ This Linux VM is used as a jumpbox for development and remote administration.
   * *adds_domain_name*: Used in cloud-init scripts to join the domain.
 * This VM is configured with [cloud-init](https://learn.microsoft.com/azure/virtual-machines/linux/using-cloud-init#:~:text=%20There%20are%20two%20stages%20to%20making%20cloud-init,is%20already%20configured%20to%20use%20cloud-init.%20More%20) using a [Mime Multi Part Archive](https://cloudinit.readthedocs.io/en/latest/topics/format.html#mime-multi-part-archive) containing the following files:
   * [configure-vm-jumpbox-linux.yaml](./configure-vm-jumpbox-linux.yaml) is [Cloud Config Data](https://cloudinit.readthedocs.io/en/latest/topics/format.html#cloud-config-data) used to configure the VM.
+    * Package updates are performed.
     * The following packages are installed:
       * [Azure CLI](https://learn.microsoft.com/cli/azure/what-is-azure-cli?view=azure-cli-latest)
       * [PowerShell](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-7.1)
@@ -354,9 +355,9 @@ This Linux VM is used as a jumpbox for development and remote administration.
         * [ntpdate](https://packages.ubuntu.com/focal/ntpdate)
         * [realmd](https://packages.ubuntu.com/focal/realmd)
         * [adcli](https://packages.ubuntu.com/focal/adcli)
-    * Package updates are performed.
     * The VM is rebooted if necessary.
   * [configure-vm-jumpbox-linux.sh](./configure-vm-jumpbox-linux.sh) is a [User-Data Script](https://cloudinit.readthedocs.io/en/latest/topics/format.html#user-data-script) used to configure the VM.
+    * Package upgrades are performed.
     * Runtime values are retrieved using [Instance Metadata](https://cloudinit.readthedocs.io/en/latest/topics/instancedata.html#instance-metadata)
       * The name of the key vault used for secrets is retrieved from the tag named *keyvault*.
       * The Active Directory domain name is retrieved from the tag named *adds_domain_name*.
@@ -385,7 +386,6 @@ This Linux VM is used as a jumpbox for development and remote administration.
           * Logins are permitted.
           * Sudo privileges are granted.
       * SSH server is configured for logins using Active Directory accounts.
-      * [pyjwt](https://pyjwt.readthedocs.io/en/latest/) Python package is installed.
   * [configure-powershell.ps1](./configure-powershell.ps1) is a [User-Data Script](https://cloudinit.readthedocs.io/en/latest/topics/format.html#user-data-script) that installs [Azure PowerShell](https://learn.microsoft.com/en-us/powershell/azure/what-is-azure-powershell?view=azps-9.5.0)
 
 #### Storage resources

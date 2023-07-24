@@ -15,9 +15,12 @@ printdiv
 printf "Timestamp: $(date +"%Y-%m-%d %H:%M:%S.%N %Z")...\n" >> $log_file
 printf "Starting '$0'...\n" >> $log_file
 
+# Upgrade packages
+printf "Running apt upgrade...\n" >> $log_file
+sudo apt upgrade &>> $log_file
+
 # Get key vault from tags
 tag_name='keyvault'
-printf "Getting tag name '$tag_name'...\n" >> $log_file
 key_vault_name=$(jp -f "/run/cloud-init/instance-data.json" -u "ds.meta_data.imds.compute.tagsList[?name == '$tag_name'] | [0].value")
 printf "Key vault name is '$key_vault_name'...\n" >> $log_file
 
@@ -158,9 +161,6 @@ servicename='sshd'
 printf "Restarting '$servicename'...\n" >> $log_file
 sudo systemctl restart $servicename &>> $log_file
 printdiv
-
-# Install pyjwt 
-pip3 install --upgrade pyjwt
 
 # Exit
 printf "Exiting '$0'...\n" >> $log_file
