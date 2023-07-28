@@ -70,8 +70,6 @@ This section describes how to provision this configuration using default setting
 
   `Apply complete! Resources: 7 added, 0 changed, 0 destroyed.`
 
-  *Note*: The script `aadsc-register-node-ps1` may report errors, but implements retry logic to ensure that Azure Automation Desired State Configuration node registration succeeds up to a maximum of 180 attempts.
-
 * Inspect `terraform.tfstate`.
 
   ```bash
