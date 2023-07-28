@@ -64,20 +64,6 @@ then
   usage
 fi
 
-# Bootstrap key vault secrets
-admin_username_secret_noquotes=${admin_username_secret:1:-1}
-key_vault_name_noquotes=${key_vault_name:1:-1}
-printf "Getting secret '$admin_username_secret_noquotes' from key vault '$key_vault_name_noquotes'...\n"
-admin_username=$(az keyvault secret show --vault-name $key_vault_name_noquotes --name $admin_username_secret_noquotes --query value --output tsv)
-
-if [ -n "$admin_username" ]
-then 
-  printf "The value of secret '$admin_username_secret_noquotes' is '$admin_username'...\n"
-else
-  printf "Unable to determine the value of secret '$admin_username_secret_noquotes'...\n"
-  usage
-fi
-
 # Upload post-deployment scripts
 vm_mssql_win_post_deploy_script_uri="https://${storage_account_name:1:-1}.blob.core.windows.net/${storage_container_name:1:-1}/$vm_mssql_win_post_deploy_script"
 vm_mssql_win_sql_startup_script_uri="https://${storage_account_name:1:-1}.blob.core.windows.net/${storage_container_name:1:-1}/$vm_mssql_win_sql_startup_script"

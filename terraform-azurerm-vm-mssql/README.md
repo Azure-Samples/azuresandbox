@@ -1,6 +1,6 @@
 # \#AzureSandbox - terraform-azurerm-vm-mssql
 
-**Contents**
+## Contents
 
 * [Architecture](#architecture)
 * [Overview](#overview)
@@ -175,7 +175,7 @@ azurerm_virtual_machine_extension . vm_mssql_win_postdeploy_script (vmext&#x2011
   * The virtual machine is domain joined.
   * The [Windows Firewall](https://learn.microsoft.com/windows/security/threat-protection/windows-firewall/windows-firewall-with-advanced-security#overview-of-windows-defender-firewall-with-advanced-security) is [Configured to Allow SQL Server Access](https://learn.microsoft.com/sql/sql-server/install/configure-the-windows-firewall-to-allow-sql-server-access). A new firewall rule is created that allows inbound traffic over port 1433.
   * A SQL Server Windows login is added for the domain administrator and added to the SQL Server builtin `sysadmin` role.
-* Post-deployment configuration is then implemented using a custom script extension that runs [configure-mssql.ps1](./configure-mssql.ps1) following guidelines established in [Checklist: Best practices for SQL Server on Azure VMs](https://learn.microsoft.com/azure/azure-sql/virtual-machines/windows/performance-guidelines-best-practices-checklist).
+* Post-deployment configuration is then implemented using a custom script extension that runs [configure-vm-mssql.ps1](./configure-vm-mssql.ps1) following guidelines established in [Checklist: Best practices for SQL Server on Azure VMs](https://learn.microsoft.com/azure/azure-sql/virtual-machines/windows/performance-guidelines-best-practices-checklist).
   * Data disk metadata is retrieved dynamically using the [Azure Instance Metadata Service (Windows)](https://learn.microsoft.com/azure/virtual-machines/windows/instance-metadata-service?tabs=windows) including:
     * Volume label and drive letter, e.g. *vol_sqldata_M*
     * Size
