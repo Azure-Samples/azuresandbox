@@ -16,7 +16,7 @@
 
 ## Overview
 
-This configuration implements an [IaaS](https://azure.microsoft.com/overview/what-is-iaas/) database server [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) based on the [SQL Server virtual machines in Azure](https://learn.microsoft.com/azure/azure-sql/virtual-machines/windows/sql-server-on-azure-vm-iaas-what-is-overview#payasyougo) offering.
+This configuration implements an [IaaS](https://azure.microsoft.com/overview/what-is-iaas/) database server [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) based on the [SQL Server virtual machines in Azure](https://learn.microsoft.com/azure/azure-sql/virtual-machines/windows/sql-server-on-azure-vm-iaas-what-is-overview#payasyougo) offering ([Step-By-Step Video](https://youtu.be/2wkGPxqNm-M)).
 
 Activity | Estimated time required
 --- | ---
@@ -30,7 +30,7 @@ Smoke testing | ~10 minutes
 
 ## Getting started
 
-This section describes how to provision this configuration using default settings.
+This section describes how to provision this configuration using default settings ([Step-By-Step Video](https://youtu.be/Qk8OIW-VgHs)).
 
 * Change the working directory.
 
@@ -81,6 +81,8 @@ This section describes how to provision this configuration using default setting
 
 ## Smoke testing
 
+Perform the following tests to validate the configuration is provisioned correctly ([Step-By-Step Video](https://youtu.be/uedt5wKIrcY))
+
 * Verify *mssqlwin1* node configuration is compliant.
   * Wait for 15 minutes to proceed to allow time for DSC configurations to complete.
   * From the client environment, navigate to *portal.azure.com* > *Automation Accounts* > *auto-xxxxxxxxxxxxxxxx-01* > *Configuration Management* > *State configuration (DSC)*.
@@ -110,7 +112,7 @@ This section provides additional information on various aspects of this configur
 
 ### Bootstrap script
 
-This configuration uses the script [bootstrap.sh](./bootstrap.sh) to create a *terraform.tfvars* file for generating and applying Terraform plans. For simplified deployment, several runtime defaults are initialized using output variables stored in the *terraform.tfstate* file associated with the [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared;) and [terraform-azurerm-vnet-app](../terraform-azurerm-vnet-app/) configurations, including:
+This configuration uses the script [bootstrap.sh](./bootstrap.sh) to create a *terraform.tfvars* file for generating and applying Terraform plans ([Step-By-Step Video](https://youtu.be/Jzi58S7lBJ8)). For simplified deployment, several runtime defaults are initialized using output variables stored in the *terraform.tfstate* file associated with the [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared;) and [terraform-azurerm-vnet-app](../terraform-azurerm-vnet-app/) configurations, including:
 
 Output variable | Sample value
 --- | ---
@@ -152,7 +154,7 @@ This section lists the resources included in this configuration.
 
 #### Database server virtual machine
 
-The configuration for these resources can be found in [020-vm-mssql-win.tf](./020-vm-mssql-win.tf).
+The configuration for these resources can be found in [020-vm-mssql-win.tf](./020-vm-mssql-win.tf) ([Step-By-Step Video](https://youtu.be/RXkPVOZZBwU)).
 
 Resource name (ARM) | Notes
 --- | ---
