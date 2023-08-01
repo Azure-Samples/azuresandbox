@@ -2,8 +2,6 @@
 
 # Note: This code has been tested on Ubuntu 22.04 LTS (Jammy Jellyfish) and will not work on other Linux distros
 
-package_update: true
-
 merge_how:
  - name: list
    settings: [append]
@@ -147,4 +145,5 @@ packages:
   - realmd
   - adcli
 
+package_update: true
 package_reboot_if_required: true

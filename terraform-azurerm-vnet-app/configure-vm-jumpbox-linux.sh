@@ -14,10 +14,19 @@ printdiv() {
 printdiv
 printf "Timestamp: $(date +"%Y-%m-%d %H:%M:%S.%N %Z")...\n" >> $log_file
 printf "Starting '$0'...\n" >> $log_file
+printdiv
+
+# Update needrestart.conf file
+filename=/etc/needrestart/needrestart.conf
+sudo cp -f "$filename" "$filename.bak"
+printf "Modifying '$filename'...\n" >> $log_file
+sudo sed -i 's/#$nrconf{restart} = '"'"'i'"'"';/$nrconf{restart} = '"'"'a'"'"';/g' $filename
+diff "$filename.bak" "$filename" >> $log_fileprintdiv
 
 # Upgrade packages
 printf "Running apt upgrade...\n" >> $log_file
-sudo apt upgrade &>> $log_file
+sudo apt-get -y upgrade &>> $log_file
+printdiv
 
 # Get key vault from tags
 tag_name='keyvault'
@@ -30,7 +39,7 @@ printf "Getting tag name '$tag_name'...\n" >> $log_file
 adds_domain_name=$(jp -f "/run/cloud-init/instance-data.json" -u "ds.meta_data.imds.compute.tagsList[?name == '$tag_name'] | [0].value")
 printf "Domain name is '$adds_domain_name'...\n" >> $log_file
 adds_realm_name=$(echo $adds_domain_name | tr '[:lower:]' '[:upper:]')
-printf "Realm name is '$adds_realm_name'...\n" >> $log_file
+printf "Realm name is '$adds_realm_name'...\n" >> $log_fileprintdiv
 
 # Get managed identity access token for key vault
 printf "Getting managed identity access token...\n" >> $log_file
