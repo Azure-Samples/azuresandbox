@@ -98,8 +98,37 @@ The following sections provide guided smoke testing of each resource provisioned
 
 ### Jumpbox smoke testing
 
+* Wait for 15 minutes to proceed to allow time for DSC and cloud-init configurations to complete.
+
+* Verify *jumplinux1* cloud-init configuration is complete.
+  * From the client environment, navigate to *portal.azure.com* > *Virtual machines* > *jumplinux1*
+  * Click *Connect*, select the *Bastion* tab, then click *Use Bastion*
+  * For *Username* enter `bootstrapadmin`
+  * For *Authentication Type* choose `SSH Private Key from Azure Key Vault`
+  * For *Azure Key Vault Secret* specify the following values:
+    * For *Subscription* choose the same Azure subscription used to provision the #AzureSandbox.
+    * For *Azure Key Vault* choose the key vault provisioned by[terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared/#bootstrap-script), e.g. `kv-xxxxxxxxxxxxxxx`
+    * For *Azure Key Vault Secret choose `bootstrapadmin-ssh-key-private`
+    * Expand *Advanced*
+      * For *SSH Passphrase* enter the value of the *adminpassword* secret in key vault.
+    * Click *Connect*
+    * Execute the following commands from the Bash command prompt:
+
+      ```bash
+      # Check status of cloud-init
+      cloud-init status
+
+      # Review cloud-init logs
+      sudo cat /var/log/cloud-init-output.log | more
+      ```
+
+    * Verify that cloud-init status is `done`.
+    * Note from cloud-init log the amount of automated configuration management being performed including:
+      * package updates and upgrades
+      * reboots
+      * user script executions
+
 * Verify *jumpwin1* node configuration is compliant.
-  * Wait for 15 minutes to proceed to allow time for DSC configurations to complete.
   * From the client environment, navigate to *portal.azure.com* > *Automation Accounts* > *auto-xxxxxxxxxxxxxxxx-01* > *Configuration Management* > *State configuration (DSC)*.
   * Refresh the data on the *Nodes* tab and verify that all nodes are compliant.
   * Review the data in the *Configurations* and *Compiled configurations* tabs as well.
