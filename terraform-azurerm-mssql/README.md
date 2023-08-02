@@ -1,6 +1,6 @@
 # \#AzureSandbox - terraform-azurerm-mssql
 
-**Contents**
+## Contents
 
 * [Architecture](#architecture)
 * [Overview](#overview)
@@ -101,33 +101,31 @@ This section describes how to provision this configuration using default setting
     * Login: *bootstrapadmin*
     * Password: Use the value stored in the *adminpassword* key vault secret
   * Expand the *Databases* tab and verify you can see *testdb*
-* Optional: Deny internet access to Azure SQL Database
-  * From the client environment, test DNS configuration
-    * Verify that PrivateLink is not already configured on the private network
-      * Open a Windows command prompt and run the following command:
+* Optional: Enable internet access to Azure SQL Database
+  * Note: This smoke testing is performed from the client environment (not *jumpwin1*)
+  * Verify that PrivateLink is not already configured on the network
+    * Open a Windows command prompt and run the following command:
 
-        ```text
-        ipconfig /all
-        ```
-
-      * Scan the results for *privatelink.database.windows.net* in *Connection-specific DNS Suffix Search List*.
-        * If found, PrivateLink is already configured on the private network.
-          * If you are directly connected to a private network, skip this portion of the smoke testing.
-          * If you are connected to a private network using a VPN, disconnect from it and try again.
-            * If the *privatelink.database.windows.net* DNS Suffix is no longer listed, you can continue.
-    * Using Windows PowerShell, run this command and make a note of the *IP4Address* returned:
-
-      ```powershell
-      Resolve-DnsName mssql-xxxxxxxxxxxxxxxx.database.windows.net
+      ```text
+      ipconfig /all
       ```
 
-    * Navigate to [lookip.net](https://www.lookip.net/ip) and lookup the *IP4Address* from the previous step. Examine the *Technical details* and verify that the ISP for the IP Address is *Microsoft Corporation* and the Company is *Microsoft Azure*.
-  * Add Azure SQL Database firewall rule for client IP
-    * From the client environment, navigate to *portal.azure.com* > *Home* > *SQL Servers* > *mssql&#x2011;xxxxxxxxxxxxxxxx* > *Security* > *Networking*
-    * Confirm *Public network access* is set to *Selected networks*.
-    * Navigate to *Firewall rules* and click *+ Add your client client IPV4 address...*.
-    * Verify a firewall rule was added to match your client IP address.
-      * Note: Only IPv4 addresses will work, so replace any IPv6 addresses with IPv4 addresses. Use [whatismyhipaddress.com](https://whatismyipaddress.com) to determine your IPv4 address.
+    * Scan the results for *privatelink.database.windows.net* in *Connection-specific DNS Suffix Search List*.
+      * If found, PrivateLink is already configured on the network.
+        * If you are directly connected to a private network, skip this portion of the smoke testing.
+        * If you are connected to a private network using a VPN, disconnect from it and try again.
+          * If the *privatelink.database.windows.net* DNS Suffix is no longer listed, you can continue.
+  * Using Windows PowerShell, run this command and make a note of the *IP4Address* returned:
+
+    ```powershell
+    Resolve-DnsName mssql-xxxxxxxxxxxxxxxx.database.windows.net
+    ```
+
+  * Navigate to [lookip.net](https://www.lookip.net/ip) and lookup the *IP4Address* from the previous step. Examine the *Technical details* and verify that the ISP for the IP Address is *Microsoft Corporation* and the Company is *Microsoft Azure*.
+  * Manually enable public access to Azure SQL Database
+    * Navigate to *portal.azure.com* > *Home* > *SQL Servers* > *mssql&#x2011;xxxxxxxxxxxxxxxx* > *Security* > *Networking*
+    * On the *Public access* tab, click *Selected networks*
+    * In the *Firewall rules* section, click *Add your client IPv4 address*
     * Click *Save*
   * Test Internet connectivity to Azure SQL Database
     * Launch *Microsoft SQL Server Management Studio* (SSMS)
@@ -138,9 +136,7 @@ This section describes how to provision this configuration using default setting
       * Password: Use the value stored in the *adminpassword* key vault secret
     * Expand the *Databases* tab and verify you can see *testdb*
     * Disconnect from Azure SQL Database
-  * Deny public network access
-    * In Visual Studio code, navigate to line 14 of [060-mssql.tf](./060-mssql.tf)
-    * Change `public_network_access_enabled` from `true` to `false` and save the changes.
+  * Disable public network access
     * In a bash terminal, run the following commands to apply changes to the configuration:
 
       ```bash
@@ -150,8 +146,8 @@ This section describes how to provision this configuration using default setting
       # Apply the change
       terraform apply
       ```
-  
-  * Test Internet connectivity to Azure SQL Database
+
+  * Verify public network access is disabled
     * Launch *Microsoft SQL Server Management Studio* (SSMS)
     * Connect to the Azure SQL Database server using public endpoint
       * Server name: *mssql&#x2011;xxxxxxxxxxxxxxxx.database.windows.net*
