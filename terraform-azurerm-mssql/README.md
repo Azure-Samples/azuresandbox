@@ -16,7 +16,7 @@
 
 ## Overview
 
-This configuration implements a [PaaS](https://azure.microsoft.com/overview/what-is-paas/) database hosted in [Azure SQL Database](https://learn.microsoft.com/azure/azure-sql/database/sql-database-paas-overview) with a private endpoint implemented using [PrivateLink](https://learn.microsoft.com/azure/azure-sql/database/private-endpoint-overview).
+This configuration implements a [PaaS](https://azure.microsoft.com/overview/what-is-paas/) database hosted in [Azure SQL Database](https://learn.microsoft.com/azure/azure-sql/database/sql-database-paas-overview) with a private endpoint implemented using [PrivateLink](https://learn.microsoft.com/azure/azure-sql/database/private-endpoint-overview) ([Step-By-Step Video](https://youtu.be/bkgyYhHfoKg)).
 
 Activity | Estimated time required
 --- | ---
@@ -30,7 +30,7 @@ Smoke testing | ~20 minutes
 
 ## Getting started
 
-This section describes how to provision this configuration using default settings.
+This section describes how to provision this configuration using default settings ([Step-By-Step Video](https://youtu.be/atq1GXv_Jlg)).
 
 * Change the working directory.
 
@@ -78,6 +78,8 @@ This section describes how to provision this configuration using default setting
   ```
 
 ## Smoke testing
+
+Use the steps in this section to smoke test the configuration ([Step-By-Step Video](https://youtu.be/pLYKU50Z014))
 
 * Test DNS queries for Azure SQL database private endpoint
   * From the client environment, navigate to *portal.azure.com* > *SQL Servers* > *mssql-xxxxxxxxxxxxxxxx* > *Overview* > *Server name* and and copy the the FQDN, e.g. *mssql&#x2011;xxxxxxxxxxxxxxxx.database.windows.net*.
@@ -162,7 +164,7 @@ This section provides additional information on various aspects of this configur
 
 ### Bootstrap script
 
-This configuration uses the script [bootstrap.sh](./bootstrap.sh) to create a *terraform.tfvars* file for generating and applying Terraform plans. For simplified deployment, several runtime defaults are initialized using output variables stored in the *terraform.tfstate* file associated with the [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared;) and [terraform-azurerm-vnet-app](../terraform-azurerm-vnet-app/) configurations, including:
+This configuration uses the script [bootstrap.sh](./bootstrap.sh) to create a *terraform.tfvars* file for generating and applying Terraform plans ([Step-By-Step Video](https://youtu.be/sD6ySES0fJQ)). For simplified deployment, several runtime defaults are initialized using output variables stored in the *terraform.tfstate* file associated with the [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared;) and [terraform-azurerm-vnet-app](../terraform-azurerm-vnet-app/) configurations, including:
 
 Output variable | Sample value
 --- | ---
@@ -182,7 +184,7 @@ vnet_app_01_subnets | Contains all the subnet definitions including *snet-app-01
 
 ### Terraform Resources
 
-This section lists the resources included in this configuration.
+This section lists the resources included in this configuration ([Step-By-Step Video](https://youtu.be/-nuc-Q6N430)).
 
 #### Azure SQL Database
 
