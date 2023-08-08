@@ -16,18 +16,6 @@ printf "Timestamp: $(date +"%Y-%m-%d %H:%M:%S.%N %Z")...\n" >> $log_file
 printf "Starting '$0'...\n" >> $log_file
 printdiv
 
-# Update needrestart.conf file
-# filename=/etc/needrestart/needrestart.conf
-# sudo cp -f "$filename" "$filename.bak"
-# printf "Modifying '$filename'...\n" >> $log_file
-# sudo sed -i 's/#$nrconf{restart} = '"'"'i'"'"';/$nrconf{restart} = '"'"'a'"'"';/g' $filename
-# diff "$filename.bak" "$filename" >> $log_fileprintdiv
-
-# Upgrade packages
-# printf "Running apt upgrade...\n" >> $log_file
-# sudo apt-get -y upgrade &>> $log_file
-# printdiv
-
 # Get key vault from tags
 tag_name='keyvault'
 key_vault_name=$(jp -f "/run/cloud-init/instance-data.json" -u "ds.meta_data.imds.compute.tagsList[?name == '$tag_name'] | [0].value")
