@@ -176,20 +176,19 @@ function Update-ExistingModule {
                 Continue
             }
 
-            # Check status
-            $i = 0
-            Do {
-                Start-Sleep 10
-                $updateState = (Get-AzAutomationModule -Name $moduleName -ResourceGroupName $ResourceGroupName -AutomationAccountName $AutomationAccountName).ProvisioningState
-                Write-Log "Update state for module '$moduleName' is '$updateState'..."
-                $i++
-            } While (($updateState -ne "Failed" -and $updateState -ne "Succeeded") -or $i -gt 20)
+            # Check provisioning state
+            while ($true) {
+                $automationModule = Get-AzAutomationModule -Name $ModuleName -ResourceGroupName $ResourceGroupName -AutomationAccountName $AutomationAccountName
 
-            if ($i -gt 20) {
-                Write-Log "Module '$moduleName' is still udpating. Please check manually..."
+                if (($automationModule.ProvisioningState -eq 'Succeeded') -or ($automationModule.ProvisioningState -eq 'Failed') ) {
+                    break
+                }
+
+                Write-Log "Module '$($automationModule.Name)' provisioning state is '$($automationModule.ProvisioningState)'..."
+                Start-Sleep -Seconds 10    
             }
 
-            switch ($updateState) {
+            switch ($automationModule.ProvisioningState) {
                 "Failed" { 
                     Exit-WithError "Update for module '$moduleName' has failed..." 
                 }
