@@ -1,6 +1,6 @@
 # \#AzureSandbox - terraform-azurerm-mysql
 
-**Contents**
+## Contents
 
 * [Architecture](#architecture)
 * [Overview](#overview)
@@ -99,7 +99,7 @@ This section describes how to provision this configuration using default setting
     * Connection method: `Standard (TCP/IP)`
     * Hostname: `mysql-xxxxxxxxxxxxxxxx.mysql.database.azure.com`
     * Port: `3306`
-    * Uwername: `bootstrapadmin`
+    * Username: `bootstrapadmin`
     * Schema: `testdb`
     * Click *OK* and when prompted for *password* use the value of the *adminpassword* secret in key vault.
     * Create a table, insert some data and run some sample queries to verify functionality.
