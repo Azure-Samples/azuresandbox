@@ -291,7 +291,7 @@ This section describes DevOps security best practices for development and deploy
       required_providers {
         azurerm = {
           source = "hashicorp/azurerm"
-          version = "=3.68.0"
+          version = "=3.69.0"
         }
       }
     
