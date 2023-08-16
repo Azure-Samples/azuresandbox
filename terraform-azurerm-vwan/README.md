@@ -1,6 +1,6 @@
 # \#AzureSandbox - terraform-azurerm-vwan
 
-**Contents**
+## Contents
 
 * [Architecture](#architecture)
 * [Overview](#overview)
@@ -29,7 +29,7 @@ Smoke testing | ~45 minutes
 
 ## Before you start
 
-This configuration only supports the [Windows 10 with WSL](../README.md#windows-10-with-wsl) client environment. [Cloud shell](../README.md#cloud-shell) and [Linux / macOS](../README.md#linux--macos) client environments are not supported. The following configurations must be deployed first before starting:
+This configuration only supports the [Windows Subsystem for Linux](../README.md#windows-subsystem-for-linux) client environment. [Cloud shell](../README.md#azure-cloud-shell) and [Linux / macOS](../README.md#linux--macos) client environments are not supported. The following configurations must be deployed first before starting:
 
 * [terraform-azurerm-vnet-app](../terraform-azurerm-vnet-app)
 
@@ -86,7 +86,7 @@ This section describes how to provision this configuration using default setting
 
 * Monitor output. Upon completion, you should see a message similar to the following:
 
-  `Apply complete! Resources: 58 added, 0 changed, 0 destroyed.`
+  `Apply complete! Resources: 8 added, 0 changed, 0 destroyed.`
 
 * Inspect `terraform.tfstate`.
 
@@ -96,7 +96,7 @@ This section describes how to provision this configuration using default setting
 
 ## Smoke testing
 
-This smoke testing is designed to be performed from a [Windows 10 with WSL](../README.md#windows-10-with-wsl) client environment using a user (point-to-site) VPN connection to the Azure Virtual WAN Hub. Upon completion you will have tested connectivity using a variety of ports and protocols to Azure resources using private endpoints.
+This smoke testing is designed to be performed from a [Windows Subsystem for Linux](../README.md#windows-subsystem-for-linux) client environment using a user (point-to-site) VPN connection to the Azure Virtual WAN Hub. Upon completion you will have tested connectivity using a variety of ports and protocols to Azure resources using private endpoints.
 
 * [Install and configure VPN client](#install-and-configure-vpn-client)
 * [Test user (point-to-site) VPN connectivity](#test-user-point-to-site-vpn-connectivity)
