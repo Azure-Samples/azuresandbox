@@ -16,7 +16,7 @@
 
 ## Overview
 
-This configuration implements an [Azure Virtual WAN](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about) to connect /#AzureSandbox to remote users using [User VPN (point-to-site) connections](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#uservpn), including:
+This configuration implements an [Azure Virtual WAN](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about) to connect /#AzureSandbox to remote users using [User VPN (point-to-site) connections](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#uservpn), including ([Step-By-Step Video](https://youtu.be/68E-HiDaXng)):
 
 * A [virtual wan](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#resources).
 * A [virtual wan hub](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#resources) with pre-configured [hub virtual network connections](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#resources) with [terraform-azurerm-vnet-shared](./terraform-azurerm-vnet-shared/) and [terraform-azurerm-vnet-app](./terraform-azurerm-vnet-app/). The hub is also pre-configured for [User VPN (point-to-site) connections](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#uservpn).
@@ -35,7 +35,7 @@ This configuration only supports the [Windows Subsystem for Linux](../README.md#
 
 ## Getting started
 
-This section describes how to provision this configuration using default settings.
+This section describes how to provision this configuration using default settings ([Step-By-Step Video](https://youtu.be/jFkW6GDdg1I)).
 
 * From the client environment, generate self-signed certificates to use for P2S VPN certificate authentication.
   * Run [genp2svpncerts.ps1](./genp2svpncerts.ps1) from Windows Powershell (not from WSL / PowerShell core) to generate the certificates required for setting up a P2S VPN:
@@ -96,7 +96,7 @@ This section describes how to provision this configuration using default setting
 
 ## Smoke testing
 
-This smoke testing is designed to be performed from a [Windows Subsystem for Linux](../README.md#windows-subsystem-for-linux) client environment using a user (point-to-site) VPN connection to the Azure Virtual WAN Hub. Upon completion you will have tested connectivity using a variety of ports and protocols to Azure resources using private endpoints.
+This smoke testing is designed to be performed from a [Windows Subsystem for Linux](../README.md#windows-subsystem-for-linux) client environment using a user (point-to-site) VPN connection to the Azure Virtual WAN Hub. Upon completion you will have tested connectivity using a variety of ports and protocols to Azure resources using private endpoints ([Step-By-Step Video](https://youtu.be/pUUUiUnchCw)).
 
 * [Install and configure VPN client](#install-and-configure-vpn-client)
 * [Test user (point-to-site) VPN connectivity](#test-user-point-to-site-vpn-connectivity)
@@ -273,7 +273,7 @@ Use the following sections to test user VPN (point-to-site) connectivity to priv
 
 ## Documentation
 
-This section provides additional information on various aspects of this configuration.
+This section provides additional information on various aspects of this configuration ([Step-By-Step Video](https://youtu.be/jHm_36a8ms4)).
 
 ### Bootstrap script
 
