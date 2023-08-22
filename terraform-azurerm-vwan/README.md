@@ -38,9 +38,16 @@ This configuration only supports the [Windows Subsystem for Linux](../README.md#
 This section describes how to provision this configuration using default settings ([Step-By-Step Video](https://youtu.be/jFkW6GDdg1I)).
 
 * From the client environment, generate self-signed certificates to use for P2S VPN certificate authentication.
-  * Run [genp2svpncerts.ps1](./genp2svpncerts.ps1) from Windows Powershell (not from WSL / PowerShell core) to generate the certificates required for setting up a P2S VPN:
+  * Download [genp2svpncerts.ps1](./genp2svpncerts.ps1) into a folder named `C:\scripts`.
+  * Open a Windows PowerShell command prompt using `Run as administrator`.
+  * Execute the following commands to to generate the self-signed certificates required for setting up a P2S VPN:
   
     ```powershell
+    # Change execution policy, enter 'Y' when prompted for confirmation
+    Set-ExecutionPolicy -ExecutionPolicy Unrestricted
+    cd C:\scripts
+
+    # Generate self-signed certificates, enter 'R' when prompted for confirmation
     .\genp2svpncerts.ps1
     ```
   
