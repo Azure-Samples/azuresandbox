@@ -4,19 +4,28 @@
 $defaultRootCertCN = "MyP2SVPNRootCert"
 $defaultChildCertCN = "MyP2SVPNChildCert"
 
-#Get user input
-if (!($rootCertCN = Read-Host "Root certificate CN [$defaultRootCertCN]")) { $rootCertCN = $defaultRootCertCN }
-if (!($childCertCN = Read-Host "Child certificate CN [$defaultChildCertCN]")) { $childCertCN = $defaultChildCertCN }
+# Get user input
+do {
+    $rootCertCN = Read-Host "Root certificate CN [$defaultRootCertCN]"
+    if ($rootCertCN.Trim().Length -eq 0) {
+        $rootCertCN = $defaultRootCertCN
+    }
+} until ($rootCertCN.Trim().Length -gt 0)
 
-if (!($childCertPwd = Read-Host "Child certificate password" -AsSecureString)) { 
-    Write-Host "Error: Strong client certificate password required."
-    return 2 
-}
+do {
+    $childCertCN = Read-Host "Child certificate CN [$defaultChildCertCN]"
+    if ($childCertCN.Trim().Length -eq 0) {
+        $childCertCN = $defaultChildCertCN
+    }
+} until ($childCertCN.Trim().Length -gt 0)
+
+do {
+    $childCertPwd = Read-Host "Child certificate password" -AsSecureString
+} until ($childCertPwd.Trim().Length -gt 0)
 
 $rootCertDerFilePath = ".\$($rootCertCN)_DER_Encoded.cer"
 $rootCertBase64FilePath = ".\$($rootCertCN)_Base64_Encoded.cer"
 $childCertPfxFilePath = ".\$($childCertCN).pfx"
-
 
 Write-Host "Creating root certificate..."
 
@@ -60,4 +69,3 @@ Export-PfxCertificate `
     -Force
 
 Write-Host "Child Certificate Thumbprint: $($childCert.Thumbprint)"
-
