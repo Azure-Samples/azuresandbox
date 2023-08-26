@@ -8,6 +8,7 @@
 * [Prerequisites](#prerequisites)
 * [Getting started](#getting-started)
 * [Next steps](#next-steps)
+* [Videos](#videos)
 * [Known issues](#known-issues)
 
 ## Architecture
@@ -29,7 +30,7 @@ This repository contains a collection of inter-dependent [cloud computing](https
   * [PowerShell Core](https://learn.microsoft.com/powershell/scripting/whats-new/what-s-new-in-powershell-71?view=powershell-7.1)
   * [PowerShell 5.1](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-5.1) for Windows Server configuration.
 * [Terraform](https://www.terraform.io/intro/index.html#what-is-terraform-) v1.5.5 for [Infrastructure as Code](https://en.wikipedia.org/wiki/Infrastructure_as_code) (IaC).
-  * [Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs) (azuerrm) v3.70.0
+  * [Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs) (azuerrm) v3.71.0
   * [cloud-init Provider](https://registry.terraform.io/providers/hashicorp/cloudinit/latest/docs) (cloudinit) v2.3.2
   * [Random Provider](https://registry.terraform.io/providers/hashicorp/random/latest/docs) (random) v3.5.1
 
@@ -62,13 +63,7 @@ This repo was created by [Roger Doherty](https://www.linkedin.com/in/roger-doher
 * [terraform-azurerm-vwan](./terraform-azurerm-vwan/) includes the following:
   * A [virtual wan](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#resources).
   * A [virtual wan hub](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#resources) with pre-configured [hub virtual network connections](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#resources) with [terraform-azurerm-vnet-shared](./terraform-azurerm-vnet-shared/) and [terraform-azurerm-vnet-app](./terraform-azurerm-vnet-app/). The hub is also pre-configured for [User VPN (point-to-site) connections](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#uservpn).
-* extras
-  * [terraform-azurerm-rg-devops](./extras/terraform-azurerm-rg-devops/) includes the following:
-    * A [resource group](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#resource-group) which contains DevOps environment resources.
-    * A [key vault](https://learn.microsoft.com/azure/key-vault/general/overview) for managing secrets.
-    * A [storage account](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#storage-account) for use as a [Terraform azurerm backend](https://developer.hashicorp.com/terraform/language/settings/backends/azurerm).
-    * A Linux [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) for use as a DevOps agent.
-  * [terraform-azurerm-vm-devops](./terraform-azurerm-vm-devops/) implements a collection of identical [IaaS](https://azure.microsoft.com/overview/what-is-iaas/) [virtual machines](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) designed to be used as DevOps agents by [Azure Pipelines](https://learn.microsoft.com/azure/devops/pipelines/get-started/what-is-azure-pipelines?view=azure-devops) or [Github Actions](https://docs.github.com/en/actions).
+* [extras](./extras/README.md) contains additional Terraform configurations and supporting resources.
 
 ## Prerequisites
 
@@ -369,6 +364,15 @@ Application | snet-app-01 | TBD | TBD | TBD | TBD
 Application | snet-db-01 | TBD | TBD | TBD | TBD
 Application | snet-privatelink-01 | TBD | TBD | TBD | TBD
 Application | snet-mysql-01 | TBD | TBD | TBD | TBD
+
+## Videos
+
+Video | Section
+--- | ---
+[Overview](https://youtu.be/2TN4SEq4wzM) | [Overview](#overview)  
+[Configure Client Environment (Part 1)](https://youtu.be/Q4dOoQspt90) | [Getting started \| Configure client environment \| Windows Subsystem for Linux \| Windows prerequisites](#windows-subsystem-for-linux)
+[Configure Client Environment (Part 2)](https://youtu.be/YW37uG0aX8c) | [Getting started \| Configure client environment \| Windows Subsystem for Linux \| Linux prerequisites](#windows-subsystem-for-linux)
+[Next Steps](https://youtu.be/EtNrzs4ZCvM) | [Next steps](#next-steps)
 
 ## Known issues
 

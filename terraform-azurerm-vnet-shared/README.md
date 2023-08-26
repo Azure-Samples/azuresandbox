@@ -9,6 +9,7 @@
 * [Smoke testing](#smoke-testing)
 * [Documentation](#documentation)
 * [Next steps](#next-steps)
+* [Videos](#videos)
 
 ## Architecture
 
@@ -285,3 +286,14 @@ vnet_shared_01_name | "vnet-shared-01"
 ## Next steps
 
 * Move on to the next configuration [terraform-azurerm-vnet-app](../terraform-azurerm-vnet-app).
+
+## Videos
+
+Video | Section
+--- | ---
+[Shared services virtual network (Part 1)](https://youtu.be/tYSnlPy-oJc) | [Overview](#overview)
+[Shared services virtual network (Part 2)](https://youtu.be/Es4I8NAM318) | [Before you start](#before-you-start)
+[Shared services virtual network (Part 3)](https://youtu.be/CaRT0LMrmKc) | [Getting started](#getting-started)
+[Shared services virtual network (Part 4)](https://youtu.be/gxO9oKoitQ0) | [Smoke testing](#smoke-testing)
+[Shared services virtual network (Part 5)](https://youtu.be/metxR0TXEeE) | [Documentation \| Bootstrap script](#bootstrap-script)
+[Shared services virtual network (Part 6)](https://youtu.be/skfxxsOTEuY) | [Documentation \| Terraform resources](#terraform-resources)

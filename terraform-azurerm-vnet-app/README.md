@@ -9,6 +9,7 @@
 * [Smoke testing](#smoke-testing)
 * [Documentation](#documentation)
 * [Next steps](#next-steps)
+* [Videos](#videos)
 
 ## Architecture
 
@@ -445,3 +446,16 @@ vnet_app_01_subnets | Contains all the subnet definitions from this configuratio
 ## Next steps
 
 Move on to the next configuration [terraform-azurerm-vm-mssql](../terraform-azurerm-vm-mssql/).
+
+## Videos
+
+Video | Section
+--- | ---
+[Application virtual network (Part 1)](https://youtu.be/J7jK-dxiFrA) | [terraform-azurerm-vnet-app \| Overview](#overview)
+[Application virtual network (Part 2)](https://youtu.be/seV-fT8QcO8) | [terraform-azurerm-vnet-app \| Getting started](#getting-started)
+[Application virtual network (Part 3)](https://youtu.be/YkojLAi-Op8) | [terraform-azurerm-vnet-app \| Smoke testing](#smoke-testing)
+[Application virtual network (Part 4)](https://youtu.be/EHxb01H4XSs) | [terraform-azurerm-vnet-app \| Documentation \| Bootstrap script](#bootstrap-script)
+[Application virtual network (Part 5)](https://youtu.be/5nxck-NXfk4) | [terraform-azurerm-vnet-app \| Documentation \| Network resources](#network-resources)
+[Application virtual network (Part 6)](https://youtu.be/J-Zz8EOCyi4) | [terraform-azurerm-vnet-app \| Documentation \| Windows Server Jumpbox VM](#windows-server-jumpbox-vm)
+[Application virtual network (Part 7)](https://youtu.be/ZeQx0SZV29E) | [terraform-azurerm-vnet-app \| Documentation \| Linux Jumpbox VM](#linux-jumpbox-vm)
+[Application virtual network (Part 8)](https://youtu.be/2-HwFEsIDJI) | [terraform-azurerm-vnet-app \| Documentation \| Storage resources](#storage-resources)

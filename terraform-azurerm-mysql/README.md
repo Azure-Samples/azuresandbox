@@ -9,6 +9,7 @@
 * [Smoke testing](#smoke-testing)
 * [Documentation](#documentation)
 * [Next steps](#next-steps)
+* [Videos](#videos)
 
 ## Architecture
 
@@ -146,3 +147,12 @@ azurerm_mysql_flexible_database.mysql_database_01 | A MySQL Database named *test
 ## Next steps
 
 Move on to the next configuration [terraform-azurerm-vwan](../terraform-azurerm-vwan).
+
+## Videos
+
+Video | Section
+--- | ---
+[Azure MySQL Flexible Server (Part 1)](https://youtu.be/OE4KFZtq0oY) | [terraform-azurerm-mysql \| Overview](#overview)
+[Azure MySQL Flexible Server (Part 2)](https://youtu.be/_pBU2ifVSGQ) | [terraform-azurerm-mysql \| Getting started](#getting-started)
+[Azure MySQL Flexible Server (Part 3)](https://youtu.be/KWUUeBCsFMQ) | [terraform-azurerm-mysql \| Smoke testing](#smoke-testing)
+[Azure MySQL Flexible Server (Part 4)](https://youtu.be/VgFl0efQ7NI) | [terraform-azurerm-mysql \| Documentation](#documentation)

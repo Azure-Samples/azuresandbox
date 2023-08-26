@@ -9,6 +9,7 @@
 * [Smoke testing](#smoke-testing)
 * [Documentation](#documentation)
 * [Next steps](#next-steps)
+* [Videos](#videos)
 
 ## Architecture
 
@@ -190,3 +191,13 @@ azurerm_virtual_machine_extension . vm_mssql_win_postdeploy_script (vmext&#x2011
 ## Next steps
 
 Move on to the next configuration [terraform-azurerm-mssql](../terraform-azurerm-mssql).
+
+## Videos
+
+Video | Section
+--- | ---
+[SQL Server VM (Part 1)](https://youtu.be/2wkGPxqNm-M) | [terraform-azurerm-vm-mssql \| Overview](#overview)
+[SQL Server VM (Part 2)](https://youtu.be/Qk8OIW-VgHs) | [terraform-azurerm-vm-mssql \| Getting started](#getting-started)
+[SQL Server VM (Part 3)](https://youtu.be/uedt5wKIrcY) | [terraform-azurerm-vm-mssql \| Smoke testing](#smoke-testing)
+[SQL Server VM (Part 4)](https://youtu.be/Jzi58S7lBJ8) | [terraform-azurerm-vm-mssql \| Documentation \| Bootstrap script](#bootstrap-script)
+[SQL Server VM (Part 5)](https://youtu.be/RXkPVOZZBwU) | [terraform-azurerm-vm-mssql \| Documentation \| Terraform resources](#terraform-resources)

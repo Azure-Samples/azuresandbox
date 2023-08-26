@@ -9,6 +9,7 @@
 * [Smoke testing](#smoke-testing)
 * [Documentation](#documentation)
 * [Next steps](#next-steps)
+* [Videos](#videos)
 
 ## Architecture
 
@@ -200,3 +201,13 @@ azurerm_private_dns_a_record.sql_server_01 | A DNS A record for resolving DNS qu
 ## Next steps
 
 Move on to the next configuration [terraform-azurerm-mysql](../terraform-azurerm-mysql).
+
+## Videos
+
+Video | Section
+--- | ---
+[Azure SQL Database (Part 1)](https://youtu.be/bkgyYhHfoKg) | [terraform-azurerm-mssql \| Overview](#overview)
+[Azure SQL Database (Part 2)](https://youtu.be/atq1GXv_Jlg) | [terraform-azurerm-mssql \| Getting started](#getting-started)
+[Azure SQL Database (Part 3)](https://youtu.be/pLYKU50Z014) | [terraform-azurerm-mssql \| Smoke testing](#smoke-testing)
+[Azure SQL Database (Part 4)](https://youtu.be/sD6ySES0fJQ) | [terraform-azurerm-mssql \| Documentation \| Bootstrap script](#bootstrap-script)
+[Azure SQL Database (Part 5)](https://youtu.be/-nuc-Q6N430) | [terraform-azurerm-mssql \| Documentation \| Terraform resources](#terraform-resources)

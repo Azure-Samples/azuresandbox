@@ -9,6 +9,7 @@
 * [Smoke testing](#smoke-testing)
 * [Documentation](#documentation)
 * [Next steps](#next-steps)
+* [Videos](#videos)
 
 ## Architecture
 
@@ -321,3 +322,12 @@ azurerm_vpn_server_configuration.vpn_server_configuration_01 | Defines the param
 ## Next steps
 
 You have provisioned all of the configurations included in \#AzureSandbox. Now it's time to use your sandbox environment to experiment with additional Azure services and capabilities.
+
+## Videos
+
+Video | Section
+--- | ---
+[Azure Virtual WAN (Part 1)](https://youtu.be/68E-HiDaXng) | [terraform-azurerm-vwan \| Overview](#overview)
+[Azure Virtual WAN (Part 2)](https://youtu.be/jFkW6GDdg1I) | [terraform-azurerm-vwan \| Getting started](#getting-started)
+[Azure Virtual WAN (Part 3)](https://youtu.be/pUUUiUnchCw) | [terraform-azurerm-vwan \| Smoke testing](#smoke-testing)
+[Azure Virtual WAN (Part 4)](https://youtu.be/jHm_36a8ms4) | [terraform-azurerm-vwan \| Documentation](#documentation)
