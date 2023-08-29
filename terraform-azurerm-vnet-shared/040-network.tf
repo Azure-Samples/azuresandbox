@@ -182,6 +182,10 @@ resource "azurerm_subnet" "vnet_shared_01_subnets" {
   private_endpoint_network_policies_enabled = each.value.private_endpoint_network_policies_enabled
 }
 
+output "vnet_shared_01_subnets" {
+  value = azurerm_subnet.vnet_shared_01_subnets
+}
+
 resource "azurerm_network_security_group" "network_security_groups" {
   for_each = azurerm_subnet.vnet_shared_01_subnets
 
