@@ -511,6 +511,12 @@ Import-Module `
     -ModuleName 'ActiveDirectoryDsc' `
     -ModuleUri 'https://www.powershellgallery.com/api/v2/package/ActiveDirectoryDsc'
 
+Import-Module `
+    -ResourceGroupName $ResourceGroupName `
+    -AutomationAccountName $automationAccount.AutomationAccountName `
+    -ModuleName 'DnsServerDsc' `
+    -ModuleUri 'https://www.powershellgallery.com/api/v2/package/DnsServerDsc'
+
 # Bootstrap automation variables
 Set-Variable `
     -ResourceGroupName $ResourceGroupName `
