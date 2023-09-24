@@ -87,6 +87,11 @@ variable "subnet_AzureBastionSubnet_address_prefix" {
   description = "The address prefix for the AzureBastionSubnet subnet."
 }
 
+variable "subnet_misc_address_prefix" {
+  type        = string
+  description = "The address prefix for the miscellaneous subnet."
+}
+
 variable "subscription_id" {
   type        = string
   description = "The Azure subscription id used to provision resources."
@@ -148,4 +153,5 @@ variable "vnet_address_space" {
 variable "vnet_name" {
   type        = string
   description = "The name of the new virtual network to be provisioned."
+  default     = "vnet-shared-01"
 }

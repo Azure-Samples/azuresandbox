@@ -120,9 +120,9 @@ default_resource_group_name="rg-sandbox-01"
 default_skip_admin_password_gen="no"
 default_subnet_adds_address_prefix="10.1.1.0/24"
 default_subnet_AzureBastionSubnet_address_prefix="10.1.0.0/27"
+default_subnet_misc_address_prefix="10.1.2.0/24"
 default_vm_adds_name="adds1"
 default_vnet_address_space="10.1.0.0/16"
-default_vnet_name="vnet-shared-01"
 
 # Get user input
 read -e                                                       -p "Service principal appId (arm_client_id) ---------------------------------------------: " arm_client_id
@@ -137,6 +137,7 @@ read -e -i $default_project                                   -p "Project tag va
 read -e -i $default_vnet_address_space                        -p "Virtual network address space (vnet_address_space) ----------------------------------: " vnet_address_space
 read -e -i $default_subnet_AzureBastionSubnet_address_prefix  -p "Bastion subnet address prefix (subnet_AzureBastionSubnet_address_prefix) ------------: " subnet_AzureBastionSubnet_address_prefix
 read -e -i $default_subnet_adds_address_prefix                -p "AD Domain Services subnet address prefix (subnet_adds_address_prefix) ---------------: " subnet_adds_address_prefix
+read -e -i $default_subnet_misc_address_prefix                -p "Miscellaneous subnet address prefix (subnet_misc_address_prefix) --------------------: " subnet_misc_address_prefix
 read -e -i $default_dns_server                                -p "DNS server ip address (dns_server) --------------------------------------------------: " dns_server
 read -e -i $default_adds_domain_name                          -p "AD Domain Services domain name (adds_domain_name) -----------------------------------: " adds_domain_name
 read -e -i $default_vm_adds_name                              -p "AD Domain Services virtual machine name (vm_adds_name) ------------------------------: " vm_adds_name
@@ -159,10 +160,10 @@ resource_group_name=${resource_group_name:-$default_resource_group_name}
 skip_admin_password_gen=${skip_admin_password_gen:-$default_skip_admin_password_gen}
 subnet_adds_address_prefix=${subnet_adds_address_prefix:-$default_subnet_adds_address_prefix}
 subnet_AzureBastionSubnet_address_prefix=${subnet_AzureBastionSubnet_address_prefix:-$default_subnet_AzureBastionSubnet_address_prefix}
+subnet_misc_address_prefix=${subnet_misc_address_prefix:-$default_subnet_misc_address_prefix}
 subscription_id=${subscription_id:-$default_subscription_id}
 vm_adds_name=${vm_adds_name:-$default_vm_adds_name}
 vnet_address_space=${vnet_address_space:-$default_vnet_address_space}
-vnet_name=${vnet_name:=$default_vnet_name}
 
 # Validate arm_client_id
 if [ -z "$arm_client_id" ]
@@ -313,7 +314,6 @@ else
     --tags costcenter=$costcenter project=$project environment=$environment provisioner="bootstrap.sh"
 fi
 
-storage_account_id=$(az storage account show --subscription $subscription_id --name $storage_account_name --query id --output tsv)
 storage_account_key=$(az storage account keys list --subscription $subscription_id --account-name $storage_account_name --output tsv --query "[0].value")
 
 printf "Setting storage account secret '$storage_account_name' with value length '${#storage_account_key}' to keyvault '$key_vault_name'...\n"
@@ -376,11 +376,11 @@ printf "storage_account_name                      = \"$storage_account_name\"\n"
 printf "storage_container_name                    = \"$storage_container_name\"\n"                    >> ./terraform.tfvars
 printf "subnet_adds_address_prefix                = \"$subnet_adds_address_prefix\"\n"                >> ./terraform.tfvars
 printf "subnet_AzureBastionSubnet_address_prefix  = \"$subnet_AzureBastionSubnet_address_prefix\"\n"  >> ./terraform.tfvars
+printf "subnet_misc_address_prefix                = \"$subnet_misc_address_prefix\"\n"                >> ./terraform.tfvars
 printf "subscription_id                           = \"$subscription_id\"\n"                           >> ./terraform.tfvars
 printf "tags                                      = $tags\n"                                          >> ./terraform.tfvars
 printf "vm_adds_name                              = \"$vm_adds_name\"\n"                              >> ./terraform.tfvars
 printf "vnet_address_space                        = \"$vnet_address_space\"\n"                        >> ./terraform.tfvars
-printf "vnet_name                                 = \"$vnet_name\"\n"                                 >> ./terraform.tfvars
 
 cat ./terraform.tfvars
 

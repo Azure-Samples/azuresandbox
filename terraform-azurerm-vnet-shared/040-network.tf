@@ -14,8 +14,19 @@ locals {
         "AllowGetSessionInformationOutbound"
       ]
     }
+
     snet-adds-01 = {
       address_prefix                            = var.subnet_adds_address_prefix
+      private_endpoint_network_policies_enabled = false
+      nsgrules = [
+        "AllowVirtualNetworkInbound",
+        "AllowVirtualNetworkOutbound",
+        "AllowInternetOutbound"
+      ]
+    }
+
+    snet-misc-01 = {
+      address_prefix                            = var.subnet_misc_address_prefix
       private_endpoint_network_policies_enabled = false
       nsgrules = [
         "AllowVirtualNetworkInbound",
@@ -233,7 +244,7 @@ resource "azurerm_network_security_rule" "network_security_rules" {
   ]
 }
 
-# Dedicated bastion
+# Bastion
 resource "random_id" "bastion_host_01_name" {
   byte_length = 8
 }
