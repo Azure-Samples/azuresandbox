@@ -29,8 +29,8 @@ This repository contains a collection of inter-dependent [cloud computing](https
 * [PowerShell](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-7.1)
   * [PowerShell Core](https://learn.microsoft.com/powershell/scripting/whats-new/what-s-new-in-powershell-71?view=powershell-7.1)
   * [PowerShell 5.1](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-5.1) for Windows Server configuration.
-* [Terraform](https://www.terraform.io/intro/index.html#what-is-terraform-) v1.5.6 for [Infrastructure as Code](https://en.wikipedia.org/wiki/Infrastructure_as_code) (IaC).
-  * [Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs) (azuerrm) v3.71.0
+* [Terraform](https://www.terraform.io/intro/index.html#what-is-terraform-) v1.5.7 for [Infrastructure as Code](https://en.wikipedia.org/wiki/Infrastructure_as_code) (IaC).
+  * [Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs) (azuerrm) v3.74.0
   * [cloud-init Provider](https://registry.terraform.io/providers/hashicorp/cloudinit/latest/docs) (cloudinit) v2.3.2
   * [Random Provider](https://registry.terraform.io/providers/hashicorp/random/latest/docs) (random) v3.5.1
 
@@ -248,7 +248,7 @@ Shared services | Reserved for future use | 10.1.0.32/27 | 10.1.0.32 | 10.1.0.63
 Shared services | Reserved for future use | 10.1.0.64/26 | 10.1.0.64 | 10.1.0.127 | 64
 Shared services | Reserved for future use | 10.1.0.128/25 | 10.1.0.128 | 10.1.0.255 | 128
 Shared services | snet-adds-01 | 10.1.1.0/24 | 10.1.1.0 | 10.1.1.255 | 256
-Shared services | Reserved for future use | 10.1.2.0/24 | 10.1.2.0 | 10.1.2.255 | 256
+Shared services | snet-misc-01 | 10.1.2.0/24 | 10.1.2.0 | 10.1.2.255 | 256
 Shared services | Reserved for future use | 10.1.3.0/24 | 10.1.3.0 | 10.1.3.255 | 256
 Shared services | Reserved for future use | 10.1.4.0/22 | 10.1.4.0 | 10.1.7.255 | 1,024
 Shared services | Reserved for future use | 10.1.8.0/21 | 10.1.8.0 | 10.1.15.255 | 2,048
@@ -289,7 +289,12 @@ While a default sandbox deployment is fine for testing, it may not work with an 
 1. [terraform-azurerm-vnet-app](./terraform-azurerm-vnet-app/)
 1. [terraform-azurerm-vnet-shared](./terraform-azurerm-vnet-shared/). Note: Resources provisioned by `bootstrap.sh` must be deleted manually.
 
-Alternatively, for speed, simply run `az group delete -g rg-sandbox-01`. You can run [cleanterraformtemp.sh](./cleanterraformtemp.sh) to clean up temporary files and directories.
+Alternatively, for speed, simply delete rg-sandbox-01`. You can run [cleanterraformtemp.sh](./cleanterraformtemp.sh) to clean up temporary files and directories.
+
+```bash
+# Warning: This command will delete an entire resource group and should be used with great caution.
+az group delete -g rg-sandbox-01
+```
 
 ### Perform custom sandbox deployment
 
@@ -343,7 +348,8 @@ Virtual network | Subnet | IP address prefix | First | Last | IP address count
 --- | --- | --- | --- | --- | --:
 Shared services | AzureBastionSubnet | 10.73.8.0/27 | 10.73.8.0 | 10.73.8.31 | 32
 Shared services | snet-adds-01 | 10.73.8.32/27 | 10.73.8.32 | 10.73.8.63 | 32
-Shared services | Reserved for future use | 10.73.8.64/26 | 10.73.8.64 | 10.73.8.127 | 64
+Shared services | snet-misc-01 | 10.73.8.64/27 | 10.73.8.64 | 10.73.8.95 | 32
+Shared services | Reserved for future use | 10.73.8.96/27 | 10.73.8.96 | 10.73.8.127 | 32
 Shared services | Reserved for future use | 10.73.8.128/25 | 10.73.8.128 | 10.73.8.255 | 128
 Application | snet-app-01 | 10.73.9.0/27 | 10.73.9.0 | 10.73.9.31 | 32
 Application | snet-db-01 | 10.73.9.32/27 | 10.73.9.32 | 10.73.9.63 | 32
@@ -384,7 +390,7 @@ This section documents known issues with these configurations that should be add
 * Configuration management
   * *Terraform*
     * For simplicity, these configurations store [State](https://www.terraform.io/language/state) in a local file named `terraform.tfstate`. For production use, state should be managed in a secure, encrypted [Backend](https://www.terraform.io/language/state/backends) such as [azurerm](https://www.terraform.io/language/settings/backends/azurerm).
-    * There is a [known issue](https://github.com/hashicorp/terraform-provider-azurerm/issues/2977) that causes Terraform plan or apply operations to fail after provisioning an Azure Files share behind a private endpoint. If this is blocking you from applying changes you can [Target Resources](https://developer.hashicorp.com/terraform/tutorials/state/resource-targeting) to work around it.
+    * There is a [known issue](https://github.com/hashicorp/terraform-provider-azurerm/issues/2977) that causes Terraform plan or apply operations to fail after provisioning an Azure Files share behind a private endpoint. If this is causing plan or apply operations to fail you can either whitelist the IP address of the client environment on the storage account firewall or use [Target Resources](https://developer.hashicorp.com/terraform/tutorials/state/resource-targeting) to work around it.
   * *Windows Server*: This configuration uses [Azure Automation State Configuration (DSC)](https://learn.microsoft.com/azure/automation/automation-dsc-overview) for configuring the Windows Server virtual machines, which will be replaced by [Azure Automanage Machine Configuration](https://learn.microsoft.com/azure/governance/machine-configuration/overview). This configuration will be updated to the new implementation in a future release.
     * *configure-automation.ps1*: The performance of this script could be improved by using multi-threading to run Azure Automation operations in parallel.
     * There is a known issue with the automated installation of MySQL Workbench using the [mysql.workbench](https://community.chocolatey.org/packages/mysql.workbench) Chocolatey package. DSC reports compliance for `cChocoPackageInstaller` > `MySQLWorkbench`, however the package itself has a bad download link and fails to install. The issue has been reported to the package publishers with a request to update the package. In the meantime, MySQL Workbench must be installed manually.
@@ -408,3 +414,5 @@ This section documents known issues with these configurations that should be add
 * Networking
   * *azurerm_subnet.vnet_shared_01_subnets["snet-adds-01"]*: This subnet is protected by an NSG as per best practices described in described in [Deploy AD DS in an Azure virtual network](https://learn.microsoft.com/azure/architecture/reference-architectures/identity/adds-extend-domain), however the network security rules permit ingress and egress from the Virtual Network on all ports to allow for flexibility in the configurations. Production implementations of this subnet should follow the guidance in [How to configure a firewall for Active Directory domains and trusts](https://learn.microsoft.com/troubleshoot/windows-server/identity/config-firewall-for-ad-domains-and-trusts).
   * *azurerm_private_dns_zone_virtual_network_link.private_dns_zone_virtual_network_links_vnet_app_01[*] and azurerm_private_dns_zone_virtual_network_link.private_dns_zone_virtual_network_links_vnet_shared_01[*]*: Ideally private dns zones should only need to be linked to the shared services virtual network, however some provisioning processes (e.g. Azure Database for MySQL), require them to be linked to the same virtual network where the service is being provisioned. For this reason all private DNS zones are linked to all virtual networks.
+  * *azurerm_point_to_site_vpn_gateway.point_to_site_vpn_gateway_01*: Connection attempts using the Azure VPN client may fail with the message `Server did not respond correctly to VPN control packets. Session state: Reset sent`. Synchronizing the time on the VPN client should resolve the issue. For Windows 11 clients go to `Settings` > `Time & Language` > `Date & Time` > `Additional settings` > `Sync now`.
+  

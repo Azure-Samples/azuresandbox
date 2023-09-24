@@ -154,10 +154,11 @@ The following sections provide guided smoke testing of each resource provisioned
 * From *jumpwin1*, inspect the *mysandbox.local* DNS zone
   * Navigate to *Start* > *Windows Administrative Tools* > *DNS*
   * Connect to the DNS Server on *adds1*.
-  * Click on *adds1* in the left pane, then double-click on *Forwarders* in the right pane.
+  * Click on *adds1* in the left pane
+    * Double-click on *Forwarders* in the right pane.
     * Verify that [168.63.129.16](https://learn.microsoft.com/azure/virtual-network/what-is-ip-address-168-63-129-16) is listed. This ensures that the DNS server will forward any DNS queries it cannot resolve to the Azure Recursive DNS resolver.
     * Click *Cancel*.
-  * Navigate to *adds1* > *Forward Lookup Zones* > *mysandbox.local* and verify that there are *Host (A)* records for *adds1*, *jumpwin1* and *jumplinux1*.
+    * Navigate to *adds1* > *Forward Lookup Zones* > *mysandbox.local* and verify that there are *Host (A)* records for *adds1*, *jumpwin1* and *jumplinux1*.
 
 * From *jumpwin1*, configure [Visual Studio Code](https://aka.ms/vscode) to do remote development on *jumplinux1*
   * Navigate to *Start* > *Visual Studio Code* > *Visual Studio Code*.
@@ -193,7 +194,7 @@ The following sections provide guided smoke testing of each resource provisioned
     * When prompted for *"jumplinux1" has fingerprint...* select *Continue*.
     * When prompted for *Enter password* use the value of the *adminpassword* secret in key vault.
       * This will install Visual Studio code remote development binaries on *jumplinux1*.
-    * Verify that *SSH:jumplinux1* is displayed in the green status section in the lower left hand corner.
+    * Verify that *SSH:jumplinux1* is displayed in the blue status section in the lower left corner.
     * Connect to remote file system
       * Navigate to *View* > *Explorer*
       * Click *Open Folder*

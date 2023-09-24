@@ -208,6 +208,7 @@ This configuration makes extensive use of [Azure Automation State Configuration 
       * Existing modules are updated to the most recent release where possible.
       * Imports new modules including the following:
         * [ActiveDirectoryDsc](https://github.com/dsccommunity/ActiveDirectoryDsc)
+        * [DnsServerDsc](https://github.com/dsccommunity/DnsServerDsc)
     * Bootstraps [Variables](https://learn.microsoft.com/azure/automation/shared-resources/variables)
     * Bootstraps [Credentials](https://learn.microsoft.com/azure/automation/shared-resources/credentials)
   * Configures [Azure Automation State Configuration (DSC)](https://learn.microsoft.com/azure/automation/automation-dsc-overview) which is used to configure Windows Server virtual machines used in the configurations.
@@ -221,10 +222,11 @@ The configuration for these resources can be found in [040-network.tf](./040-net
 
 Resource name (ARM) | Notes
 --- | ---
-azurerm_virtual_network.vnet_shared_01 (vnet&#x2011;shared&#x2011;01) | By default this virtual network is configured with an address space of `10.1.0.0/16` and is configured with DNS server addresses of `10.1.1.4` (the private ip for *azurerm_windows_virtual_machine.vm_adds*) and [168.63.129.16](https://learn.microsoft.com/azure/virtual-network/what-is-ip-address-168-63-129-16).
+azurerm_virtual_network.vnet_shared_01 (vnet&#x2011;shared&#x2011;01) | By default this virtual network is configured with an address space of `10.1.0.0/16` and is configured with DNS server addresses of `10.1.1.4` (the private ip for *azurerm_windows_virtual_machine.vm_adds*) and [168.63.129.16](https://learn.microsoft.com/azure/virtual-network/what-is-ip-address-168-63-129-16). This DNS configuration supports both the default Azure DNS behavior required to initially configure *azurerm_windows_virtual_machine.vm_adds*, as well as the custom DNS behavior provided by the AD integrated DNS server running on *azurerm_windows_virtual_machine.vm_adds* after it is fully configured.
 azurerm_subnet.vnet_shared_01_subnets["AzureBastionSubnet"] | The default address prefix for this subnet is 10.1.0.0/27 which includes the private ip addresses for *azurerm_bastion_host.bastion_host_01*. A network security group is associated with this subnet and is configured according to [Working with NSG access and Azure Bastion](https://learn.microsoft.com/azure/bastion/bastion-nsg).
 azurerm_subnet.vnet_shared_01_subnets["snet-adds-01"] | The default address prefix for this subnet is 10.1.1.0/24 which includes the private ip address for *azurerm_windows_virtual_machine.vm_adds*. A network security group is associated with this subnet that permits ingress and egress from virtual networks, and egress to the Internet.
 azurerm_bastion_host.bastion_host_01 (bst&#x2011;xxxxxxxxxxxxxxxx&#x2011;1) | Used for secure RDP and SSH access to VMs.
+[azurerm_subnet.vnet_shared_01_subnets["snet-misc-01"]| The default address prefix for this subnet is 10.1.2.0/24 and is intended for use by optional configurations which require connectivity in the shared services virtual network.
 random_id.bastion_host_01_name | Used to generate a random name for *azurerm_bastion_host.bastion_host_01*.
 azurerm_public_ip.bastion_host_01 (pip&#x2011;xxxxxxxxxxxxxxxx&#x2011;1) | Public ip used by *azurerm_bastion_host.bastion_host_01*.
 random_id.public_ip_bastion_host_01_name | Used to generate a random name for *azurerm_public_ip.bastion_host_01*.
@@ -250,12 +252,11 @@ This Windows Server VM is used as an [Active Directory Domain Services](https://
     * The domain admin credentials are configured using the *adminusername* and *adminpassword* key vault secrets.
     * The forest functional level is set to `WinThreshhold`
     * A DNS Server is automatically configured
-      * Server configuration
-        * Forwarder: [168.63.129.16](https://learn.microsoft.com/azure/virtual-network/what-is-ip-address-168-63-129-16).
-          * Note: This ensures that any DNS queries that can't be resolved by the DNS server are forwarded to the Azure recursive resolver as per [Name resolution for resources in Azure virtual networks](https://learn.microsoft.com/azure/virtual-network/virtual-networks-name-resolution-for-vms-and-role-instances).
       * *mysandbox.local* DNS forward lookup zone configuration
         * Zone type: Primary / Active Directory-Integrated
         * Dynamic updates: Secure only
+      * Forwarder: [168.63.129.16](https://learn.microsoft.com/azure/virtual-network/what-is-ip-address-168-63-129-16).
+        * Note: This ensures that any DNS queries that can't be resolved by the DNS server are forwarded to  Azure DNS as per [Name resolution for resources in Azure virtual networks](https://learn.microsoft.com/azure/virtual-network/virtual-networks-name-resolution-for-vms-and-role-instances).
 
 ### Terraform output variables
 
