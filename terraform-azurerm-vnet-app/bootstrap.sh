@@ -8,9 +8,6 @@ usage() {
     exit 1
 }
 
-# Initialize constants
-vm_jumpbox_linux_userdata_file='vm-jumpbox-linux-userdata.mim'
-
 # Set these defaults prior to running the script.
 default_vnet_name="vnet-app-01"
 default_vnet_address_space="10.2.0.0/16"
@@ -214,7 +211,6 @@ printf "subnet_privatelink_address_prefix           = \"$subnet_privatelink_addr
 printf "subscription_id                             = $subscription_id\n"                                 >> ./terraform.tfvars
 printf "tags                                        = $tags\n"                                            >> ./terraform.tfvars
 printf "vm_jumpbox_linux_name                       = \"$vm_jumpbox_linux_name\"\n"                       >> ./terraform.tfvars
-printf "vm_jumpbox_linux_userdata_file              = \"$vm_jumpbox_linux_userdata_file\"\n"              >> ./terraform.tfvars
 printf "vm_jumpbox_win_name                         = \"$vm_jumpbox_win_name\"\n"                         >> ./terraform.tfvars
 printf "vm_jumpbox_win_post_deploy_script           = \"$vm_jumpbox_win_post_deploy_script\"\n"           >> ./terraform.tfvars
 printf "vm_jumpbox_win_post_deploy_script_uri       = \"$vm_jumpbox_win_post_deploy_script_uri\"\n"       >> ./terraform.tfvars
