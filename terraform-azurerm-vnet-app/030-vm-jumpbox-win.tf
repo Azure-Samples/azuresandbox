@@ -71,10 +71,6 @@ resource "azurerm_network_interface" "vm_jumpbox_win_nic_01" {
     subnet_id                     = azurerm_subnet.vnet_app_01_subnets["snet-app-01"].id
     private_ip_address_allocation = "Dynamic"
   }
-
-  depends_on = [
-    azurerm_subnet_network_security_group_association.nsg_subnet_associations
-  ]
 }
 
 # Virtual machine extensions
