@@ -161,11 +161,6 @@ variable "vm_jumpbox_linux_storage_account_type" {
   default     = "Standard_LRS"
 }
 
-variable "vm_jumpbox_linux_userdata_file" {
-  type        = string
-  description = "The name of the cloud-init User-Data file for the virtual machine."
-}
-
 variable "vm_jumpbox_win_configure_storage_script" {
   type        = string
   description = "The name of the PowerShell script used to configure Azure Storage for kerberos authentication."
