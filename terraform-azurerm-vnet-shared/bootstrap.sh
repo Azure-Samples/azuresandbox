@@ -121,6 +121,7 @@ default_skip_admin_password_gen="no"
 default_subnet_adds_address_prefix="10.1.1.0/24"
 default_subnet_AzureBastionSubnet_address_prefix="10.1.0.0/27"
 default_subnet_misc_address_prefix="10.1.2.0/24"
+default_subnet_misc_02_address_prefix="10.1.3.0/24"
 default_vm_adds_name="adds1"
 default_vnet_address_space="10.1.0.0/16"
 
@@ -138,6 +139,7 @@ read -e -i $default_vnet_address_space                        -p "Virtual networ
 read -e -i $default_subnet_AzureBastionSubnet_address_prefix  -p "Bastion subnet address prefix (subnet_AzureBastionSubnet_address_prefix) ------------: " subnet_AzureBastionSubnet_address_prefix
 read -e -i $default_subnet_adds_address_prefix                -p "AD Domain Services subnet address prefix (subnet_adds_address_prefix) ---------------: " subnet_adds_address_prefix
 read -e -i $default_subnet_misc_address_prefix                -p "Miscellaneous subnet address prefix (subnet_misc_address_prefix) --------------------: " subnet_misc_address_prefix
+read -e -i $default_subnet_misc_02_address_prefix             -p "Miscellaneous subnet 2 address prefix (subnet_misc_02_address_prefix) ---------------: " subnet_misc_02_address_prefix
 read -e -i $default_dns_server                                -p "DNS server ip address (dns_server) --------------------------------------------------: " dns_server
 read -e -i $default_adds_domain_name                          -p "AD Domain Services domain name (adds_domain_name) -----------------------------------: " adds_domain_name
 read -e -i $default_vm_adds_name                              -p "AD Domain Services virtual machine name (vm_adds_name) ------------------------------: " vm_adds_name
@@ -161,6 +163,7 @@ skip_admin_password_gen=${skip_admin_password_gen:-$default_skip_admin_password_
 subnet_adds_address_prefix=${subnet_adds_address_prefix:-$default_subnet_adds_address_prefix}
 subnet_AzureBastionSubnet_address_prefix=${subnet_AzureBastionSubnet_address_prefix:-$default_subnet_AzureBastionSubnet_address_prefix}
 subnet_misc_address_prefix=${subnet_misc_address_prefix:-$default_subnet_misc_address_prefix}
+subnet_misc_02_address_prefix=${subnet_misc_02_address_prefix:-$default_subnet_misc_02_address_prefix}
 subscription_id=${subscription_id:-$default_subscription_id}
 vm_adds_name=${vm_adds_name:-$default_vm_adds_name}
 vnet_address_space=${vnet_address_space:-$default_vnet_address_space}
@@ -377,6 +380,7 @@ printf "storage_container_name                    = \"$storage_container_name\"\
 printf "subnet_adds_address_prefix                = \"$subnet_adds_address_prefix\"\n"                >> ./terraform.tfvars
 printf "subnet_AzureBastionSubnet_address_prefix  = \"$subnet_AzureBastionSubnet_address_prefix\"\n"  >> ./terraform.tfvars
 printf "subnet_misc_address_prefix                = \"$subnet_misc_address_prefix\"\n"                >> ./terraform.tfvars
+printf "subnet_misc_02_address_prefix             = \"$subnet_misc_02_address_prefix\"\n"             >> ./terraform.tfvars
 printf "subscription_id                           = \"$subscription_id\"\n"                           >> ./terraform.tfvars
 printf "tags                                      = $tags\n"                                          >> ./terraform.tfvars
 printf "vm_adds_name                              = \"$vm_adds_name\"\n"                              >> ./terraform.tfvars

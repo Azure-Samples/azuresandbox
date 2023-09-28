@@ -34,6 +34,16 @@ locals {
         "AllowInternetOutbound"
       ]
     }
+
+    snet-misc-02 = {
+      address_prefix                            = var.subnet_misc_02_address_prefix
+      private_endpoint_network_policies_enabled = false
+      nsgrules = [
+        "AllowVirtualNetworkInbound",
+        "AllowVirtualNetworkOutbound",
+        "AllowInternetOutbound"
+      ]
+    }
   }
 
   nsgrules = {

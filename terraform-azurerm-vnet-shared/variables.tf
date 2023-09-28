@@ -92,6 +92,11 @@ variable "subnet_misc_address_prefix" {
   description = "The address prefix for the miscellaneous subnet."
 }
 
+variable "subnet_misc_02_address_prefix" {
+  type        = string
+  description = "The address prefix for the miscellaneous 2 subnet."
+}
+
 variable "subscription_id" {
   type        = string
   description = "The Azure subscription id used to provision resources."
