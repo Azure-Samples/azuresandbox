@@ -25,6 +25,10 @@ resource "azurerm_virtual_hub" "vwan_01_hub_01" {
   tags                = var.tags
 }
 
+output "vwan_01_hub_01_id" {
+  value = azurerm_virtual_hub.vwan_01_hub_01.id
+}
+
 resource "azurerm_virtual_hub_connection" "vwan_01_hub_01_connections" {
   for_each = var.virtual_networks
 
