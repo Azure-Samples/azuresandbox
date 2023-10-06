@@ -227,6 +227,7 @@ azurerm_subnet.vnet_shared_01_subnets["AzureBastionSubnet"] | The default addres
 azurerm_subnet.vnet_shared_01_subnets["snet-adds-01"] | The default address prefix for this subnet is 10.1.1.0/24 which includes the private ip address for *azurerm_windows_virtual_machine.vm_adds*. A network security group is associated with this subnet that permits ingress and egress from virtual networks, and egress to the Internet.
 azurerm_bastion_host.bastion_host_01 (bst&#x2011;xxxxxxxxxxxxxxxx&#x2011;1) | Used for secure RDP and SSH access to VMs.
 [azurerm_subnet.vnet_shared_01_subnets["snet-misc-01"]| The default address prefix for this subnet is 10.1.2.0/24 and is intended for use by optional configurations which require connectivity in the shared services virtual network.
+[azurerm_subnet.vnet_shared_01_subnets["snet-misc-02"]| The default address prefix for this subnet is 10.1.3.0/24 and is intended for use by optional configurations which require connectivity in the shared services virtual network.
 random_id.bastion_host_01_name | Used to generate a random name for *azurerm_bastion_host.bastion_host_01*.
 azurerm_public_ip.bastion_host_01 (pip&#x2011;xxxxxxxxxxxxxxxx&#x2011;1) | Public ip used by *azurerm_bastion_host.bastion_host_01*.
 random_id.public_ip_bastion_host_01_name | Used to generate a random name for *azurerm_public_ip.bastion_host_01*.
@@ -281,6 +282,7 @@ storage_account_name | "stXXXXXXXXXXXXXXX"
 storage_container_name | "scripts"
 subscription_id | "00000000-0000-0000-0000-000000000000"
 tags | tomap( { "costcenter" = "10177772" "environment" = "dev" "project" = "#AzureSandbox" } )
+vnet_shared_01_address_space | "10.1.0.0/16"
 vnet_shared_01_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualNetworks/vnet-shared-01""
 vnet_shared_01_name | "vnet-shared-01"
 vnet_shared_01_subnets | Contains all the subnet definitions from this configuration including *AzureBastionSubnet* and *snet-adds-01*.
