@@ -319,6 +319,15 @@ azurerm_vpn_server_configuration.vpn_server_configuration_01 | Defines the param
 
 [User VPN (point-to-site) connections](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#uservpn) are enabled by generating a self-signed certificate in the client environment and using it to authenticate with a point-to-site VPN gateway provisioned in a [Virtual WAN hub](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#resources) that is connected to both the shared services and application virtual networks used in \#AzureSandbox.
 
+### Terraform output variables
+
+This section lists the output variables defined in the Terraform configurations in this sample. Some of these may be used for automation in other configurations.
+
+Output variable | Sample value
+--- | ---
+vwan_01_hub_01_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualHubs/vhub-xxxxxxxxxxxxxxxx-01"
+vwan_01_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualWans/vwan-xxxxxxxxxxxxxxxx-01"
+
 ## Next steps
 
 You have provisioned all of the configurations included in \#AzureSandbox. Now it's time to use your sandbox environment to experiment with additional Azure services and capabilities.

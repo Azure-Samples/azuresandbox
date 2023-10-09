@@ -11,6 +11,10 @@ resource "azurerm_virtual_wan" "vwan_01" {
   tags                = var.tags
 }
 
+output "vwan_01_id" {
+  value = azurerm_virtual_wan.vwan_01.id
+}
+
 # Virtual wan hub
 resource "random_id" "random_id_vwan_01_hub_01_name" {
   byte_length = 8
