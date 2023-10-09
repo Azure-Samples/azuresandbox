@@ -194,10 +194,6 @@ output "vnet_shared_01_name" {
   value = azurerm_virtual_network.vnet_shared_01.name
 }
 
-output "vnet_shared_01_address_space" {
-  value = azurerm_virtual_network.vnet_shared_01.address_space[0]
-}
-
 resource "azurerm_subnet" "vnet_shared_01_subnets" {
   for_each                                  = local.subnets
   name                                      = each.key

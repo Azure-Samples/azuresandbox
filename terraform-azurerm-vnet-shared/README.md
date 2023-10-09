@@ -282,7 +282,6 @@ storage_account_name | "stXXXXXXXXXXXXXXX"
 storage_container_name | "scripts"
 subscription_id | "00000000-0000-0000-0000-000000000000"
 tags | tomap( { "costcenter" = "10177772" "environment" = "dev" "project" = "#AzureSandbox" } )
-vnet_shared_01_address_space | "10.1.0.0/16"
 vnet_shared_01_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualNetworks/vnet-shared-01""
 vnet_shared_01_name | "vnet-shared-01"
 vnet_shared_01_subnets | Contains all the subnet definitions from this configuration including *AzureBastionSubnet* and *snet-adds-01*.
