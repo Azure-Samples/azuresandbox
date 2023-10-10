@@ -20,9 +20,11 @@ This section describes additional Terraform configurations that can be added to 
   * A [storage account](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#storage-account) for use as a [Terraform azurerm backend](https://developer.hashicorp.com/terraform/language/settings/backends/azurerm).
   * A Linux [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) for use as a DevOps agent.
 * [terraform-azurerm-vm-devops](./terraform-azurerm-vm-devops/) implements a collection of identical [IaaS](https://azure.microsoft.com/overview/what-is-iaas/) [virtual machines](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) designed to be used as DevOps agents by [Azure Pipelines](https://learn.microsoft.com/azure/devops/pipelines/get-started/what-is-azure-pipelines?view=azure-devops) or [Github Actions](https://docs.github.com/en/actions).
+* [terraform-azurerm-vnet-onprem](./terraform-azurerm-vnet-onprem/) simulates connectivity to an on-premises network using a site-to-site VPN connection and Azure DNS private resolver.
 
 ## Demo videos
 
 This section contains an index of demo videos that were built using aspects of #AzureSandbox.
 
-* [Fixing a PowerShell script bug with GitHub Copilot](https://youtu.be/xRgdzc_Rl9w)
+* [Accessing Azure Files over HTTPS](https://youtu.be/6ft5rxET8Pc) (October 2023)
+* [Fixing a PowerShell script bug with GitHub Copilot](https://youtu.be/xRgdzc_Rl9w) (August 2023)
