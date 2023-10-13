@@ -26,7 +26,7 @@ Smoke testing | ~5 minutes
 
 ## Before you start
 
-[terraform-azurerm-vnet-app](../terraform-azurerm-vnet-app) must be provisioned first before starting. This configuration is optional and can be skipped to reduce costs. Proceed with [terraform-azurerm-vm-mssql](../terraform-azurerm-vm-mssql) if you wish to skip it.
+[terraform-azurerm-vnet-app](../../terraform-azurerm-vnet-app/) must be provisioned first before starting.
 
 ## Getting started
 
@@ -35,7 +35,7 @@ This section describes how to provision this configuration using default setting
 * Change the working directory.
 
   ```bash
-  cd ~/azuresandbox/terraform-azurerm-vm-devops
+  cd ~/azuresandbox/extras/terraform-azurerm-vm-devops
   ```
 
 * Add an environment variable containing the password for the service principal.
