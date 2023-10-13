@@ -259,7 +259,7 @@ resource "random_id" "bastion_host_02_name" {
 }
 
 resource "azurerm_bastion_host" "bastion_host_02" {
-  name                = "bst-${random_id.bastion_host_02_name.hex}-1"
+  name                = "bst-${random_id.bastion_host_02_name.hex}-2"
   location            = var.location
   resource_group_name = var.resource_group_name
   tags                = var.tags
@@ -276,7 +276,7 @@ resource "random_id" "public_ip_bastion_host_02_name" {
 }
 
 resource "azurerm_public_ip" "bastion_host_02" {
-  name                = "pip-${random_id.public_ip_bastion_host_02_name.hex}-1"
+  name                = "pip-${random_id.public_ip_bastion_host_02_name.hex}-2"
   location            = var.location
   resource_group_name = var.resource_group_name
   allocation_method   = "Static"
@@ -307,6 +307,7 @@ resource "azurerm_virtual_network_gateway" "vnet_shared_02_gateway" {
   generation                 = "Generation1"
   private_ip_address_enabled = false
   tags                       = var.tags
+  depends_on                 = [azurerm_subnet.vnet_shared_02_subnets]
 
   ip_configuration {
     name                          = "gw-${var.vnet_name}-ipconfig"
