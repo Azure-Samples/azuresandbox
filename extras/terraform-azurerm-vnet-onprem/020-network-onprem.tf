@@ -224,9 +224,7 @@ resource "azurerm_subnet_network_security_group_association" "nsg_subnet_associa
   # Note: This depedency is a workaround for an issue that arises when existing NSG rules do not exactly match what Azure Bastion wants, even if the rules are correct.
   # The NSG rules in this configuration functionally match what is reccomended, however the name and priority of the rules are different.
   # See https://docs.microsoft.com/en-us/azure/bastion/bastion-nsg?msclkid=b12f8b18ac6e11ecb11e8f00c2bce23d for more information.
-  depends_on = [
-    azurerm_bastion_host.bastion_host_02
-  ]
+  depends_on = [azurerm_virtual_network_gateway_connection.onprem_to_cloud]
 }
 
 resource "azurerm_network_security_rule" "network_security_rules" {
