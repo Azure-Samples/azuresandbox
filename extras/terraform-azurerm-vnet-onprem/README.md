@@ -71,7 +71,7 @@ This section describes how to provision this configuration using default setting
 
 * Monitor output. Upon completion, you should see a message similar to the following:
 
-  `Apply complete! Resources: xx added, 0 changed, 0 destroyed.`
+  `Apply complete! Resources: 49 added, 0 changed, 0 destroyed.`
 
 * Inspect `terraform.tfstate`.
 
@@ -83,3 +83,38 @@ This section describes how to provision this configuration using default setting
 ## Smoke testing
 
 ## Documentation
+
+This section provides additional information on various aspects of this configuration.
+
+### Bootstrap script
+
+This configuration uses the script [bootstrap.sh](./bootstrap.sh) to create a `terraform.tfvars` file for generating and applying Terraform plans. For simplified deployment, several runtime defaults are initialized using output variables stored in the `terraform.tfstate` files associated with the following configurations:
+
+* [terraform-azurerm-vnet-shared](../../terraform-azurerm-vnet-shared/)
+* [terraform-azurerm-vnet-app](../../terraform-azurerm-vnet-app/)
+* [terraform-azurerm-vwan](../../terraform-azurerm-vwan/)
+
+Output variable | Configuration | Sample value
+--- | --- | ---
+aad_tenant_id | terraform-azurerm-vnet-shared | "00000000-0000-0000-0000-000000000000"
+adds_domain_name_cloud | terraform-azurerm-vnet-shared | "mysandbox.local"
+admin_password_secret | terraform-azurerm-vnet-shared | "adminpassword"
+admin_username_secret | terraform-azurerm-vnet-shared | "adminuser"
+arm_client_id | terraform-azurerm-vnet-shared | "00000000-0000-0000-0000-000000000000"
+automation_account_name | terraform-azurerm-vnet-shared | "auto-xxxxxxxxxxxxxxxx-01"
+dns_server_cloud | terraform-azurerm-vnet-shared | "10.1.2.4"
+key_vault_id | terraform-azurerm-vnet-shared | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.KeyVault/vaults/kv-xxxxxxxxxxxxxxx"
+key_vault_name | terraform-azurerm-vnet-shared | "kv-xxxxxxxxxxxxxxx"
+location | terraform-azurerm-vnet-shared | "eastus"
+resource_group_name | terraform-azurerm-vnet-shared | "rg-sandbox-01"
+subscription_id | terraform-azurerm-vnet-shared | "00000000-0000-0000-0000-000000000000"
+tags | terraform-azurerm-vnet-shared | "tomap( { "costcenter" = "10177772" "environment" = "dev" "project" = "#AzureSandbox" } )"
+vnet_app_01_id | terraform-azurerm-vnet-app | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualNetworks/vnet-app-01"
+vnet_app_01_name | terraform-azurerm-vnet-app | "vnet-app-01"
+vnet_shared_01_id | terraform-azurerm-vnet-shared | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualNetworks/vnet-shared-01"
+vnet_shared_01_name | terraform-azurerm-vnet-shared | "vnet-shared-01"
+vnet_shared_01_subnets | terraform-azurerm-vnet-shared | Contains all the subnet definitions.
+vwan_01_hub_01_id | terraform-azurerm-vwan | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualHubs/vhub-xxxxxxxxxxxxxxxx-01"
+vwan_01_id | terraform-azurerm-vwan |"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualWans/vwan-xxxxxxxxxxxxxxxx-01"
+
+### Terraform resources

@@ -300,7 +300,7 @@ vnet_shared_01_name | "vnet-shared-01"
 vnet_app_01_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualNetworks/vnet-app-01"
 vnet_app_01_name | "vnet-app-01"
 
-### Terraform Resources
+### Terraform resources
 
 This section lists the resources included in this configuration.
 
