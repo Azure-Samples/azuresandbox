@@ -118,3 +118,25 @@ vwan_01_hub_01_id | terraform-azurerm-vwan | "/subscriptions/00000000-0000-0000-
 vwan_01_id | terraform-azurerm-vwan |"/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualWans/vwan-xxxxxxxxxxxxxxxx-01"
 
 ### Terraform resources
+
+This section describes the resources included in this configuration.
+
+#### Network resources (on-premises)
+
+The configuration for these resources can be found in [020-network-onprem.tf](./020-network-onprem.tf).
+
+Resource name (ARM) | Notes
+--- | ---
+azurerm_virtual_network.vnet_shared_02 (vnet&#x2011;onprem&#x2011;01) | By default this virtual network is configured with an address space of `192.168.0.0/16` and is configured with DNS server addresses of `192.168.2.4` (the private ip for *azurerm_windows_virtual_machine.vm_adds*) and [168.63.129.16](https://learn.microsoft.com/azure/virtual-network/what-is-ip-address-168-63-129-16). This DNS configuration supports both the default Azure DNS behavior required to initially configure *azurerm_windows_virtual_machine.vm_adds*, as well as the custom DNS behavior provided by the AD integrated DNS server running on *azurerm_windows_virtual_machine.vm_adds* after it is fully configured.
+azurerm_subnet.vnet_shared_02_GatewaySubnet | This subnet is reserved for use by *azurerm_virtual_network_gateway.vnet_shared_02_gateway* and has a default IP address prefix of `192.168.0.0/24`. It is defined separately from *azurerm_subnet.vnet_shared_02_subnets* because gateway subnets have special behaviors in Azure such as the restriction on using network security groups.
+azurerm_subnet.vnet_shared_02_subnets["AzureBastionSubnet"] | This subnet is reserved for use by *azurerm_bastion_host.bastion_host_02* and has a default IP address prefix of `192.168.1.0/27`. A network security group is associated with this subnet and is configured according to [Working with NSG access and Azure Bastion](https://learn.microsoft.com/azure/bastion/bastion-nsg).
+azurerm_subnet.vnet_shared_02_subnets["snet-adds-02"] | This subnet is used by *azurerm_windows_virtual_machine.vm_adds* and has a default IP address prefix of `192.168.2.0/24`. A network security group is associated with this subnet that permits ingress and egress from virtual networks, and egress to the Internet.
+azurerm_subnet.vnet_shared_02_subnets["snet-misc-03"] | This subnet is used by *azurerm_windows_virtual_machine.vm_jumpbox_win* and has a default IP address prefix of `192.168.3.0/24`. A network security group is associated with this subnet that permits ingress and egress from virtual networks, and egress to the Internet.
+azurerm_bastion_host.bastion_host_02 (bst&#x2011;xxxxxxxxxxxxxxxx&#x2011;2) | Used for secure RDP and SSH access to VMs.
+azurerm_virtual_network_gateway.vnet_shared_02_gateway (gw&#x2011;vnet&#x2011;onprem&#x2011;01) | VPN gateway used to connect on-premises network to cloud network.
+azurerm_virtual_network_gateway_connection.onprem_to_cloud | Used by *azurerm_virtual_network_gateway.vnet_shared_02_gateway* to connect to cloud network.
+azurerm_local_network_gateway.cloud_network | Used by *azurerm_virtual_network_gateway_connection.onprem_to_cloud* to connect to cloud network. *azurerm_vpn_gateway.site_to_site_vpn_gateway_01* is used to configure the gateway address (default `tbd`) and the BGP peering address (default `tbd`).
+azurerm_public_ip.vnet_shared_02_gateway_ip (pip&#x2011;vnet&#x2011;onprem&#x2011;01) | Public ip used by *azurerm_virtual_network_gateway.vnet_shared_02_gateway*.
+azurerm_public_ip.bastion_host_02 (pip&#x2011;xxxxxxxxxxxxxxxx&#x2011;2) | Public ip used by *azurerm_bastion_host.bastion_host_02*.
+random_id.bastion_host_02_name | Used to generate a random name for *azurerm_bastion_host.bastion_host_02*.
+random_id.public_ip_bastion_host_02_name | Used to generate a random name for *azurerm_public_ip.bastion_host_02*
