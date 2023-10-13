@@ -198,6 +198,8 @@ resource "azurerm_subnet" "vnet_shared_02_subnets" {
   virtual_network_name                      = azurerm_virtual_network.vnet_shared_02.name
   address_prefixes                          = [each.value.address_prefix]
   private_endpoint_network_policies_enabled = each.value.private_endpoint_network_policies_enabled
+
+  depends_on = [azurerm_subnet.vnet_shared_02_GatewaySubnet]
 }
 
 output "vnet_shared_02_subnets" {
