@@ -11,11 +11,10 @@ usage() {
 # Set these defaults prior to running the script.
 default_adds_domain_name="myonprem.local"
 default_dns_resolver_cloud="10.1.2.4"
-default_dns_server="192.168.2.4"
-default_subnet_adds_address_prefix="192.168.2.0/24"
-default_subnet_AzureBastionSubnet_address_prefix="192.168.1.0/27"
+default_dns_server="192.168.1.4"
+default_subnet_adds_address_prefix="192.168.1.0/24"
 default_subnet_GatewaySubnet_address_prefix="192.168.0.0/24"
-default_subnet_misc_address_prefix="192.168.3.0/24"
+default_subnet_misc_address_prefix="192.168.2.0/24"
 default_vnet_address_space="192.168.0.0/16"
 default_vm_adds_name="adds2"
 default_vm_jumpbox_win_name="jumpwin2"
@@ -80,7 +79,6 @@ vwan_01_id=$(terraform output -state=$state_file vwan_01_id)
 # User input
 read -e -i $default_vnet_address_space                        -p "Virtual network address space (vnet_address_space) -----------------------: " vnet_address_space
 read -e -i $default_subnet_GatewaySubnet_address_prefix       -p "Gateway subnet address prefix (subnet_GatewaySubnet_address_prefix) ------: " subnet_GatewaySubnet_address_prefix
-read -e -i $default_subnet_AzureBastionSubnet_address_prefix  -p "Bastion subnet address prefix (subnet_AzureBastionSubnet_address_prefix) -: " subnet_AzureBastionSubnet_address_prefix
 read -e -i $default_subnet_adds_address_prefix                -p "AD Domain Services subnet address prefix (subnet_adds_address_prefix) ----: " subnet_adds_address_prefix
 read -e -i $default_subnet_misc_address_prefix                -p "Miscellaneous subnet address prefix (subnet_misc_address_prefix) ---------: " subnet_misc_address_prefix
 read -e -i $default_dns_server                                -p "DNS server ip address (dns_server) ---------------------------------------: " dns_server
@@ -94,7 +92,6 @@ adds_domain_name=${adds_domain_name:-$default_adds_domain_name}
 dns_resolver_cloud=${dns_resolver_cloud:-$default_dns_resolver_cloud}
 dns_server=${dns_server:-default_dns_server}
 subnet_adds_address_prefix=${subnet_adds_address_prefix:-$default_subnet_adds_address_prefix}
-subnet_AzureBastionSubnet_address_prefix=${subnet_AzureBastionSubnet_address_prefix:-$default_subnet_AzureBastionSubnet_address_prefix}
 subnet_GatewaySubnet_address_prefix=${subnet_GatewaySubnet_address_prefix:-$default_subnet_GatewaySubnet_address_prefix}
 subnet_misc_address_prefix=${subnet_misc_address_prefix:-$default_subnet_misc_address_prefix}
 vnet_address_space=${vnet_address_space:-$default_vnet_address_space}
@@ -168,7 +165,6 @@ printf "key_vault_name                            = $key_vault_name\n"          
 printf "location                                  = $location\n"                                      >> ./terraform.tfvars
 printf "resource_group_name                       = $resource_group_name\n"                           >> ./terraform.tfvars
 printf "subnet_adds_address_prefix                = \"$subnet_adds_address_prefix\"\n"                >> ./terraform.tfvars
-printf "subnet_AzureBastionSubnet_address_prefix  = \"$subnet_AzureBastionSubnet_address_prefix\"\n"  >> ./terraform.tfvars
 printf "subnet_GatewaySubnet_address_prefix       = \"$subnet_GatewaySubnet_address_prefix\"\n"       >> ./terraform.tfvars
 printf "subnet_misc_address_prefix                = \"$subnet_misc_address_prefix\"\n"                >> ./terraform.tfvars
 printf "subscription_id                           = $subscription_id\n"                               >> ./terraform.tfvars

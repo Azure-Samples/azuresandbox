@@ -74,11 +74,6 @@ variable "subnet_adds_address_prefix" {
   description = "The address prefix for the AD Domain Services subnet."
 }
 
-variable "subnet_AzureBastionSubnet_address_prefix" {
-  type        = string
-  description = "The address prefix for the AzureBastionSubnet subnet."
-}
-
 variable "subnet_GatewaySubnet_address_prefix" {
   type        = string
   description = "The address prefix for the GatewaySubnet subnet."
