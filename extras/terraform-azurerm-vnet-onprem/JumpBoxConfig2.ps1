@@ -6,6 +6,7 @@ configuration JumpBoxConfig2 {
 
     Import-DscResource -ModuleName 'PSDscResources'
     Import-DscResource -ModuleName 'xDSCDomainjoin'
+    Import-DscResource -ModuleName 'ActiveDirectoryDsc'
     Import-DscResource -ModuleName 'cChoco'
     
     $domain = Get-AutomationVariable -Name 'adds2_domain_name'
@@ -35,6 +36,28 @@ configuration JumpBoxConfig2 {
             DependsOn = '[xDSCDomainjoin]JoinDomain' 
         }
 
+        WindowsFeature 'RSAT-Clustering-Mgmt' {
+            Name = 'RSAT-Clustering-Mgmt'
+            Ensure = 'Present'
+            DependsOn = '[xDSCDomainjoin]JoinDomain' 
+        }
+
+        WindowsFeature 'RSAT-Clustering-PowerShell' {
+            Name = 'RSAT-Clustering-PowerShell'
+            Ensure = 'Present'
+            DependsOn = '[xDSCDomainjoin]JoinDomain' 
+        }
+
+        ADGroup 'JumpBoxes' {
+            GroupName = 'JumpBoxes'
+            GroupScope = 'Global'
+            Category = 'Security'
+            MembersToInclude = "$ComputerName$"
+            Credential = $domainAdminCredential
+            Ensure = 'Present'
+            DependsOn = '[WindowsFeature]RSAT-AD-PowerShell'            
+        }
+
         cChocoInstaller 'Chocolatey' {
             InstallDir = 'c:\choco'
             DependsOn = '[xDSCDomainjoin]JoinDomain'
@@ -54,6 +77,36 @@ configuration JumpBoxConfig2 {
 
         cChocoPackageInstaller 'VSCode' {
             Name = 'vscode'
+            DependsOn = '[cChocoInstaller]Chocolatey'
+            AutoUpgrade = $true
+        }
+
+        cChocoPackageInstaller 'SSMS' {
+            Name = 'sql-server-management-studio'
+            DependsOn = '[cChocoInstaller]Chocolatey'
+            AutoUpgrade = $true
+        }
+
+        cChocoPackageInstaller 'AzureStorageExplorer' {
+            Name = 'microsoftazurestorageexplorer'
+            DependsOn = '[cChocoInstaller]Chocolatey'
+            AutoUpgrade = $true
+        }
+
+        cChocoPackageInstaller 'AzCopy' {
+            Name = 'azcopy10'
+            DependsOn = '[cChocoInstaller]Chocolatey'
+            AutoUpgrade = $true
+        }
+
+        cChocoPackageInstaller 'AzureDataStudio' {
+            Name = 'azure-data-studio'
+            DependsOn = '[cChocoInstaller]Chocolatey'
+            AutoUpgrade = $true
+        }
+
+        cChocoPackageInstaller 'MySQLWorkbench' {
+            Name = 'mysql.workbench'
             DependsOn = '[cChocoInstaller]Chocolatey'
             AutoUpgrade = $true
         }
