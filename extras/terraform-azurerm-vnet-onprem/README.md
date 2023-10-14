@@ -71,7 +71,7 @@ This section describes how to provision this configuration using default setting
 
 * Monitor output. Upon completion, you should see a message similar to the following:
 
-  `Apply complete! Resources: 49 added, 0 changed, 0 destroyed.`
+  `Apply complete! Resources: 24 added, 0 changed, 0 destroyed.`
 
 * Inspect `terraform.tfstate`.
 
@@ -81,6 +81,80 @@ This section describes how to provision this configuration using default setting
   ```
 
 ## Smoke testing
+
+### Test connectivity from cloud to on-premises
+
+* Connect to *jumpwin1* using Bastion.
+  * From the client environment, navigate to *portal.azure.com* > *Virtual machines* > *jumpwin1*
+  * Click *Connect*.
+  * Expand *More ways to connect*.
+  * Click *Go to Bastion*
+  * For *Username* enter `bootstrapadmin@mysandbox.local`.
+  * For *Authentication Type* choose `Password from Azure Key Vault`.
+  * For *Subscription* select the appropriate subscription.
+  * For *Azure Key Vault* select the appropriate key vault, e.g. `kv-xxxxxxxxxxxxxxx`.
+  * For *Azure Key Vault Secret* select `adminpassword`.
+  * Click *Connect*.
+  * For *password* use the value of the *adminpassword* secret in key vault.
+  * Click *Connect*
+
+* Test cloud to on-premises private DNS zones from *jumpwin2*.
+  * Navigate to *Start* > *Windows PowerShell*.
+  * Run the following PowerShell Command using the FQDN copied previously:
+
+  ```powershell
+  Resolve-DnsName jump2win2.myonprem.local
+  ```
+
+  * Verify the *IPAddress* returned is within the IP address prefix for *azurerm_subnet.vnet_shared_02_subnets["snet-misc-03"]*, e.g. `192.168.2.4`.
+  * Note: This demonstrates that DNS queries can be resolved from the cloud network to the on-premises network. This is accomplished using a DNS forwarding ruleset that is linked to `vnet-app-01` which forwards DNS queries to a private on-premises DNS zone `myonprem.local` to `192.168.1.4` which is the IP address for DNS server `adds2` on the on-premises network.
+
+* Test cloud to on-premises RDP connectivity from *jumpwin1*
+  * Navigate to *Start* > *Windows Accessories* > *Remote Desktop Connection*
+  * For *Computer*, enter `jumpwin2.myonprem.local`.
+  * For *User name*, enter `boostrapadmin@myonprem.local`.
+  * Click *Connect*.
+  * For *Password*, enter the value of the *adminpassword* secret in key vault.
+  * Click *OK*.
+  * Close Server Manager.
+  * Note: This demonstrates that network traffic can be routed from the cloud network to the on-premises network, and that RDP connections can be established from the cloud to hosts on the on-premises network.
+
+### Test connectivity from on-premises to cloud
+
+* Look up the FQDN for Azure Files endpoint from client environment.
+  * Navigate to *portal.azure.com* > *Storage accounts* > *stgxxxxxxxxxxxxxxx* > *Settings* > *Endpoints* > *File service* and copy the FQDN for the `File service`, e.g. `https://stxxxxxxxxxxxxx.file.core.windows.net/`.
+  * This will be used in the next smoke test.
+
+* Test on-premises to cloud private DNS zones from *jumpwin2*.
+  * Navigate to *Start* > *Windows PowerShell*.
+  * Run the following PowerShell Command:
+
+  ```powershell
+  # Replace the FQDN below with the FQDN copied previously.
+  Resolve-DnsName stxxxxxxxxxxxxx.file.core.windows.net
+  ```
+
+  * Verify the *IP4Address* returned is within the IP address prefix for *zurerm_subnet.vnet_app_01_subnets["snet-privatelink-01"]*, e.g. `10.2.2.4`.
+  * Note: This demonstrates that DNS queries can be resolved from the on-premises network to the cloud network. This is accomplished using conditional forwarder for `file.core.windows.net` which forwards DNS queries to the inbound endpoint of the DNS private resolver on the cloud network at `10.1.2.4`. The DNS private resolver then queries an Azure private DNS zone to return the Azure Files private endpoint at `10.2.2.4`.
+
+* Test on-premises to cloud SMB connectivity from *jumpwin2*.
+  * Navigate to *Start* > *Windows PowerShell*.
+  * Run the following PowerShell Command:
+
+  ```powershell
+  # Replace the FQDN below with the FQDN copied previously.
+  net use z: \\stxxxxxxxxxxx.file.core.windows.net\myfileshare /USER:bootstrapadmin@mysandbox.local
+  ```
+  
+  * For *Password*, enter the value of the *adminpassword* secret in key vault.
+  * Create some test files and folders on the newly mapped Z: drive.
+  * Unmap the z: drive using the following command:
+
+  ```powershell
+  net use z: /delete
+  ```
+
+  * Note: This demonstrates that network traffic can be routed from the on-premises network to the cloud network, and that SMB connections can be established from the on-premises network to an Azure Files private endpoint in the cloud network.
 
 ## Documentation
 
