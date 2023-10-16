@@ -20,7 +20,6 @@ This configuration simulates connectivity to an on-premises network using a site
 * Simulated on-premises environment
   * A [virtual network](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vnet) for hosting [virtual machines](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm).
   * A [VPN gateway site-to-site VPN](https://learn.microsoft.com/en-us/azure/vpn-gateway/design#s2smulti) connection to simulate connectivity from an on-premises network to Azure.
-  * A [bastion](https://learn.microsoft.com/azure/bastion/bastion-overview) for secure RDP and SSH access to virtual machines.
   * A Windows Server [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) running [Active Directory Domain Services](https://learn.microsoft.com/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview) with a pre-configured domain and DNS server.
   * A Windows Server [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) for use as a jumpbox.
 * Azure Sandbox environment
