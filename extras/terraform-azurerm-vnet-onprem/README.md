@@ -278,7 +278,7 @@ The configuration for these resources can be found in [020-network-onprem.tf](./
 
 Resource name (ARM) | Notes
 --- | ---
-azurerm_virtual_network.vnet_shared_02 (vnet&#x2011;onprem&#x2011;01) | By default this virtual network is configured with an address space of `192.168.0.0/16` and is configured with DNS server addresses of `192.168.2.4` (the private ip for *azurerm_windows_virtual_machine.vm_adds*) and [168.63.129.16](https://learn.microsoft.com/azure/virtual-network/what-is-ip-address-168-63-129-16). This DNS configuration supports both the default Azure DNS behavior required to initially configure *azurerm_windows_virtual_machine.vm_adds*, as well as the custom DNS behavior provided by the AD integrated DNS server running on *azurerm_windows_virtual_machine.vm_adds* after it is fully configured.
+azurerm_virtual_network.vnet_shared_02 (vnet&#x2011;onprem&#x2011;01) | By default this virtual network is configured with an address space of `192.168.0.0/16` and is configured with DNS server addresses of `192.168.2.4` (the private ip for *azurerm_windows_virtual_machine.vm_adds*) and [168.63.129.16](https://learn.microsoft.com/azure/virtual-network/what-is-ip-address-168-63-129-16). See below for more information.
 azurerm_subnet.vnet_shared_02_subnets["GatewaySubnet"] | This subnet is reserved for use by *azurerm_virtual_network_gateway.vnet_shared_02_gateway* and has a default IP address prefix of `192.168.0.0/24`. It is defined separately from *azurerm_subnet.vnet_shared_02_subnets* because gateway subnets have special behaviors in Azure such as the restriction on using network security groups.
 azurerm_subnet.vnet_shared_02_subnets["snet-adds-02"] | This subnet is used by *azurerm_windows_virtual_machine.vm_adds* and has a default IP address prefix of `192.168.1.0/24`. A network security group is associated with this subnet that permits ingress and egress from virtual networks, and egress to the Internet.
 azurerm_subnet.vnet_shared_02_subnets["snet-misc-03"] | This subnet is used by *azurerm_windows_virtual_machine.vm_jumpbox_win* and has a default IP address prefix of `192.168.2.0/24`. A network security group is associated with this subnet that permits ingress and egress from virtual networks, and egress to the Internet.
@@ -286,6 +286,8 @@ azurerm_virtual_network_gateway.vnet_shared_02_gateway (gw&#x2011;vnet&#x2011;on
 azurerm_virtual_network_gateway_connection.onprem_to_cloud | Used by *azurerm_virtual_network_gateway.vnet_shared_02_gateway* to connect to cloud network.
 azurerm_local_network_gateway.cloud_network | Configures the gateway address, ASN and BGP peering address of the cloud network used by *azurerm_virtual_network_gateway_connection.onprem_to_cloud*.
 azurerm_public_ip.vnet_shared_02_gateway_ip (pip&#x2011;vnet&#x2011;onprem&#x2011;01) | Public ip used by *azurerm_virtual_network_gateway.vnet_shared_02_gateway*.
+
+The virtual network `vnet-onprem-01` is used to simulate an on-premises network at `192.168.0.0/16`. It is configured with a virtual network gateway `gw-vnet-onprem-01` which is used to establish a site-to-site VPN gateway connection to the cloud network. The connection properties for the cloud network are configured using a local network gateway.  
 
 #### Network resources (cloud)
 
