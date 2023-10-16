@@ -1,4 +1,4 @@
-# #AzureSandbox - terraform-azurerm-vnet-opnprem
+# #AzureSandbox - terraform-azurerm-vnet-onprem
 
 ## Contents
 
@@ -82,9 +82,16 @@ This section describes how to provision this configuration using default setting
 
 ## Smoke testing
 
+This smoke testing is divided into two sections:
+
+* [Test connectivity from cloud to on-premises](#test-connectivity-from-cloud-to-on-premises)
+* [Test connectivity from on-premises to cloud](#test-connectivity-from-on-premises-to-cloud)
+
 ### Test connectivity from cloud to on-premises
 
-* Connect to *jumpwin1* using Bastion.
+#### Test RDP (port 3389) connectivity to *jumpwin2* private endpoint (IaaS)
+
+* Connect to *jumpwin1*.
   * From the client environment, navigate to *portal.azure.com* > *Virtual machines* > *jumpwin1*
   * Click *Connect*.
   * Expand *More ways to connect*.
@@ -99,62 +106,133 @@ This section describes how to provision this configuration using default setting
   * Click *Connect*
 
 * Test cloud to on-premises private DNS zones from *jumpwin2*.
-  * Navigate to *Start* > *Windows PowerShell*.
-  * Run the following PowerShell Command using the FQDN copied previously:
+  * From a Windows PowerShell command prompt, run the following command:
 
-  ```powershell
-  Resolve-DnsName jump2win2.myonprem.local
-  ```
+    ```powershell
+    Resolve-DnsName jumpwin2.myonprem.local
+    ```
 
   * Verify the *IPAddress* returned is within the IP address prefix for *azurerm_subnet.vnet_shared_02_subnets["snet-misc-03"]*, e.g. `192.168.2.4`.
-  * Note: This demonstrates that DNS queries can be resolved from the cloud network to the on-premises network. This is accomplished using a DNS forwarding ruleset that is linked to `vnet-app-01` which forwards DNS queries to a private on-premises DNS zone `myonprem.local` to `192.168.1.4` which is the IP address for DNS server `adds2` on the on-premises network.
 
-* Test cloud to on-premises RDP connectivity from *jumpwin1*
+* Test cloud to on-premises RDP connectivity (port 3389) from *jumpwin1*
   * Navigate to *Start* > *Windows Accessories* > *Remote Desktop Connection*
   * For *Computer*, enter `jumpwin2.myonprem.local`.
   * For *User name*, enter `boostrapadmin@myonprem.local`.
   * Click *Connect*.
   * For *Password*, enter the value of the *adminpassword* secret in key vault.
   * Click *OK*.
-  * Close Server Manager.
-  * Note: This demonstrates that network traffic can be routed from the cloud network to the on-premises network, and that RDP connections can be established from the cloud to hosts on the on-premises network.
 
 ### Test connectivity from on-premises to cloud
 
-* Look up the FQDN for Azure Files endpoint from client environment.
-  * Navigate to *portal.azure.com* > *Storage accounts* > *stgxxxxxxxxxxxxxxx* > *Settings* > *Endpoints* > *File service* and copy the FQDN for the `File service`, e.g. `https://stxxxxxxxxxxxxx.file.core.windows.net/`.
-  * This will be used in the next smoke test.
+This smoke testing uses the RDP connection to *jumpwin2* established previously and is divided into the following sections:
 
-* Test on-premises to cloud private DNS zones from *jumpwin2*.
-  * Navigate to *Start* > *Windows PowerShell*.
-  * Run the following PowerShell Command:
+* [Test SSH (port 22) connectivity to *jumplinux1* private endpoint (IaaS)](#test-ssh-port-22-connectivity-to-jumplinux1-private-endpoint-iaas)
+* [Test SMB (port 445) connectivity to Azure Files private endpoint (PaaS)](#test-smb-port-445-connectivity-to-azure-files-private-endpoint-paas)
+* [Test TDS (port 1433) connectivity to *mssqlwin1* private endpoint (IaaS)](#test-tds-port-1433-connectivity-to-mssqlwin1-private-endpoint-iaas)
+* [Test TDS (port 1433) connectivity to Azure SQL Database private endpoint (PaaS)](#test-tds-port-1433-connectivity-to-azure-sql-database-private-endpoint-paas)
+* [Test port 3306 connectivity to Azure MySQL Flexible Server private endpoint (PaaS)](#test-port-3306-connectivity-to-azure-mysql-flexible-server-private-endpoint-paas)
+
+#### Test SSH (port 22) connectivity to *jumplinux1* private endpoint (IaaS)
+
+* From a Windows PowerShell command prompt, run the following command:
 
   ```powershell
-  # Replace the FQDN below with the FQDN copied previously.
+  Resolve-DnsName jumplinux1.mysandbox.local
+  ```
+
+* Verify the *IP4Address* returned is within the IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-app-01"]*, e.g. `10.2.0.5`.
+* From a Windows PowerShell command prompt, run the following command:
+
+  ```powershell
+  ssh bootstrapadmin@mysandbox.local@jumplinux1.mysandbox.local
+  ```
+
+* Enter `yes` when prompted `Are you sure you want to continue connecting?`
+* Enter the value of the *adminpassword* secret when prompted for a password.
+* Enter `exit` to terminate the SSH session.
+
+#### Test SMB (port 445) connectivity to Azure Files private endpoint (PaaS)
+
+* From the client environment, Navigate to *portal.azure.com* > *Storage accounts* > *stxxxxxxxxxxxxxxx* > *Settings* > *Endpoints* > *File service* and copy the FQDN for the `File service`, e.g. `stxxxxxxxxxxxxx.file.core.windows.net`.
+* From *jumpwin2*, run the following Windows PowerShell command:
+
+  ```powershell
+  # Replace FQDN with the value copied previously.
   Resolve-DnsName stxxxxxxxxxxxxx.file.core.windows.net
   ```
 
-  * Verify the *IP4Address* returned is within the IP address prefix for *zurerm_subnet.vnet_app_01_subnets["snet-privatelink-01"]*, e.g. `10.2.2.4`.
-  * Note: This demonstrates that DNS queries can be resolved from the on-premises network to the cloud network. This is accomplished using conditional forwarder for `file.core.windows.net` which forwards DNS queries to the inbound endpoint of the DNS private resolver on the cloud network at `10.1.2.4`. The DNS private resolver then queries an Azure private DNS zone to return the Azure Files private endpoint at `10.2.2.4`.
-
-* Test on-premises to cloud SMB connectivity from *jumpwin2*.
-  * Navigate to *Start* > *Windows PowerShell*.
-  * Run the following PowerShell Command:
+* Verify the *IP4Address* returned is within the IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-privatelink-01"]*, e.g. `10.2.2.4`.
+* From a Windows PowerShell command prompt, run the following command:
 
   ```powershell
-  # Replace the FQDN below with the FQDN copied previously.
+  # Replace FQDN with the value copied previously.
   net use z: \\stxxxxxxxxxxx.file.core.windows.net\myfileshare /USER:bootstrapadmin@mysandbox.local
   ```
-  
-  * For *Password*, enter the value of the *adminpassword* secret in key vault.
-  * Create some test files and folders on the newly mapped Z: drive.
-  * Unmap the z: drive using the following command:
+
+* For *Password*, enter the value of the *adminpassword* secret in key vault.
+* Create some test files and folders on the newly mapped Z: drive.
+* Unmap the z: drive using the following command:
 
   ```powershell
   net use z: /delete
   ```
 
-  * Note: This demonstrates that network traffic can be routed from the on-premises network to the cloud network, and that SMB connections can be established from the on-premises network to an Azure Files private endpoint in the cloud network.
+#### Test TDS (port 1433) connectivity to *mssqlwin1* private endpoint (IaaS)
+
+* From a Windows PowerShell command prompt, run the following command:
+
+  ```powershell
+  # Replace FQDN with the value copied previously.
+  Resolve-DnsName mssqlwin1.mysandbox.local
+  ```
+
+* Verify the *IP4Address* returned is within the IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-db-01"]*, e.g. `10.2.1.4`.
+* Navigate to *Start* > *Microsoft SQL Server Tools 19* > *Microsoft SQL Server Management Studio 19*.
+* Connect to the default instance of SQL Server installed on mssqlwin1 using the following values:
+  * Server name: *mssqlwin1.mysandbox.local*
+  * Authentication: *SQL Server Authentication*
+    * Login: `sa`
+    * Password: Use the value of the *adminpassword* secret in key vault.
+* Close SQL Server Management Studio.
+
+#### Test TDS (port 1433) connectivity to Azure SQL Database private endpoint (PaaS)
+
+* From the client environment, navigate to *portal.azure.com* > *SQL Servers* > *mssql-xxxxxxxxxxxxxxxx* > *Properties* > *Server name* and copy the the FQDN, e.g. *mssql&#x2011;xxxxxxxxxxxxxxxx.database.windows.net*.
+* From *jumpwin2*, run the following Windows PowerShell command:
+
+  ```powershell
+  # Replace FQDN with the value copied previously.
+  Resolve-DnsName mssql-xxxxxxxxxxxxxxxx.database.windows.net
+  ```
+
+* Verify the *IP4Address* returned is within the subnet IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-privatelink-01"]*, e.g. `10.2.2.5`.
+* Navigate to *Start* > *Microsoft SQL Server Tools 18* > *Microsoft SQL Server Management Studio 18*
+* Connect to the Azure SQL Database server private endpoint
+  * Server name: `mssql&#x2011;xxxxxxxxxxxxxxxx.database.windows.net`
+  * Authentication: `SQL Server Authentication`
+  * Login: `bootstrapadmin`
+  * Password: Use the value stored in the *adminpassword* key vault secret
+* Expand the *Databases* tab and verify you can see *testdb*.
+
+#### Test port 3306 connectivity to Azure MySQL Flexible Server private endpoint (PaaS)
+
+* From the client environment, navigate to *portal.azure.com* > *Azure Database for MySQL flexible servers* > *mysql-xxxxxxxxxxxxxxxx* > *Overview* > *Server name* and and copy the the FQDN, e.g. *mysql&#x2011;xxxxxxxxxxxxxxxx.mysql.database.azure.com*.
+* From *jumpwin2*, run the following Windows PowerShell command:
+
+  ```powershell
+  # Replace FQDN with the value copied previously.
+  Resolve-DnsName mysql-xxxxxxxxxxxxxxxx.mysql.database.azure.com
+  ```
+
+* Verify the *IP4Address* returned is within the subnet IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-mysql-01"]*, e.g. `10.2.3.4`.
+* Navigate to *Start* > *MySQL Workbench*
+* Navigate to *Database* > *Connect to Database* and connect using the following values:
+  * Connection method: `Standard (TCP/IP)`
+  * Hostname: `mysql-xxxxxxxxxxxxxxxx.mysql.database.azure.com`
+  * Port: `3306`
+  * Uwername: `bootstrapadmin`
+  * Schema: `testdb`
+  * Click *OK* and when prompted for *password* use the value of the *adminpassword* secret in key vault.
 
 ## Documentation
 
@@ -202,15 +280,93 @@ The configuration for these resources can be found in [020-network-onprem.tf](./
 Resource name (ARM) | Notes
 --- | ---
 azurerm_virtual_network.vnet_shared_02 (vnet&#x2011;onprem&#x2011;01) | By default this virtual network is configured with an address space of `192.168.0.0/16` and is configured with DNS server addresses of `192.168.2.4` (the private ip for *azurerm_windows_virtual_machine.vm_adds*) and [168.63.129.16](https://learn.microsoft.com/azure/virtual-network/what-is-ip-address-168-63-129-16). This DNS configuration supports both the default Azure DNS behavior required to initially configure *azurerm_windows_virtual_machine.vm_adds*, as well as the custom DNS behavior provided by the AD integrated DNS server running on *azurerm_windows_virtual_machine.vm_adds* after it is fully configured.
-azurerm_subnet.vnet_shared_02_GatewaySubnet | This subnet is reserved for use by *azurerm_virtual_network_gateway.vnet_shared_02_gateway* and has a default IP address prefix of `192.168.0.0/24`. It is defined separately from *azurerm_subnet.vnet_shared_02_subnets* because gateway subnets have special behaviors in Azure such as the restriction on using network security groups.
-azurerm_subnet.vnet_shared_02_subnets["AzureBastionSubnet"] | This subnet is reserved for use by *azurerm_bastion_host.bastion_host_02* and has a default IP address prefix of `192.168.1.0/27`. A network security group is associated with this subnet and is configured according to [Working with NSG access and Azure Bastion](https://learn.microsoft.com/azure/bastion/bastion-nsg).
-azurerm_subnet.vnet_shared_02_subnets["snet-adds-02"] | This subnet is used by *azurerm_windows_virtual_machine.vm_adds* and has a default IP address prefix of `192.168.2.0/24`. A network security group is associated with this subnet that permits ingress and egress from virtual networks, and egress to the Internet.
-azurerm_subnet.vnet_shared_02_subnets["snet-misc-03"] | This subnet is used by *azurerm_windows_virtual_machine.vm_jumpbox_win* and has a default IP address prefix of `192.168.3.0/24`. A network security group is associated with this subnet that permits ingress and egress from virtual networks, and egress to the Internet.
-azurerm_bastion_host.bastion_host_02 (bst&#x2011;xxxxxxxxxxxxxxxx&#x2011;2) | Used for secure RDP and SSH access to VMs.
+azurerm_subnet.vnet_shared_02_subnets["GatewaySubnet"] | This subnet is reserved for use by *azurerm_virtual_network_gateway.vnet_shared_02_gateway* and has a default IP address prefix of `192.168.0.0/24`. It is defined separately from *azurerm_subnet.vnet_shared_02_subnets* because gateway subnets have special behaviors in Azure such as the restriction on using network security groups.
+azurerm_subnet.vnet_shared_02_subnets["snet-adds-02"] | This subnet is used by *azurerm_windows_virtual_machine.vm_adds* and has a default IP address prefix of `192.168.1.0/24`. A network security group is associated with this subnet that permits ingress and egress from virtual networks, and egress to the Internet.
+azurerm_subnet.vnet_shared_02_subnets["snet-misc-03"] | This subnet is used by *azurerm_windows_virtual_machine.vm_jumpbox_win* and has a default IP address prefix of `192.168.2.0/24`. A network security group is associated with this subnet that permits ingress and egress from virtual networks, and egress to the Internet.
 azurerm_virtual_network_gateway.vnet_shared_02_gateway (gw&#x2011;vnet&#x2011;onprem&#x2011;01) | VPN gateway used to connect on-premises network to cloud network.
 azurerm_virtual_network_gateway_connection.onprem_to_cloud | Used by *azurerm_virtual_network_gateway.vnet_shared_02_gateway* to connect to cloud network.
-azurerm_local_network_gateway.cloud_network | Used by *azurerm_virtual_network_gateway_connection.onprem_to_cloud* to connect to cloud network. *azurerm_vpn_gateway.site_to_site_vpn_gateway_01* is used to configure the gateway address (default `tbd`) and the BGP peering address (default `tbd`).
+azurerm_local_network_gateway.cloud_network | Configures the gateway address, ASN and BGP peering address of the cloud network used by *azurerm_virtual_network_gateway_connection.onprem_to_cloud*.
 azurerm_public_ip.vnet_shared_02_gateway_ip (pip&#x2011;vnet&#x2011;onprem&#x2011;01) | Public ip used by *azurerm_virtual_network_gateway.vnet_shared_02_gateway*.
-azurerm_public_ip.bastion_host_02 (pip&#x2011;xxxxxxxxxxxxxxxx&#x2011;2) | Public ip used by *azurerm_bastion_host.bastion_host_02*.
-random_id.bastion_host_02_name | Used to generate a random name for *azurerm_bastion_host.bastion_host_02*.
-random_id.public_ip_bastion_host_02_name | Used to generate a random name for *azurerm_public_ip.bastion_host_02*
+
+#### Network resources (cloud)
+
+The configuration for these resources can be found in [030-network-cloud.tf](./030-network-cloud.tf).
+
+Resource name (ARM) | Notes
+--- | ---
+azurerm_vpn_gateway.site_to_site_vpn_gateway_01 | Site to site VPN gateway deployed in the Azure Virtual WAN hub *azurerm_virtual_hub.vwan_01_hub_01*.
+azurerm_vpn_gateway_connection.cloud_to_onprem | Used by *azurerm_vpn_gateway.site_to_site_vpn_gateway_01* to connect to on-premises network.
+azurerm_vpn_site.vpn_site_onprem | Configures the gateway address, ASN and BGP peering address of the on-premises network used by *azurerm_vpn_gateway_connection.cloud_to_onprem*.
+azurerm_private_dns_resolver.pdnsr_01 (pdnsr-xxxxxxxxxxxxxxxx-01) | The DNS private resolver used to resolve DNS queries for private zones in both environments (on-premises and Azure) in a bi-directional fashion.
+azurerm_private_dns_resolver_inbound_endpoint.pdnsr_inbound_01 | The inbound endpoint for *azurerm_private_dns_resolver.pdnsr_01* used by conditional forwarders in the on-premises network.
+azurerm_private_dns_resolver_outbound_endpoint.pdnsr_outbound_01 | The outbound endpoint for *azurerm_private_dns_resolver.pdnsr_01* used to conditionally forward DNS queries to private DNS zones defined by *azurerm_private_dns_resolver_dns_forwarding_ruleset.rset-pdnsr-01*.
+azurerm_private_dns_resolver_dns_forwarding_ruleset.rset-pdnsr-01 (rset-pdnsr-xxxxxxxxxxxxxxxx-01) | The DNS forwarding ruleset used to forward DNS queries to private DNS zones associated with domain controllers in both the on-premises and cloud networks.
+azurerm_private_dns_resolver_forwarding_rule.rule-cloud | Rule added to *azurerm_private_dns_resolver_dns_forwarding_ruleset.rset-pdnsr-01* for the `mysandbox.local` private DNS zone.
+azurerm_private_dns_resolver_forwarding_rule.rule-onprem | Rule added to *azurerm_private_dns_resolver_dns_forwarding_ruleset.rset-pdnsr-01* for the `myonprem.local` private DNS zone.
+azurerm_private_dns_resolver_virtual_network_link.vnet_app_01 | Links *azurerm_private_dns_resolver_dns_forwarding_ruleset.rset-pdnsr-01* to *vnet-app-01*.
+azurerm_private_dns_resolver_virtual_network_link.vnet_shared_01 | Links *azurerm_private_dns_resolver_dns_forwarding_ruleset.rset-pdnsr-01* to *vnet-shared-01*.
+random_id.random_id_pdnsr_01_name | Used to generate a random name for *azurerm_private_dns_resolver.pdnsr_01*.
+
+#### AD DS domain controller VM
+
+The configuration for these resources can be found in [040-vm-adds.tf](./040-vm-adds.tf).
+
+Resource name (ARM) | Notes
+--- | ---
+azurerm_windows_virtual_machine.vm_adds (adds2) | By default, provisions a [Standard_B2s](https://learn.microsoft.com/azure/virtual-machines/sizes-b-series-burstable) virtual machine for use as a domain controller and dns server. See below for more information.
+azurerm_network_interface.vm_adds_nic_01 (nic-adds2-1) | The configured subnet is *azurerm_subnet.vnet_shared_02_subnets["snet-adds-02"]*.
+
+This Windows Server VM is used as an [Active Directory Domain Services](https://learn.microsoft.com/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview) [Domain Controller](https://learn.microsoft.com/previous-versions/windows/it-pro/windows-server-2003/cc786438(v=ws.10)) and a DNS Server running in Active Directory-integrated mode.
+
+* Guest OS: Windows Server 2022 Datacenter Core
+* By default the [Patch orchestration mode](https://learn.microsoft.com/azure/virtual-machines/automatic-vm-guest-patching#patch-orchestration-modes) is set to `AutomaticByPlatform`.
+* *admin_username* and *admin_password* are configured using the key vault secrets *adminuser* and *adminpassword*.
+* This resource has a dependency on *azurerm_automation_account.automation_account_01*.
+* This resource is configured using a [provisioner](https://www.terraform.io/docs/language/resources/provisioners/syntax.html) that runs [aadsc-register-node.ps1](./aadsc-register-node.ps1) which registers the node with *azurerm_automation_account.automation_account_01* and applies the configuration [OnPremDomainConfig](./OnPremDomainConfig.ps1) which includes the following:
+  * The `AD-Domain-Services` feature (which includes DNS) is installed.
+  * A new *myonprem.local* domain is configured
+    * The domain admin credentials are configured using the *adminusername* and *adminpassword* key vault secrets.
+    * The forest functional level is set to `WinThreshhold`
+    * A DNS Server is automatically configured
+      * *myonprem.local* DNS forward lookup zone configuration
+        * Zone type: Primary / Active Directory-Integrated
+        * Dynamic updates: Secure only
+      * Forwarder: [168.63.129.16](https://learn.microsoft.com/azure/virtual-network/what-is-ip-address-168-63-129-16).
+        * Note: This ensures that any DNS queries that can't be resolved by the DNS server are forwarded to  Azure DNS as per [Name resolution for resources in Azure virtual networks](https://learn.microsoft.com/azure/virtual-network/virtual-networks-name-resolution-for-vms-and-role-instances).
+      * Conditional forwarders are configured for the following private DNS zones and routed to the IP address of *azurerm_private_dns_resolver_inbound_endpoint.pdnsr_inbound_01*:
+        * `mysandbox.local` (cloud network)
+        * `file.core.windows.net` (Azure Files)
+        * `database.windows.net` (Azure SQL Database)
+        * `mysql.database.azure.com` (Azure MySQL Flexible Server)
+
+#### Windows Server Jumpbox VM
+
+The configuration for these resources can be found in [050-vm-jumpbox-win.tf](./050-vm-jumpbox-win.tf).
+
+Resource name (ARM) | Notes
+--- | ---
+azurerm_windows_virtual_machine.vm_jumpbox_win (jumpwin2) | By default, provisions a [Standard_B2s](https://learn.microsoft.com/azure/virtual-machines/sizes-b-series-burstable) virtual machine for use as a jumpbox. See below for more information.
+azurerm_network_interface.vm_jumpbox_win_nic_01 (nic-jumpwin2-1) | The configured subnet is *azurerm_subnet.vnet_app_01_subnets["snet-misc-03"]*.
+
+This Windows Server VM is used as a jumpbox for development and remote server administration.
+
+* Guest OS: Windows Server 2022 Datacenter.
+* By default the [patch orchestration mode](https://learn.microsoft.com/azure/virtual-machines/automatic-vm-guest-patching#patch-orchestration-modes) is set to `AutomaticByPlatform`.
+* *admin_username* and *admin_password* are configured using the key vault secrets *adminuser* and *adminpassword*.
+* This resource is configured using a [provisioner](https://www.terraform.io/docs/language/resources/provisioners/syntax.html) that runs [aadsc-register-node.ps1](./aadsc-register-node.ps1) which registers the node with *azurerm_automation_account.automation_account_01* and applies the configuration [JumpBoxConfig2](./JumpBoxConfig2.ps1).
+  * The virtual machine is domain joined  and added to `JumpBoxes` security group.
+  * The following [Remote Server Administration Tools (RSAT)](https://learn.microsoft.com/windows-server/remote/remote-server-administration-tools) are installed:
+    * Active Directory module for Windows PowerShell (RSAT-AD-PowerShell)
+    * Active Directory Administrative Center (RSAT-AD-AdminCenter)
+    * AD DS Snap-Ins and Command-Line Tools (RSAT-ADDS-Tools)
+    * DNS Server Tools (RSAT-DNS-Server)
+    * Failover Cluster Management Tools (RSAT-Clustering-Mgmt)
+    * Failover Cluster Module for for Windows PowerShell (RSAT-Clustering-PowerShell)
+  * The following software packages are pre-installed using [Chocolatey](https://chocolatey.org/why-chocolatey):
+    * [az.powershell](https://community.chocolatey.org/packages/az.powershell)
+    * [vscode](https://community.chocolatey.org/packages/vscode)
+    * [sql-server-management-studio](https://community.chocolatey.org/packages/sql-server-management-studio)
+    * [microsoftazurestorageexplorer](https://community.chocolatey.org/packages/microsoftazurestorageexplorer)
+    * [azcopy10](https://community.chocolatey.org/packages/azcopy10)
+    * [azure-data-studio](https://community.chocolatey.org/packages/azure-data-studio)
+    * [mysql.workbench](https://community.chocolatey.org/packages/mysql.workbench)
