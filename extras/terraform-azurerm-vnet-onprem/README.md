@@ -8,6 +8,7 @@
 * [Getting started](#getting-started)
 * [Smoke testing](#smoke-testing)
 * [Documentation](#documentation)
+* [Videos](#videos)
 
 ## Architecture
 
@@ -15,7 +16,7 @@
 
 ## Overview
 
-This configuration simulates connectivity to an on-premises network using a site-to-site VPN connection and Azure DNS private resolver. It includes the following resources:
+This configuration simulates connectivity to an on-premises network using a site-to-site VPN connection and Azure DNS private resolver ([Step-By-Step Video](https://youtu.be/S-Ma-sRkcN0)). It includes the following resources:
 
 * Simulated on-premises environment
   * A [virtual network](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vnet) for hosting [virtual machines](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm).
@@ -32,7 +33,7 @@ This configuration simulates connectivity to an on-premises network using a site
 
 ## Getting started
 
-This section describes how to provision this configuration using default settings.
+This section describes how to provision this configuration using default settings ([Step-By-Step Video](https://youtu.be/yVhdhcelYMU)).
 
 * Change the working directory.
 
@@ -81,7 +82,7 @@ This section describes how to provision this configuration using default setting
 
 ## Smoke testing
 
-This smoke testing is divided into two sections:
+This smoke testing is divided into two sections ([Step-By-Step Video](https://youtu.be/4t1oh-roSrg)):
 
 * [Test connectivity from cloud to on-premises](#test-connectivity-from-cloud-to-on-premises)
 * [Test connectivity from on-premises to cloud](#test-connectivity-from-on-premises-to-cloud)
@@ -235,7 +236,7 @@ This smoke testing uses the RDP connection to *jumpwin2* established previously 
 
 ## Documentation
 
-This section provides additional information on various aspects of this configuration.
+This section provides additional information on various aspects of this configuration ([Step-By-Step Video](https://youtu.be/VJnWT6V5hPk)).
 
 ### Bootstrap script
 
@@ -371,3 +372,12 @@ This Windows Server VM is used as a jumpbox for development and remote server ad
     * [azcopy10](https://community.chocolatey.org/packages/azcopy10)
     * [azure-data-studio](https://community.chocolatey.org/packages/azure-data-studio)
     * [mysql.workbench](https://community.chocolatey.org/packages/mysql.workbench)
+
+## Videos
+
+Video | Section
+--- | ---
+[Azure Sandbox - On-premises Connectivity (Part 1)](https://youtu.be/S-Ma-sRkcN0) | [Overview](#overview)
+[Azure Sandbox - On-premises Connectivity (Part 2)](https://youtu.be/yVhdhcelYMU) | [Getting started](#getting-started)
+[Azure Sandbox - On-premises Connectivity (Part 3)](https://youtu.be/4t1oh-roSrg) | [Smoke testing](#smoke-testing)
+[Azure Sandbox - On-premises Connectivity (Part 4)](https://youtu.be/VJnWT6V5hPk) | [Documentation](#documentation)
