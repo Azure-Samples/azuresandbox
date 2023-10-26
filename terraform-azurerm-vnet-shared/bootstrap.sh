@@ -266,22 +266,7 @@ else
     --tags costcenter=$costcenter project=$project environment=$environment provisioner="bootstrap.sh"
 fi
 
-key_vault_id=""
-attempts=0
-sleepseconds=15
-while [ -z "$key_vault_id" ] && [ $attempts -lt 4 ]
-do
-  printf "Sleeping for '$sleepseconds' seconds...\n"
-  sleep $sleepseconds
-  key_vault_id=$(az keyvault show --subscription $subscription_id --name $key_vault_name --query id --output tsv)
-  (( attempts+=1 ))
-done
-
-if [ -z "$key_vault_id" ]
-then
-  printf "Error: Could not retrieve ID for key vault '$key_vault_name' after '$attempts' attempts.\n"
-  usage
-fi
+key_vault_id=$(az keyvault show --subscription $subscription_id --resource-group $resource_group_name --name $key_vault_name --query id --output tsv)
 
 printf "Creating key vault secret access policy for Azure CLI logged in user id '$owner_object_id'...\n"
 az keyvault set-policy \
@@ -337,22 +322,7 @@ else
     --tags costcenter=$costcenter project=$project environment=$environment provisioner="bootstrap.sh"
 fi
 
-storage_account_key=""
-attempts=0
-sleepseconds=15
-while [ -z "$storage_account_key" ] && [ $attempts -lt 4 ]
-do
-  printf "Sleeping for '$sleepseconds' seconds...\n"
-  sleep $sleepseconds
-  storage_account_key=$(az storage account keys list --subscription $subscription_id --account-name $storage_account_name --output tsv --query "[0].value")
-  (( attempts+=1 ))
-done
-
-if [ -z "$storage_account_key" ]
-then
-  printf "Error: Could not retrieve key for storage account '$storage_account_name' after '$attempts' attempts.\n"
-  usage
-fi
+storage_account_key=$(az storage account keys list --subscription $subscription_id --resource-group $resource_group_name --account-name $storage_account_name --output tsv --query "[0].value")
 
 printf "Setting storage account secret '$storage_account_name' with value length '${#storage_account_key}' to keyvault '$key_vault_name'...\n"
 az keyvault secret set \
