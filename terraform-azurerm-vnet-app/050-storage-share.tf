@@ -5,6 +5,10 @@ resource "azurerm_storage_share" "storage_share_01" {
   quota                = var.storage_share_quota_gb
 }
 
+output "storage_share_01_name" {
+  value = azurerm_storage_share.storage_share_01.name
+}
+
 # Azure Files private endpoint
 resource "azurerm_private_endpoint" "storage_account_01_file" {
   name                = "pend-${var.storage_account_name}-file"

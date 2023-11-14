@@ -440,6 +440,7 @@ This section lists the output variables defined in this configuration. Some of t
 Output variable | Sample value
 --- | ---
 private_dns_zones | contains all the private dns zone definitions from this configuration including *privatelink.database.windows.net*, *privatelink.file.core.windows.net* and *private.mysql.database.azure.com*.
+storage_share_01_name | "myfileshare"
 vnet_app_01_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualNetworks/vnet-app-01"
 vnet_app_01_name | "vnet-app-01"
 vnet_app_01_subnets | Contains all the subnet definitions from this configuration including *snet-app-01*, *snet-db-01*, *snet-mysql-01* and *snet-privatelink-01*.
