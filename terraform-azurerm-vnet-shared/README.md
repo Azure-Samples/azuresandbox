@@ -250,7 +250,7 @@ This Windows Server VM is used as an [Active Directory Domain Services](https://
 * This resource is configured using a [provisioner](https://www.terraform.io/docs/language/resources/provisioners/syntax.html) that runs [aadsc-register-node.ps1](./aadsc-register-node.ps1) which registers the node with *azurerm_automation_account.automation_account_01* and applies the configuration [LabDomainConfig](./LabDomainConfig.ps1) which includes the following:
   * The `AD-Domain-Services` feature (which includes DNS) is installed.
   * A new *mysandbox.local* domain is configured
-    * The domain admin credentials are configured using the *adminusername* and *adminpassword* key vault secrets.
+    * The domain admin credentials are configured using the *adminusername* and *adminpassword* key vault secrets. The password is set to never expire.
     * The forest functional level is set to `WinThreshhold`
     * A DNS Server is automatically configured
       * *mysandbox.local* DNS forward lookup zone configuration

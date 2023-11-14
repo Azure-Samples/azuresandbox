@@ -31,5 +31,13 @@ configuration LabDomainConfig {
             UseRootHint = $false
             DependsOn = '[ADDomain]LabDomain'
         }
+
+        ADUser 'bootstrapadmin' {
+            UserName = $adminCredential.UserName
+            PasswordNeverExpires = $true
+            DomainName = $domain
+            DomainController = $ComputerName
+            DependsOn = '[ADDomain]LabDomain'
+        }
     }
 }
