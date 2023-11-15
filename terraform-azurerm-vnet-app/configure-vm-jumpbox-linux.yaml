@@ -134,6 +134,8 @@ packages:
   - powershell
   - python3-pip
   - jp
+  - linux-modules-extra-azure
+  - cifs-utils
   - krb5-user
   - samba
   - sssd

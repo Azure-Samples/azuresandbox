@@ -5,7 +5,7 @@ resource "azurerm_storage_share" "storage_share_01" {
   quota                = var.storage_share_quota_gb
 }
 
-output "storage_share_01_name" {
+output "storage_share_name" {
   value = azurerm_storage_share.storage_share_01.name
 }
 

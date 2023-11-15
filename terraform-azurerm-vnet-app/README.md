@@ -366,6 +366,8 @@ This Linux VM is used as a jumpbox for development and remote administration.
 * Custom tags are added which are used by [cloud-init](https://learn.microsoft.com/azure/virtual-machines/linux/using-cloud-init#:~:text=%20There%20are%20two%20stages%20to%20making%20cloud-init,is%20already%20configured%20to%20use%20cloud-init.%20More%20) [User-Data Scripts](https://cloudinit.readthedocs.io/en/latest/topics/format.html#user-data-script) to configure the virtual machine.
   * *keyvault*: Used in cloud-init scripts to determine which key vault to use for secrets.
   * *adds_domain_name*: Used in cloud-init scripts to join the domain.
+  * *storage_account_name*: Used in cloud-init scripts to mount an Azure Files share.
+  * *storage_share_name*: Used in cloud-init scripts to mount an Azure Files share.
 * This VM is configured with [cloud-init](https://learn.microsoft.com/azure/virtual-machines/linux/using-cloud-init#:~:text=%20There%20are%20two%20stages%20to%20making%20cloud-init,is%20already%20configured%20to%20use%20cloud-init.%20More%20) using a [Mime Multi Part Archive](https://cloudinit.readthedocs.io/en/latest/topics/format.html#mime-multi-part-archive) containing the following files:
   * [configure-vm-jumpbox-linux.yaml](./configure-vm-jumpbox-linux.yaml) is [Cloud Config Data](https://cloudinit.readthedocs.io/en/latest/topics/format.html#cloud-config-data) used to configure the VM.
     * Package updates are performed.
@@ -373,50 +375,58 @@ This Linux VM is used as a jumpbox for development and remote administration.
       * [Azure CLI](https://learn.microsoft.com/cli/azure/what-is-azure-cli?view=azure-cli-latest)
       * [PowerShell](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-7.1)
       * [Terraform](https://www.terraform.io/intro/index.html#what-is-terraform-)
-      * [python3-pip](https://pypi.org/project/pip/)
-      * [jp](https://packages.ubuntu.com/focal/jp)
+      * [python3-pip](https://packages.ubuntu.com/jammy/python3-pip)
+      * [jp](https://packages.ubuntu.com/jammy/jp)
+      * [linux-modules-extra-azure](https://packages.ubuntu.com/jammy/linux-modules-extra-azure)
+      * [cifs-utils](https://packages.ubuntu.com/jammy/cifs-utils)
       * [Kerberos](https://kerberos.org/software/mixenvkerberos.pdf) packages required to AD domain join a Linux host and enable dynamic DNS (DDNS) registration.
-        * [krb5-user](https://packages.ubuntu.com/focal/krb5-user)
-        * [samba](https://packages.ubuntu.com/focal/samba)
-        * [sssd](https://packages.ubuntu.com/focal/sssd)
-        * [sssd-tools](https://packages.ubuntu.com/focal/sssd-tools)
-        * [libnss-sss](https://packages.ubuntu.com/focal/libnss-sss)
-        * [libpam-sss](https://packages.ubuntu.com/focal/libpam-sss)
-        * [ntp](https://packages.ubuntu.com/focal/ntp)
-        * [ntpdate](https://packages.ubuntu.com/focal/ntpdate)
-        * [realmd](https://packages.ubuntu.com/focal/realmd)
-        * [adcli](https://packages.ubuntu.com/focal/adcli)
+        * [krb5-user](https://packages.ubuntu.com/jammy/krb5-user)
+        * [samba](https://packages.ubuntu.com/jammy/samba)
+        * [sssd](https://packages.ubuntu.com/jammy/sssd)
+        * [sssd-tools](https://packages.ubuntu.com/jammy/sssd-tools)
+        * [libnss-sss](https://packages.ubuntu.com/jammy/libnss-sss)
+        * [libpam-sss](https://packages.ubuntu.com/jammy/libpam-sss)
+        * [ntp](https://packages.ubuntu.com/jammy/ntp)
+        * [ntpdate](https://packages.ubuntu.com/jammy/ntpdate)
+        * [realmd](https://packages.ubuntu.com/jammy/realmd)
+        * [adcli](https://packages.ubuntu.com/jammy/adcli)
     * The VM is rebooted if necessary.
-  * [configure-vm-jumpbox-linux.sh](./configure-vm-jumpbox-linux.sh) is a [User-Data Script](https://cloudinit.readthedocs.io/en/latest/topics/format.html#user-data-script) used to configure the VM.
-    * Package upgrades are performed.
-    * Runtime values are retrieved using [Instance Metadata](https://cloudinit.readthedocs.io/en/latest/topics/instancedata.html#instance-metadata)
-      * The name of the key vault used for secrets is retrieved from the tag named *keyvault*.
-      * The Active Directory domain name is retrieved from the tag named *adds_domain_name*.
-      * An access token is generated using the VM's system assigned managed identity.
-      * The access token is used to get secrets from key vault, including:
-        * *adminuser*: The name of the administrative user account for configuring the VM (e.g. "bootstrapadmin" by default).
-        * *adminpassword*: The password for the administrative user account.
-      * The networking configuration of the VM is modified to enable domain joining the VM
-        * The *hosts* file is updated to reference the newly configured host name and domain name.
-        * The DHCP client configuration file *dhclient.conf* is updated to include the newly configured domain name.
-      * The VM is domain joined
-        * The *ntp.conf* file is updated to synchronize the time with the domain controller.
-        * The *krb5.conf* file is updated to disable the *rdns* setting.
-        * *dhclient* is run to refresh the DHCP settings using the new networking configuration.
-        * *realm join* is run to join the domain
-      * The VM is registered with the DNS server
-        * A local *keytab* file is created and used to authenticate with the domain using *kinit*
-        * A new A record is added to the DNS server using *nsupdate*.
-      * Dynamic DNS registration is configured
-        * A new DHCP client exit hook script named `/etc/dhcp/dhclient-exit-hooks.d/hook-ddns` is created which runs whenever the DHCP client exits.
-          * The script uses *kinit* to authenticate with the domain using the previously created keytab file.
-          * The old A record is deleted and a new A record is added to the DNS server using *nsupdate*.
-      * Privileged access management is configured.
-        * Automatic home directory creation is enabled.
-        * The domain administrator account is configured.
-          * Logins are permitted.
-          * Sudo privileges are granted.
-      * SSH server is configured for logins using Active Directory accounts.
+  * [configure-vm-jumpbox-linux.sh](./configure-vm-jumpbox-linux.sh) is a [User-Data Script](https://cloudinit.readthedocs.io/en/latest/topics/format.html#user-data-script) used to configure the VM. Runtime values are retrieved using [Instance Metadata](https://cloudinit.readthedocs.io/en/latest/topics/instancedata.html#instance-metadata).
+    * The name of the key vault used for secrets is retrieved from the tag named *keyvault*.
+    * The Active Directory domain name is retrieved from the tag named *adds_domain_name*.
+    * An access token is generated using the VM's system assigned managed identity.
+    * The access token is used to get secrets from key vault, including:
+      * *adminuser*: The name of the administrative user account for configuring the VM (e.g. "bootstrapadmin" by default).
+      * *adminpassword*: The password for the administrative user account.
+    * The networking configuration of the VM is modified to enable domain joining the VM
+      * The *hosts* file is updated to reference the newly configured host name and domain name.
+      * The DHCP client configuration file *dhclient.conf* is updated to include the newly configured domain name.
+    * The VM is domain joined
+      * The *ntp.conf* file is updated to synchronize the time with the domain controller.
+      * The *krb5.conf* file is updated to disable the *rdns* setting.
+      * *dhclient* is run to refresh the DHCP settings using the new networking configuration.
+      * *realm join* is run to join the domain
+    * The VM is registered with the DNS server
+      * A local *keytab* file is created and used to authenticate with the domain using *kinit*
+      * A new A record is added to the DNS server using *nsupdate*.
+    * Dynamic DNS registration is configured
+      * A new DHCP client exit hook script named `/etc/dhcp/dhclient-exit-hooks.d/hook-ddns` is created which runs whenever the DHCP client exits.
+        * The script uses *kinit* to authenticate with the domain using the previously created keytab file.
+        * The old A record is deleted and a new A record is added to the DNS server using *nsupdate*.
+    * Privileged access management is configured.
+      * Automatic home directory creation is enabled.
+      * The domain administrator account is configured.
+        * Logins are permitted.
+        * Sudo privileges are granted.
+    * SSH server is configured for logins using Active Directory accounts.
+    * The Azure Files share is mounted using CIFS.
+      * The name of the storage account used for mounting Azure Files shares is retrieved from the tag named `storage_account_name``.
+      * The name of the Azure Files share is retrieved from the tag named `storage_share_name``.
+      * A new mount directory is created at `/storage_account_name/storage_share_name` for mounting the Azure Files share.
+      * A credentials file is created for `bootstrapadmin@mysandbox.local` to be used to mount the Azure Files share.
+      * The `/etc/fstab` file is modified to automatically mount the Azure Files share using CIFS.
+      * Mounting / unmounting of the Azure Files share is tested.
+      * Auto-mounting of the Azure Files share is tested.
   * [configure-powershell.ps1](./configure-powershell.ps1) is a [User-Data Script](https://cloudinit.readthedocs.io/en/latest/topics/format.html#user-data-script) that installs [Azure PowerShell](https://learn.microsoft.com/en-us/powershell/azure/what-is-azure-powershell?view=azps-9.5.0)
 
 #### Storage resources
@@ -440,7 +450,7 @@ This section lists the output variables defined in this configuration. Some of t
 Output variable | Sample value
 --- | ---
 private_dns_zones | contains all the private dns zone definitions from this configuration including *privatelink.database.windows.net*, *privatelink.file.core.windows.net* and *private.mysql.database.azure.com*.
-storage_share_01_name | "myfileshare"
+storage_share_name | "myfileshare"
 vnet_app_01_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualNetworks/vnet-app-01"
 vnet_app_01_name | "vnet-app-01"
 vnet_app_01_subnets | Contains all the subnet definitions from this configuration including *snet-app-01*, *snet-db-01*, *snet-mysql-01* and *snet-privatelink-01*.

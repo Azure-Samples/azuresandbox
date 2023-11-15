@@ -31,7 +31,13 @@ resource "azurerm_linux_virtual_machine" "vm_jumpbox_linux" {
   admin_username        = data.azurerm_key_vault_secret.adminuser.value
   network_interface_ids = [azurerm_network_interface.vm_jumbox_linux_nic_01.id]
   patch_mode            = "AutomaticByPlatform"
-  tags                  = merge(var.tags, { keyvault = var.key_vault_name }, { adds_domain_name = var.adds_domain_name })
+  tags                  = merge(
+                            var.tags, 
+                            { keyvault = var.key_vault_name }, 
+                            { adds_domain_name = var.adds_domain_name },
+                            { storage_account_name = var.storage_account_name },
+                            { storage_share_name = var.storage_share_name }
+                          )
 
   admin_ssh_key {
     username   = data.azurerm_key_vault_secret.adminuser.value

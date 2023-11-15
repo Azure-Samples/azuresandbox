@@ -159,6 +159,55 @@ printf "Restarting '$servicename'...\n" >> $log_file
 sudo systemctl restart $servicename &>> $log_file
 printdiv
 
+# Mount CIFS file system
+printf 'Mounting CIFS filesystem...\n' >> $log_file
+
+tag_name='storage_account_name'
+printf "Getting tag name '$tag_name'...\n" >> $log_file
+storage_account_name=$(jp -f "/run/cloud-init/instance-data.json" -u "ds.meta_data.imds.compute.tagsList[?name == '$tag_name'] | [0].value")
+printf "CIFS storage account name is '$storage_account_name'...\n" >> $log_file
+
+tag_name='storage_share_name'
+printf "Getting tag name '$tag_name'...\n" >> $log_file
+storage_share_name=$(jp -f "/run/cloud-init/instance-data.json" -u "ds.meta_data.imds.compute.tagsList[?name == '$tag_name'] | [0].value")
+printf "CIFS share name is '$storage_share_name'...\n" >> $log_file
+
+cifs_mount_dir="/$storage_account_name/$storage_share_name"
+printf "Creating mount directory '$cifs_mount_dir'...\n" >> $log_file
+sudo mkdir -p $cifs_mount_dir &>> $log_file
+
+cred_file_dir="/etc/smbcredentials"
+printf "Creating credential files directory '$cred_file_dir'...\n" >> $log_file
+sudo mkdir $cred_file_dir &>> $log_file
+
+cred_file="$cred_file_dir/$storage_account_name.cred"
+printf "Creating credential file '$cred_file'...\n" >> $log_file
+echo "username=$admin_username" | sudo tee $cred_file > /dev/null
+echo "password=$admin_password" | sudo tee -a $cred_file > /dev/null
+sudo chmod 600 $cred_file &>> $log_file
+
+filename=/etc/fstab
+printf "Backing up file '$filename'...\n" >> $log_file
+sudo cp -f "$filename" "$filename.bak"
+printf "Modifying '$filename'...\n" >> $log_file
+cifs_unc_path="//$storage_account_name.file.core.windows.net/$storage_share_name"
+echo "$cifs_unc_path $cifs_mount_dir cifs nofail,credentials=$cred_file,serverino,nosharesock,actimeo=30,sec=krb5,dir_mode=0777,file_mode=0777,x-systemd.automount 0 0" | sudo tee -a $filename >> $log_file
+diff "$filename.bak" "$filename" >> $log_file
+
+printf "Mounting CIFS file system at '$cifs_mount_dir'...\n" >> $log_file
+sudo mount $cifs_mount_dir &>> $log_file
+
+printf "Unmounting CIFS file system at '$cifs_mount_dir'...\n" >> $log_file
+sudo umount $cifs_mount_dir &>> $log_file
+
+printf "Load newly created units and register new configurations...\n" >> $log_file
+sudo systemctl daemon-reload
+mount_unit="$storage_account_name-$storage_share_name.automount"
+printf "Testing automount for unit at '$mount_unit'...\n" >> $log_file
+sudo systemctl start $mount_unit &>> $log_file
+sudo systemctl status $mount_unit &>> $log_file
+printdiv
+
 # Exit
 printf "Exiting '$0'...\n" >> $log_file
 printf "Timestamp: $(date +"%Y-%m-%d %H:%M:%S.%N %Z")...\n" >> $log_file
