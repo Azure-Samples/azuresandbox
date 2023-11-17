@@ -92,9 +92,9 @@ Use the steps in this section to verify the configuration is working as expected
 
   * Verify the *IP4Address* returned is within the subnet IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-mysql-01"]*, e.g. `10.2.3.*`.
   * Note: This DNS query is resolved using the following resources:
-    * A DNS A record is added for the MySQL server automatically by the provisioning process. This can be verified in the Azure portal by navigating to *Private DNS zones* > *private.mysql.database.azure.com* and viewing the A record listed.
-    * *azurerm_private_dns_zone.private_dns_zones["private.mysql.database.azure.com"]*
-    * *azurerm_private_dns_zone_virtual_network_link.private_dns_zone_virtual_network_links_vnet_app_01["private.mysql.database.azure.com"]*
+    * A DNS A record is added for the MySQL server automatically by the provisioning process. This can be verified in the Azure portal by navigating to *Private DNS zones* > *privatelink.mysql.database.azure.com* and viewing the A record listed.
+    * *azurerm_private_dns_zone.private_dns_zones["privatelink.mysql.database.azure.com"]*
+    * *azurerm_private_dns_zone_virtual_network_link.private_dns_zone_virtual_network_links_vnet_app_01["privatelink.mysql.database.azure.com"]*
 
 * From *jumpwin1*, test private MySQL connectivity using MySQL Workbench.
   * Navigate to *Start* > *MySQL Workbench*
@@ -129,7 +129,7 @@ resource_group_name | "rg-sandbox-01"
 subscription_id | "00000000-0000-0000-0000-000000000000"
 tags | tomap( { "costcenter" = "10177772" "environment" = "dev" "project" = "#AzureSandbox" } )
 private_dns_zones | Contains all the subnet definitions from this configuration including *snet-app-01*, *snet-db-01*, *snet-mysql-01* and *snet-privatelink-01*.
-vnet_app_01_subnets | Contains all the subnet definitions including *snet-app-01*, *snet-db-01*, *snet-mysql-01* and *snet-privatelink-01*.
+vnet_app_01_subnets | Contains all the subnet definitions including *snet-app-01*, *snet-db-01*, *snet-privatelink-01* and *snet-misc-03*.
 
 ### Terraform Resources
 
@@ -141,8 +141,10 @@ The configuration for these resources can be found in [020-mysql.tf](./020-mysql
 
 Resource name (ARM) | Notes
 --- | ---
-azurerm_mysql_flexible_server.mysql_server_01 (mysql-xxxxxxxxxxxxxxxx) | An [Azure Database for MySQL - Flexible Server](https://learn.microsoft.com/azure/mysql/flexible-server/overview) for hosting databases. Note that a private endpoint is automatically created during provisioning and a corresponding DNS A record is automatically added to the corresponding private DNS zone.
+azurerm_mysql_flexible_server.mysql_server_01 (mysql-xxxxxxxxxxxxxxxx) | An [Azure Database for MySQL - Flexible Server](https://learn.microsoft.com/azure/mysql/flexible-server/overview) for hosting databases.
 azurerm_mysql_flexible_database.mysql_database_01 | A MySQL Database named *testdb* for testing connectivity.
+azurerm_private_endpoint.mysql_server_01 (pend-mysql-xxxxxxxxxxxxxxxx) | A private endpoint for the MySQL server.
+azurerm_private_dns_a_record.mysql_server_01 | A private DNS A record for the MySQL server private endpoint.
 
 ## Next steps
 

@@ -78,7 +78,7 @@ This section describes how to provision this configuration using default setting
 
 * Monitor output. Upon completion, you should see a message similar to the following:
 
-  `Apply complete! Resources: 43 added, 0 changed, 0 destroyed.`
+  `Apply complete! Resources: 44 added, 0 changed, 0 destroyed.`
 
 * Inspect `terraform.tfstate`.
 
@@ -243,9 +243,15 @@ The following sections provide guided smoke testing of each resource provisioned
     net use z: \\stxxxxxxxxxxx.file.core.windows.net\myfileshare
     ```
 
-  * Create some test files and folders on the newly mapped Z: drive
-  * Note: Integrated Windows Authentication was configured using [configure-storage-kerberos.ps1](./configure-storage-kerberos.ps1) which was run by *azurerm_virtual_machine_extension.vm_jumpbox_win_postdeploy_script*.
-  * Note: SMB connectivity with storage key authentication to Azure Files via the Internet will not be tested because most ISP's block port 445.
+  * Create some test files and folders on the newly mapped Z: drive.
+
+* From *jumplinux1*, verify SMB connectivity to Azure Files private endpoint (PaaS)
+  * Run the following commands from a bash shell to verify access to the test files and folders you created from *jumpwin1*:
+
+    ```bash
+    # Note: replace stxxxxxxxxxxxxx with the name of your storage account
+    ll /stxxxxxxxxxxxxx/myfileshare/
+    ```
 
 ## Documentation
 
@@ -307,7 +313,7 @@ azurerm_subnet .vnet_app_01_subnets ["snet-privatelink-01"] | terraform-azurerm-
 azurerm_subnet . vnet_app_01_subnets ["snet-mysql-01"] | terraform-azurerm-mysql | The default address prefix for this subnet is `10.2.3.0/24`. *service_delegation_name* is set to `Microsoft.DBforMySQL/flexibleServers` for use with [subnet delegation](https://learn.microsoft.com/azure/virtual-network/subnet-delegation-overview). A network security group is associated with this subnet that permits ingress and egress from virtual networks.
 azurerm_virtual_network_peering . vnet_shared_01_to_vnet_app_01_peering | terraform-azurerm-vnet-app | Establishes the [virtual network peering](https://learn.microsoft.com/azure/virtual-network/virtual-network-peering-overview) relationship from *azurerm_virtual_network.vnet_shared_01* to *azurerm_virtual_network.vnet_app_01*.
 azurerm_virtual_network_peering . vnet_app_01_to_vnet_shared_01_peering | terraform-azurerm-vnet-app |Establishes the [virtual network peering](https://learn.microsoft.com/azure/virtual-network/virtual-network-peering-overview) relationship from *azurerm_virtual_network.vnet_app_01* to *azurerm_virtual_network.vnet_shared_01*.
-azurerm_private_dns_zone . private_dns_zones ["private.mysql.database.azure.com"] | terraform-azurerm-mysql | Creates a [private Azure DNS zone](https://learn.microsoft.com/azure/dns/private-dns-privatednszone) for using [Private Network Access for Azure Database for MySQL - Flexible Server](https://learn.microsoft.com/azure/mysql/flexible-server/concepts-networking-vnet).
+azurerm_private_dns_zone . private_dns_zones ["privatelink.mysql.database.azure.com"] | terraform-azurerm-mysql | Creates a [private Azure DNS zone](https://learn.microsoft.com/azure/dns/private-dns-privatednszone) for using [Private Network Access for Azure Database for MySQL - Flexible Server](https://learn.microsoft.com/azure/mysql/flexible-server/concepts-networking-vnet).
 azurerm_private_dns_zone . private_dns_zones ["privatelink.database.windows.net"] | terraform-azurerm-mssql | Creates a [private Azure DNS zone](https://learn.microsoft.com/azure/dns/private-dns-privatednszone) for using [Azure Private Link for Azure SQL Database](https://learn.microsoft.com/azure/azure-sql/database/private-endpoint-overview).
 azurerm_private_dns_zone . private_dns_zones ["privatelink.file.core.windows.net"] | terraform-azurerm-vnet-app | Creates a [private Azure DNS zone](https://learn.microsoft.com/azure/dns/private-dns-privatednszone) for using [Azure Private Link for Azure Files](https://learn.microsoft.com/azure/storage/common/storage-private-endpoints).
 azurerm_private_dns_zone_virtual_network_link . private_dns_zone_virtual_network_links_vnet_app_01 [*] | terraform-azurerm-vnet-app, terraform-azurerm-mssql, terraform-azurerm-mysql | Links each of the private DNS zones with azurerm_virtual_network.vnet_app_01
@@ -449,7 +455,7 @@ This section lists the output variables defined in this configuration. Some of t
 
 Output variable | Sample value
 --- | ---
-private_dns_zones | contains all the private dns zone definitions from this configuration including *privatelink.database.windows.net*, *privatelink.file.core.windows.net* and *private.mysql.database.azure.com*.
+private_dns_zones | contains all the private dns zone definitions from this configuration including *privatelink.database.windows.net*, *privatelink.file.core.windows.net* and *privatelink.mysql.database.azure.com*.
 storage_share_name | "myfileshare"
 vnet_app_01_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualNetworks/vnet-app-01"
 vnet_app_01_name | "vnet-app-01"
