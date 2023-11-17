@@ -53,7 +53,7 @@ resource "azurerm_network_interface" "vm_jumpbox_win_nic_01" {
 
   ip_configuration {
     name                          = "ipc-${var.vm_jumpbox_win_name}-1"
-    subnet_id                     = azurerm_subnet.vnet_shared_02_subnets["snet-misc-03"].id
+    subnet_id                     = azurerm_subnet.vnet_shared_02_subnets["snet-misc-04"].id
     private_ip_address_allocation = "Dynamic"
   }
 }

@@ -8,7 +8,7 @@ locals {
       address_prefix                            = var.subnet_adds_address_prefix
     }
 
-    snet-misc-03 = {
+    snet-misc-04 = {
       address_prefix                            = var.subnet_misc_address_prefix
     }
   }
