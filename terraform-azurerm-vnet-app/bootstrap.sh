@@ -15,8 +15,8 @@ default_skip_ssh_key_gen="no"
 default_storage_share_name="myfileshare"
 default_subnet_application_address_prefix="10.2.0.0/24"
 default_subnet_database_address_prefix="10.2.1.0/24"
+default_subnet_misc_address_prefix="10.2.3.0/24"
 default_subnet_privatelink_address_prefix="10.2.2.0/24"
-default_subnet_mysql_address_prefix="10.2.3.0/24"
 default_vm_jumpbox_linux_name="jumplinux1"
 default_vm_jumpbox_win_name="jumpwin1"
 vm_jumpbox_win_post_deploy_script="configure-vm-jumpbox-win.ps1"
@@ -53,16 +53,16 @@ subscription_id=$(terraform output -state=$state_file subscription_id)
 tags=$(terraform output -json -state=$state_file tags)
 
 # User input
-read -e -i $default_vnet_name                           -p "Virtual network name (vnet_name) --------------------------------------: " vnet_name
-read -e -i $default_vnet_address_space                  -p "Virtual network address space (vnet_address_space) --------------------: " vnet_address_space
-read -e -i $default_subnet_application_address_prefix   -p "Application subnet address prefix (subnet_application_address_prefix) -: " subnet_application_address_prefix
-read -e -i $default_subnet_database_address_prefix      -p "Database subnet address prefix (subnet_database_address_prefix) -------: " subnet_database_address_prefix
-read -e -i $default_subnet_privatelink_address_prefix   -p "privatelink subnet address prefix (subnet_privatelink_address_prefix) -: " subnet_privatelink_address_prefix
-read -e -i $default_subnet_mysql_address_prefix         -p "MySQL subnet address prefix (subnet_mysql_address_prefix) -------------: " subnet_mysql_address_prefix
-read -e -i $default_vm_jumpbox_linux_name               -p "Linux jumpbox virtual machine name (vm_jumpbox_linux_name) ------------: " vm_jumpbox_linux_name
-read -e -i $default_skip_ssh_key_gen                    -p "Skip SSH key generation (skip_ssh_key_gen) yes/no ? -------------------: " skip_ssh_key_gen
-read -e -i $default_vm_jumpbox_win_name                 -p "Windows jumpbox virtual machine name (vm_jumpbox_win_name) ------------: " vm_jumpbox_win_name
-read -e -i $default_storage_share_name                  -p "Azure Files share name (storage_share_name) ---------------------------: " storage_share_name
+read -e -i $default_vnet_name                         -p "Virtual network name (vnet_name) --------------------------------------: " vnet_name
+read -e -i $default_vnet_address_space                -p "Virtual network address space (vnet_address_space) --------------------: " vnet_address_space
+read -e -i $default_subnet_application_address_prefix -p "Application subnet address prefix (subnet_application_address_prefix) -: " subnet_application_address_prefix
+read -e -i $default_subnet_database_address_prefix    -p "Database subnet address prefix (subnet_database_address_prefix) -------: " subnet_database_address_prefix
+read -e -i $default_subnet_privatelink_address_prefix -p "privatelink subnet address prefix (subnet_privatelink_address_prefix) -: " subnet_privatelink_address_prefix
+read -e -i $default_subnet_misc_address_prefix        -p "Miscellaneous subnet address prefix (subnet_misc_address_prefix) ------: " subnet_misc_address_prefix
+read -e -i $default_vm_jumpbox_linux_name             -p "Linux jumpbox virtual machine name (vm_jumpbox_linux_name) ------------: " vm_jumpbox_linux_name
+read -e -i $default_skip_ssh_key_gen                  -p "Skip SSH key generation (skip_ssh_key_gen) yes/no ? -------------------: " skip_ssh_key_gen
+read -e -i $default_vm_jumpbox_win_name               -p "Windows jumpbox virtual machine name (vm_jumpbox_win_name) ------------: " vm_jumpbox_win_name
+read -e -i $default_storage_share_name                -p "Azure Files share name (storage_share_name) ---------------------------: " storage_share_name
 
 application_subnet_name=${application_subnet_name:-$default_application_subnet_name}
 database_subnet_name=${database_subnet_name:-$default_database_subnet_name}
@@ -71,8 +71,8 @@ skip_ssh_key_gen=${skip_ssh_key_gen:-$default_skip_ssh_key_gen}
 storage_share_name=${storage_share_name:-$default_storage_share_name}
 subnet_application_address_prefix=${subnet_application_address_prefix:-$default_subnet_application_address_prefix}
 subnet_database_address_prefix=${subnet_database_address_prefix:-$default_subnet_database_address_prefix}
+subnet_misc_address_prefix=${subnet_misc_address_prefix:-$default_subnet_misc_address_prefix}
 subnet_privatelink_address_prefix=${subnet_privatelink_address_prefix:-$default_subnet_privatelink_address_prefix}
-subnet_mysql_address_prefix=${subnet_mysql_address_prefix:-$default_subnet_mysql_address_prefix}
 vm_jumpbox_linux_name=${vm_jumpbox_linux_name:-$default_vm_jumpbox_linux_name}
 vm_jumpbox_win_name=${vm_jumpbox_win_name:-$default_vm_jumpbox_win_name}
 vnet_name=${vnet_name:=$default_vnet_name}
@@ -206,7 +206,7 @@ printf "storage_account_name                        = $storage_account_name\n"  
 printf "storage_share_name                          = \"$storage_share_name\"\n"                          >> ./terraform.tfvars
 printf "subnet_application_address_prefix           = \"$subnet_application_address_prefix\"\n"           >> ./terraform.tfvars
 printf "subnet_database_address_prefix              = \"$subnet_database_address_prefix\"\n"              >> ./terraform.tfvars
-printf "subnet_mysql_address_prefix                 = \"$subnet_mysql_address_prefix\"\n"                 >> ./terraform.tfvars
+printf "subnet_misc_address_prefix                  = \"$subnet_misc_address_prefix\"\n"                  >> ./terraform.tfvars
 printf "subnet_privatelink_address_prefix           = \"$subnet_privatelink_address_prefix\"\n"           >> ./terraform.tfvars
 printf "subscription_id                             = $subscription_id\n"                                 >> ./terraform.tfvars
 printf "tags                                        = $tags\n"                                            >> ./terraform.tfvars

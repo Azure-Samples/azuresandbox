@@ -100,7 +100,7 @@ variable "subnet_database_address_prefix" {
   description = "The address prefix for the database subnet."
 }
 
-variable "subnet_mysql_address_prefix" {
+variable "subnet_misc_address_prefix" {
   type        = string
   description = "The address prefix for the MySQL subnet."
 }

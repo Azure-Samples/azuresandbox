@@ -8,7 +8,6 @@ locals {
         "AllowVirtualNetworkOutbound",
         "AllowInternetOutbound"
       ]
-      service_delegation_name = null
     }
 
     snet-db-01 = {
@@ -19,17 +18,16 @@ locals {
         "AllowVirtualNetworkOutbound",
         "AllowInternetOutbound"
       ]
-      service_delegation_name = null
     }
 
-    snet-mysql-01 = {
-      address_prefix                            = var.subnet_mysql_address_prefix
+    snet-misc-03 = {
+      address_prefix                            = var.subnet_misc_address_prefix
       private_endpoint_network_policies_enabled = false
       nsgrules = [
         "AllowVirtualNetworkInbound",
-        "AllowVirtualNetworkOutbound"
+        "AllowVirtualNetworkOutbound",
+        "AllowInternetOutbound"
       ]
-      service_delegation_name = "Microsoft.DBforMySQL/flexibleServers"
     }
 
     snet-privatelink-01 = {
@@ -39,7 +37,6 @@ locals {
         "AllowVirtualNetworkInbound",
         "AllowVirtualNetworkOutbound"
       ]
-      service_delegation_name = null
     }
   }
 
@@ -95,7 +92,7 @@ locals {
   private_dns_zones = [
     "privatelink.database.windows.net",
     "privatelink.file.core.windows.net",
-    "private.mysql.database.azure.com"
+    "privatelink.mysql.database.azure.com"
   ]
 }
 
@@ -124,21 +121,6 @@ resource "azurerm_subnet" "vnet_app_01_subnets" {
   virtual_network_name                      = azurerm_virtual_network.vnet_app_01.name
   address_prefixes                          = [each.value.address_prefix]
   private_endpoint_network_policies_enabled = each.value.private_endpoint_network_policies_enabled
-
-  dynamic "delegation" {
-    for_each = each.value.service_delegation_name == null ? [] : [1]
-
-    content {
-      name = "delegation"
-
-      service_delegation {
-        name = each.value.service_delegation_name
-        actions = [
-          "Microsoft.Network/virtualNetworks/subnets/join/action"
-        ]
-      }
-    }
-  }
 }
 
 output "vnet_app_01_subnets" {
