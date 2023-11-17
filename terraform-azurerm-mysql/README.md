@@ -69,7 +69,7 @@ This section describes how to provision this configuration using default setting
 
 * Monitor output. Upon completion, you should see a message similar to the following:
 
-  `Apply complete! Resources: 3 added, 0 changed, 0 destroyed.`
+  `Apply complete! Resources: 5 added, 0 changed, 0 destroyed.`
 
 * Inspect `terraform.tfstate`.
 
