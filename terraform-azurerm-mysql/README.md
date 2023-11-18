@@ -84,18 +84,13 @@ Use the steps in this section to verify the configuration is working as expected
 
 * Test DNS queries for Azure Database for MySQL private endpoint (PaaS)
   * From the client environment, navigate to *portal.azure.com* > *Azure Database for MySQL flexible servers* > *mysql-xxxxxxxxxxxxxxxx* > *Overview* > *Server name* and and copy the the FQDN, e.g. *mysql&#x2011;xxxxxxxxxxxxxxxx.mysql.database.azure.com*.
-  * From *jumpwin1*, run the following Windows PowerShell command:
+  * From *jumpwin1*, execute the following PowerShell command:
   
     ```powershell
     Resolve-DnsName mysql-xxxxxxxxxxxxxxxx.mysql.database.azure.com
     ```
 
-  * Verify the *IP4Address* returned is within the subnet IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-mysql-01"]*, e.g. `10.2.3.*`.
-  * Note: This DNS query is resolved using the following resources:
-    * A DNS A record is added for the MySQL server automatically by the provisioning process. This can be verified in the Azure portal by navigating to *Private DNS zones* > *privatelink.mysql.database.azure.com* and viewing the A record listed.
-    * *azurerm_private_dns_zone.private_dns_zones["privatelink.mysql.database.azure.com"]*
-    * *azurerm_private_dns_zone_virtual_network_link.private_dns_zone_virtual_network_links_vnet_app_01["privatelink.mysql.database.azure.com"]*
-
+  * Verify the *IP4Address* returned is within the subnet IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-privatelink-01"]*, e.g. `10.2.2.*`.
 * From *jumpwin1*, test private MySQL connectivity using MySQL Workbench.
   * Navigate to *Start* > *MySQL Workbench*
   * Navigate to *Database* > *Connect to Database* and connect using the following values:
@@ -106,7 +101,59 @@ Use the steps in this section to verify the configuration is working as expected
     * Schema: `testdb`
     * Click *OK* and when prompted for *password* use the value of the *adminpassword* secret in key vault.
     * Create a table, insert some data and run some sample queries to verify functionality.
-    * Note: Internet connectivity will not be tested because Azure Database for MySQL can only be configured for access via private endpoints or public endpoints, but not both simultaneously.
+* Optional: Enable internet access to Azure MySQL Flexible Server
+  * From the client environment (not *jumpwin1*), verify that PrivateLink is not already configured on the network
+    * Open a command prompt and run the following command:
+
+      ```text
+      ipconfig /all
+      ```
+
+    * Scan the results for *privatelink.mysql.database.azure.com* in *Connection-specific DNS Suffix Search List*.
+      * If found, PrivateLink is already configured on the network.
+        * If you are directly connected to a private network, skip this portion of the smoke testing.
+        * If you are connected to a private network using a VPN, disconnect from it and try again.
+          * If the *privatelink.database.windows.net* DNS Suffix is no longer listed, you can continue.
+  * Execute the following PowerShell command:
+
+    ```powershell
+    Resolve-DnsName mysql-xxxxxxxxxxxxxxxx.mysql.database.azure.com
+    ```
+
+  * Make a note of the *IP4Address* returned. It is different from the private IP address returned previously in the smoke testing.
+  * Navigate to [lookip.net](https://www.lookip.net/ip) and lookup the *IP4Address* from the previous step. Examine the *Technical details* and verify that the ISP for the IP Address is `Microsoft Azure` and the Company is `Microsoft Azure`.
+  * Manually enable public access to Azure MySQL Flexible Server
+    * Navigate to *portal.azure.com* > *Home* > *SQL Servers* > *mssql&#x2011;xxxxxxxxxxxxxxxx* > *Settings* > *Networking* > *Firewall rules*
+    * Click *Add current client IP address*
+    * Click *Save*
+    * Verify the *Public access* tab, click *Selected networks*
+    * In the *Firewall rules* section, click *Add your client IPv4 address*
+    * Click *Save*
+  * Test Internet connectivity to Azure MySQL Flexible Server
+    * From the client environment (not *jumpwin1*) launch *MySQL Workbench*
+    * Navigate to *Database* > *Connect to Database* and connect using the following values:
+      * Connection method: `Standard (TCP/IP)`
+      * Hostname: `mysql-xxxxxxxxxxxxxxxx.mysql.database.azure.com`
+      * Port: `3306`
+      * Username: `bootstrapadmin`
+      * Schema: `testdb`
+      * Click *OK* and when prompted for *password* use the value of the *adminpassword* secret in key vault.
+      * Verify connection has been established by browsing the schema for `testdb`
+      * Close *MySQL Workbench*
+  * Disable public network access
+    * Navigate to *portal.azure.com* > *Home* > *SQL Servers* > *mssql&#x2011;xxxxxxxxxxxxxxxx* > *Settings* > *Networking* > *Firewall rules*
+    * Delete the row containing your client IP address.
+    * Click *Save*
+    * From the client environment (not *jumpwin1*) launch *MySQL Workbench*
+    * Navigate to *Database* > *Connect to Database* and connect using the following values:
+      * Connection method: `Standard (TCP/IP)`
+      * Hostname: `mysql-xxxxxxxxxxxxxxxx.mysql.database.azure.com`
+      * Port: `3306`
+      * Username: `bootstrapadmin`
+      * Schema: `testdb`
+      * Click *OK*.
+      * The connection should fail.
+      * Close *MySQL Workbench*
 
 ## Documentation
 
