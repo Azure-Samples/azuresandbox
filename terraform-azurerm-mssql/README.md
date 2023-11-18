@@ -91,13 +91,8 @@ Use the steps in this section to smoke test the configuration ([Step-By-Step Vid
     ```
 
   * Verify the *IP4Address* returned is within the subnet IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-privatelink-01"]*, e.g. `10.2.2.*`.
-  * Note: This DNS query is resolved using the following resources:
-    * *azurerm_private_dns_a_record.sql_server_01*
-    * *azurerm_private_dns_zone.private_dns_zones["privatelink.database.windows.net"]*
-    * *azurerm_private_dns_zone_virtual_network_link.private_dns_zone_virtual_network_links_vnet_app_01["privatelink.database.windows.net"]*
-
 * From *jumpwin1*, test SQL Server Connectivity with SQL Server Management Studio (SSMS)
-  * Navigate to *Start* > *Microsoft SQL Server Tools 18* > *Microsoft SQL Server Management Studio 18*
+  * Navigate to *Start* > *Microsoft SQL Server Tools 19* > *Microsoft SQL Server Management Studio 19*
   * Connect to the Azure SQL Database server using PrivateLink
     * Server name: *mssql&#x2011;xxxxxxxxxxxxxxxx.database.windows.net*
     * Authentication: *SQL Server Authentication*
@@ -105,9 +100,8 @@ Use the steps in this section to smoke test the configuration ([Step-By-Step Vid
     * Password: Use the value stored in the *adminpassword* key vault secret
   * Expand the *Databases* tab and verify you can see *testdb*
 * Optional: Enable internet access to Azure SQL Database
-  * Note: This smoke testing is performed from the client environment (not *jumpwin1*)
-  * Verify that PrivateLink is not already configured on the network
-    * Open a Windows command prompt and run the following command:
+  * From the client environment (not *jumpwin1*), verify that PrivateLink is not already configured on the network
+    * Open a command prompt and run the following command:
 
       ```text
       ipconfig /all
@@ -118,13 +112,14 @@ Use the steps in this section to smoke test the configuration ([Step-By-Step Vid
         * If you are directly connected to a private network, skip this portion of the smoke testing.
         * If you are connected to a private network using a VPN, disconnect from it and try again.
           * If the *privatelink.database.windows.net* DNS Suffix is no longer listed, you can continue.
-  * Using Windows PowerShell, run this command and make a note of the *IP4Address* returned:
+  * Execute the following PowerShell command:
 
     ```powershell
     Resolve-DnsName mssql-xxxxxxxxxxxxxxxx.database.windows.net
     ```
 
-  * Navigate to [lookip.net](https://www.lookip.net/ip) and lookup the *IP4Address* from the previous step. Examine the *Technical details* and verify that the ISP for the IP Address is *Microsoft Corporation* and the Company is *Microsoft Azure*.
+  * Make a note of the *IP4Address* returned. It is different from the private IP address returned previously in the smoke testing.
+  * Navigate to [lookip.net](https://www.lookip.net/ip) and lookup the *IP4Address* from the previous step. Examine the *Technical details* and verify that the ISP for the IP Address is `Microsoft Corporation` and the Company is `Microsoft Azure`.
   * Manually enable public access to Azure SQL Database
     * Navigate to *portal.azure.com* > *Home* > *SQL Servers* > *mssql&#x2011;xxxxxxxxxxxxxxxx* > *Security* > *Networking*
     * On the *Public access* tab, click *Selected networks*
@@ -140,9 +135,12 @@ Use the steps in this section to smoke test the configuration ([Step-By-Step Vid
     * Expand the *Databases* tab and verify you can see *testdb*
     * Disconnect from Azure SQL Database
   * Disable public network access
-    * In a bash terminal, run the following commands to apply changes to the configuration:
+    * From the client environment, execute the following Bash commands:
 
       ```bash
+      # Change the working directory
+      cd ~/azuresandbox/terraform-azurerm-mssql
+      
       # Verify plan will change one property on one resource only
       terraform plan
 
