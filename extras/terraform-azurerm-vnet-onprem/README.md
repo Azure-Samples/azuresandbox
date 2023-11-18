@@ -93,38 +93,35 @@ This smoke testing is divided into two sections ([Step-By-Step Video](https://yo
 
 * Connect to *jumpwin1*.
   * From the client environment, navigate to *portal.azure.com* > *Virtual machines* > *jumpwin1*
-  * Click *Connect*.
-  * Expand *More ways to connect*.
-  * Click *Go to Bastion*
-  * For *Username* enter `bootstrapadmin@mysandbox.local`.
-  * For *Authentication Type* choose `Password from Azure Key Vault`.
-  * For *Subscription* select the appropriate subscription.
-  * For *Azure Key Vault* select the appropriate key vault, e.g. `kv-xxxxxxxxxxxxxxx`.
-  * For *Azure Key Vault Secret* select `adminpassword`.
-  * Click *Connect*.
-  * For *password* use the value of the *adminpassword* secret in key vault.
+  * Click *Connect*, then click *Connect via Bastion*
+  * For *Authentication Type* choose `Password from Azure Key Vault`
+  * For *username* enter the UPN of the domain admin, which by default is `bootstrapadmin@mysandbox.local`
+  * For *Azure Key Vault Secret* specify the following values:
+    * For *Subscription* choose the same Azure subscription used to provision the #AzureSandbox.
+    * For *Azure Key Vault* choose the key vault provisioned by [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared/#bootstrap-script), e.g. `kv-xxxxxxxxxxxxxxx`
+    * For *Azure Key Vault Secret* choose `adminpassword`
   * Click *Connect*
 
-* Test cloud to on-premises private DNS zones from *jumpwin2*.
+* Test cloud to on-premises private DNS zones from *jumpwin1*.
   * From a Windows PowerShell command prompt, run the following command:
 
     ```powershell
     Resolve-DnsName jumpwin2.myonprem.local
     ```
 
-  * Verify the *IPAddress* returned is within the IP address prefix for *azurerm_subnet.vnet_shared_02_subnets["snet-misc-03"]*, e.g. `192.168.2.4`.
+  * Verify the *IPAddress* returned is within the IP address prefix for *azurerm_subnet.vnet_shared_02_subnets["snet-misc-04"]*, e.g. `192.168.2.4`.
 
 * Test cloud to on-premises RDP connectivity (port 3389) from *jumpwin1*
   * Navigate to *Start* > *Windows Accessories* > *Remote Desktop Connection*
-  * For *Computer*, enter `jumpwin2.myonprem.local`.
-  * For *User name*, enter `boostrapadmin@myonprem.local`.
-  * Click *Connect*.
-  * For *Password*, enter the value of the *adminpassword* secret in key vault.
-  * Click *OK*.
+  * For *Computer*, enter `jumpwin2.myonprem.local`
+  * For *User name*, enter `boostrapadmin@myonprem.local`
+  * Click *Connect*
+  * For *Password*, enter the value of the *adminpassword* secret in key vault
+  * Click *OK*
 
 ### Test connectivity from on-premises to cloud
 
-This smoke testing uses the RDP connection to *jumpwin2* established previously and is divided into the following sections:
+This smoke testing uses the RDP connection to *jumpwin2* established previously from *jumpwin1* and is divided into the following sections:
 
 * [Test SSH (port 22) connectivity to *jumplinux1* private endpoint (IaaS)](#test-ssh-port-22-connectivity-to-jumplinux1-private-endpoint-iaas)
 * [Test SMB (port 445) connectivity to Azure Files private endpoint (PaaS)](#test-smb-port-445-connectivity-to-azure-files-private-endpoint-paas)
@@ -161,7 +158,7 @@ This smoke testing uses the RDP connection to *jumpwin2* established previously 
   Resolve-DnsName stxxxxxxxxxxxxx.file.core.windows.net
   ```
 
-* Verify the *IP4Address* returned is within the IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-privatelink-01"]*, e.g. `10.2.2.4`.
+* Verify the *IP4Address* returned is within the IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-privatelink-01"]*, e.g. `10.2.2.*`.
 * From a Windows PowerShell command prompt, run the following command:
 
   ```powershell
@@ -205,10 +202,10 @@ This smoke testing uses the RDP connection to *jumpwin2* established previously 
   Resolve-DnsName mssql-xxxxxxxxxxxxxxxx.database.windows.net
   ```
 
-* Verify the *IP4Address* returned is within the subnet IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-privatelink-01"]*, e.g. `10.2.2.5`.
+* Verify the *IP4Address* returned is within the subnet IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-privatelink-01"]*, e.g. `10.2.2.*`.
 * Navigate to *Start* > *Microsoft SQL Server Tools 18* > *Microsoft SQL Server Management Studio 18*
 * Connect to the Azure SQL Database server private endpoint
-  * Server name: `mssql&#x2011;xxxxxxxxxxxxxxxx.database.windows.net`
+  * Server name: `mssql-xxxxxxxxxxxxxxxx.database.windows.net`
   * Authentication: `SQL Server Authentication`
   * Login: `bootstrapadmin`
   * Password: Use the value stored in the *adminpassword* key vault secret
@@ -224,7 +221,7 @@ This smoke testing uses the RDP connection to *jumpwin2* established previously 
   Resolve-DnsName mysql-xxxxxxxxxxxxxxxx.mysql.database.azure.com
   ```
 
-* Verify the *IP4Address* returned is within the subnet IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-mysql-01"]*, e.g. `10.2.3.4`.
+* Verify the *IP4Address* returned is within the subnet IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-privatelink-01"]*, e.g. `10.2.2.*`.
 * Navigate to *Start* > *MySQL Workbench*
 * Navigate to *Database* > *Connect to Database* and connect using the following values:
   * Connection method: `Standard (TCP/IP)`
