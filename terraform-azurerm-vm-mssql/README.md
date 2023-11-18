@@ -88,14 +88,13 @@ Perform the following tests to validate the configuration is provisioned correct
   * Refresh the data on the *Nodes* tab and verify that all nodes are compliant.
   * Review the data in the *Configurations* and *Compiled configurations* tabs as well.
 * From *jumpwin1*, test DNS queries for SQL Server (IaaS)
-  * Using Windows PowerShell, run the command:
+  * Execute the following command from PowerShell:
 
     ```powershell
     Resolve-DnsName mssqlwin1
     ```
 
   * Verify the IPAddress returned is within the subnet IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-db-01"]*, e.g. `10.2.1.*`.
-  * Note: This DNS query is resolved by the DNS Server running on *azurerm_windows_virtual_machine.vm_adds*.
 * From *jumpwin1*, test SQL Server Connectivity with SQL Server Management Studio (SSMS)
   * Navigate to *Start* > *Microsoft SQL Server Tools 19* > *Microsoft SQL Server Management Studio 19*
   * Connect to the default instance of SQL Server installed on the database server virtual machine using the following default values:
