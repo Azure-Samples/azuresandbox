@@ -225,6 +225,7 @@ The following sections provide guided smoke testing of each resource provisioned
   * Open a Windows command prompt and enter the following command:
   
     ```text
+    # Note: replace stxxxxxxxxxxxxx with the name of your storage account
     net use z: \\stxxxxxxxxxxx.file.core.windows.net\myfileshare
     ```
 
