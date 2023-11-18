@@ -103,42 +103,53 @@ The following sections provide guided smoke testing of each resource provisioned
 
 * Verify *jumplinux1* cloud-init configuration is complete.
   * From the client environment, navigate to *portal.azure.com* > *Virtual machines* > *jumplinux1*
-  * Click *Connect*, select the *Bastion* tab, then click *Use Bastion*
-  * For *Username* enter `bootstrapadmin`
+  * Click *Connect*, then click *Connect via Bastion*
   * For *Authentication Type* choose `SSH Private Key from Azure Key Vault`
+  * For *Username* enter `bootstrapadmin`
   * For *Azure Key Vault Secret* specify the following values:
     * For *Subscription* choose the same Azure subscription used to provision the #AzureSandbox.
-    * For *Azure Key Vault* choose the key vault provisioned by[terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared/#bootstrap-script), e.g. `kv-xxxxxxxxxxxxxxx`
-    * For *Azure Key Vault Secret choose `bootstrapadmin-ssh-key-private`
-    * Expand *Advanced*
-      * For *SSH Passphrase* enter the value of the *adminpassword* secret in key vault.
-    * Click *Connect*
-    * Execute the following commands from the Bash command prompt:
+    * For *Azure Key Vault* choose the key vault provisioned by [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared/#bootstrap-script), e.g. `kv-xxxxxxxxxxxxxxx`
+    * For *Azure Key Vault Secret* choose `bootstrapadmin-ssh-key-private`
+  * Expand *Advanced*
+    * For *SSH Passphrase* enter the value of the *adminpassword* secret in key vault.
+  * Click *Connect*
+  * Execute the following command:
 
-      ```bash
-      # Check status of cloud-init
-      cloud-init status
+    ```bash
+    cloud-init status
+    ```
 
-      # Review cloud-init logs
-      sudo cat /var/log/cloud-init-output.log | more
-      ```
+  * Verify that cloud-init status is `done`.
+  * Execute the following command:
 
-    * Verify that cloud-init status is `done`.
-    * Note from cloud-init log the amount of automated configuration management being performed including:
-      * package updates and upgrades
-      * reboots
-      * user script executions
+    ```bash
+    sudo cat /var/log/cloud-init-output.log | more
+    ```
+
+  * Review the log file output. Note the automated configuration management being performed including:
+    * package updates and upgrades
+    * reboots
+    * user script executions
+  * Execute the following command:
+
+    ```bash
+    exit
+    ```
 
 * Verify *jumpwin1* node configuration is compliant.
   * From the client environment, navigate to *portal.azure.com* > *Automation Accounts* > *auto-xxxxxxxxxxxxxxxx-01* > *Configuration Management* > *State configuration (DSC)*.
   * Refresh the data on the *Nodes* tab and verify that all nodes are compliant.
   * Review the data in the *Configurations* and *Compiled configurations* tabs as well.
-  * Note: *jumplinux1* is not configured using cloud-init, not Azure Automation DSC and is therefore not shown in the *Nodes* tab.
+  * Note: *jumplinux1* is configured using cloud-init, and is therefore not shown in the Azure Automation DSC *Nodes* tab.
 
 * From the client environment, navigate to *portal.azure.com* > *Virtual machines* > *jumpwin1*
-  * Click *Connect*, select the *Bastion* tab, then click *Use Bastion*
-  * For *username* enter the UPN of the domain admin, which by default is *<bootstrapadmin@mysandbox.local>*.
-  * For *password* use the value of the *adminpassword* secret in key vault.
+  * Click *Connect*, then click *Connect via Bastion*
+  * For *Authentication Type* choose `Password from Azure Key Vault`
+  * For *username* enter the UPN of the domain admin, which by default is `bootstrapadmin@mysandbox.local`
+  * For *Azure Key Vault Secret* specify the following values:
+    * For *Subscription* choose the same Azure subscription used to provision the #AzureSandbox.
+    * For *Azure Key Vault* choose the key vault provisioned by [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared/#bootstrap-script), e.g. `kv-xxxxxxxxxxxxxxx`
+    * For *Azure Key Vault Secret* choose `adminpassword`
   * Click *Connect*
 
 * From *jumpwin1*, disable Server Manager
@@ -162,79 +173,53 @@ The following sections provide guided smoke testing of each resource provisioned
 
 * From *jumpwin1*, configure [Visual Studio Code](https://aka.ms/vscode) to do remote development on *jumplinux1*
   * Navigate to *Start* > *Visual Studio Code* > *Visual Studio Code*.
-  * Install the [Remote-SSH](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-ssh) extension.
-    * Navigate to *View* > *Extensions*
-    * Search for *Remote-SSH*
-    * Click *Install*
-  * Configure SSH
-    * Navigate to *View* > *Command Palette...* and enter:
+  * Click on the blue *Open a Remote Window* icon in the lower left corner
+  * For *Select an option to open a Remote Window* choose `SSH`
+  * For *Select configured SSH host or enter user@host* choose `+ Add New SSH Host...`
+  * For *Enter SSH Connection Command* enter `ssh bootstrapadmin@mysandbox.local@jumplinux1`
+  * For *Select SSH configuration file to update choose `C:\Users\bootstrapadmin\.ssh\config`
 
-      ```text
-      Remote-SSH: Add New SSH Host
-      ```
+* From *jumpwin1*, open a remote window to *jumplinux1*
+  * From Visual Studio Code, click on the blue *Open a Remote Window* icon in the lower left corner
+  * For *Select an option to open a Remote Window* choose `Connect to Host...`
+  * For *Select configured SSH host or enter user@host* choose `jumplinux1`
+  * A new Visual Studio Code window will open.
+  * For *Select the platform of the remote host "jumplinux1"* choose `Linux`
+  * For *"jumplinux1" has fingerprint...* choose `Continue`
+  * For *Enter password...* enter the value of the *adminpassword* secret in key vault.
+  * Verify that *SSH:jumplinux1* is displayed in the blue status section in the lower left corner.
+  * Navigate to *View* > *Explorer*
+  * Click *Open Folder*
+  * For *Open Folder* select the default folder (home directory) and click *OK*.
+  * For *Enter password...* enter the value of the *adminpassword* secret in key vault.
+  * If a Bash terminal is not visible, navigate to *View* > *Terminal*.
+  * Inspect the configuration of *jumplinux1* by executing the following commands from Bash:
 
-    * When prompted for *Enter SSH Connection Command* enter:
+    ```bash
+    # Verify Linux distribution
+    cat /etc/*-release
 
-      ```text
-      ssh bootstrapadmin@mysandbox.local@jumplinux1
-      ```
+    # Verify Azure CLI version
+    az --version
 
-    * When prompted for *Select SSH configuration file to update* choose *C:\\Users\\bootstrapadmin\\.ssh\\config*.
+    # Verify PowerShell version
+    pwsh --version
 
-  * Connect to SSH host
-    * Navigate to *View* >  *Command Palette...* and enter:
-
-      ```text
-      Remote-SSH: Connect to Host
-      ```
-
-    * Select *jumplinux1*
-      * A second Visual Studio Code window will open.
-    * When prompted for *Select the platform of the remote host "jumplinux1"* select *Linux*.
-    * When prompted for *"jumplinux1" has fingerprint...* select *Continue*.
-    * When prompted for *Enter password* use the value of the *adminpassword* secret in key vault.
-      * This will install Visual Studio code remote development binaries on *jumplinux1*.
-    * Verify that *SSH:jumplinux1* is displayed in the blue status section in the lower left corner.
-    * Connect to remote file system
-      * Navigate to *View* > *Explorer*
-      * Click *Open Folder*
-      * Accept the default folder (home directory) and click *OK*.
-      * When prompted for *Enter password* use the value of the *adminpassword* secret in key vault.
-      * When prompted with *Do you trust the authors of the files in this folder?* click *Yes, I trust the authors*.
-      * Review the home directory structure displayed in Explorer.
-    * Open a bash terminal
-      * Navigate to *View* > *Terminal*. This will open up a new bash shell.
-      * Inspect the configuration of *jumplinux1* by executing the following commands from the bash command prompt:
-  
-        ```bash
-        # Verify Linux distribution
-        cat /etc/*-release
-
-        # Verify Azure CLI version
-        az --version
-
-        # Verify PowerShell version
-        pwsh --version
-
-        # Verify Terraform version
-        terraform --version
-        ```
+    # Verify Terraform version
+    terraform --version
+    ```
 
 ### Azure Files smoke testing
 
 * Test DNS queries for Azure Files private endpoint
   * From the client environment, navigate to *portal.azure.com* > *Storage accounts* > *stxxxxxxxxxxx* > *File shares* > *myfileshare* > *Settings* > *Properties* and copy the the FQDN portion of the URL, e.g. *stxxxxxxxxxxx.file.core.windows.net*.
-  * From *jumpwin1*, run the Windows PowerShell command:
+  * From *jumpwin1*, execute the following command from PowerShell:
   
     ```powershell
     Resolve-DnsName stxxxxxxxxxxx.file.core.windows.net
     ```
 
   * Verify the *IP4Address* returned is within the subnet IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-privatelink-01"]*, e.g. `10.2.2.*`.
-  * Note: This DNS query is resolved using the following resources:
-    * *azurerm_private_dns_a_record.storage_account_01_file*
-    * *azurerm_private_dns_zone.private_dns_zones["privatelink.file.core.windows.net"]*
-    * *azurerm_private_dns_zone_virtual_network_link.private_dns_zone_virtual_network_links_vnet_app_01["privatelink.file.core.windows.net"]*
 
 * From *jumpwin1*, test SMB connectivity with integrated Windows Authentication to Azure Files private endpoint (PaaS)
   * Open a Windows command prompt and enter the following command:
@@ -246,7 +231,7 @@ The following sections provide guided smoke testing of each resource provisioned
   * Create some test files and folders on the newly mapped Z: drive.
 
 * From *jumplinux1*, verify SMB connectivity to Azure Files private endpoint (PaaS)
-  * Run the following commands from a bash shell to verify access to the test files and folders you created from *jumpwin1*:
+  * Execute the following commands Bash to verify access to the test files and folders you created from *jumpwin1*:
 
     ```bash
     # Note: replace stxxxxxxxxxxxxx with the name of your storage account
