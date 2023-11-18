@@ -140,7 +140,7 @@ Use the following sections to test user VPN (point-to-site) connectivity to priv
 * [Test SMB (port 445) connectivity to Azure Files private endpoint (PaaS)](#test-smb-port-445-connectivity-to-azure-files-private-endpoint-paas)
 * [Test TDS (port 1433) connectivity to *mssqlwin1* private endpoint (IaaS)](#test-tds-port-1433-connectivity-to-mssqlwin1-private-endpoint-iaas)
 * [Test TDS (port 1433) connectivity to Azure SQL Database private endpoint (PaaS)](#test-tds-port-1433-connectivity-to-azure-sql-database-private-endpoint-paas)
-* [Test port 3306 connectivity to Azure Database for MySQL private endpoint (PaaS)](#test-port-3306-connectivity-to-azure-database-for-mysql-private-endpoint-paas)
+* [Test port 3306 connectivity to Azure Database for MySQL private endpoint (PaaS)](#test-port-3306-connectivity-to-azure-mysql-flexible-server-private-endpoint-paas)
 
 #### Test RDP (port 3389) connectivity to *jumpwin1* private endpoint (IaaS)
 
@@ -251,14 +251,14 @@ Use the following sections to test user VPN (point-to-site) connectivity to priv
 * Verify the *IP4Address* returned is within the subnet IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-privatelink-01"]*, e.g. `10.2.2.*`.
 * Navigate to *Start* > *Microsoft SQL Server Tools 18* > *Microsoft SQL Server Management Studio 18*
 * Connect to the Azure SQL Database server private endpoint
-  * Server name: `mssql&#x2011;xxxxxxxxxxxxxxxx.database.windows.net`
+  * Server name: `mssql-xxxxxxxxxxxxxxxx.database.windows.net`
   * Authentication: `SQL Server Authentication`
   * Login: `bootstrapadmin`
   * Password: Use the value stored in the *adminpassword* key vault secret
 * Expand the *Databases* tab and verify you can see *testdb*.
 * Navigate to *File* > *Exit*
 
-#### Test port 3306 connectivity to Azure Database for MySQL private endpoint (PaaS)
+#### Test port 3306 connectivity to Azure MySQL Flexible Server private endpoint (PaaS)
 
 * Navigate to *portal.azure.com* > *Azure Database for MySQL flexible servers* > *mysql-xxxxxxxxxxxxxxxx* > *Overview* > *Server name* and and copy the the FQDN, e.g. *mysql&#x2011;xxxxxxxxxxxxxxxx.mysql.database.azure.com*.
 * Using Windows PowerShell, run the following command:
@@ -267,13 +267,13 @@ Use the following sections to test user VPN (point-to-site) connectivity to priv
   Resolve-DnsName mysql-xxxxxxxxxxxxxxxx.mysql.database.azure.com
   ```
 
-* Verify the *IP4Address* returned is within the subnet IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-mysql-01"]*, e.g. `10.2.3.*`.
+* Verify the *IP4Address* returned is within the subnet IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-privatelink-01"]*, e.g. `10.2.2.*`.
 * Navigate to *Start* > *MySQL Workbench*
 * Navigate to *Database* > *Connect to Database* and connect using the following values:
   * Connection method: `Standard (TCP/IP)`
   * Hostname: `mysql-xxxxxxxxxxxxxxxx.mysql.database.azure.com`
   * Port: `3306`
-  * Uwername: `bootstrapadmin`
+  * Username: `bootstrapadmin`
   * Schema: `testdb`
   * Click *OK* and when prompted for *password* use the value of the *adminpassword* secret in key vault.
 * Navigate to *File* > *Exit*.
