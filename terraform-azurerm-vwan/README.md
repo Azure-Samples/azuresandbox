@@ -166,7 +166,7 @@ Use the following sections to test user VPN (point-to-site) connectivity to priv
 * Run the following command from a Windows PowerShell command prompt to establish an SSH connection to *jumplinux1*:
 
   ```powershell
-  ssh bootstrapadmin@mysandbox.local@jumplinux1
+  ssh bootstrapadmin@mysandbox.local@jumplinux1.mysandbox.local
   ```
 
   * When prompted for a password, use the value of the *adminpassword* secret in key vault.
