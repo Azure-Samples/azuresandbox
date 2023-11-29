@@ -30,7 +30,16 @@ This configuration simulates connectivity to an on-premises network using a site
 
 ## Before you start
 
-[terraform-azurerm-vwan](../../terraform-azurerm-vwan/) must be provisioned first before starting.
+The following configurations must be provisioned before starting:
+
+* [terraform-azurerm-vnet-shared](../../terraform-azurerm-vnet-shared/)
+* [terraform-azurerm-vnet-app](../../terraform-azurerm-vnet-app/)
+* [terraform-azurerm-vm-mssql](../../terraform-azurerm-vm-mssql/)
+* [terraform-azurerm-mssql](../../terraform-azurerm-mssql/)
+* [terraform-azurerm-mysql](../../terraform-azurerm-mysql/)
+* [terraform-azurerm-vwan](../../terraform-azurerm-vwan/)
+
+Make sure all virtual machines are started, and that Azure Automation DSC is reporting that all node registrations are `Compliant`.
 
 ## Getting started
 
