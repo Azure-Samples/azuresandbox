@@ -9,6 +9,7 @@
 * [Smoke testing](#smoke-testing)
 * [Documentation](#documentation)
 * [Videos](#videos)
+* [Troubleshooting](#troubleshooting)
 
 ## Architecture
 
@@ -378,3 +379,16 @@ Video | Section
 [Azure Sandbox - On-premises Connectivity (Part 2)](https://youtu.be/yVhdhcelYMU) | [Getting started](#getting-started)
 [Azure Sandbox - On-premises Connectivity (Part 3)](https://youtu.be/4t1oh-roSrg) | [Smoke testing](#smoke-testing)
 [Azure Sandbox - On-premises Connectivity (Part 4)](https://youtu.be/VJnWT6V5hPk) | [Documentation](#documentation)
+
+## Troubleshooting
+
+* Azure Automation DSC issues
+  * `DSC node configuration 'OnPremDomainConfig.adds2' RollupStatus is 'Bad'...` : This error may occur during `terraform apply` when the provisioner for *azurerm_windows_virtual_machine.vm_adds* (`adds2`) runs the script [aadsc-register-node.ps1](./aadsc-register-node.ps1). The script checks the status of all DSC node configurations, and if any of them are not `Compliant` it will fail. This is by design as the smoke testing for this configuration requires that all virtual machines in both the *cloud* environment and the *onprem* environment are properly configured. To resolve this issue, do the following:
+    * Ensure all virtual machines are a `Compliant` state by checking that all existing virtual machines are started and Azure Automation DSC has had time to refresh the configuration status. If the status is still not `Compliant` try destroying and reapplying the configuration associated with the problematic virtual machine. Alternatively you can comment out the check in [aadsc-register-node.ps1](./aadsc-register-node.ps1) on lines 108-113.
+    * Unregister *adds2* from Azure Automation DSC.
+    * Delete compiled configurations `OnPremDomainConfig.adds2` and `JumpBoxConfig2.jumpwin2` from Azure Automation DSC.
+    * Delete Configurations `OnPremDomainConfig` and `JumpBoxConfig2` from Azure Automation DSC.
+    * Delete the virtual machine *adds2*.
+    * Delete the Terraform state information for *adds2*: `terraform state rm azurerm_windows_virtual_machine.vm_adds`.
+    * Rerun [bootstrap.sh](./bootstrap.sh).
+    * Re-apply the Terraform configuration.
