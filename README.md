@@ -29,8 +29,8 @@ This repository contains a collection of inter-dependent [cloud computing](https
 * [PowerShell](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-7.1)
   * [PowerShell Core](https://learn.microsoft.com/powershell/scripting/whats-new/what-s-new-in-powershell-71?view=powershell-7.1)
   * [PowerShell 5.1](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-5.1) for Windows Server configuration.
-* [Terraform](https://www.terraform.io/intro/index.html#what-is-terraform-) v1.6.4 for [Infrastructure as Code](https://en.wikipedia.org/wiki/Infrastructure_as_code) (IaC).
-  * [Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs) (azuerrm) v3.82.0
+* [Terraform](https://www.terraform.io/intro/index.html#what-is-terraform-) v1.6.5 for [Infrastructure as Code](https://en.wikipedia.org/wiki/Infrastructure_as_code) (IaC).
+  * [Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs) (azuerrm) v3.83.0
   * [cloud-init Provider](https://registry.terraform.io/providers/hashicorp/cloudinit/latest/docs) (cloudinit) v2.3.2
   * [Random Provider](https://registry.terraform.io/providers/hashicorp/random/latest/docs) (random) v3.5.1
 

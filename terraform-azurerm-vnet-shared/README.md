@@ -30,7 +30,7 @@ This configuration implements a virtual network with shared services used by all
 
 Activity | Estimated time required
 --- | ---
-Pre-configuration | ~10 minutes
+Bootstrap | ~5 minutes
 Provisioning | ~20 minutes
 Smoke testing | ~5 minutes
 

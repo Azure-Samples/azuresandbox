@@ -26,9 +26,9 @@ This configuration implements a virtual network for applications including ([Ste
 
 Activity | Estimated time required
 --- | ---
-Pre-configuration | ~5 minutes
+Bootstrap | ~5 minutes
 Provisioning | ~30 minutes
-Smoke testing | ~ 30 minutes
+Smoke testing | ~30 minutes
 
 ## Before you start
 
