@@ -141,7 +141,7 @@ variable "vm_jumpbox_linux_image_sku" {
 variable "vm_jumpbox_linux_image_version" {
   type        = string
   description = "The version of the virtual machine image used to create the VM"
-  default     = "22.04.202310260"
+  default     = "Latest"
 }
 
 variable "vm_jumpbox_linux_name" {
