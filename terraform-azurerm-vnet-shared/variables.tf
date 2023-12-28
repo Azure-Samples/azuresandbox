@@ -1,6 +1,6 @@
 variable "aad_tenant_id" {
   type        = string
-  description = "The Azure Active Directory tenant id."
+  description = "The Microsoft Entra tenant id."
 }
 
 variable "adds_domain_name" {

@@ -266,7 +266,7 @@ This section describes DevOps security best practices for development and deploy
 
 * Configure role assignments for [Managed identities](https://learn.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview).
   * Add an Azure RBAC `Contributor` role assignment for the system-assigned managed identity associated with [jumplinux1](#linux-jumpbox-vm) to the appropriate Azure subscriptions.  
-  * If use of service principals is required for a specific configuration, add an Azure Active Directory `DirectoryReader` role assignment for the system-assigned managed identity associated with [jumplinux1](#linux-jumpbox-vm).
+  * If use of service principals is required for a specific configuration, add an Microsoft Entra ID `DirectoryReader` role assignment for the system-assigned managed identity associated with [jumplinux1](#linux-jumpbox-vm).
 * Authenticate using managed identities
   * **Azure CLI**: Use `az login --identity` to [Sign in with a managed identity](https://learn.microsoft.com/en-us/cli/azure/authenticate-azure-cli#sign-in-with-a-managed-identity).
   * **PowerShell**: Use `Connect-AzAccount -Identity` to [Sign in with a managed identity](https://learn.microsoft.com/en-us/powershell/azure/authenticate-azureps?view=azps-9.5.0#sign-in-using-a-managed-identity).

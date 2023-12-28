@@ -103,7 +103,7 @@ default_subscription_id=$(az account list --only-show-errors --query "[? isDefau
 default_vm_name="jumplinux1"
 
 # User input
-read -e -i $default_aad_tenant_id           -p "Azure Active Directory tenant id (aad_tenant_id) ------------------------------------: " aad_tenant_id
+read -e -i $default_aad_tenant_id           -p "Microsoft Entra tenant id (aad_tenant_id) -------------------------------------------: " aad_tenant_id
 read -e -i $default_subscription_id         -p "Subscription id (subscription_id)----------------------------------------------------: " subscription_id
 read -e -i $default_owner_object_id         -p "Owner object id (owner_object_id) ---------------------------------------------------: " owner_object_id
 read -e -i $default_project                 -p "Project (project) -------------------------------------------------------------------: " project

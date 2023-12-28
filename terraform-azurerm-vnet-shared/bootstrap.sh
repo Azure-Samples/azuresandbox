@@ -132,7 +132,7 @@ default_vnet_address_space="10.1.0.0/16"
 
 # Get user input
 read -e                                                       -p "Service principal appId (arm_client_id) ---------------------------------------------: " arm_client_id
-read -e -i $default_aad_tenant_id                             -p "Azure AD tenant id (aad_tenant_id) --------------------------------------------------: " aad_tenant_id
+read -e -i $default_aad_tenant_id                             -p "Microsoft Entra tenant id (aad_tenant_id) -------------------------------------------: " aad_tenant_id
 read -e -i $default_owner_object_id                           -p "Object id for Azure CLI signed in user (owner_object_id) ----------------------------: " owner_object_id
 read -e -i $default_subscription_id                           -p "Azure subscription id (subscription_id) ---------------------------------------------: " subscription_id
 read -e -i $default_resource_group_name                       -p "Azure resource group name (resource_group_name) -------------------------------------: " resource_group_name
