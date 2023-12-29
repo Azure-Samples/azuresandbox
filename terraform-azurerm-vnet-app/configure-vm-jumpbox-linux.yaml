@@ -128,24 +128,26 @@ apt:
         =J6gs
         -----END PGP PUBLIC KEY BLOCK-----
       filename: microsoft-prod.list
-packages:
-  - azure-cli
-  - terraform
-  - powershell
-  - python3-pip
-  - jp
-  - linux-modules-extra-azure
-  - cifs-utils
-  - krb5-user
-  - samba
-  - sssd
-  - sssd-tools
-  - libnss-sss
-  - libpam-sss
-  - ntp
-  - ntpdate
-  - realmd
-  - adcli
 
 package_update: true
+
+packages:
+  - autofs
+  - azure-cli
+  - cifs-utils
+  - jp
+  - keyutils
+  - krb5-config
+  - krb5-user
+  - libnss-winbind
+  - libpam-winbind
+  - ntp
+  - powershell
+  - python3-pip
+  - samba
+  - terraform
+  - winbind
+
+package_upgrade: true
+
 package_reboot_if_required: true

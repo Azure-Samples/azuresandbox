@@ -24,14 +24,16 @@ data "cloudinit_config" "vm_jumpbox_linux" {
 
 # Linux virtual machine
 resource "azurerm_linux_virtual_machine" "vm_jumpbox_linux" {
-  name                  = var.vm_jumpbox_linux_name
-  resource_group_name   = var.resource_group_name
-  location              = var.location
-  size                  = var.vm_jumpbox_linux_size
-  admin_username        = data.azurerm_key_vault_secret.adminuser.value
-  network_interface_ids = [azurerm_network_interface.vm_jumbox_linux_nic_01.id]
-  patch_mode            = "AutomaticByPlatform"
-  depends_on            = [azurerm_virtual_machine_extension.vm_jumpbox_win_postdeploy_script]
+  name                            = var.vm_jumpbox_linux_name
+  resource_group_name             = var.resource_group_name
+  location                        = var.location
+  size                            = var.vm_jumpbox_linux_size
+  admin_username                  = "${data.azurerm_key_vault_secret.adminuser.value}local"
+  disable_password_authentication = false
+  admin_password                  = data.azurerm_key_vault_secret.adminpassword.value
+  network_interface_ids           = [azurerm_network_interface.vm_jumbox_linux_nic_01.id]
+  patch_mode                      = "AutomaticByPlatform"
+  depends_on                      = [azurerm_virtual_machine_extension.vm_jumpbox_win_postdeploy_script]
   tags = merge(
     var.tags,
     { keyvault = var.key_vault_name },
@@ -40,10 +42,10 @@ resource "azurerm_linux_virtual_machine" "vm_jumpbox_linux" {
     { storage_share_name = var.storage_share_name }
   )
 
-  admin_ssh_key {
-    username   = data.azurerm_key_vault_secret.adminuser.value
-    public_key = var.ssh_public_key
-  }
+  # admin_ssh_key {
+  #   username   = data.azurerm_key_vault_secret.adminuser.value
+  #   public_key = var.ssh_public_key
+  # }
 
   os_disk {
     caching              = "ReadWrite"
@@ -59,6 +61,10 @@ resource "azurerm_linux_virtual_machine" "vm_jumpbox_linux" {
 
   identity {
     type = "SystemAssigned"
+  }
+
+  boot_diagnostics {
+    storage_account_uri = "https://${var.storage_account_name}.blob.core.windows.net"
   }
 
   custom_data = data.cloudinit_config.vm_jumpbox_linux.rendered

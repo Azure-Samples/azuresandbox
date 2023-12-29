@@ -6,7 +6,7 @@
 log_file='/run/cloud-init/tmp/configure-vm-jumpbox-linux.log'
 
 printdiv() {
-    printf  '=%.0s' {1..100} >> $log_file
+    printf  '=%.0s' {1..80} >> $log_file
     printf  '\n' >> $log_file
 }
 
@@ -27,7 +27,7 @@ printf "Getting tag name '$tag_name'...\n" >> $log_file
 adds_domain_name=$(jp -f "/run/cloud-init/instance-data.json" -u "ds.meta_data.imds.compute.tagsList[?name == '$tag_name'] | [0].value")
 printf "Domain name is '$adds_domain_name'...\n" >> $log_file
 adds_realm_name=$(echo $adds_domain_name | tr '[:lower:]' '[:upper:]')
-printf "Realm name is '$adds_realm_name'...\n" >> $log_fileprintdiv
+printf "Realm name is '$adds_realm_name'...\n" >> $log_file
 
 # Get managed identity access token for key vault
 printf "Getting managed identity access token...\n" >> $log_file
@@ -74,78 +74,6 @@ sudo sed -i "$ a server $adds_domain_name" $filename
 diff "$filename.bak" "$filename" >> $log_file
 printdiv
 
-# Update Kerberos configuration
-filename=/etc/krb5.conf
-sudo cp -f "$filename" "$filename.bak"
-printf "Modifying '$filename'...\n" >> $log_file
-sudo sed -i '/^\[libdefaults\]/a \        rdns=false' $filename
-diff "$filename.bak" "$filename" >> $log_file
-printdiv
-
-# Renew DHCP 
-printf "Renewing DHCP...\n" >> $log_file
-sudo dhclient eth0 -v &>> $log_file
-printdiv
-
-# Join domain
-printf "Joining domain...\n" >> $log_file
-echo $admin_password | sudo realm join --verbose $adds_realm_name -U "$admin_username@$adds_realm_name" --install=/ &>> $log_file
-printdiv
-
-# Create keytab file then authenticate with AD
-filename="/etc/$admin_username.keytab"
-printf "Creating keytab file '$filename'...\n" >> $log_file
-printf "%b" "addent -password -p $admin_username@$adds_realm_name -k 1 -e RC4-HMAC\n$admin_password\nwkt $filename\nq\n" | sudo ktutil &>> $log_file
-printf "Authenticating using keytab file '$filename'...\n" >> $log_file
-sudo kinit -V -k -t /etc/$admin_username.keytab $admin_username@$adds_realm_name &>> $log_file
-printdiv
-
-# Register with DNS server
-commands="update add `hostname`.$adds_domain_name 3600 a `hostname -I`\nsend\n"
-printf "Registering with DNS server...\n" >> $log_file
-printf "%b" "nsgupdate -g\n$commands" >> $log_file
-printf "%b" "$commands" | sudo nsupdate -g
-printdiv
-
-# Configure dynamic DNS registration
-filename='/etc/dhcp/dhclient-exit-hooks.d/hook-ddns'
-printf "Creating DHCP client exit hook '$filename'...\n" >> $log_file
-sudo bash -c "cat > $filename" <<EOF
-#!/bin/sh
-adds_realm_name=\$(echo \$new_domain_name | tr "[:lower:]" "[:upper:]")
-host=\`hostname\`
-admin_username=$admin_username
-if [ "\$interface" != "eth0" ]
-then
-  return
-fi
-if [ "\$reason" = BOUND ] || [ "\$reason" = RENEW ] ||
-   [ "\$reason" = REBIND ] || [ "\$reason" = REBOOT ]
-then
-  sudo kinit -k -t "/etc/\$admin_username.keytab" "\$admin_username@\$adds_realm_name"
-  printf "%b" "update delete \$host.\$new_domain_name a\nupdate add \$host.\$new_domain_name 3600 a \$new_ip_address\nsend\n" | nsupdate -g
-fi
-EOF
-sudo chmod 755 $filename &>> $log_file
-sudo cat $filename >> $log_file
-printdiv
-
-# Configure privileged access management
-printf "Configuring privileged access management...\n" >> $log_file
-sudo pam-auth-update --enable 'mkhomedir' --force &>> $log_file
-servicename='sssd'
-printf "Restarting '$servicename'...\n" >> $log_file
-sudo systemctl restart $servicename &>> $log_file
-username="$admin_username@$adds_domain_name"
-printf "Permit logins for user '$username'...\n" >> $log_file
-sudo realm permit -v $username &>> $log_file
-groupname='sudo'
-printf "Adding user '$username' to group '$groupname'...\n" >> $log_file
-sudo usermod -aG $groupname $username &>> $log_file
-printf "Checking id '$username'...\n"  >> $log_file
-id "$username" >> $log_file
-printdiv
-
 # Update ssh configuration 
 filename=/etc/ssh/sshd_config
 printf "Backing up file '$filename'...\n" >> $log_file
@@ -159,54 +87,152 @@ printf "Restarting '$servicename'...\n" >> $log_file
 sudo systemctl restart $servicename &>> $log_file
 printdiv
 
-# Mount CIFS file system
-printf 'Mounting CIFS filesystem...\n' >> $log_file
+# Configure dynamic DNS registration
+filename='/etc/dhcp/dhclient-exit-hooks.d/hook-ddns'
+printf "Creating DHCP client exit hook '$filename'...\n" >> $log_file
+sudo bash -c "cat > $filename" <<EOF
+#!/bin/sh
 
-tag_name='storage_account_name'
-printf "Getting tag name '$tag_name'...\n" >> $log_file
-storage_account_name=$(jp -f "/run/cloud-init/instance-data.json" -u "ds.meta_data.imds.compute.tagsList[?name == '$tag_name'] | [0].value")
-printf "CIFS storage account name is '$storage_account_name'...\n" >> $log_file
+if [ "\$interface" != "eth0" ]
+then
+  return
+fi
 
-tag_name='storage_share_name'
-printf "Getting tag name '$tag_name'...\n" >> $log_file
-storage_share_name=$(jp -f "/run/cloud-init/instance-data.json" -u "ds.meta_data.imds.compute.tagsList[?name == '$tag_name'] | [0].value")
-printf "CIFS share name is '$storage_share_name'...\n" >> $log_file
+if [ "\$reason" = BOUND ] || [ "\$reason" = RENEW ] ||
+   [ "\$reason" = REBIND ] || [ "\$reason" = REBOOT ]
+then
+  host=`hostname -f`
+  nsupdatecmds=/var/tmp/nsupdatecmds
 
-cifs_mount_dir="/$storage_account_name/$storage_share_name"
-printf "Creating mount directory '$cifs_mount_dir'...\n" >> $log_file
-sudo mkdir -p $cifs_mount_dir &>> $log_file
+  echo "update delete \$host a" > \$nsupdatecmds
+  echo "update add \$host 3600 a \$new_ip_address" >> \$nsupdatecmds
+  echo "send" >> \$nsupdatecmds
+ 
+  nsupdate \$nsupdatecmds
+fi
+EOF
+sudo chmod 755 $filename &>> $log_file
+sudo cat $filename >> $log_file
+printdiv
 
-cred_file_dir="/etc/smbcredentials"
-printf "Creating credential files directory '$cred_file_dir'...\n" >> $log_file
-sudo mkdir $cred_file_dir &>> $log_file
+# Renew DHCP 
+printf "Renewing DHCP...\n" >> $log_file
+sudo dhclient eth0 -v &>> $log_file
+printdiv
 
-cred_file="$cred_file_dir/$storage_account_name.cred"
-printf "Creating credential file '$cred_file'...\n" >> $log_file
-echo "username=$admin_username" | sudo tee $cred_file > /dev/null
-echo "password=$admin_password" | sudo tee -a $cred_file > /dev/null
-sudo chmod 600 $cred_file &>> $log_file
-
-filename=/etc/fstab
-printf "Backing up file '$filename'...\n" >> $log_file
+# Update Kerberos configuration
+filename=/etc/krb5.conf
 sudo cp -f "$filename" "$filename.bak"
 printf "Modifying '$filename'...\n" >> $log_file
-cifs_unc_path="//$storage_account_name.file.core.windows.net/$storage_share_name"
-echo "$cifs_unc_path $cifs_mount_dir cifs nofail,credentials=$cred_file,serverino,nosharesock,actimeo=30,sec=krb5,dir_mode=0777,file_mode=0777,x-systemd.automount 0 0" | sudo tee -a $filename >> $log_file
+echo "[libdefaults]" | sudo tee $filename > /dev/null
+echo "        default_realm = $adds_realm_name" | sudo tee -a $filename > /dev/null
+echo "        dns_lookup_realm = false" | sudo tee -a $filename > /dev/null
+echo "        dns_lookup_kdc = true" | sudo tee -a $filename > /dev/null
 diff "$filename.bak" "$filename" >> $log_file
-
-printf "Mounting CIFS file system at '$cifs_mount_dir'...\n" >> $log_file
-sudo mount $cifs_mount_dir &>> $log_file
-
-printf "Unmounting CIFS file system at '$cifs_mount_dir'...\n" >> $log_file
-sudo umount $cifs_mount_dir &>> $log_file
-
-printf "Load newly created units and register new configurations...\n" >> $log_file
-sudo systemctl daemon-reload
-mount_unit="$storage_account_name-$storage_share_name.automount"
-printf "Testing automount for unit at '$mount_unit'...\n" >> $log_file
-sudo systemctl start $mount_unit &>> $log_file
-sudo systemctl status $mount_unit &>> $log_file
 printdiv
+
+# Update SMB configuration
+filename=/etc/samba/smb.conf
+workgroup=$(echo $adds_realm_name | sed 's/\.LOCAL$//')
+sudo cp -f "$filename" "$filename.bak"
+printf "Modifying '$filename'...\n" >> $log_file
+echo "[global]" | sudo tee $filename > /dev/null
+echo "   workgroup = $workgroup" | sudo tee -a $filename > /dev/null
+echo "   security = ADS" | sudo tee -a $filename > /dev/null
+echo "   realm = $adds_realm_name" | sudo tee -a $filename > /dev/null
+echo "   winbind refresh tickets = Yes" | sudo tee -a $filename > /dev/null
+echo "   vfs objects = acl_xattr" | sudo tee -a $filename > /dev/null
+echo "   map acl inherit = Yes" | sudo tee -a $filename > /dev/null
+echo "   store dos attributes = Yes" | sudo tee -a $filename > /dev/null
+echo "   dedicated keytab file = /etc/krb5.keytab" | sudo tee -a $filename > /dev/null
+echo "   kerberos method = secrets and keytab" | sudo tee -a $filename > /dev/null
+echo "   winbind use default domain = Yes" | sudo tee -a $filename > /dev/null
+echo "   load printers = No" | sudo tee -a $filename > /dev/null
+echo "   printing = bsd" | sudo tee -a $filename > /dev/null
+echo "   printcap name = /dev/null" | sudo tee -a $filename > /dev/null
+echo "   disable spoolss = Yes" | sudo tee -a $filename > /dev/null
+echo "   log file = /var/log/samba/log.%m" | sudo tee -a $filename > /dev/null
+echo "   log level = 1" | sudo tee -a $filename > /dev/null
+echo "   idmap config * : backend = tdb" | sudo tee -a $filename > /dev/null
+echo "   idmap config * : range = 3000-7999" | sudo tee -a $filename > /dev/null
+echo "   idmap config $workgroup : backend = rid" | sudo tee -a $filename > /dev/null
+echo "   idmap config $workgroup : range = 10000-999999" | sudo tee -a $filename > /dev/null
+echo "   template shell = /bin/bash" | sudo tee -a $filename > /dev/null
+echo "   template homedir = /home/%U" | sudo tee -a $filename > /dev/null
+diff "$filename.bak" "$filename" >> $log_file
+printf "Force windbind to reload the changed config file...\n" >> $log_file
+sudo smbcontrol all reload-config &>> $log_file
+printdiv
+
+# Join domain
+printf "Joining domain...\n" >> $log_file
+echo $admin_password | sudo net ads join -U $admin_username &>> $log_file
+printdiv
+
+# Configure winbind
+filename=/etc/nsswitch.conf
+sudo cp -f "$filename" "$filename.bak"
+printf "Modifying '$filename'...\n" >> $log_file
+sudo sed -i 's/passwd:         files systemd/passwd:         compat systemd winbind/g' $filename
+sudo sed -i 's/group:          files systemd/group:          compat systemd winbind/g' $filename
+diff "$filename.bak" "$filename" >> $log_file
+servicename='winbind'
+printf "Enabling '$servicename'...\n" >> $log_file
+sudo systemctl enable $servicename &>> $log_file
+printf "Restarting '$servicename'...\n" >> $log_file
+sudo systemctl restart $servicename &>> $log_file
+sudo systemctl status winbind &>> $log_file
+printf "Configuring pluggable authentication (PAM) module for winbind...\n" >> $log_file
+sudo pam-auth-update --enable winbind &>> $log_file
+sudo pam-auth-update --enable mkhomedir &>> $log_file
+groupname='sudo'
+printf "Adding user '$admin_username' to group '$groupname'...\n" >> $log_file
+sudo usermod -aG $groupname $admin_username &>> $log_file
+printdiv
+
+# Mount CIFS file system
+# printf 'Configuring dynamic mount of CIFS filesystem...\n' >> $log_file
+
+# tag_name='storage_account_name'
+# printf "Getting tag name '$tag_name'...\n" >> $log_file
+# storage_account_name=$(jp -f "/run/cloud-init/instance-data.json" -u "ds.meta_data.imds.compute.tagsList[?name == '$tag_name'] | [0].value")
+# printf "CIFS storage account name is '$storage_account_name'...\n" >> $log_file
+
+# tag_name='storage_share_name'
+# printf "Getting tag name '$tag_name'...\n" >> $log_file
+# storage_share_name=$(jp -f "/run/cloud-init/instance-data.json" -u "ds.meta_data.imds.compute.tagsList[?name == '$tag_name'] | [0].value")
+# printf "CIFS share name is '$storage_share_name'...\n" >> $log_file
+
+# cifs_mount_dir="/$storage_account_name/$storage_share_name"
+# printf "Creating mount directory '$cifs_mount_dir'...\n" >> $log_file
+# sudo mkdir -p $cifs_mount_dir &>> $log_file
+
+# cred_file_dir="/etc/smbcredentials"
+# printf "Creating credential files directory '$cred_file_dir'...\n" >> $log_file
+# sudo mkdir $cred_file_dir &>> $log_file
+
+# cred_file="$cred_file_dir/$storage_account_name.cred"
+# printf "Creating credential file '$cred_file'...\n" >> $log_file
+# echo "username=$admin_username" | sudo tee $cred_file > /dev/null
+# echo "password=$admin_password" | sudo tee -a $cred_file > /dev/null
+# sudo chmod 600 $cred_file &>> $log_file
+
+# filename="/etc/auto.$storage_account_name"
+# printf "Creating '$filename'...\n" >> $log_file
+# cifs_unc_path="//$storage_account_name.file.core.windows.net/$storage_share_name"
+# echo "$storage_share_name -fstype=cifs,nofail,credentials=$cred_file,serverino,nosharesock,actimeo=30,sec=krb5,dir_mode=0777,file_mode=0777 :$cifs_unc_path" | sudo tee $filename > /dev/null
+# sudo cat $filename >> $log_file
+
+# filename=/etc/auto.master
+# printf "Modifying '$filename'...\n" >> $log_file
+# sudo cp -f "$filename" "$filename.bak"
+# echo "/$storage_account_name /etc/auto.$storage_account_name --timeout=60" | sudo tee -a $filename > /dev/null
+# diff "$filename.bak" "$filename" >> $log_file
+
+# servicename='autofs'
+# printf "Restarting '$servicename'...\n" >> $log_file
+# sudo systemctl restart $servicename &>> $log_file
+# printdiv
 
 # Exit
 printf "Exiting '$0'...\n" >> $log_file
