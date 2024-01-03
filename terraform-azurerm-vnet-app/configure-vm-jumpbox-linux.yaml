@@ -154,7 +154,6 @@ package_reboot_if_required: true
 
 write_files:
   - content: |
-      #!/bin/bash
-      dhclient eth0 -v
-    path: /var/lib/cloud/scripts/per-boot/dhcp-renew.sh
-    permissions: '0755'
+      network: {config: disabled}
+    path: /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+

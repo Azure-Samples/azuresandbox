@@ -3,7 +3,7 @@
 # Note: This code has been tested on Ubuntu 20.04 LTS (Focal Fossa) and will not work on other Linux distros
 
 # Initialize constants
-log_file='/run/cloud-init/tmp/configure-vm-jumpbox-linux.log'
+log_file='/var/log/configure-vm-jumpbox-linux.log'
 
 printdiv() {
     printf  '=%.0s' {1..80} >> $log_file
@@ -12,25 +12,39 @@ printdiv() {
 
 # Startup
 printdiv
-printf "Timestamp: $(date +"%Y-%m-%d %H:%M:%S.%N %Z")...\n" >> $log_file
+printf "Timestamp: $(date +"%Y-%m-%d %H:%M:%S.%N %Z")...\n" > $log_file
 printf "Starting '$0'...\n" >> $log_file
 printf "Timestamp: $(date +"%Y-%m-%d %H:%M:%S.%N %Z")...\n"
 printf "Starting '$0'...\n"
 printf "See log file '$log_file' for details...\n"
 printdiv
 
-# Get key vault from tags
+# Get variables from tags
 tag_name='keyvault'
 key_vault_name=$(jp -f "/run/cloud-init/instance-data.json" -u "ds.meta_data.imds.compute.tagsList[?name == '$tag_name'] | [0].value")
 printf "Key vault name is '$key_vault_name'...\n" >> $log_file
 
-# Get domain name from tags
 tag_name='adds_domain_name'
 printf "Getting tag name '$tag_name'...\n" >> $log_file
 adds_domain_name=$(jp -f "/run/cloud-init/instance-data.json" -u "ds.meta_data.imds.compute.tagsList[?name == '$tag_name'] | [0].value")
 printf "Domain name is '$adds_domain_name'...\n" >> $log_file
 adds_realm_name=$(echo $adds_domain_name | tr '[:lower:]' '[:upper:]')
 printf "Realm name is '$adds_realm_name'...\n" >> $log_file
+
+tag_name='dns_server'
+printf "Getting tag name '$tag_name'...\n" >> $log_file
+dns_server=$(jp -f "/run/cloud-init/instance-data.json" -u "ds.meta_data.imds.compute.tagsList[?name == '$tag_name'] | [0].value")
+printf "DNS server address is '$dns_server'...\n" >> $log_file
+
+tag_name='storage_account_name'
+printf "Getting tag name '$tag_name'...\n" >> $log_file
+storage_account_name=$(jp -f "/run/cloud-init/instance-data.json" -u "ds.meta_data.imds.compute.tagsList[?name == '$tag_name'] | [0].value")
+printf "CIFS storage account name is '$storage_account_name'...\n" >> $log_file
+
+tag_name='storage_share_name'
+printf "Getting tag name '$tag_name'...\n" >> $log_file
+storage_share_name=$(jp -f "/run/cloud-init/instance-data.json" -u "ds.meta_data.imds.compute.tagsList[?name == '$tag_name'] | [0].value")
+printf "CIFS share name is '$storage_share_name'...\n" >> $log_file
 
 # Get managed identity access token for key vault
 printf "Getting managed identity access token...\n" >> $log_file
@@ -82,12 +96,20 @@ sudo sed -i "s/127.0.0.1 localhost/127.0.0.1 `hostname`.$adds_domain_name `hostn
 diff "$filename.bak" "$filename" >> $log_file
 printdiv
 
-# Update DHCP configuration
-filename=/etc/dhcp/dhclient.conf
-sudo cp -f "$filename" "$filename.bak"
+# Update DNS configuration
+filename=/etc/netplan/50-cloud-init.yaml
 printf "Modifying '$filename'...\n" >> $log_file
-sudo sed -i "s/#supersede domain-name \"fugue.com home.vix.com\";/supersede domain-name \"$adds_domain_name\";/" $filename
+sudo cp -f "$filename" "$filename.bak"
+sudo sudo sed -i '/set-name:/a \            nameservers:' $filename
+sudo sudo sed -i "/nameservers:/a \                addresses: [$dns_server, 168.63.129.16]" $filename
+sudo sudo sed -i "/addresses:/a \                search: [$adds_domain_name, reddog.microsoft.com]" $filename
 diff "$filename.bak" "$filename" >> $log_file
+printf "Generating netplan...\n" >> $log_file
+sudo netplan generate &>> $log_file
+printf "Applying netplan...\n" >> $log_file
+sudo netplan apply &>> $log_file
+printf "Checking DNS configuration...\n" >> $log_file
+sudo resolvectl status &>> $log_file
 printdiv
 
 # Configure dynamic DNS registration
@@ -116,11 +138,6 @@ fi
 EOF
 sudo chmod 755 $filename &>> $log_file
 sudo cat $filename >> $log_file
-printdiv
-
-# Renew DHCP 
-printf "Renewing DHCP...\n" >> $log_file
-sudo dhclient eth0 -v &>> $log_file
 printdiv
 
 # Update Kerberos configuration
@@ -195,16 +212,6 @@ printdiv
 
 # Mount CIFS file system
 # printf 'Configuring dynamic mount of CIFS filesystem...\n' >> $log_file
-
-# tag_name='storage_account_name'
-# printf "Getting tag name '$tag_name'...\n" >> $log_file
-# storage_account_name=$(jp -f "/run/cloud-init/instance-data.json" -u "ds.meta_data.imds.compute.tagsList[?name == '$tag_name'] | [0].value")
-# printf "CIFS storage account name is '$storage_account_name'...\n" >> $log_file
-
-# tag_name='storage_share_name'
-# printf "Getting tag name '$tag_name'...\n" >> $log_file
-# storage_share_name=$(jp -f "/run/cloud-init/instance-data.json" -u "ds.meta_data.imds.compute.tagsList[?name == '$tag_name'] | [0].value")
-# printf "CIFS share name is '$storage_share_name'...\n" >> $log_file
 
 # cifs_mount_dir="/$storage_account_name/$storage_share_name"
 # printf "Creating mount directory '$cifs_mount_dir'...\n" >> $log_file

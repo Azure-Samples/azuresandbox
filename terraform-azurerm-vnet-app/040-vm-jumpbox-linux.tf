@@ -39,7 +39,8 @@ resource "azurerm_linux_virtual_machine" "vm_jumpbox_linux" {
     { keyvault = var.key_vault_name },
     { adds_domain_name = var.adds_domain_name },
     { storage_account_name = var.storage_account_name },
-    { storage_share_name = var.storage_share_name }
+    { storage_share_name = var.storage_share_name },
+    { dns_server = var.dns_server }
   )
 
   # admin_ssh_key {
