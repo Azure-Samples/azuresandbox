@@ -14,6 +14,9 @@ printdiv() {
 printdiv
 printf "Timestamp: $(date +"%Y-%m-%d %H:%M:%S.%N %Z")...\n" >> $log_file
 printf "Starting '$0'...\n" >> $log_file
+printf "Timestamp: $(date +"%Y-%m-%d %H:%M:%S.%N %Z")...\n"
+printf "Starting '$0'...\n"
+printf "See log file '$log_file' for details...\n"
 printdiv
 
 # Get key vault from tags
@@ -50,6 +53,27 @@ admin_password=$(curl -X GET -H "Authorization: Bearer $access_token" -H "Conten
 printf "Length of '$secret_name' secret is '${#admin_password}'...\n" >> $log_file
 printdiv
 
+# Update ssh configuration 
+filename=/etc/ssh/sshd_config
+printf "Backing up file '$filename'...\n" >> $log_file
+sudo cp -f "$filename" "$filename.bak"
+printf "Modifying '$filename'...\n" >> $log_file
+sudo sed -i "s/PasswordAuthentication no/PasswordAuthentication yes/" $filename
+sudo sed -i "s/ChallengeResponseAuthentication no/ChallengeResponseAuthentication yes/" $filename
+diff "$filename.bak" "$filename" >> $log_file
+servicename='sshd'
+printf "Restarting '$servicename'...\n" >> $log_file
+sudo systemctl restart $servicename &>> $log_file
+printdiv
+
+# Update NTP configuration
+filename=/etc/ntp.conf
+sudo cp -f "$filename" "$filename.bak"
+printf "Modifying '$filename'...\n" >> $log_file
+sudo sed -i "$ a server $adds_domain_name" $filename
+diff "$filename.bak" "$filename" >> $log_file
+printdiv
+
 # Update hosts file
 filename=/etc/hosts
 sudo cp -f "$filename" "$filename.bak"
@@ -64,27 +88,6 @@ sudo cp -f "$filename" "$filename.bak"
 printf "Modifying '$filename'...\n" >> $log_file
 sudo sed -i "s/#supersede domain-name \"fugue.com home.vix.com\";/supersede domain-name \"$adds_domain_name\";/" $filename
 diff "$filename.bak" "$filename" >> $log_file
-printdiv
-
-# Update NTP configuration
-filename=/etc/ntp.conf
-sudo cp -f "$filename" "$filename.bak"
-printf "Modifying '$filename'...\n" >> $log_file
-sudo sed -i "$ a server $adds_domain_name" $filename
-diff "$filename.bak" "$filename" >> $log_file
-printdiv
-
-# Update ssh configuration 
-filename=/etc/ssh/sshd_config
-printf "Backing up file '$filename'...\n" >> $log_file
-sudo cp -f "$filename" "$filename.bak"
-printf "Modifying '$filename'...\n" >> $log_file
-sudo sed -i "s/PasswordAuthentication no/PasswordAuthentication yes/" $filename
-sudo sed -i "s/ChallengeResponseAuthentication no/ChallengeResponseAuthentication yes/" $filename
-diff "$filename.bak" "$filename" >> $log_file
-servicename='sshd'
-printf "Restarting '$servicename'...\n" >> $log_file
-sudo systemctl restart $servicename &>> $log_file
 printdiv
 
 # Configure dynamic DNS registration
@@ -237,5 +240,7 @@ printdiv
 # Exit
 printf "Exiting '$0'...\n" >> $log_file
 printf "Timestamp: $(date +"%Y-%m-%d %H:%M:%S.%N %Z")...\n" >> $log_file
+printf "Exiting '$0'...\n"
+printf "Timestamp: $(date +"%Y-%m-%d %H:%M:%S.%N %Z")...\n"
 printdiv
 exit 0
