@@ -211,38 +211,24 @@ sudo usermod -aG $groupname $admin_username &>> $log_file
 printdiv
 
 # Mount CIFS file system
-# printf 'Configuring dynamic mount of CIFS filesystem...\n' >> $log_file
+printf 'Configuring dynamic mount of CIFS filesystem...\n' >> $log_file
 
-# cifs_mount_dir="/$storage_account_name/$storage_share_name"
-# printf "Creating mount directory '$cifs_mount_dir'...\n" >> $log_file
-# sudo mkdir -p $cifs_mount_dir &>> $log_file
+filename="/etc/auto.fileshares"
+printf "Creating '$filename'...\n" >> $log_file
+cifs_unc_path="//$storage_account_name.file.core.windows.net/$storage_share_name"
+echo "/fileshares/$storage_share_name -fstype=cifs,multiuser,sec=krb5,cruid=\${UID},nofail,serverino,nosharesock,actimeo=30,dir_mode=0777,file_mode=0777 :$cifs_unc_path" | sudo tee $filename > /dev/null
+sudo cat $filename >> $log_file
 
-# cred_file_dir="/etc/smbcredentials"
-# printf "Creating credential files directory '$cred_file_dir'...\n" >> $log_file
-# sudo mkdir $cred_file_dir &>> $log_file
+filename=/etc/auto.master
+printf "Modifying '$filename'...\n" >> $log_file
+sudo cp -f "$filename" "$filename.bak"
+echo "/- /etc/auto.fileshares --timeout=60" | sudo tee -a $filename > /dev/null
+diff "$filename.bak" "$filename" >> $log_file
 
-# cred_file="$cred_file_dir/$storage_account_name.cred"
-# printf "Creating credential file '$cred_file'...\n" >> $log_file
-# echo "username=$admin_username" | sudo tee $cred_file > /dev/null
-# echo "password=$admin_password" | sudo tee -a $cred_file > /dev/null
-# sudo chmod 600 $cred_file &>> $log_file
-
-# filename="/etc/auto.$storage_account_name"
-# printf "Creating '$filename'...\n" >> $log_file
-# cifs_unc_path="//$storage_account_name.file.core.windows.net/$storage_share_name"
-# echo "$storage_share_name -fstype=cifs,nofail,credentials=$cred_file,serverino,nosharesock,actimeo=30,sec=krb5,dir_mode=0777,file_mode=0777 :$cifs_unc_path" | sudo tee $filename > /dev/null
-# sudo cat $filename >> $log_file
-
-# filename=/etc/auto.master
-# printf "Modifying '$filename'...\n" >> $log_file
-# sudo cp -f "$filename" "$filename.bak"
-# echo "/$storage_account_name /etc/auto.$storage_account_name --timeout=60" | sudo tee -a $filename > /dev/null
-# diff "$filename.bak" "$filename" >> $log_file
-
-# servicename='autofs'
-# printf "Restarting '$servicename'...\n" >> $log_file
-# sudo systemctl restart $servicename &>> $log_file
-# printdiv
+servicename='autofs'
+printf "Restarting '$servicename'...\n" >> $log_file
+sudo systemctl restart $servicename &>> $log_file
+printdiv
 
 # Exit
 printf "Exiting '$0'...\n" >> $log_file
