@@ -54,7 +54,7 @@ This section describes how to provision this configuration using default setting
   export TF_VAR_arm_client_secret=YourServicePrincipalSecret
   ```
 
-* Run [bootstrap.sh](./bootstrap.sh) using the default settings or custom settings.
+* Run [bootstrap.sh](./bootstrap.sh) using the default values or custom values.
 
   ```bash
   ./bootstrap.sh
@@ -99,13 +99,13 @@ The following sections provide guided smoke testing of each resource provisioned
 
 ### Jumpbox smoke testing
 
-* Wait for 15 minutes to proceed to allow time for DSC and cloud-init configurations to complete.
+* Wait for 5 minutes to proceed to allow time for cloud-init configurations to complete. Note these steps assume default values were used when running [bootstrap.sh](./bootstrap.sh).
 
 * Verify *jumplinux1* cloud-init configuration is complete.
   * From the client environment, navigate to *portal.azure.com* > *Virtual machines* > *jumplinux1*
   * Click *Connect*, then click *Connect via Bastion*
   * For *Authentication Type* choose `SSH Private Key from Azure Key Vault`
-  * For *Username* enter `bootstrapadmin`
+  * For *Username* enter `bootstrapadminlocal`
   * For *Azure Key Vault Secret* specify the following values:
     * For *Subscription* choose the same Azure subscription used to provision the #AzureSandbox.
     * For *Azure Key Vault* choose the key vault provisioned by [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared/#bootstrap-script), e.g. `kv-xxxxxxxxxxxxxxx`
@@ -212,7 +212,7 @@ The following sections provide guided smoke testing of each resource provisioned
 ### Azure Files smoke testing
 
 * Test DNS queries for Azure Files private endpoint
-  * From the client environment, navigate to *portal.azure.com* > *Storage accounts* > *stxxxxxxxxxxx* > *File shares* > *myfileshare* > *Settings* > *Properties* and copy the the FQDN portion of the URL, e.g. *stxxxxxxxxxxx.file.core.windows.net*.
+  * From the client environment, navigate to *portal.azure.com* > *Storage accounts* > *stxxxxxxxxxxx* > *File shares* > *myfileshare* and copy the the FQDN portion of the `Share URL`, e.g. *stxxxxxxxxxxx.file.core.windows.net*.
   * From *jumpwin1*, execute the following command from PowerShell:
   
     ```powershell
@@ -222,9 +222,9 @@ The following sections provide guided smoke testing of each resource provisioned
   * Verify the *IP4Address* returned is within the subnet IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-privatelink-01"]*, e.g. `10.2.2.*`.
 
 * From *jumpwin1*, test SMB connectivity with integrated Windows Authentication to Azure Files private endpoint (PaaS)
-  * Open a Windows command prompt and enter the following command:
+  * Execute teh following command from PowerShell::
   
-    ```text
+    ```powershell
     # Note: replace stxxxxxxxxxxxxx with the name of your storage account
     net use z: \\stxxxxxxxxxxx.file.core.windows.net\myfileshare
     ```
@@ -235,8 +235,7 @@ The following sections provide guided smoke testing of each resource provisioned
   * Execute the following commands Bash to verify access to the test files and folders you created from *jumpwin1*:
 
     ```bash
-    # Note: replace stxxxxxxxxxxxxx with the name of your storage account
-    ll /stxxxxxxxxxxxxx/myfileshare/
+    ll /fileshares/myfileshare/
     ```
 
 ## Documentation
@@ -357,70 +356,56 @@ This Linux VM is used as a jumpbox for development and remote administration.
 * A system assigned [managed identity](https://learn.microsoft.com/azure/active-directory/managed-identities-azure-resources/overview) is configured by default for use in DevOps related identity and access management scenarios.
 * A dependency on *azurerm_virtual_machine_extension.vm_jumpbox_win_postdeploy_script* is established. This custom script extension is used to run [configure-storage-kerberos.ps1](./configure-storage-kerberos.ps1) which is required in order to mount the Azure Files share using CIFS.
 * Custom tags are added which are used by [cloud-init](https://learn.microsoft.com/azure/virtual-machines/linux/using-cloud-init#:~:text=%20There%20are%20two%20stages%20to%20making%20cloud-init,is%20already%20configured%20to%20use%20cloud-init.%20More%20) [User-Data Scripts](https://cloudinit.readthedocs.io/en/latest/topics/format.html#user-data-script) to configure the virtual machine.
-  * *keyvault*: Used in cloud-init scripts to determine which key vault to use for secrets.
   * *adds_domain_name*: Used in cloud-init scripts to join the domain.
+  * *keyvault*: Used in cloud-init scripts to determine which key vault to use for secrets.
   * *storage_account_name*: Used in cloud-init scripts to mount an Azure Files share.
   * *storage_share_name*: Used in cloud-init scripts to mount an Azure Files share.
 * This VM is configured with [cloud-init](https://learn.microsoft.com/azure/virtual-machines/linux/using-cloud-init#:~:text=%20There%20are%20two%20stages%20to%20making%20cloud-init,is%20already%20configured%20to%20use%20cloud-init.%20More%20) using a [Mime Multi Part Archive](https://cloudinit.readthedocs.io/en/latest/topics/format.html#mime-multi-part-archive) containing the following files:
   * [configure-vm-jumpbox-linux.yaml](./configure-vm-jumpbox-linux.yaml) is [Cloud Config Data](https://cloudinit.readthedocs.io/en/latest/topics/format.html#cloud-config-data) used to configure the VM.
     * Package updates are performed.
     * The following packages are installed:
-      * [Azure CLI](https://learn.microsoft.com/cli/azure/what-is-azure-cli?view=azure-cli-latest)
-      * [PowerShell](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-7.1)
-      * [Terraform](https://www.terraform.io/intro/index.html#what-is-terraform-)
-      * [python3-pip](https://packages.ubuntu.com/jammy/python3-pip)
-      * [jp](https://packages.ubuntu.com/jammy/jp)
-      * [linux-modules-extra-azure](https://packages.ubuntu.com/jammy/linux-modules-extra-azure)
+      * [autofs](https://packages.ubuntu.com/jammy/autofs)
+      * [azure-cli](https://learn.microsoft.com/cli/azure/what-is-azure-cli?view=azure-cli-latest)
       * [cifs-utils](https://packages.ubuntu.com/jammy/cifs-utils)
-      * [Kerberos](https://kerberos.org/software/mixenvkerberos.pdf) packages required to AD domain join a Linux host and enable dynamic DNS (DDNS) registration.
-        * [krb5-user](https://packages.ubuntu.com/jammy/krb5-user)
-        * [samba](https://packages.ubuntu.com/jammy/samba)
-        * [sssd](https://packages.ubuntu.com/jammy/sssd)
-        * [sssd-tools](https://packages.ubuntu.com/jammy/sssd-tools)
-        * [libnss-sss](https://packages.ubuntu.com/jammy/libnss-sss)
-        * [libpam-sss](https://packages.ubuntu.com/jammy/libpam-sss)
-        * [ntp](https://packages.ubuntu.com/jammy/ntp)
-        * [ntpdate](https://packages.ubuntu.com/jammy/ntpdate)
-        * [realmd](https://packages.ubuntu.com/jammy/realmd)
-        * [adcli](https://packages.ubuntu.com/jammy/adcli)
+      * [jp](https://packages.ubuntu.com/jammy/jp)
+      * [keyutils](https://packages.ubuntu.com/jammy/keyutils)
+      * [krb5-config](https://packages.ubuntu.com/jammy/krb5-config)
+      * [krb5-user](https://packages.ubuntu.com/jammy/krb5-user)
+      * [libnss-winbind](https://packages.ubuntu.com/jammy/libnss-winbind)
+      * [libpam-winbind](https://packages.ubuntu.com/jammy/libpam-winbind)
+      * [ntp](https://packages.ubuntu.com/jammy/ntp)
+      * [powershell](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-7.1)
+      * [python3-pip](https://packages.ubuntu.com/jammy/python3-pip)
+      * [samba](https://packages.ubuntu.com/jammy/samba)
+      * [terraform](https://www.terraform.io/intro/index.html#what-is-terraform-)
+      * [winbind](https://packages.ubuntu.com/jammy/winbind)
+    * Packages are upgraded.
     * The VM is rebooted if necessary.
-  * [configure-vm-jumpbox-linux.sh](./configure-vm-jumpbox-linux.sh) is a [User-Data Script](https://cloudinit.readthedocs.io/en/latest/topics/format.html#user-data-script) used to configure the VM. Runtime values are retrieved using [Instance Metadata](https://cloudinit.readthedocs.io/en/latest/topics/instancedata.html#instance-metadata).
-    * The name of the key vault used for secrets is retrieved from the tag named *keyvault*.
-    * The Active Directory domain name is retrieved from the tag named *adds_domain_name*.
-    * An access token is generated using the VM's system assigned managed identity.
-    * The access token is used to get secrets from key vault, including:
-      * *adminuser*: The name of the administrative user account for configuring the VM (e.g. "bootstrapadmin" by default).
-      * *adminpassword*: The password for the administrative user account.
-    * The networking configuration of the VM is modified to enable domain joining the VM
-      * The *hosts* file is updated to reference the newly configured host name and domain name.
-      * The DHCP client configuration file *dhclient.conf* is updated to include the newly configured domain name.
-    * The VM is domain joined
-      * The *ntp.conf* file is updated to synchronize the time with the domain controller.
-      * The *krb5.conf* file is updated to disable the *rdns* setting.
-      * *dhclient* is run to refresh the DHCP settings using the new networking configuration.
-      * *realm join* is run to join the domain
-    * The VM is registered with the DNS server
-      * A local *keytab* file is created and used to authenticate with the domain using *kinit*
-      * A new A record is added to the DNS server using *nsupdate*.
-    * Dynamic DNS registration is configured
-      * A new DHCP client exit hook script named `/etc/dhcp/dhclient-exit-hooks.d/hook-ddns` is created which runs whenever the DHCP client exits.
-        * The script uses *kinit* to authenticate with the domain using the previously created keytab file.
-        * The old A record is deleted and a new A record is added to the DNS server using *nsupdate*.
-    * Privileged access management is configured.
-      * Automatic home directory creation is enabled.
-      * The domain administrator account is configured.
-        * Logins are permitted.
-        * Sudo privileges are granted.
-    * SSH server is configured for logins using Active Directory accounts.
-    * The Azure Files share is mounted using CIFS.
-      * The name of the storage account used for mounting Azure Files shares is retrieved from the tag named `storage_account_name`.
-      * The name of the Azure Files share is retrieved from the tag named `storage_share_name`.
-      * A new mount directory is created at `/storage_account_name/storage_share_name` for mounting the Azure Files share.
-      * A credentials file is created for `bootstrapadmin@mysandbox.local` to be used to mount the Azure Files share.
-      * The `/etc/fstab` file is modified to automatically mount the Azure Files share using CIFS.
-      * Mounting / unmounting of the Azure Files share is tested.
-      * Auto-mounting of the Azure Files share is tested.
+    * The file `/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg` is written to ensure that modifications to `/etc/netplan/50-cloud-init.yaml` are not overwritten after a reboot.
   * [configure-powershell.ps1](./configure-powershell.ps1) is a [User-Data Script](https://cloudinit.readthedocs.io/en/latest/topics/format.html#user-data-script) that installs [Azure PowerShell](https://learn.microsoft.com/en-us/powershell/azure/what-is-azure-powershell?view=azps-9.5.0)
+  * [configure-vm-jumpbox-linux.sh](./configure-vm-jumpbox-linux.sh) is a [User-Data Script](https://cloudinit.readthedocs.io/en/latest/topics/format.html#user-data-script) used to configure the VM. Runtime values are retrieved using [Instance Metadata](https://cloudinit.readthedocs.io/en/latest/topics/instancedata.html#instance-metadata).
+    * Configuration data and secrets are retrieved.
+      * The name of the key vault used for secrets is retrieved from the tag named *keyvault*.
+      * The Active Directory domain name is retrieved from the tag named *adds_domain_name*.
+      * The IP address of the DNS server is retrieved from the tag named *dns_server*.
+      * The name of the storage account used for mounting Azure Files shares is retrieved from the tag named *storage_account_name*.
+      * The name of the Azure Files share is retrieved from the tag named *storage_share_name*.
+      * An access token is generated using the VM's system assigned managed identity.
+      * The access token is used to get secrets from key vault, including:
+        * *adminuser*: The name of the administrative user account for configuring the VM (e.g. "bootstrapadmin" by default).
+        * *adminpassword*: The password for the administrative user account.
+    * The virtual machine is domain joined using winbind.
+      * The SSH server is configured for logins using Active Directory accounts.
+      * The *ntp.conf* file is updated to synchronize the time with the domain controller.
+      * The *hosts* file is updated to reference the newly configured host name and domain name.
+      * The netplan configuration is modified to configure DNS nameservers and IP addresses.
+      * A new DHCP client exit hook script named `/etc/dhcp/dhclient-exit-hooks.d/hook-ddns` to implement dynamic DNS registration.
+      * The *krb5.conf* file is modified to configure the domain name.
+      * The *smb.conf* file is modified to configure the domain and workgroup names.
+      * The virtual machine is domain joined.
+      * The *nsswitch.conf* file is modified to look for users and groups using winbind.
+      * Pluggable authentication modules are configured to use winbind and create home directories for domain users.
+    * Dynamic mounting of the Azure Files share is enabled using autofs.
 
 #### Storage resources
 
