@@ -22,7 +22,7 @@ This configuration implements an [IaaS](https://azure.microsoft.com/overview/wha
 Activity | Estimated time required
 --- | ---
 Pre-configuration | ~10 minutes
-Provisioning | ~30 minutes
+Provisioning | ~15 minutes
 Smoke testing | ~10 minutes
 
 ## Before you start

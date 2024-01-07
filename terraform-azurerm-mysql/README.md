@@ -22,7 +22,7 @@ This configuration implements a [PaaS](https://azure.microsoft.com/overview/what
 Activity | Estimated time required
 --- | ---
 Pre-configuration | ~5 minutes
-Provisioning | ~20 minutes
+Provisioning | ~10 minutes
 Smoke testing | ~10 minutes
 
 ## Before you start
