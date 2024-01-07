@@ -122,7 +122,7 @@ fi
 if [ "$skip_ssh_key_gen" = 'no' ]
 then
   printf "Generating SSH keys...\n"
-  echo -e 'y' | ssh-keygen -m PEM -t rsa -b 4096 -C "$admin_username" -f sshkeytemp -N "$admin_password" 
+  echo -e 'y' | ssh-keygen -m PEM -t rsa -b 4096 -C "${admin_username}local" -f sshkeytemp -N "$admin_password" 
 fi
 
 if [ ! -f 'sshkeytemp.pub' ] 

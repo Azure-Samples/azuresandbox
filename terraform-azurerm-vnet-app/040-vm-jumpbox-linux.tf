@@ -42,7 +42,7 @@ resource "azurerm_linux_virtual_machine" "vm_jumpbox_linux" {
   )
 
   admin_ssh_key {
-    username   = data.azurerm_key_vault_secret.adminuser.value
+    username   = "${data.azurerm_key_vault_secret.adminuser.value}local"
     public_key = var.ssh_public_key
   }
 
