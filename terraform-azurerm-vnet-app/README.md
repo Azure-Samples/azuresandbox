@@ -92,7 +92,7 @@ This section describes how to provision this configuration using default setting
 
 ## Smoke testing
 
-The following sections provide guided smoke testing of each resource provisioned in this configuration, and should be completed in the order indicated ([Step-By-Step Video](https://youtu.be/YkojLAi-Op8)).
+The following sections provide guided smoke testing of each resource provisioned in this configuration, and should be completed in the order indicated ([Step-By-Step Video](https://youtu.be/J6QdXWtR_HU)).
 
 * [Jumpbox smoke testing](#jumpbox-smoke-testing)
 * [Azure Files smoke testing](#azure-files-smoke-testing)
@@ -341,7 +341,7 @@ This Windows Server VM is used as a jumpbox for development and remote server ad
 
 #### Linux Jumpbox VM
 
-The configuration for these resources can be found in [040-vm-jumpbox-linux.tf](./040-vm-jumpbox-linux.tf) ([Step-By-Step Video](https://youtu.be/ZeQx0SZV29E)).
+The configuration for these resources can be found in [040-vm-jumpbox-linux.tf](./040-vm-jumpbox-linux.tf) ([Step-By-Step Video](https://youtu.be/r0NzgE44BIg)).
 
 Resource name (ARM) | Notes
 --- | ---
@@ -443,9 +443,9 @@ Video | Section
 --- | ---
 [Application virtual network (Part 1)](https://youtu.be/J7jK-dxiFrA) | [terraform-azurerm-vnet-app \| Overview](#overview)
 [Application virtual network (Part 2)](https://youtu.be/seV-fT8QcO8) | [terraform-azurerm-vnet-app \| Getting started](#getting-started)
-[Application virtual network (Part 3)](https://youtu.be/YkojLAi-Op8) | [terraform-azurerm-vnet-app \| Smoke testing](#smoke-testing)
+[Application virtual network (Part 3)](https://youtu.be/J6QdXWtR_HU) | [terraform-azurerm-vnet-app \| Smoke testing](#smoke-testing)
 [Application virtual network (Part 4)](https://youtu.be/EHxb01H4XSs) | [terraform-azurerm-vnet-app \| Documentation \| Bootstrap script](#bootstrap-script)
 [Application virtual network (Part 5)](https://youtu.be/5nxck-NXfk4) | [terraform-azurerm-vnet-app \| Documentation \| Network resources](#network-resources)
 [Application virtual network (Part 6)](https://youtu.be/J-Zz8EOCyi4) | [terraform-azurerm-vnet-app \| Documentation \| Windows Server Jumpbox VM](#windows-server-jumpbox-vm)
-[Application virtual network (Part 7)](https://youtu.be/ZeQx0SZV29E) | [terraform-azurerm-vnet-app \| Documentation \| Linux Jumpbox VM](#linux-jumpbox-vm)
+[Application virtual network (Part 7)](https://youtu.be/r0NzgE44BIg) | [terraform-azurerm-vnet-app \| Documentation \| Linux Jumpbox VM](#linux-jumpbox-vm)
 [Application virtual network (Part 8)](https://youtu.be/2-HwFEsIDJI) | [terraform-azurerm-vnet-app \| Documentation \| Storage resources](#storage-resources)
