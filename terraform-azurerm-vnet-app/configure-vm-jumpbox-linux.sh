@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Note: This code has been tested on Ubuntu 20.04 LTS (Focal Fossa) and will not work on other Linux distros
+# Note: This code has been tested on Ubuntu 22.04 LTS (Jammy Jellyfish) and will not work on other Linux distros
 
 # Initialize constants
 log_file='/var/log/configure-vm-jumpbox-linux.log'
