@@ -17,7 +17,7 @@
 
 ## Overview
 
-This configuration implements a [PaaS](https://azure.microsoft.com/overview/what-is-paas/) database hosted in [Azure Database for MySQL - Flexible Server](https://learn.microsoft.com/azure/mysql/flexible-server/overview) with a private endpoint implemented using [subnet delegation](https://learn.microsoft.com/azure/virtual-network/subnet-delegation-overview) ([Step-by-Step Video](https://youtu.be/OE4KFZtq0oY)).
+This configuration implements a [PaaS](https://azure.microsoft.com/overview/what-is-paas/) database hosted in [Azure Database for MySQL - Flexible Server](https://learn.microsoft.com/azure/mysql/flexible-server/overview) with a private endpoint implemented using [subnet delegation](https://learn.microsoft.com/azure/virtual-network/subnet-delegation-overview) ([Step-by-Step Video](https://youtu.be/MPYO-7HaFAQ)).
 
 Activity | Estimated time required
 --- | ---
@@ -31,7 +31,7 @@ Smoke testing | ~10 minutes
 
 ## Getting started
 
-This section describes how to provision this configuration using default settings ([Step-by-Step Video](https://youtu.be/_pBU2ifVSGQ)).
+This section describes how to provision this configuration using default settings ([Step-by-Step Video](https://youtu.be/yCzbmekoQLI)).
 
 * Change the working directory.
 
@@ -80,7 +80,7 @@ This section describes how to provision this configuration using default setting
 
 ## Smoke testing
 
-Use the steps in this section to verify the configuration is working as expected ([Step-by-Step Video](https://youtu.be/KWUUeBCsFMQ)).
+Use the steps in this section to verify the configuration is working as expected ([Step-by-Step Video](https://youtu.be/AAOBooTgcus)).
 
 * Test DNS queries for Azure Database for MySQL private endpoint (PaaS)
   * From the client environment, navigate to *portal.azure.com* > *Azure Database for MySQL flexible servers* > *mysql-xxxxxxxxxxxxxxxx* > *Overview* > *Server name* and and copy the the FQDN, e.g. *mysql&#x2011;xxxxxxxxxxxxxxxx.mysql.database.azure.com*.
@@ -157,7 +157,7 @@ Use the steps in this section to verify the configuration is working as expected
 
 ## Documentation
 
-This section provides additional information on various aspects of this configuration ([Step-by-Step Video](https://youtu.be/VgFl0efQ7NI)).
+This section provides additional information on various aspects of this configuration ([Step-by-Step Video](https://youtu.be/4oTJuFeBrdg)).
 
 ### Bootstrap script
 
@@ -201,7 +201,7 @@ Move on to the next configuration [terraform-azurerm-vwan](../terraform-azurerm-
 
 Video | Section
 --- | ---
-[Azure MySQL Flexible Server (Part 1)](https://youtu.be/OE4KFZtq0oY) | [terraform-azurerm-mysql \| Overview](#overview)
-[Azure MySQL Flexible Server (Part 2)](https://youtu.be/_pBU2ifVSGQ) | [terraform-azurerm-mysql \| Getting started](#getting-started)
-[Azure MySQL Flexible Server (Part 3)](https://youtu.be/KWUUeBCsFMQ) | [terraform-azurerm-mysql \| Smoke testing](#smoke-testing)
-[Azure MySQL Flexible Server (Part 4)](https://youtu.be/VgFl0efQ7NI) | [terraform-azurerm-mysql \| Documentation](#documentation)
+[Azure MySQL Flexible Server (Part 1)](https://youtu.be/MPYO-7HaFAQ) | [terraform-azurerm-mysql \| Overview](#overview)
+[Azure MySQL Flexible Server (Part 2)](https://youtu.be/yCzbmekoQLI) | [terraform-azurerm-mysql \| Getting started](#getting-started)
+[Azure MySQL Flexible Server (Part 3)](https://youtu.be/AAOBooTgcus) | [terraform-azurerm-mysql \| Smoke testing](#smoke-testing)
+[Azure MySQL Flexible Server (Part 4)](https://youtu.be/4oTJuFeBrdg) | [terraform-azurerm-mysql \| Documentation](#documentation)
