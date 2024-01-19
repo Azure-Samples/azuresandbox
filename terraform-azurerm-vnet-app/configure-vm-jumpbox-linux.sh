@@ -19,31 +19,37 @@ printf "Starting '$0'...\n"
 printf "See log file '$log_file' for details...\n"
 printdiv
 
-# Get variables from tags
-tag_name='keyvault'
-key_vault_name=$(jp -f "/run/cloud-init/instance-data.json" -u "ds.meta_data.imds.compute.tagsList[?name == '$tag_name'] | [0].value")
-printf "Key vault name is '$key_vault_name'...\n" >> $log_file
+# Get arguments from config file
+config_file=/etc/azuresandbox-conf.json
+if [ -f "$config_file" ]
+then
+    printf "Config file '$config_file' found...\n" >> $log_file
+else
+    printf "Config file '$config_file' not found...\n" >> $log_file
+fi
 
-tag_name='adds_domain_name'
-printf "Getting tag name '$tag_name'...\n" >> $log_file
-adds_domain_name=$(jp -f "/run/cloud-init/instance-data.json" -u "ds.meta_data.imds.compute.tagsList[?name == '$tag_name'] | [0].value")
+printf "Getting variables from file '$config_file'...\n" >> $log_file
+
+var_name=adds_domain_name
+adds_domain_name=$(jp -f $config_file -u $var_name)
 printf "Domain name is '$adds_domain_name'...\n" >> $log_file
 adds_realm_name=$(echo $adds_domain_name | tr '[:lower:]' '[:upper:]')
 printf "Realm name is '$adds_realm_name'...\n" >> $log_file
 
-tag_name='dns_server'
-printf "Getting tag name '$tag_name'...\n" >> $log_file
-dns_server=$(jp -f "/run/cloud-init/instance-data.json" -u "ds.meta_data.imds.compute.tagsList[?name == '$tag_name'] | [0].value")
+var_name=dns_server
+dns_server=$(jp -f $config_file -u $var_name)
 printf "DNS server address is '$dns_server'...\n" >> $log_file
 
-tag_name='storage_account_name'
-printf "Getting tag name '$tag_name'...\n" >> $log_file
-storage_account_name=$(jp -f "/run/cloud-init/instance-data.json" -u "ds.meta_data.imds.compute.tagsList[?name == '$tag_name'] | [0].value")
+var_name=key_vault_name
+key_vault_name=$(jp -f $config_file -u $var_name)
+printf "Key vault name is '$key_vault_name'...\n" >> $log_file
+
+var_name=storage_account_name
+storage_account_name=$(jp -f $config_file -u $var_name)
 printf "CIFS storage account name is '$storage_account_name'...\n" >> $log_file
 
-tag_name='storage_share_name'
-printf "Getting tag name '$tag_name'...\n" >> $log_file
-storage_share_name=$(jp -f "/run/cloud-init/instance-data.json" -u "ds.meta_data.imds.compute.tagsList[?name == '$tag_name'] | [0].value")
+var_name='storage_share_name'
+storage_share_name=$(jp -f $config_file -u $var_name)
 printf "CIFS share name is '$storage_share_name'...\n" >> $log_file
 
 # Get managed identity access token for key vault

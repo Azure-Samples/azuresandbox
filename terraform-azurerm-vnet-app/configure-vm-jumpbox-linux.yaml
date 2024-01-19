@@ -2,12 +2,6 @@
 
 # Note: This code has been tested on Ubuntu 22.04 LTS (Jammy Jellyfish) and will not work on other Linux distros
 
-merge_how:
- - name: list
-   settings: [append]
- - name: dict
-   settings: [no_replace, recurse_list]
-
 cloud_config_modules:
   - apt_configure
   - package_update_upgrade_install
@@ -156,4 +150,13 @@ write_files:
   - content: |
       network: {config: disabled}
     path: /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
-
+  - content: |
+      {
+        "adds_domain_name": "${adds_domain_name}",
+        "dns_server": "${dns_server}",
+        "key_vault_name": "${key_vault_name}",
+        "storage_account_name": "${storage_account_name}",
+        "storage_share_name": "${storage_share_name}"
+      }
+    path: /etc/azuresandbox-conf.json
+    permissions: '0644'
