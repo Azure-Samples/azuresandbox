@@ -381,19 +381,24 @@ This Linux VM is used as a jumpbox for development and remote administration.
       * [winbind](https://packages.ubuntu.com/jammy/winbind)
     * Packages are upgraded.
     * The VM is rebooted if necessary.
-    * The file `/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg` is written to ensure that modifications to `/etc/netplan/50-cloud-init.yaml` are not overwritten after a reboot.
+    * The file `/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg` is created to ensure that modifications to `/etc/netplan/50-cloud-init.yaml` are not overwritten after a reboot.
+    * The file `/etc/azuresandbox-conf.json` is created to initialize variables in the [configure-vm-jumpbox-linux.sh](./configure-vm-jumpbox-linux.sh) script.
+
   * [configure-powershell.ps1](./configure-powershell.ps1) is a [User-Data Script](https://cloudinit.readthedocs.io/en/latest/topics/format.html#user-data-script) that installs [Azure PowerShell](https://learn.microsoft.com/en-us/powershell/azure/what-is-azure-powershell?view=azps-9.5.0)
   * [configure-vm-jumpbox-linux.sh](./configure-vm-jumpbox-linux.sh) is a [User-Data Script](https://cloudinit.readthedocs.io/en/latest/topics/format.html#user-data-script) used to configure the VM. Runtime values are retrieved using [Instance Metadata](https://cloudinit.readthedocs.io/en/latest/topics/instancedata.html#instance-metadata).
-    * Configuration data and secrets are retrieved.
-      * The name of the key vault used for secrets is retrieved from the tag named *keyvault*.
-      * The Active Directory domain name is retrieved from the tag named *adds_domain_name*.
-      * The IP address of the DNS server is retrieved from the tag named *dns_server*.
-      * The name of the storage account used for mounting Azure Files shares is retrieved from the tag named *storage_account_name*.
-      * The name of the Azure Files share is retrieved from the tag named *storage_share_name*.
-      * An access token is generated using the VM's system assigned managed identity.
-      * The access token is used to get secrets from key vault, including:
-        * *adminuser*: The name of the administrative user account for configuring the VM (e.g. "bootstrapadmin" by default).
-        * *adminpassword*: The password for the administrative user account.
+    * Variables are initialized using the configuration file `/etc/azuresandbox-conf.json`.
+
+      Variable | Sample value
+      --- | ---
+      adds_domain_name | `mysandbox.local`
+      dns_server | `10.1.1.4`
+      key_vault_name | `kv-xxxxxxxxxxxxxxx`
+      storage_account_name" | `stxxxxxxxxxxxxxxx`
+      storage_share_name | `myfileshare`
+
+    * Secrets are retrieved from key vault using the VM's system assigned managed identity.
+      * *adminuser*: The name of the administrative user account for configuring the VM (e.g. "bootstrapadmin" by default).
+      * *adminpassword*: The password for the administrative user account.
     * The virtual machine is domain joined using winbind.
       * The SSH server is configured for logins using Active Directory accounts.
       * The *ntp.conf* file is updated to synchronize the time with the domain controller.

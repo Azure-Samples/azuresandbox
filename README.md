@@ -30,7 +30,7 @@ This repository contains a collection of inter-dependent [cloud computing](https
   * [PowerShell Core](https://learn.microsoft.com/powershell/scripting/whats-new/what-s-new-in-powershell-71?view=powershell-7.1)
   * [PowerShell 5.1](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-5.1) for Windows Server configuration.
 * [Terraform](https://www.terraform.io/intro/index.html#what-is-terraform-) v1.6.6 for [Infrastructure as Code](https://en.wikipedia.org/wiki/Infrastructure_as_code) (IaC).
-  * [Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs) (azuerrm) v3.86.0
+  * [Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs) (azuerrm) v3.88.0
   * [cloud-init Provider](https://registry.terraform.io/providers/hashicorp/cloudinit/latest/docs) (cloudinit) v2.3.2
   * [Random Provider](https://registry.terraform.io/providers/hashicorp/random/latest/docs) (random) v3.6.0
 
@@ -393,8 +393,6 @@ This section documents known issues with these configurations that should be add
     * There is a [known issue](https://github.com/hashicorp/terraform-provider-azurerm/issues/2977) that causes Terraform plan or apply operations to fail after provisioning an Azure Files share behind a private endpoint. If this is causing plan or apply operations to fail you can either whitelist the IP address of the client environment on the storage account firewall or use [Target Resources](https://developer.hashicorp.com/terraform/tutorials/state/resource-targeting) to work around it.
   * *Windows Server*: This configuration uses [Azure Automation State Configuration (DSC)](https://learn.microsoft.com/azure/automation/automation-dsc-overview) for configuring the Windows Server virtual machines, which will be replaced by [Azure Automanage Machine Configuration](https://learn.microsoft.com/azure/governance/machine-configuration/overview). This configuration will be updated to the new implementation in a future release.
     * *configure-automation.ps1*: The performance of this script could be improved by using multi-threading to run Azure Automation operations in parallel.
-  * *Linux*: This configuration uses [cloud-init](https://cloudinit.readthedocs.io/) for configuring [Ubuntu 20.04 LTS (Focal Fossa)](http://www.releases.ubuntu.com/20.04/) virtual machines.
-    * *azurerm_linux_virtual_machine.vm_jumpbox_linux*: ARM tags are currently used to pass some configuration data to cloud-init. This dependency on ARM tags could make the configuration more fragile if users manually manipulate ARM tags or they are overwritten by Azure Policy.
 * Identity, Access Management and Authentication.
   * *Authentication*: These configurations use a service principal to authenticate with Azure which requires a client secret to be shared. This is due to the requirement that sandbox users be limited to a *Contributor* Azure RBAC role assignment which is not authorized to do Azure RBAC role assignments. Production environments should consider using [managed identities](https://learn.microsoft.com/azure/active-directory/managed-identities-azure-resources/overview) instead of service principals which eliminates the need to share secrets.
     * *SQL Server Authentication*: By default this configuration uses mixed mode authentication. Production deployments should use Windows integrated authentication as per best practices.
