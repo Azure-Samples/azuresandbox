@@ -76,7 +76,7 @@ The following prerequisites are required in order to get started. Note that once
 * Verify the subscription owner has privileges to create a Service principal name on the AAD tenant. See [Check Azure AD permissions](https://learn.microsoft.com/azure/active-directory/develop/howto-create-service-principal-portal#check-azure-ad-permissions) for more information.
 * Ask the subscription owner to [Create a service principal](https://learn.microsoft.com/cli/azure/create-an-azure-service-principal-azure-cli) (SPN) for sandbox users by running the following Azure CLI command in [Azure Cloud Shell](https://learn.microsoft.com/azure/cloud-shell/quickstart).
 
-  ```lang-bash
+  ```bash
   az ad sp create-for-rbac -n AzureSandboxSPN --role Contributor --scopes /subscriptions/00000000-0000-0000-0000-000000000000
   ```
 
