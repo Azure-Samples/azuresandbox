@@ -78,8 +78,8 @@ filename=/etc/ssh/sshd_config
 printf "Backing up file '$filename'...\n" >> $log_file
 sudo cp -f "$filename" "$filename.bak"
 printf "Modifying '$filename'...\n" >> $log_file
-sudo sed -i "s/PasswordAuthentication no/PasswordAuthentication yes/" $filename
-sudo sed -i "s/ChallengeResponseAuthentication no/ChallengeResponseAuthentication yes/" $filename
+sudo sed -i "s/#PasswordAuthentication yes/PasswordAuthentication yes/" $filename
+sudo sed -i "s/KbdInteractiveAuthentication no/KbdInteractiveAuthentication yes/" $filename
 diff "$filename.bak" "$filename" >> $log_file
 servicename='sshd'
 printf "Restarting '$servicename'...\n" >> $log_file
