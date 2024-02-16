@@ -248,6 +248,15 @@ else
 fi
 
 # Bootstrap key vault
+namespace="Microsoft.KeyVault"
+registration_state=$(az provider show --namespace $namespace --query "registrationState" --output tsv)
+
+if [ "$registration_state" != 'Registered' ]
+then
+  printf "Registering resource provider '$namespace'...\n"
+  az provider register --namespace $namespace --wait
+fi
+
 key_vault_name=$(az keyvault list --subscription $subscription_id --resource-group $resource_group_name --query "[?tags.provisioner == 'bootstrap.sh'] | [0].name" --output tsv)
 
 if [ -n "$key_vault_name" ]
@@ -263,6 +272,7 @@ else
     --location $location \
     --sku standard \
     --no-self-perms \
+    --enable-rbac-authorization false \
     --tags costcenter=$costcenter project=$project environment=$environment provisioner="bootstrap.sh"
 fi
 
@@ -304,6 +314,15 @@ then
 fi
 
 # Boostrap storage account
+namespace="Microsoft.Storage"
+registration_state=$(az provider show --namespace $namespace --query "registrationState" --output tsv)
+
+if [ "$registration_state" != 'Registered' ]
+then
+  printf "Registering resource provider '$namespace'...\n"
+  az provider register --namespace $namespace --wait
+fi
+
 storage_account_name=$(az storage account list --subscription $subscription_id --resource-group $resource_group_name --query "[?tags.provisioner == 'bootstrap.sh'] | [0].name" --output tsv)
 
 if [ -n "$storage_account_name" ]
