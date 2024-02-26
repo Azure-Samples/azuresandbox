@@ -69,14 +69,15 @@ This repo was created by [Roger Doherty](https://www.linkedin.com/in/roger-doher
 
 The following prerequisites are required in order to get started. Note that once these prerequisite are in place, a [Contributor](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#contributor) Azure RBAC role assignment is sufficient to use the configurations.
 
-* Identify the [Microsoft Entra ID](https://learn.microsoft.com/azure/active-directory/fundamentals/active-directory-whatis) tenant to be used for identity and access management, or create a new tenant using [Quickstart: Set up a tenant](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-create-new-tenant).
+* Identify the [Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/fundamentals/whatis) tenant to be used for identity and access management, or create a new tenant using [Quickstart: Set up a tenant](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-create-new-tenant).
 * Identify a single Azure [subscription](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#subscription) or create a new Azure subscription. See [Azure Offer Details](https://azure.microsoft.com/support/legal/offer-details/) and [Associate or add an Azure subscription to your Microsoft Entra tenant](https://learn.microsoft.com/entra/fundamentals/how-subscriptions-associated-directory) for more information.
 * Identify the owner of the Azure subscription to be used for \#AzureSandbox. This user should have an [Owner](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#owner) Azure RBAC role assignment on the subscription. See [Steps to assign an Azure role](https://learn.microsoft.com/azure/role-based-access-control/role-assignments-steps) for more information.
 * Ask the subscription owner to create a [Contributor](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#contributor) Azure RBAC role assignment for each sandbox user. See [Steps to assign an Azure role](https://learn.microsoft.com/azure/role-based-access-control/role-assignments-steps) for more information.
-* Verify the subscription owner has privileges to create a Service principal name on the AAD tenant. See [Check Azure AD permissions](https://learn.microsoft.com/azure/active-directory/develop/howto-create-service-principal-portal#check-azure-ad-permissions) for more information.
-* Ask the subscription owner to [Create a service principal](https://learn.microsoft.com/cli/azure/create-an-azure-service-principal-azure-cli) (SPN) for sandbox users by running the following Azure CLI command in [Azure Cloud Shell](https://learn.microsoft.com/azure/cloud-shell/quickstart).
+* Verify the subscription owner has privileges to create a Service principal name on the Microsoft Entra tenant. See [Permissions required for registering an app](https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal#permissions-required-for-registering-an-app) for more information.
+* Ask the subscription owner to [Create an Azure service principal with Azure CLI](https://learn.microsoft.com/en-us/cli/azure/azure-cli-sp-tutorial-1?tabs=bash) (SPN) for sandbox users by running the following Azure CLI command in [Azure Cloud Shell](https://learn.microsoft.com/azure/cloud-shell/quickstart).
 
   ```bash
+  # Replace 00000000-0000-0000-0000-000000000000 with the subscription id
   az ad sp create-for-rbac -n AzureSandboxSPN --role Contributor --scopes /subscriptions/00000000-0000-0000-0000-000000000000
   ```
 
