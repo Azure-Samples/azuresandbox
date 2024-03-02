@@ -69,12 +69,6 @@ configuration JumpBoxConfig {
             AutoUpgrade = $true
         }
 
-        cChocoPackageInstaller 'AzPowerShell' {
-            Name = 'az.powershell'
-            DependsOn = '[cChocoInstaller]Chocolatey'
-            AutoUpgrade = $true
-        }
-
         cChocoPackageInstaller 'VSCode' {
             Name = 'vscode'
             DependsOn = '[cChocoInstaller]Chocolatey'
