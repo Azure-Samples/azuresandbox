@@ -176,6 +176,7 @@ resource "azurerm_virtual_network_peering" "vnet_shared_01_to_vnet_app_01_peerin
   allow_virtual_network_access = true
   allow_forwarded_traffic      = true
   allow_gateway_transit        = true
+  depends_on                   = [azurerm_network_security_rule.network_security_rules]
 }
 
 resource "azurerm_virtual_network_peering" "vnet_app_01_to_vnet_shared_01_peering" {
@@ -186,6 +187,7 @@ resource "azurerm_virtual_network_peering" "vnet_app_01_to_vnet_shared_01_peerin
   allow_virtual_network_access = true
   allow_forwarded_traffic      = true
   allow_gateway_transit        = true
+  depends_on                   = [azurerm_network_security_rule.network_security_rules]
 }
 
 # Private DNS zones
@@ -207,6 +209,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "private_dns_zone_virtu
   private_dns_zone_name = each.value.name
   virtual_network_id    = azurerm_virtual_network.vnet_app_01.id
   tags                  = var.tags
+  depends_on            = [azurerm_virtual_network_peering.vnet_app_01_to_vnet_shared_01_peering, azurerm_virtual_network_peering.vnet_shared_01_to_vnet_app_01_peering]
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "private_dns_zone_virtual_network_links_vnet_shared_01" {
@@ -216,4 +219,5 @@ resource "azurerm_private_dns_zone_virtual_network_link" "private_dns_zone_virtu
   private_dns_zone_name = each.value.name
   virtual_network_id    = var.remote_virtual_network_id
   tags                  = var.tags
+  depends_on            = [azurerm_virtual_network_peering.vnet_app_01_to_vnet_shared_01_peering, azurerm_virtual_network_peering.vnet_shared_01_to_vnet_app_01_peering]
 }

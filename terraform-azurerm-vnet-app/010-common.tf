@@ -2,7 +2,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "=3.94.0"
+      version = "=3.95.0"
     }
 
     random = {
@@ -23,7 +23,6 @@ provider "azurerm" {
   client_id                  = var.arm_client_id
   client_secret              = var.arm_client_secret
   tenant_id                  = var.aad_tenant_id
-  skip_provider_registration = true
 
   features {}
 }
