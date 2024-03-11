@@ -39,6 +39,8 @@ resource "azurerm_windows_virtual_machine" "vm_jumpbox_win" {
     version   = var.vm_jumpbox_win_image_version
   }
 
+  depends_on = [ azurerm_private_dns_zone_virtual_network_link.private_dns_zone_virtual_network_links_vnet_app_01 ]
+
   # Note: To view provisioner output, use the Terraform nonsensitive() function when referencing key vault secrets or variables marked 'sensitive'
   provisioner "local-exec" {
     command     = <<EOT
