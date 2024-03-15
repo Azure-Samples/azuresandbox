@@ -1,11 +1,6 @@
 variable "aad_tenant_id" {
   type        = string
-  description = "The Microsoft Entra tenant id."
-}
-
-variable "adds_domain_name" {
-  type        = string
-  description = "The AD DS domain name."
+  description = "The Azure Active Directory tenant id."
 }
 
 variable "admin_password_secret" {
@@ -39,11 +34,6 @@ variable "key_vault_id" {
   description = "The existing key vault where secrets are stored"
 }
 
-variable "key_vault_name" {
-  type        = string
-  description = "The existing key vault where secrets are stored"
-}
-
 variable "location" {
   type        = string
   description = "The name of the Azure Region where resources will be provisioned."
@@ -54,6 +44,20 @@ variable "resource_group_name" {
   description = "The name of the existing resource group for provisioning resources."
 }
 
+variable "storage_account_name" {
+  type = string
+  description = "The name of the storage account where scripts are stored."
+}
+
+variable "storage_container_name" {
+  type = string
+  description = "The name of the storage container where scripts are stored."
+  
+}
+variable "subnet_id" {
+  type        = string
+  description = "The id of the subnet used for virtual machine nics."
+}
 variable "subscription_id" {
   type        = string
   description = "The Azure subscription id used to provision resources."
@@ -62,6 +66,21 @@ variable "subscription_id" {
 variable "tags" {
   type        = map(any)
   description = "The tags in map format to be used when creating new resources."
+}
+
+variable "vm_devops_win_config_script" {
+  type        = string
+  description = "The name of the configuration script for the devops agent VMs."
+}
+
+variable "vm_devops_win_dsc_config" {
+  type        = string
+  description = "The name of the DSC configuration to apply to the devops agent VMs"
+}
+
+variable "vm_devops_win_data_disk_size_gb" {
+  type        = number
+  description = "The size of the virtual machine data disk in GB"  
 }
 
 variable "vm_devops_win_image_offer" {
@@ -93,9 +112,29 @@ variable "vm_devops_win_instances" {
   description = "The nunber of devops agent VMs to provision."
 }
 
+variable "vm_devops_win_instances_start" {
+  type        = number
+  description = "The first sequence nunber of devops agent VMs to provision."
+}
+
+variable "vm_devops_win_license_type" {
+  type        = string
+  description = "The license type for the virtual machine."
+}
+
 variable "vm_devops_win_name" {
   type        = string
   description = "The name of the devops agent VM."
+}
+
+variable "vm_devops_win_os_disk_size_gb" {
+  type        = number
+  description = "The size of the virtual machine OS disk in GB"
+}
+
+variable "vm_devops_win_patch_mode" {
+  type        = string
+  description = "The patch mode for the virtual machine"
 }
 
 variable "vm_devops_win_size" {
@@ -108,9 +147,4 @@ variable "vm_devops_win_storage_account_type" {
   type        = string
   description = "The storage replication type to be used for the VMs OS disk"
   default     = "StandardSSD_LRS"
-}
-
-variable "vnet_app_01_subnets" {
-  type        = map(any)
-  description = "The existing subnets defined in the application virtual network."
 }

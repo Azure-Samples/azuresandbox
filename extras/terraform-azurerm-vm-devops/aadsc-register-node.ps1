@@ -95,21 +95,13 @@ function Register-DscNode {
     Write-Log "Checking for node configuration '$nodeConfigName'..."
 
     try {
-        $nodeConfig = Get-AzAutomationDscNodeConfiguration `
+        Get-AzAutomationDscNodeConfiguration `
             -ResourceGroupName $ResourceGroupName `
             -AutomationAccountName $AutomationAccountName `
-            -Name $nodeConfigName `
-            -ErrorAction Stop
+            -Name $nodeConfigName | Out-Null
     }
     catch {
         Exit-WithError $_
-    }
-
-    $rollupStatus = $nodeConfig.RollupStatus
-    Write-Log "DSC node configuration '$nodeConfigName' RollupStatus is '$($rollupStatus)'..."
-
-    if ($rollupStatus -ne 'Good'){
-        Exit-WithError "Invalid DSC node configuration RollupStatus..."
     }
 
     Write-Log "Registering DSC node '$VirtualMachineName' with node configuration '$nodeConfigName'..."
