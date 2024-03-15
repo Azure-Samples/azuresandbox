@@ -202,7 +202,7 @@ Here is an example of a json configuration file:
   "vm_devops_win_patch_mode": "AutomaticByOS",
   "vm_devops_win_size": "Standard_B2s",
   "vm_devops_win_storage_account_type": "Standard_LRS"
-}    
+}
 ```
 
 Configuration of [Azure Automation State Configuration (DSC)](https://learn.microsoft.com/azure/automation/automation-dsc-overview) is performed.
