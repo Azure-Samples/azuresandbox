@@ -19,7 +19,7 @@ This section describes additional Terraform configurations that can be added to 
   * A [key vault](https://learn.microsoft.com/azure/key-vault/general/overview) for managing secrets.
   * A [storage account](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#storage-account) for use as a [Terraform azurerm backend](https://developer.hashicorp.com/terraform/language/settings/backends/azurerm).
   * A Linux [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) for use as a DevOps agent.
-* [terraform-azurerm-vm-devops](./terraform-azurerm-vm-devops/) implements a collection of identical [IaaS](https://azure.microsoft.com/overview/what-is-iaas/) [virtual machines](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) designed to be used as developer workstations.
+* [terraform-azurerm-vm-devops](./terraform-azurerm-vm-devops/) implements a collection of identical [IaaS](https://azure.microsoft.com/overview/what-is-iaas/) [virtual machines](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) designed to be used as Windows Developer Workstations.
 * [terraform-azurerm-vnet-onprem](./terraform-azurerm-vnet-onprem/) simulates connectivity to an on-premises network using a site-to-site VPN connection and Azure DNS private resolver.
 
 ## Demo videos

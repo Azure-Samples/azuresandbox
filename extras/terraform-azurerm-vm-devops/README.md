@@ -1,4 +1,4 @@
-# \#AzureSandbox - terraform-azurerm-vm-devops
+# \#AzureSandbox - terraform-azurerm-vm-devops (Windows Developer Workstations)
 
 ## Contents
 
@@ -8,6 +8,7 @@
 * [Getting started](#getting-started)
 * [Smoke testing](#smoke-testing)
 * [Documentation](#documentation)
+* [Videos](#videos)
 
 ## Architecture
 
@@ -15,7 +16,7 @@
 
 ## Overview
 
-This configuration implements a collection of identical [IaaS](https://azure.microsoft.com/overview/what-is-iaas/) [virtual machines](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) designed to be used as developer workstations. While it can be used with #AzureSandbox, it can also be used in your own Azure estate. Note this configuration is designed for a Windows client environment, and WSL is not required.
+This configuration implements a collection of identical [IaaS](https://azure.microsoft.com/overview/what-is-iaas/) [virtual machines](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) designed to be used as developer workstations. While it can be used with #AzureSandbox, it can also be used in your own Azure estate. Note this configuration is designed for a Windows client environment, and WSL is not required. [Step-by-step video](https://youtu.be/z6yqKDNFq60).
 
 Activity | Estimated time required
 --- | ---
@@ -62,7 +63,7 @@ If you are using this configuration with #AzureSandbox, [terraform-azurerm-vnet-
 
 ## Getting started
 
-This section describes how to provision this configuration.
+This section describes how to provision this configuration. [Step-by-step video](https://youtu.be/iQ41EMCOj34).
 
 * [Install Winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/#install-winget).
 * [Install Git for Windows](https://git-scm.com/download/win).
@@ -117,11 +118,11 @@ This section describes how to provision this configuration.
 
 ## Smoke testing
 
-Check State Configuration (DSC) dashboard in Azure Automation periodically for configuration status. It may be necessary to reboot VMs that are stuck in `Failed` due to a .NET framework installation issues. Wait for a while after reboot and nodes should report as `Compliant`. Wait 30 minutes after the Terraform configuration is applied before attempting reboots.
+Check State Configuration (DSC) dashboard in Azure Automation periodically for configuration status. It may be necessary to reboot VMs that are stuck in `Failed` state or are slow logging in. Wait for a while after reboot and nodes should report as `Compliant`. Wait 30 minutes after the Terraform configuration is applied before attempting reboots. [Step-by-step video](https://youtu.be/GcdNhvzRSm8).
 
 ## Documentation
 
-This section provides additional information on various aspects of this configuration.
+This section provides additional information on various aspects of this configuration. [Step-by-step video](https://youtu.be/S1Rp5rVBzR4).
 
 ### Bootstrap script
 
@@ -272,3 +273,12 @@ azurerm_virtual_machine_extension.vm_devops_win[*] | A collection of virtual mac
 * This VM is configured by [configure-vm-devops-win.ps1](./configure-vm-devops-win.ps1) using a custom script extension. This script can be customized to fit your needs.
   * The OS disk is expanded to use any unallocated space on the disk.
   * Data disks are initialized, partitioned and formatted.
+
+## Videos
+
+Video | Section
+--- | ---
+[Azure Sandbox Extras - Windows Developer Workstations (Part 1)](https://youtu.be/z6yqKDNFq60) | [Overview](#overview)
+[Azure Sandbox Extras - Windows Developer Workstations (Part 2)](https://youtu.be/iQ41EMCOj34) | [Getting started](#getting-started)
+[Azure Sandbox Extras - Windows Developer Workstations (Part 3)](https://youtu.be/GcdNhvzRSm8) | [Smoke testing](#smoke-testing)
+[Azure Sandbox Extras - Windows Developer Workstations (Part 4)](https://youtu.be/S1Rp5rVBzR4) | [Documentation](#documentation)
