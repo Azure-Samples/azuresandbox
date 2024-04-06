@@ -8,6 +8,7 @@
 * [Getting started](#getting-started)
 * [Smoke testing](#smoke-testing)
 * [Documentation](#documentation)
+* [Customization](#customization)
 * [Videos](#videos)
 
 ## Architecture
@@ -273,6 +274,44 @@ azurerm_virtual_machine_extension.vm_devops_win[*] | A collection of virtual mac
 * This VM is configured by [configure-vm-devops-win.ps1](./configure-vm-devops-win.ps1) using a custom script extension. This script can be customized to fit your needs.
   * The OS disk is expanded to use any unallocated space on the disk.
   * Data disks are initialized, partitioned and formatted.
+
+## Customization
+
+This section describes how to customize the configuration to meet your specific requirements.
+
+### Software packages
+
+The Chocolatey package manager is used to install software on the developer workstations. The list of software packages to install is defined in the [DevopsVmWin.ps1](./DevopsVmWin.ps1) DSC configuration. To customize the list of software packages, modify the `cChocoPackageInstaller` resources in the DSC configuration. For example, here is how you would add MySQL Workbench to the configuration:
+
+```pwsh
+cChocoPackageInstaller 'MySQLWorkbench' {
+  Name = 'mysql.workbench'
+  DependsOn = '[cChocoInstaller]Chocolatey'
+  AutoUpgrade = $true
+}
+```
+
+### Local administrators
+
+By default the configuration adds the domain administrator and the `Domain Admins` group to the local `Administrators` group on the developer workstations. To add additional security principals, modify the the [DevopsVmWin.ps1](./DevopsVmWin.ps1) DSC configuration and add the desired security principals using the `Group` resource in the `PSDscResources` module. Use `DependsOn` to ensure the computer is domain joined before attempting to add security principals from a domain.
+
+```pwsh
+configuration DevopsVmWin {
+  # ...
+  # Create a new Azure Automation variable and set it to the name of the security principal you want to add to the local administrators group, e.g. 'MYSANDBOX\DevopsAdmins'
+  $localAdminAdGroupName = Get-AutomationVariable 'local_admin_ad_group_name'
+  # ...
+  node $ComputerName {
+    # ...
+    Group 'Administrators' {
+      GroupName = 'Administrators'
+      MembersToInclude = @($localAdminAdGroupName)
+      DependsOn = '[xDSCDomainjoin]JoinDomain'
+    }
+  # ...
+  }
+}
+```
 
 ## Videos
 
