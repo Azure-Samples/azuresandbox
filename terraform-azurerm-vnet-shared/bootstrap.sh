@@ -338,6 +338,8 @@ else
     --location $location \
     --kind StorageV2 \
     --sku Standard_LRS \
+    --https-only \
+    --min-tls-version TLS1_2 \
     --tags costcenter=$costcenter project=$project environment=$environment provisioner="bootstrap.sh"
 fi
 
