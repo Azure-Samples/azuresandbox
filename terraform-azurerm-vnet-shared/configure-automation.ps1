@@ -364,7 +364,7 @@ function Set-Variable {
         try {
             $automationVariable = New-AzAutomationVariable `
                 -Name $VariableName `
-                -Encrypted $false `
+                -Encrypted $true `
                 -Description $VariableName `
                 -Value $VariableValue `
                 -ResourceGroupName $ResourceGroupName `
@@ -379,7 +379,7 @@ function Set-Variable {
         try {
             $automationVariable = Set-AzAutomationVariable `
                 -Name $VariableName `
-                -Encrypted $false `
+                -Encrypted $true `
                 -Value $VariableValue `
                 -ResourceGroupName $ResourceGroupName `
                 -AutomationAccountName $AutomationAccountName `
