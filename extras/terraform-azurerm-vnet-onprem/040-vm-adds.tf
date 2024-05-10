@@ -2,16 +2,17 @@
 # Important: For production use you should deploy two domain controller VMs in an availability set or in different Availablity Groups.
 
 resource "azurerm_windows_virtual_machine" "vm_adds" {
-  name                     = var.vm_adds_name
-  resource_group_name      = var.resource_group_name
-  location                 = var.location
-  size                     = var.vm_adds_size
-  admin_username           = data.azurerm_key_vault_secret.adminuser.value
-  admin_password           = data.azurerm_key_vault_secret.adminpassword.value
-  network_interface_ids    = [azurerm_network_interface.vm_adds_nic_01.id]
-  enable_automatic_updates = true
-  patch_mode               = "AutomaticByPlatform"
-  tags                     = var.tags
+  name                       = var.vm_adds_name
+  resource_group_name        = var.resource_group_name
+  location                   = var.location
+  size                       = var.vm_adds_size
+  admin_username             = data.azurerm_key_vault_secret.adminuser.value
+  admin_password             = data.azurerm_key_vault_secret.adminpassword.value
+  network_interface_ids      = [azurerm_network_interface.vm_adds_nic_01.id]
+  encryption_at_host_enabled = true
+  enable_automatic_updates   = true
+  patch_mode                 = "AutomaticByPlatform"
+  tags                       = var.tags
 
   os_disk {
     caching              = "ReadWrite"

@@ -23,14 +23,15 @@ data "cloudinit_config" "vm_jumpbox_linux" {
 
 # Linux virtual machine
 resource "azurerm_linux_virtual_machine" "vm_jumpbox_linux" {
-  name                  = var.vm_name
-  resource_group_name   = azurerm_network_interface.vm_jumpbox_linux_nic_01.resource_group_name
-  location              = azurerm_network_interface.vm_jumpbox_linux_nic_01.location
-  size                  = var.vm_size
-  admin_username        = data.azurerm_key_vault_secret.adminuser.value
-  network_interface_ids = [azurerm_network_interface.vm_jumpbox_linux_nic_01.id]
-  patch_mode            = "AutomaticByPlatform"
-  tags                  = merge(var.tags, { keyvault = var.key_vault_name })
+  name                       = var.vm_name
+  resource_group_name        = azurerm_network_interface.vm_jumpbox_linux_nic_01.resource_group_name
+  location                   = azurerm_network_interface.vm_jumpbox_linux_nic_01.location
+  size                       = var.vm_size
+  admin_username             = data.azurerm_key_vault_secret.adminuser.value
+  network_interface_ids      = [azurerm_network_interface.vm_jumpbox_linux_nic_01.id]
+  patch_mode                 = "AutomaticByPlatform"
+  encryption_at_host_enabled = true
+  tags                       = merge(var.tags, { keyvault = var.key_vault_name })
 
   admin_ssh_key {
     username   = data.azurerm_key_vault_secret.adminuser.value
