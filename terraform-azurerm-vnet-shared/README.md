@@ -119,7 +119,7 @@ This section describes how to provision this configuration using default setting
 
 * Monitor output. Upon completion, you should see a message similar to the following:
 
-  `Apply complete! Resources: 37 added, 0 changed, 0 destroyed.`
+  `Apply complete! Resources: 42 added, 0 changed, 0 destroyed.`
 
 * Inspect `terraform.tfstate`.
 
@@ -168,6 +168,7 @@ The bootstrap script [bootstrap.sh](./bootstrap.sh) is used to initialize variab
   * Access policies are created to enable the administration and retrieval of secrets.
     * *AzureSandboxSPN* is granted *Get* and *Set* secrets permissions.
     * The sandbox user is granted *Get*, *List* and *Set* secrets permissions.
+  * Diagnostic settings are configured in [020-loganalytics.tf](./020-loganalytics.tf) to send `audit` category logs to the [Log Analytics Workspace](#log-analytics-workspace).
 * Creates a storage account with a randomly generated 15-character name like *stxxxxxxxxxxxxx*.
   * The name is limited to 15 characters for compatibility with Active Directory Domain Services.
   * A new *scripts* container is created for configurations that leverage the Custom Script Extension for [Windows](https://learn.microsoft.com/azure/virtual-machines/extensions/custom-script-windows) or [Linux](https://learn.microsoft.com/azure/virtual-machines/extensions/custom-script-linux).
@@ -244,6 +245,7 @@ azurerm_network_interface.vm_adds_nic_01 (nic&#x2011;adds1&#x2011;1) | The confi
 This Windows Server VM is used as an [Active Directory Domain Services](https://learn.microsoft.com/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview) [Domain Controller](https://learn.microsoft.com/previous-versions/windows/it-pro/windows-server-2003/cc786438(v=ws.10)) and a DNS Server running in Active Directory-integrated mode.
 
 * Guest OS: Windows Server 2022 Datacenter Core
+* `encryption_at_host_enabled` is set to `true`
 * By default the [Patch orchestration mode](https://learn.microsoft.com/azure/virtual-machines/automatic-vm-guest-patching#patch-orchestration-modes) is set to `AutomaticByPlatform`.
 * *admin_username* and *admin_password* are configured using the key vault secrets *adminuser* and *adminpassword*.
 * This resource has a dependency on *azurerm_automation_account.automation_account_01*.
