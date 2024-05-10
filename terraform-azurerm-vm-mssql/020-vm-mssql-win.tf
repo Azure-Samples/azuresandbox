@@ -93,21 +93,16 @@ resource "azurerm_virtual_machine_extension" "vm_mssql_win_postdeploy_script" {
     azurerm_virtual_machine_data_disk_attachment.vm_mssql_win_data_disk_attachments
   ]
 
-  settings = <<SETTINGS
+  protected_settings = <<PROTECTED_SETTINGS
     {
+      "commandToExecute": 
+        "powershell.exe -ExecutionPolicy Unrestricted -File \"./${var.vm_mssql_win_post_deploy_script}\" -Domain \"${var.adds_domain_name}\" -Username \"${data.azurerm_key_vault_secret.adminuser.value}\" -UsernameSecret \"${data.azurerm_key_vault_secret.adminpassword.value}\"",
+      "storageAccountName": "${var.storage_account_name}",
+      "storageAccountKey": "${data.azurerm_key_vault_secret.storage_account_key.value}",
       "fileUris": [ 
         "${var.vm_mssql_win_post_deploy_script_uri}", 
         "${var.vm_mssql_win_sql_startup_script_uri}" 
-      ],
-      "commandToExecute": 
-        "powershell.exe -ExecutionPolicy Unrestricted -File \"./${var.vm_mssql_win_post_deploy_script}\" -Domain \"${var.adds_domain_name}\" -Username \"${data.azurerm_key_vault_secret.adminuser.value}\" -UsernameSecret \"${data.azurerm_key_vault_secret.adminpassword.value}\""
-    }    
-  SETTINGS
-
-  protected_settings = <<PROTECTED_SETTINGS
-    {
-      "storageAccountName": "${var.storage_account_name}",
-      "storageAccountKey": "${data.azurerm_key_vault_secret.storage_account_key.value}"
+      ]
     }
   PROTECTED_SETTINGS
 }
