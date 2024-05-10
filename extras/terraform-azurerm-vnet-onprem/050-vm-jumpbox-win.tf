@@ -1,14 +1,15 @@
 # Windows jumpbox virtual machine
 resource "azurerm_windows_virtual_machine" "vm_jumpbox_win" {
-  name                     = var.vm_jumpbox_win_name
-  resource_group_name      = var.resource_group_name
-  location                 = var.location
-  size                     = var.vm_jumpbox_win_size
-  admin_username           = data.azurerm_key_vault_secret.adminuser.value
-  admin_password           = data.azurerm_key_vault_secret.adminpassword.value
-  network_interface_ids    = [azurerm_network_interface.vm_jumpbox_win_nic_01.id]
-  patch_mode               = "AutomaticByPlatform"
-  tags                     = var.tags
+  name                       = var.vm_jumpbox_win_name
+  resource_group_name        = var.resource_group_name
+  location                   = var.location
+  size                       = var.vm_jumpbox_win_size
+  admin_username             = data.azurerm_key_vault_secret.adminuser.value
+  admin_password             = data.azurerm_key_vault_secret.adminpassword.value
+  network_interface_ids      = [azurerm_network_interface.vm_jumpbox_win_nic_01.id]
+  encryption_at_host_enabled = true
+  patch_mode                 = "AutomaticByPlatform"
+  tags                       = var.tags
 
   os_disk {
     caching              = "ReadWrite"
@@ -22,7 +23,7 @@ resource "azurerm_windows_virtual_machine" "vm_jumpbox_win" {
     version   = var.vm_jumpbox_win_image_version
   }
 
-  depends_on = [ azurerm_windows_virtual_machine.vm_adds ]
+  depends_on = [azurerm_windows_virtual_machine.vm_adds]
 
   # Note: To view provisioner output, use the Terraform nonsensitive() function when referencing key vault secrets or variables marked 'sensitive'
   provisioner "local-exec" {

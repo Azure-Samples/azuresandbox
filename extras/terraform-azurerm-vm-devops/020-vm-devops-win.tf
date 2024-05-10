@@ -5,18 +5,19 @@ locals {
 }
 
 resource "azurerm_windows_virtual_machine" "vm_devops_win" {
-  for_each                 = toset(local.vm_devops_win_names)
-  name                     = each.key
-  resource_group_name      = var.resource_group_name
-  location                 = var.location
-  size                     = var.vm_devops_win_size
-  admin_username           = data.azurerm_key_vault_secret.adminuser.value
-  admin_password           = data.azurerm_key_vault_secret.adminpassword.value
-  network_interface_ids    = [azurerm_network_interface.vm_devops_win[each.key].id]
-  enable_automatic_updates = true
-  patch_mode               = var.vm_devops_win_patch_mode
-  license_type             = var.vm_devops_win_license_type
-  tags                     = var.tags
+  for_each                   = toset(local.vm_devops_win_names)
+  name                       = each.key
+  resource_group_name        = var.resource_group_name
+  location                   = var.location
+  size                       = var.vm_devops_win_size
+  admin_username             = data.azurerm_key_vault_secret.adminuser.value
+  admin_password             = data.azurerm_key_vault_secret.adminpassword.value
+  network_interface_ids      = [azurerm_network_interface.vm_devops_win[each.key].id]
+  encryption_at_host_enabled = true
+  enable_automatic_updates   = true
+  patch_mode                 = var.vm_devops_win_patch_mode
+  license_type               = var.vm_devops_win_license_type
+  tags                       = var.tags
 
   os_disk {
     caching              = "ReadWrite"

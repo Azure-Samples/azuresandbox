@@ -1,8 +1,8 @@
 locals {
   subnets = {
     AzureBastionSubnet = {
-      address_prefix                            = var.subnet_AzureBastionSubnet_address_prefix
-      private_endpoint_network_policies_enabled = false
+      address_prefix                    = var.subnet_AzureBastionSubnet_address_prefix
+      private_endpoint_network_policies = "Disabled"
       nsgrules = [
         "AllowHttpsInbound",
         "AllowGatewayManagerInbound",
@@ -16,8 +16,8 @@ locals {
     }
 
     snet-adds-01 = {
-      address_prefix                            = var.subnet_adds_address_prefix
-      private_endpoint_network_policies_enabled = false
+      address_prefix                    = var.subnet_adds_address_prefix
+      private_endpoint_network_policies = "Disabled"
       nsgrules = [
         "AllowVirtualNetworkInbound",
         "AllowVirtualNetworkOutbound",
@@ -26,8 +26,8 @@ locals {
     }
 
     snet-misc-01 = {
-      address_prefix                            = var.subnet_misc_address_prefix
-      private_endpoint_network_policies_enabled = false
+      address_prefix                    = var.subnet_misc_address_prefix
+      private_endpoint_network_policies = "Disabled"
       nsgrules = [
         "AllowVirtualNetworkInbound",
         "AllowVirtualNetworkOutbound",
@@ -36,8 +36,8 @@ locals {
     }
 
     snet-misc-02 = {
-      address_prefix                            = var.subnet_misc_02_address_prefix
-      private_endpoint_network_policies_enabled = false
+      address_prefix                    = var.subnet_misc_02_address_prefix
+      private_endpoint_network_policies = "Disabled"
       nsgrules = [
         "AllowVirtualNetworkInbound",
         "AllowVirtualNetworkOutbound",
@@ -195,12 +195,12 @@ output "vnet_shared_01_name" {
 }
 
 resource "azurerm_subnet" "vnet_shared_01_subnets" {
-  for_each                                  = local.subnets
-  name                                      = each.key
-  resource_group_name                       = var.resource_group_name
-  virtual_network_name                      = azurerm_virtual_network.vnet_shared_01.name
-  address_prefixes                          = [each.value.address_prefix]
-  private_endpoint_network_policies_enabled = each.value.private_endpoint_network_policies_enabled
+  for_each                          = local.subnets
+  name                              = each.key
+  resource_group_name               = var.resource_group_name
+  virtual_network_name              = azurerm_virtual_network.vnet_shared_01.name
+  address_prefixes                  = [each.value.address_prefix]
+  private_endpoint_network_policies = each.value.private_endpoint_network_policies
 }
 
 output "vnet_shared_01_subnets" {
