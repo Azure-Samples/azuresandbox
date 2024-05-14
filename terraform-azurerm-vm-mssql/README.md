@@ -96,13 +96,17 @@ Perform the following tests to validate the configuration is provisioned correct
 
   * Verify the IPAddress returned is within the subnet IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-db-01"]*, e.g. `10.2.1.*`.
 * From *jumpwin1*, test SQL Server Connectivity with SQL Server Management Studio (SSMS)
-  * Navigate to *Start* > *Microsoft SQL Server Tools 19* > *Microsoft SQL Server Management Studio 19*
-  * Connect to the default instance of SQL Server installed on the database server virtual machine using the following default values:
-    * Server name: *mssqlwin1*
-    * Authentication: *Windows Authentication* (this will default to *MYSANDBOX\bootstrapadmin*)
-    * Create a new database named *testdb*.
-      * Verify the data files were stored on the *M:* drive
-      * Verify the log file were stored on the *L:* drive
+  * Navigate to *Start* > *Microsoft SQL Server Tools 20* > *Microsoft SQL Server Management Studio 20*
+  * Connect to the default instance of SQL Server installed on the database server virtual machine using the following settings:
+    * Server
+      * Server type: `Database Engine`
+      * Server name: `mssqlwin1`
+      * Authentication: `Windows Authentication` (this will default to *MYSANDBOX\bootstrapadmin*)
+    * Connection security
+      * Encryption: `Optional`
+  * Create a new database named *testdb*.
+    * Verify the data files were stored on the *M:* drive
+    * Verify the log file were stored on the *L:* drive
 
 ## Documentation
 
