@@ -48,6 +48,9 @@ function Exit-WithError {
 #region main
 Write-Log "Running '$PSCommandPath'..."
 
+Write-Log "Setting execution policy to 'RemoteSigned'..."
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
 $xDot500Path = "DC=$($Domain.Split('.')[0]),DC=$($Domain.Split('.')[1])"
 $password = ConvertTo-SecureString $StorageAccountKerbKey -AsPlainText -Force
 $spnValue = "cifs/$StorageAccountName.file.core.windows.net"
@@ -107,51 +110,14 @@ $forestName = $domainInformation.Forest
 $netBiosDomainName = $domainInformation.DnsRoot
 
 # Install Powershell Az module
-$nugetPackage = Get-PackageProvider | Where-Object Name -eq 'NuGet'
+Write-Log "Installing NuGet package provider..."
+Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force 
 
-if ($null -eq $nugetPackage) {
-    Write-Log "Installing NuGet PowerShell package provider..."
+Write-Log "installing PowerShellGet..."
+Install-Module -Name PowerShellGet -MinimumVersion 2.2.4.1 -Force
 
-    try {
-        Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force 
-    }
-    catch {
-        Exit-WithError $_
-    }
-}
-
-$nugetPackage = Get-PackageProvider | Where-Object Name -eq 'NuGet'
-Write-Log "NuGet Powershell Package Provider version $($nugetPackage.Version.Major).$($nugetPackage.Version.Minor).$($nugetPackage.Version.Build).$($nugetPackage.Version.Revision) is already installed..."
-
-$repo = Get-PSRepository -Name PSGallery
-if ( $repo.InstallationPolicy -eq 'Trusted' ) {
-    Write-Log "PSGallery installation policy is already set to 'Trusted'..."
-}
-else {
-    Write-Log "Setting PSGallery installation policy to 'Trusted'..."
-
-    try {
-        Set-PSRepository -Name PSGallery -InstallationPolicy Trusted    
-    }
-    catch {
-        Exit-WithError $_
-    }
-}
-
-$azModule = Get-Module -ListAvailable -Name Az*
-if ($null -eq $azModule ) {
-    Write-Log "Installing PowerShell Az module..."
-
-    try {
-        Install-Module -Name Az -AllowClobber -Scope AllUsers
-    }
-    catch {
-        Exit-WithError $_
-    }
-}
-else {
-    Write-Log "PowerShell Az module is already installed..."
-}
+Write-Log "Installing PowerShell Az module..."
+Install-Module -Name Az -Repository PSGallery -Force
 
 # Log into Azure
 Write-Log "Logging into Azure using service principal id '$AppId'..."
