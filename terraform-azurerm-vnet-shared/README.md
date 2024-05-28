@@ -101,6 +101,8 @@ This section describes how to provision this configuration using default setting
     * *Important*: If you use a custom value, avoid using [restricted usernames](https://learn.microsoft.com/azure/virtual-machines/windows/faq#what-are-the-username-requirements-when-creating-a-vm-).
   * When prompted for *skip_admin_password_gen*, accept the default which is `no`.
     * *Important*: A strong password will be generated for you and stored in the *adminpassword* key vault secret.
+  * When prompted for *skip_storage_kerb_key_gen*, accept the default which is `no`.
+    * *Important*: A secret generated for you and stored in the *STORAGE-ACCOUNT-kerb1* key vault secret.
 * Apply the Terraform configuration.
 
   ```bash

@@ -72,11 +72,6 @@ variable "storage_container_name" {
   description = "The name of the blob storage container where scripts are stored."
 }
 
-variable "storage_account_key_kerb_secret" {
-  type        = string
-  description = "The name of the key vault secret containing the Kerberos key for the storage account."
-}
-
 variable "subnet_adds_address_prefix" {
   type        = string
   description = "The address prefix for the AD Domain Services subnet."

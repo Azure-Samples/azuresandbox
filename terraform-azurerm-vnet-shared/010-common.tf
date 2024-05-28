@@ -35,11 +35,6 @@ data "azurerm_key_vault_secret" "adminuser" {
   key_vault_id = var.key_vault_id
 }
 
-data "azurerm_key_vault_secret" "storageaccountkeykerb" {
-  name         = var.storage_account_key_kerb_secret
-  key_vault_id = var.key_vault_id
-}
-
 # Output variables
 output "aad_tenant_id" {
   value = var.aad_tenant_id
