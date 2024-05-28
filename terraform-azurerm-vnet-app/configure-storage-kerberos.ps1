@@ -11,16 +11,13 @@ param(
     [String]$AppId,
 
     [Parameter(Mandatory = $true)]
-    [string]$AppSecret,
-
-    [Parameter(Mandatory = $true)]
     [string]$ResourceGroupName,
     
     [Parameter(Mandatory = $true)]
-    [string]$StorageAccountName,
-    
+    [string]$KeyVaultName,
+
     [Parameter(Mandatory = $true)]
-    [string]$StorageAccountKerbKey,
+    [string]$StorageAccountName,
     
     [Parameter(Mandatory = $true)]
     [string]$Domain
@@ -49,10 +46,52 @@ function Exit-WithError {
 Write-Log "Running '$PSCommandPath'..."
 
 Write-Log "Setting execution policy to 'RemoteSigned'..."
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
 
+# Retrieve secrets from key vault using managed identity
+Write-Log "Logging into Azure using managed identity..."
+
+try {
+    Connect-AzAccount -Identity 
+}
+catch {
+    Exit-WithError $_
+}
+
+Write-Log "Getting secret '$AppId' from key vault '$KeyVaultName'..."
+
+try {
+    $appSecret = Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name $AppId -AsPlainText
+}
+catch {
+    Exit-WithError $_
+}
+
+if ([string]::IsNullOrEmpty($appSecret)) {
+    Exit-WithError "Secret '$AppId' not found in key vault '$KeyVaultName'..."
+}
+
+Write-Log "The length of secret '$AppId' is '$($appSecret.Length)'..."
+
+Write-Log "Getting secret '$StorageAccountName-kerb1' from key vault '$KeyVaultName'..."
+
+try {
+    $storageAccountKerbKey = Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name "$StorageAccountName-kerb1" -AsPlainText
+}
+catch {
+    Exit-WithError $_
+}
+
+if ([string]::IsNullOrEmpty($storageAccountKerbKey)) {
+    Exit-WithError "Secret '$StorageAccountName-kerb1' not found in key vault '$KeyVaultName'..."
+}
+
+Write-Log "The length of secret '$StorageAccountName-kerb1' is '$($storageAccountKerbKey.Length)'..."
+
+Disconnect-AzAccount
+
+# Configure Identity-based access for storage account
 $xDot500Path = "DC=$($Domain.Split('.')[0]),DC=$($Domain.Split('.')[1])"
-$password = ConvertTo-SecureString $StorageAccountKerbKey -AsPlainText -Force
 $spnValue = "cifs/$StorageAccountName.file.core.windows.net"
 
 Write-Log "Checking for existing computer account for storage account '$StorageAccountName' in domain '$Domain'..."
@@ -74,13 +113,14 @@ else {
 }
 
 Write-Log "Adding computer account for storage account '$StorageAccountName' to domain '$Domain'..."
+$storageAccountKerbKeySecure = ConvertTo-SecureString $storageAccountKerbKey -AsPlainText -Force
 
 try {
     New-ADComputer `
         -SAMAccountName $StorageAccountName `
         -Path $xDot500Path `
         -Name $StorageAccountName `
-        -AccountPassword $password `
+        -AccountPassword $storageAccountKerbKeySecure `
         -AllowReversiblePasswordEncryption $false `
         -Description "Computer account object for Azure storage account '$StorageAccountName'." `
         -ServicePrincipalNames $spnValue `
@@ -109,21 +149,10 @@ $domainSid = $domainInformation.DomainSID.Value
 $forestName = $domainInformation.Forest
 $netBiosDomainName = $domainInformation.DnsRoot
 
-# Install Powershell Az module
-Write-Log "Installing NuGet package provider..."
-Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force 
-
-Write-Log "installing PowerShellGet..."
-Install-Module -Name PowerShellGet -MinimumVersion 2.2.4.1 -Force
-
-Write-Log "Installing PowerShell Az module..."
-Install-Module -Name Az -Repository PSGallery -Force
-
-# Log into Azure
 Write-Log "Logging into Azure using service principal id '$AppId'..."
 
-$AppSecretSecure = ConvertTo-SecureString $AppSecret -AsPlainText -Force
-$spCredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $AppId, $AppSecretSecure
+$appSecretSecure = ConvertTo-SecureString $appSecret -AsPlainText -Force
+$spCredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $AppId, $appSecretSecure
 
 try {
     Connect-AzAccount -Credential $spCredential -Tenant $TenantId -ServicePrincipal -ErrorAction Stop | Out-Null
@@ -132,7 +161,6 @@ catch {
     Exit-WithError $_
 }
 
-# Set default subscription
 Write-Log "Setting default subscription to '$SubscriptionId'..."
 
 try {
@@ -161,6 +189,8 @@ try {
 catch {
     Exit-WithError $_
 }
+
+Disconnect-AzAccount
 
 Write-Log "'$PSCommandPath' exiting normally..."
 Exit 0

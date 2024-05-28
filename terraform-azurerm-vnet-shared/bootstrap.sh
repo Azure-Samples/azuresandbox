@@ -313,6 +313,14 @@ then
     --output none
 fi
 
+printf "Setting service principal secret '$arm_client_id' with value length '${#TF_VAR_arm_client_secret}' in keyvault '$key_vault_name'...\n"
+az keyvault secret set \
+  --subscription $subscription_id \
+  --vault-name $key_vault_name \
+  --name $arm_client_id \
+  --value "$TF_VAR_arm_client_secret" \
+  --output none
+
 # Boostrap storage account
 namespace="Microsoft.Storage"
 registration_state=$(az provider show --namespace $namespace --query "registrationState" --output tsv)

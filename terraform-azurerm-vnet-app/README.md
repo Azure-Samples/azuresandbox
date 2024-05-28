@@ -313,12 +313,14 @@ Resource name (ARM) | Notes
 azurerm_windows_virtual_machine.vm_jumpbox_win (jumpwin1) | By default, provisions a [Standard_B2s](https://learn.microsoft.com/azure/virtual-machines/sizes-b-series-burstable) virtual machine for use as a jumpbox. See below for more information.
 azurerm_network_interface.vm_jumpbox_win_nic_01 (nic&#x2011;jumpwin1&#x2011;1) | The configured subnet is *azurerm_subnet.vnet_app_01_subnets["snet-app-01"]*.
 azurerm_virtual_machine_extension.vm_jumpbox_win_postdeploy_script | Downloads [configure&#x2011;vm&#x2011;jumpbox-win.ps1](./configure-vm-jumpbox-win.ps1) and [configure&#x2011;storage&#x2011;kerberos.ps1](./configure-storage-kerberos.ps1), then executes [configure&#x2011;vm&#x2011;jumpbox-win.ps1](./configure-vm-jumpbox-win.ps1) using the [Custom Script Extension for Windows](https://learn.microsoft.com/azure/virtual-machines/extensions/custom-script-windows). See below for more details.
+azurerm_key_vault_access_policy.vm_jumpbox_win_secrets_get (jumpwin1) | Allows the VM to get secrets from key vault using a system assigned managed identity.
 
 This Windows Server VM is used as a jumpbox for development and remote server administration.
 
 * Guest OS: Windows Server 2022 Datacenter.
 * By default the [patch orchestration mode](https://learn.microsoft.com/azure/virtual-machines/automatic-vm-guest-patching#patch-orchestration-modes) is set to `AutomaticByPlatform`.
 * *admin_username* and *admin_password* are configured using the key vault secrets *adminuser* and *adminpassword*.
+* A system assigned managed identity is configured by default for use in DevOps related identity and access management scenarios.
 * This resource is configured using a [provisioner](https://www.terraform.io/docs/language/resources/provisioners/syntax.html) that runs [aadsc-register-node.ps1](./aadsc-register-node.ps1) which registers the node with *azurerm_automation_account.automation_account_01* and applies the configuration [JumpBoxConfig](./JumpBoxConfig.ps1).
   * The virtual machine is domain joined  and added to `JumpBoxes` security group.
   * The following [Remote Server Administration Tools (RSAT)](https://learn.microsoft.com/windows-server/remote/remote-server-administration-tools) are installed:
@@ -336,8 +338,8 @@ This Windows Server VM is used as a jumpbox for development and remote server ad
     * [azcopy10](https://community.chocolatey.org/packages/azcopy10)
     * [azure-data-studio](https://community.chocolatey.org/packages/azure-data-studio)
     * [mysql.workbench](https://community.chocolatey.org/packages/mysql.workbench)
-* Post-deployment configuration is then performed using a custom script extension that runs [configure&#x2011;vm&#x2011;jumpbox&#x2011;win.ps1](./configure-vm-jumpbox-win.ps1).
-  * [configure&#x2011;storage&#x2011;kerberos.ps1](./configure-storage-kerberos.ps1) is registered as a scheduled task then executed using domain administrator credentials. This script must be run on a domain joined Azure virtual machine, and configures the storage account for kerberos authentication with the Active Directory Domain Services domain used in the configurations.
+* Post-deployment configuration is then performed using a custom script extension that runs [configure&#x2011;vm&#x2011;jumpbox&#x2011;win.ps1](./configure-vm-jumpbox-win.ps1). For security, secrets are retrieved at runtime using system assigned managed identity.
+  * [configure&#x2011;storage&#x2011;kerberos.ps1](./configure-storage-kerberos.ps1) is registered as a scheduled task then executed using domain administrator credentials. This script must be run on a domain joined Azure virtual machine, and configures the storage account for kerberos authentication with the Active Directory Domain Services domain used in the configurations. For security, secrets are retrieved at runtime using system assigned managed identity.
 
 #### Linux Jumpbox VM
 
