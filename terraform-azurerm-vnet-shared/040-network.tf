@@ -264,6 +264,7 @@ resource "azurerm_bastion_host" "bastion_host_01" {
   location            = var.location
   resource_group_name = var.resource_group_name
   tags                = var.tags
+  depends_on          = [azurerm_subnet.vnet_shared_01_subnets]
 
   ip_configuration {
     name                 = "ipc-${random_id.bastion_host_01_name.hex}-1"
