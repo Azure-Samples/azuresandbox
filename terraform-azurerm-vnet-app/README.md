@@ -331,7 +331,6 @@ This Windows Server VM is used as a jumpbox for development and remote server ad
     * Failover Cluster Management Tools (RSAT-Clustering-Mgmt)
     * Failover Cluster Module for for Windows PowerShell (RSAT-Clustering-PowerShell)
   * The following software packages are pre-installed using [Chocolatey](https://chocolatey.org/why-chocolatey):
-    * [az.powershell](https://community.chocolatey.org/packages/az.powershell)
     * [vscode](https://community.chocolatey.org/packages/vscode)
     * [sql-server-management-studio](https://community.chocolatey.org/packages/sql-server-management-studio)
     * [microsoftazurestorageexplorer](https://community.chocolatey.org/packages/microsoftazurestorageexplorer)
