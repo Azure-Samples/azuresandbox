@@ -19,6 +19,7 @@ default_subnet_misc_address_prefix="10.2.3.0/24"
 default_subnet_privatelink_address_prefix="10.2.2.0/24"
 default_vm_jumpbox_linux_name="jumplinux1"
 default_vm_jumpbox_win_name="jumpwin1"
+secret_expiration_days=365
 vm_jumpbox_win_post_deploy_script="configure-vm-jumpbox-win.ps1"
 vm_jumpbox_win_configure_storage_script="configure-storage-kerberos.ps1"
 
@@ -141,20 +142,17 @@ ssh_public_key_secret_value=$(cat sshkeytemp.pub)
 ssh_private_key_secret_value=$(cat sshkeytemp)
 
 # Create secrets for SSH keys
-ssh_public_key_secret_name="$admin_username-ssh-key-public"
 ssh_private_key_secret_name="$admin_username-ssh-key-private"
 
-printf "Setting secret '$ssh_public_key_secret_name' with value length '${#ssh_public_key_secret_value}' in keyvault '$key_vault_name_noquotes'...\n"
-az keyvault secret set \
-    --vault-name $key_vault_name_noquotes \
-    --name $ssh_public_key_secret_name \
-    --value "$ssh_public_key_secret_value"
+secret_expiration_date=$(date -u -d "+$secret_expiration_days days" +'%Y-%m-%dT%H:%M:%SZ')
+printf "Secrets will expire in '$secret_expiration_days' days on '$secret_expiration_date UTC'...\n"
 
 printf "Setting secret '$ssh_private_key_secret_name' with value length '${#ssh_private_key_secret_value}' in keyvault '$key_vault_name_noquotes'...\n"
 az keyvault secret set \
     --vault-name $key_vault_name_noquotes \
     --name $ssh_private_key_secret_name \
     --value "$ssh_private_key_secret_value" \
+    --expires "$secret_expiration_date" \
     --output none
 
 # Upload post-deployment scripts

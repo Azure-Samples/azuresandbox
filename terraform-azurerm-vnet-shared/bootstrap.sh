@@ -111,6 +111,7 @@ admin_password_secret='adminpassword'
 admin_username_secret='adminuser'
 arm_client_id=''
 arm_client_secret=''
+secret_expiration_days=365
 storage_container_name='scripts'
 
 # Initialize user defaults
@@ -304,12 +305,16 @@ az keyvault set-policy \
   --secret-permissions get 'set' \
   --spn $arm_client_id
 
+secret_expiration_date=$(date -u -d "+$secret_expiration_days days" +'%Y-%m-%dT%H:%M:%SZ')
+printf "Secrets will expire in '$secret_expiration_days' days on '$secret_expiration_date UTC'...\n"
+
 printf "Setting secret '$admin_username_secret' with value '$admin_username' in keyvault '$key_vault_name'...\n"
 az keyvault secret set \
   --subscription $subscription_id \
   --vault-name $key_vault_name \
   --name $admin_username_secret \
-  --value "$admin_username"
+  --value "$admin_username" \
+  --expires "$secret_expiration_date"
 
 if [ "$skip_admin_password_gen" = 'no' ]
 then
@@ -320,6 +325,7 @@ then
     --vault-name $key_vault_name \
     --name $admin_password_secret \
     --value "$admin_password" \
+    --expires "$secret_expiration_date" \
     --output none
 fi
 
@@ -329,6 +335,7 @@ az keyvault secret set \
   --vault-name $key_vault_name \
   --name $arm_client_id \
   --value "$TF_VAR_arm_client_secret" \
+  --expires "$secret_expiration_date" \
   --output none
 
 # Boostrap storage account
@@ -369,6 +376,7 @@ az keyvault secret set \
   --vault-name $key_vault_name \
   --name $storage_account_name \
   --value "$storage_account_key" \
+  --expires "$secret_expiration_date" \
   --output none
 
 # Create Kerberos key
@@ -383,6 +391,7 @@ then
     --vault-name $key_vault_name \
     --name "$storage_account_name-kerb1" \
     --value "$storage_account_key_kerb1" \
+    --expires "$secret_expiration_date" \
     --output none
 fi
 

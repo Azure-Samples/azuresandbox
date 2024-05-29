@@ -271,6 +271,8 @@ The following PowerShell scripts are uploaded to the *scripts* container in the 
 * [configure-storage-kerberos.ps1](./configure-storage-kerberos.ps1)
 * [configure-vm-jumpbox-win.ps1](./configure-vm-jumpbox-win.ps1)
 
+SSH keys are generated for use with [jumplinux1](#linux-jumpbox-vm). The private key is saved as a secret named `bootstrapadmin-ssh-key-private` in key vault. The secret is set to expire in 365 days.
+
 Configuration of [Azure Automation State Configuration (DSC)](https://learn.microsoft.com/azure/automation/automation-dsc-overview) is performed by [configure-automation.ps1](./configure-automation.ps1) including the following:
 
 * Configures [Azure Automation shared resources](https://learn.microsoft.com/azure/automation/automation-intro#shared-resources) including:

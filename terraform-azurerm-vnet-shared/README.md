@@ -161,8 +161,7 @@ The bootstrap script [bootstrap.sh](./bootstrap.sh) is used to initialize variab
 * Creates a new resource group with the default name *rg-sandbox-01* used by all the configurations.
 * Creates a key vault with a randomly generated name like *kv-xxxxxxxxxxxxxxx*.
   * The permission model is set to *Vault access policy*. *Azure role-based access control* is not used to ensure that sandbox users only require a *Contributor* Azure RBAC role assignment in order to complete the configurations.
-  * Secrets are created that are used by all configurations. Note these secrets are static and will need to be manually updated if the values change.
-    * *Log analytics workspace primary shared key*: The name of this secret is the same as the id of the log analytics workspace, e.g. *00000000-0000-0000-0000-000000000000*, and the value is the primary shared key which can be used to connect agents to the log analytics workspace.
+  * Secrets are created that are used by all configurations. Note these secrets are static and will need to be manually updated if the values change. All secrets are set to expire in 365 days.
     * *Service principal client secret*: The name of this secret is the same as the service principal client ID, e.g. *00000000-0000-0000-0000-000000000000*, and the value is the client secret.
     * *Storage account access key1*: The name of this secret is the same as the storage account, e.g. *stxxxxxxxxxxxxxxx*, and the value is access key 1.
     * *Storage account kerberos key1*: The name of this secret is the same as the storage account, e.g. *stxxxxxxxxxxxxxxx-kerb1*, and the value is kerberos key 1.
@@ -191,7 +190,7 @@ Resource name (ARM) | Notes
 --- | ---
 azurerm_log_analytics_workspace.log_analytics_workspace_01 (log&#x2011;xxxxxxxxxxxxxxxx&#x2011;01) | See below.
 random_id.log_analytics_workspace_01_name | Used to generate a random unique name for *azurerm_log_analytics_workspace.log_analytics_workspace_01*.
-azurerm_key_vault_secret.log_analytics_workspace_01_primary_shared_key | Secret used to access *azurerm_log_analytics_workspace.log_analytics_workspace_01*.
+azurerm_key_vault_secret.log_analytics_workspace_01_primary_shared_key | Secret used to access *azurerm_log_analytics_workspace.log_analytics_workspace_01*.  The name of this secret is the same as the id of the log analytics workspace, e.g. *00000000-0000-0000-0000-000000000000*, and the value is the primary shared key which can be used to connect agents to the log analytics workspace.The secret is set to expire in 365 days.
 
 The log analytics workspace is for use with services like [Azure Monitor](https://learn.microsoft.com/azure/azure-monitor/overview) and [Microsoft Defender for Cloud](https://learn.microsoft.com/azure/defender-for-cloud/defender-for-cloud-introduction).
 
