@@ -72,6 +72,11 @@ resource "azurerm_network_interface" "vm_jumpbox_win_nic_01" {
   resource_group_name = var.resource_group_name
   tags                = var.tags
 
+  depends_on = [ 
+    azurerm_virtual_network_peering.vnet_app_01_to_vnet_shared_01_peering, 
+    azurerm_virtual_network_peering.vnet_shared_01_to_vnet_app_01_peering
+  ]
+
   ip_configuration {
     name                          = "ipc-${var.vm_jumpbox_win_name}-1"
     subnet_id                     = azurerm_subnet.vnet_app_01_subnets["snet-app-01"].id

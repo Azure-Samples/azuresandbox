@@ -31,6 +31,7 @@ This repository contains a collection of inter-dependent [cloud computing](https
   * [PowerShell 5.1](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-5.1) for Windows Server configuration.
 * [Terraform](https://www.terraform.io/intro/index.html#what-is-terraform-) v1.8.3 for [Infrastructure as Code](https://en.wikipedia.org/wiki/Infrastructure_as_code) (IaC).
   * [Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs) (azuerrm) v3.104.0
+  * [AzAPI Provider](https://registry.terraform.io/providers/Azure/azapi/latest/docs) (azapi) v1.13.1
   * [cloud-init Provider](https://registry.terraform.io/providers/hashicorp/cloudinit/latest/docs) (cloudinit) v2.3.4
   * [Random Provider](https://registry.terraform.io/providers/hashicorp/random/latest/docs) (random) v3.6.1
 
@@ -50,7 +51,7 @@ This repo was created by [Roger Doherty](https://www.linkedin.com/in/roger-doher
   * A [bastion](https://learn.microsoft.com/azure/bastion/bastion-overview) for secure RDP and SSH access to virtual machines.
   * A Windows Server [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) running [Active Directory Domain Services](https://learn.microsoft.com/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview) with a pre-configured domain and DNS server.
 * [terraform-azurerm-vnet-app](./terraform-azurerm-vnet-app/) includes the following:
-  * A [virtual network](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vnet) for hosting [virtual machines](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) and private endpoints implemented using [PrivateLink](https://learn.microsoft.com/azure/private-link/private-link-overview) and [subnet delegation](https://learn.microsoft.com/azure/virtual-network/subnet-delegation-overview). [Virtual network peering](https://learn.microsoft.com/azure/virtual-network/virtual-network-peering-overview) with [terraform-azurerm-vnet-shared](./terraform-azurerm-vnet-shared/) is automatically configured.
+  * A [virtual network](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vnet) for hosting [virtual machines](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) and private endpoints implemented using [PrivateLink](https://learn.microsoft.com/azure/private-link/private-link-overview). [Virtual network peering](https://learn.microsoft.com/azure/virtual-network/virtual-network-peering-overview) with [terraform-azurerm-vnet-shared](./terraform-azurerm-vnet-shared/) is automatically configured.
   * A Windows Server [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) for use as a jumpbox.
   * A Linux [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) for use as a DevOps agent.
   * A [PaaS](https://azure.microsoft.com/overview/what-is-paas/) SMB file share hosted in [Azure Files](https://learn.microsoft.com/azure/storage/files/storage-files-introduction) with a private endpoint implemented using [PrivateLink](https://learn.microsoft.com/azure/storage/common/storage-private-endpoints).
@@ -276,7 +277,7 @@ Apply the configurations in the following order:
 1. [terraform-azurerm-vnet-app](./terraform-azurerm-vnet-app/) implements an application virtual network with pre-configured Windows Server and Linux jumpboxes.
 1. [terraform-azurerm-vm-mssql](./terraform-azurerm-vm-mssql/) (optional) implements an [IaaS](https://azure.microsoft.com/overview/what-is-iaas/) database server [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) based on the [SQL Server virtual machines in Azure](https://learn.microsoft.com/azure/azure-sql/virtual-machines/windows/sql-server-on-azure-vm-iaas-what-is-overview#payasyougo) offering.
 1. [terraform-azurerm-mssql](./terraform-azurerm-mssql/) (optional) implements a [PaaS](https://azure.microsoft.com/overview/what-is-paas/) database hosted in [Azure SQL Database](https://learn.microsoft.com/azure/azure-sql/database/sql-database-paas-overview) with a private endpoint implemented using [PrivateLink](https://learn.microsoft.com/azure/azure-sql/database/private-endpoint-overview).
-1. [terraform-azurerm-mysql](./terraform-azurerm-mysql/) (optional) implements a [PaaS](https://azure.microsoft.com/overview/what-is-paas/) database hosted in [Azure Database for MySQL - Flexible Server](https://learn.microsoft.com/azure/mysql/flexible-server/overview) with a private endpoint implemented using [subnet delegation](https://learn.microsoft.com/azure/virtual-network/subnet-delegation-overview).
+1. [terraform-azurerm-mysql](./terraform-azurerm-mysql/) (optional) implements a [PaaS](https://azure.microsoft.com/overview/what-is-paas/) database hosted in [Azure Database for MySQL - Flexible Server](https://learn.microsoft.com/azure/mysql/flexible-server/overview) with a private endpoint implemented using using [PrivateLink](https://learn.microsoft.com/en-us/azure/mysql/flexible-server/concepts-networking-private-link).
 1. [terraform-azurerm-vwan](./terraform-azurerm-vwan/) (optional) connects the shared services virtual network and the application virtual network to remote users or a private network.
 
 #### Destroy sandbox configurations
@@ -362,15 +363,16 @@ It is recommended to reserve space for future subnets. A blank table is provided
 
 Virtual network | Subnet | IP address prefix | First | Last | IP address count
 --- | --- | --- | --- | --- | --:
-Shared services | snet-default-01 | TBD | TBD | TBD | TBD
 Shared services | AzureBastionSubnet | TBD | TBD | TBD | TBD
-Shared services | snet-storage-private-endpoints-01 | TBD | TBD | TBD | TBD
-Application | snet-default-02 | TBD | TBD | TBD | TBD
-Application | AzureBastionSubnet | TBD | TBD | TBD | TBD
+Shared services | snet-adds-01 | TBD | TBD | TBD | TBD
+Shared services | snet-misc-01 | TBD | TBD | TBD | TBD
+Shared services | snet-misc-02 | TBD | TBD | TBD | TBD
+Shared services | Reserved for future use | TBD | TBD | TBD | TBD
 Application | snet-app-01 | TBD | TBD | TBD | TBD
 Application | snet-db-01 | TBD | TBD | TBD | TBD
 Application | snet-privatelink-01 | TBD | TBD | TBD | TBD
-Application | snet-mysql-01 | TBD | TBD | TBD | TBD
+Application | snet-misc-03 | TBD | TBD | TBD | TBD
+Application | Reserved for future use | TBD | TBD | TBD | TBD
 
 ## Videos
 
@@ -403,7 +405,7 @@ This section documents known issues with these configurations that should be add
     * *High availability*: The current design uses a single VM for AD DS which is counter to best practices as described in [Deploy AD DS in an Azure virtual network](https://learn.microsoft.com/azure/architecture/reference-architectures/identity/adds-extend-domain) which recommends a pair of VMs in an Availability Set.
     * *Data integrity*: The current design hosts the AD DS domain forest data on the OS Drive which is counter to  best practices as described in [Deploy AD DS in an Azure virtual network](https://learn.microsoft.com/azure/architecture/reference-architectures/identity/adds-extend-domain) which recommends hosting them on a separate data dr*ive with different cache settings.
   * *Role-Based Access Control (RBAC)*
-    * *Least privilege*: The current design uses a single Azure RBAC role assignment to grant the *Contributor* role to the currently logged in Azure CLI user and the service principal used by Terraform. Production environments should consider leveraging best practices as described in [Azure role-based access control (Azure RBAC) best practices](https://docs.microsoft.com/azure/role-based-access-control/best-practices) which recommends using multiple role assignments to grant the least privilege required to perform a task.
+    * *Least privilege*: The current design uses a single Azure RBAC role assignment to grant the *Contributor* role to the currently logged in Azure CLI user and the service principal used by Terraform. *Owner* privileges are only required for a few prerequisites. Since the *Contributor* role cannot change role assignments, all dependencies on Azure RBAC roles for data plane access were intentionally avoided. As a result, key vault access policies and storage account keys are used for access control to those resources instead of Azure RBAC role assignments. Production environments should consider leveraging best practices as described in [Azure role-based access control (Azure RBAC) best practices](https://docs.microsoft.com/azure/role-based-access-control/best-practices) which recommends using multiple role assignments to grant the least privilege required to perform a task. Additionally, production environments should also consider leveraging Azure RBAC roles for data plane access to key vault and storage accounts.
     * *ARM provider registration*: As described in [issue #4440](https://github.com/hashicorp/terraform-provider-azurerm/issues/4440), some controlled environments may not permit automatic registration of ARM resource providers by Terraform. In these cases some ARM providers may need to be registered manually. See [Azure resource providers and types](https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-providers-and-types) and the azurerm provider [skip_provider_registration](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs#skip_provider_registration) optional argument for more information.
 * Storage
   * *Azure Storage*: For simplicity, this configuration uses the [Authorize with Shared Key](https://learn.microsoft.com/rest/api/storageservices/authorize-with-shared-key) approach for [Authorizing access to data in Azure Storage](https://learn.microsoft.com/azure/storage/common/authorize-data-access?toc=/azure/storage/blobs/toc.json). For production environments, consider using [shared access signatures](https://learn.microsoft.com/azure/storage/common/storage-sas-overview?toc=/azure/storage/blobs/toc.json) instead.

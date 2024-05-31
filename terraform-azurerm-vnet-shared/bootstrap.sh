@@ -405,11 +405,19 @@ then
 else
   printf "Creating storage container '$storage_container_name' in storage account '$storage_account_name'...\n"
   az storage container create \
-  --subscription $subscription_id \
-  --name $storage_container_name \
-  --account-name $storage_account_name \
-  --account-key $storage_account_key
+    --subscription $subscription_id \
+    --name $storage_container_name \
+    --account-name $storage_account_name \
+    --account-key $storage_account_key
 fi
+
+# Disable public internet access
+printf "Disabling public internet access to storage account '$storage_account_name'...\n"
+az storage account update \
+  --subscription $subscription_id \
+  --name $storage_account_name \
+  --resource-group $resource_group_name \
+  --public-network-access Disabled
 
 # Build tags map
 tags=""

@@ -90,6 +90,7 @@ locals {
   ])
 
   private_dns_zones = [
+    "privatelink.blob.core.windows.net",
     "privatelink.database.windows.net",
     "privatelink.file.core.windows.net",
     "privatelink.mysql.database.azure.com"
@@ -176,7 +177,7 @@ resource "azurerm_virtual_network_peering" "vnet_shared_01_to_vnet_app_01_peerin
   allow_virtual_network_access = true
   allow_forwarded_traffic      = true
   allow_gateway_transit        = true
-  depends_on                   = [azurerm_network_security_rule.network_security_rules]
+  depends_on                   = [azurerm_subnet_network_security_group_association.nsg_subnet_associations]
 }
 
 resource "azurerm_virtual_network_peering" "vnet_app_01_to_vnet_shared_01_peering" {
@@ -187,7 +188,7 @@ resource "azurerm_virtual_network_peering" "vnet_app_01_to_vnet_shared_01_peerin
   allow_virtual_network_access = true
   allow_forwarded_traffic      = true
   allow_gateway_transit        = true
-  depends_on                   = [azurerm_network_security_rule.network_security_rules]
+  depends_on                   = [azurerm_virtual_network_peering.vnet_shared_01_to_vnet_app_01_peering]
 }
 
 # Private DNS zones

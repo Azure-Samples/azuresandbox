@@ -80,8 +80,9 @@ resource "azurerm_network_interface" "vm_jumbox_linux_nic_01" {
     private_ip_address_allocation = "Dynamic"
   }
 
-  depends_on = [
-    azurerm_subnet_network_security_group_association.nsg_subnet_associations
+  depends_on = [ 
+    azurerm_virtual_network_peering.vnet_app_01_to_vnet_shared_01_peering, 
+    azurerm_virtual_network_peering.vnet_shared_01_to_vnet_app_01_peering
   ]
 }
 

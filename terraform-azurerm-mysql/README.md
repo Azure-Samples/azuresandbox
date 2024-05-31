@@ -17,7 +17,7 @@
 
 ## Overview
 
-This configuration implements a [PaaS](https://azure.microsoft.com/overview/what-is-paas/) database hosted in [Azure Database for MySQL - Flexible Server](https://learn.microsoft.com/azure/mysql/flexible-server/overview) with a private endpoint implemented using [subnet delegation](https://learn.microsoft.com/azure/virtual-network/subnet-delegation-overview) ([Step-by-Step Video](https://youtu.be/MPYO-7HaFAQ)).
+This configuration implements a [PaaS](https://azure.microsoft.com/overview/what-is-paas/) database hosted in [Azure Database for MySQL - Flexible Server](https://learn.microsoft.com/azure/mysql/flexible-server/overview) with a private endpoint implemented using [PrivateLink](https://learn.microsoft.com/en-us/azure/mysql/flexible-server/concepts-networking-private-link) ([Step-by-Step Video](https://youtu.be/MPYO-7HaFAQ)).
 
 Activity | Estimated time required
 --- | ---
