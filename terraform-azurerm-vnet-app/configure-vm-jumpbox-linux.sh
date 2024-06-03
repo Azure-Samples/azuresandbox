@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Note: This code has been tested on Ubuntu 22.04 LTS (Jammy Jellyfish) and will not work on other Linux distros
+# Note: This code has been tested on Ubuntu 24.04 LTS (Noble Numbat) and will not work on other Linux distros
 
 # Initialize constants
 log_file='/var/log/configure-vm-jumpbox-linux.log'
@@ -81,17 +81,9 @@ printf "Modifying '$filename'...\n" >> $log_file
 sudo sed -i "s/#PasswordAuthentication yes/PasswordAuthentication yes/" $filename
 sudo sed -i "s/KbdInteractiveAuthentication no/KbdInteractiveAuthentication yes/" $filename
 diff "$filename.bak" "$filename" >> $log_file
-servicename='sshd'
+servicename='ssh'
 printf "Restarting '$servicename'...\n" >> $log_file
 sudo systemctl restart $servicename &>> $log_file
-printdiv
-
-# Update NTP configuration
-filename=/etc/ntp.conf
-sudo cp -f "$filename" "$filename.bak"
-printf "Modifying '$filename'...\n" >> $log_file
-sudo sed -i "$ a server $adds_domain_name" $filename
-diff "$filename.bak" "$filename" >> $log_file
 printdiv
 
 # Update hosts file
@@ -216,6 +208,18 @@ printf "Adding user '$admin_username' to group '$groupname'...\n" >> $log_file
 sudo usermod -aG $groupname $admin_username &>> $log_file
 printdiv
 
+# Update NTP configuration
+filename=/etc/ntpsec/ntp.conf
+sudo cp -f "$filename" "$filename.bak"
+printf "Modifying '$filename'...\n" >> $log_file
+sudo sed -i "s/server ntp.ubuntu.com/server $adds_domain_name/" $filename
+diff "$filename.bak" "$filename" >> $log_file
+servicename='ntp'
+printf "Restarting '$servicename'...\n" >> $log_file
+sudo systemctl restart $servicename &>> $log_file
+sudo systemctl status $servicename &>> $log_file
+printdiv
+
 # Mount CIFS file system
 printf 'Configuring dynamic mount of CIFS filesystem...\n' >> $log_file
 
@@ -235,6 +239,85 @@ servicename='autofs'
 printf "Restarting '$servicename'...\n" >> $log_file
 sudo systemctl restart $servicename &>> $log_file
 printdiv
+
+# Manually install powershell due to issue https://github.com/PowerShell/PowerShell/issues/21385
+printf "Installing PowerShell...\n" >> $log_file
+
+tmpDir=$(mktemp -d)
+curl -sSL 'https://launchpad.net/ubuntu/+archive/primary/+files/libicu72_72.1-3ubuntu3_amd64.deb' -o "$tmpDir/libicu72_72.1-3ubuntu3_amd64.deb"
+dpkg -i "$tmpDir"/libicu72_72.1-3ubuntu3_amd64.deb
+
+downloadUrl=$(curl -sSL "https://api.github.com/repos/PowerShell/PowerShell/releases/latest" |
+	jq -r '[.assets[] | select(.name | endswith("_amd64.deb")) | .browser_download_url][0]')
+curl -sSL "$downloadUrl" -o "$tmpDir/powershell.deb"
+dpkg -i "$tmpDir"/powershell.deb
+
+# Embed and run the PowerShell script
+printf "Configuring PowerShell...\n" >> $log_file
+pwsh << 'EOF'
+#!/usr/bin/env pwsh
+
+function Write-Log {
+    param( [string] $msg)
+    "$(Get-Date -Format FileDateTimeUniversal) : $msg" | Write-Host
+}
+function Exit-WithError {
+    param( [string]$msg )
+    Write-Log "There was an exception during the process, please review..."
+    Write-Log $msg
+    Exit 2
+}
+$nugetPackage = Get-PackageProvider | Where-Object Name -eq 'NuGet'
+
+if ($null -eq $nugetPackage) {
+    Write-Log "Installing NuGet PowerShell package provider..."
+
+    try {
+        Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force 
+    }
+    catch {
+        Exit-WithError $_
+    }
+}
+
+$nugetPackage = Get-PackageProvider | Where-Object Name -eq 'NuGet'
+Write-Log "NuGet Powershell Package Provider version $($nugetPackage.Version.Major).$($nugetPackage.Version.Minor).$($nugetPackage.Version.Build).$($nugetPackage.Version.Revision) is already installed..."
+
+$repo = Get-PSRepository -Name PSGallery
+if ( $repo.InstallationPolicy -eq 'Trusted' ) {
+    Write-Log "PSGallery installation policy is already set to 'Trusted'..."
+}
+else {
+    Write-Log "Setting PSGallery installation policy to 'Trusted'..."
+
+    try {
+        Set-PSRepository -Name PSGallery -InstallationPolicy Trusted    
+    }
+    catch {
+        Exit-WithError $_
+    }
+}
+
+$azModule = Get-Module -ListAvailable -Name Az*
+if ($null -eq $azModule ) {
+    Write-Log "Installing PowerShell Az module..."
+
+    try {
+        Install-Module -Name Az -AllowClobber -Scope AllUsers
+    }
+    catch {
+        Exit-WithError $_
+    }
+}
+else {
+    Write-Log "PowerShell Az module is already installed..."
+}
+
+$azAutomationModule = Get-Module -ListAvailable -Name Az
+Write-Log "PowerShell Az version $($azAutomationModule.Version) is installed..."
+
+Exit 0
+EOF
 
 # Exit
 printf "Exiting '$0'...\n" >> $log_file

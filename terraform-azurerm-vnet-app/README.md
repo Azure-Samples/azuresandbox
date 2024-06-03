@@ -266,7 +266,7 @@ tags | tomap( { "costcenter" = "10177772" "environment" = "dev" "project" = "#Az
 vnet_shared_01_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualNetworks/vnet-shared-01"
 vnet_shared_01_name | "vnet-shared-01"
 
-Public internet access is temporarily disabled for the shared storage account so the following PowerShell scripts can be uploaded to the *scripts* container in the shared storage account using the access key stored in the key vault secret *storage_account_key*. These scripts are referenced by virtual machine extensions:
+Public internet access is temporarily enabled for the shared storage account so the following PowerShell scripts can be uploaded to the *scripts* container in the shared storage account using the access key stored in the key vault secret *storage_account_key*. These scripts are referenced by virtual machine extensions:
 
 * [configure-storage-kerberos.ps1](./configure-storage-kerberos.ps1)
 * [configure-vm-jumpbox-win.ps1](./configure-vm-jumpbox-win.ps1)
@@ -357,15 +357,10 @@ azurerm_key_vault_access_policy.vm_jumpbox_linux_secrets_get | Allows the VM to 
 
 This Linux VM is used as a jumpbox for development and remote administration.
 
-* Guest OS: Ubuntu 22.04 LTS (Jammy Jellyfish)
-* By default the [patch orchestration mode](https://learn.microsoft.com/azure/virtual-machines/automatic-vm-guest-patching#patch-orchestration-modes) is set to `AutomaticByPlatform`.
+* Guest OS: Ubuntu 24.04 LTS (Noble Numbat)
+* By default the [patch assessment mode](https://learn.microsoft.com/en-us/azure/update-manager/assessment-options) is set to `AutomaticByPlatform` and `provision_vm_agent` is set to `true` to enable use of [Azure Update Manager Update or Patch Orchestration](https://learn.microsoft.com/en-us/azure/update-manager/updates-maintenance-schedules#update-or-patch-orchestration).
 * A system assigned [managed identity](https://learn.microsoft.com/azure/active-directory/managed-identities-azure-resources/overview) is configured by default for use in DevOps related identity and access management scenarios.
 * A dependency on *azurerm_virtual_machine_extension.vm_jumpbox_win_postdeploy_script* is established. This custom script extension is used to run [configure-storage-kerberos.ps1](./configure-storage-kerberos.ps1) which is required in order to mount the Azure Files share using CIFS.
-* Custom tags are added which are used by [cloud-init](https://learn.microsoft.com/azure/virtual-machines/linux/using-cloud-init#:~:text=%20There%20are%20two%20stages%20to%20making%20cloud-init,is%20already%20configured%20to%20use%20cloud-init.%20More%20) [User-Data Scripts](https://cloudinit.readthedocs.io/en/latest/topics/format.html#user-data-script) to configure the virtual machine.
-  * *adds_domain_name*: Used in cloud-init scripts to join the domain.
-  * *keyvault*: Used in cloud-init scripts to determine which key vault to use for secrets.
-  * *storage_account_name*: Used in cloud-init scripts to mount an Azure Files share.
-  * *storage_share_name*: Used in cloud-init scripts to mount an Azure Files share.
 * This VM is configured with [cloud-init](https://learn.microsoft.com/azure/virtual-machines/linux/using-cloud-init#:~:text=%20There%20are%20two%20stages%20to%20making%20cloud-init,is%20already%20configured%20to%20use%20cloud-init.%20More%20) using a [Mime Multi Part Archive](https://cloudinit.readthedocs.io/en/latest/topics/format.html#mime-multi-part-archive) containing the following files:
   * [configure-vm-jumpbox-linux.yaml](./configure-vm-jumpbox-linux.yaml) is [Cloud Config Data](https://cloudinit.readthedocs.io/en/latest/topics/format.html#cloud-config-data) used to configure the VM.
     * Package updates are performed.
@@ -380,7 +375,6 @@ This Linux VM is used as a jumpbox for development and remote administration.
       * [libnss-winbind](https://packages.ubuntu.com/jammy/libnss-winbind)
       * [libpam-winbind](https://packages.ubuntu.com/jammy/libpam-winbind)
       * [ntp](https://packages.ubuntu.com/jammy/ntp)
-      * [powershell](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-7.1)
       * [python3-pip](https://packages.ubuntu.com/jammy/python3-pip)
       * [samba](https://packages.ubuntu.com/jammy/samba)
       * [terraform](https://www.terraform.io/intro/index.html#what-is-terraform-)
@@ -389,8 +383,6 @@ This Linux VM is used as a jumpbox for development and remote administration.
     * The VM is rebooted if necessary.
     * The file `/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg` is created to ensure that modifications to `/etc/netplan/50-cloud-init.yaml` are not overwritten after a reboot.
     * The file `/etc/azuresandbox-conf.json` is created to initialize variables in the [configure-vm-jumpbox-linux.sh](./configure-vm-jumpbox-linux.sh) script.
-
-  * [configure-powershell.ps1](./configure-powershell.ps1) is a [User-Data Script](https://cloudinit.readthedocs.io/en/latest/topics/format.html#user-data-script) that installs [Azure PowerShell](https://learn.microsoft.com/en-us/powershell/azure/what-is-azure-powershell?view=azps-9.5.0)
   * [configure-vm-jumpbox-linux.sh](./configure-vm-jumpbox-linux.sh) is a [User-Data Script](https://cloudinit.readthedocs.io/en/latest/topics/format.html#user-data-script) used to configure the VM. Runtime values are retrieved using [Instance Metadata](https://cloudinit.readthedocs.io/en/latest/topics/instancedata.html#instance-metadata).
     * Variables are initialized using the configuration file `/etc/azuresandbox-conf.json`.
 
@@ -407,16 +399,17 @@ This Linux VM is used as a jumpbox for development and remote administration.
       * *adminpassword*: The password for the administrative user account.
     * The virtual machine is domain joined using winbind.
       * The SSH server is configured for logins using Active Directory accounts.
-      * The *ntp.conf* file is updated to synchronize the time with the domain controller.
       * The *hosts* file is updated to reference the newly configured host name and domain name.
       * The netplan configuration is modified to configure DNS nameservers and IP addresses.
       * A new DHCP client exit hook script named `/etc/dhcp/dhclient-exit-hooks.d/hook-ddns` to implement dynamic DNS registration.
       * The *krb5.conf* file is modified to configure the domain name.
       * The *smb.conf* file is modified to configure the domain and workgroup names.
       * The virtual machine is domain joined.
+      * The *ntp.conf* file is updated to synchronize the time with the domain controller.
       * The *nsswitch.conf* file is modified to look for users and groups using winbind.
       * Pluggable authentication modules are configured to use winbind and create home directories for domain users.
     * Dynamic mounting of the Azure Files share is enabled using autofs.
+    * PowerShell and the Azure PowerShell Module are installed.
 
 #### Storage resources
 

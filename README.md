@@ -127,7 +127,7 @@ Before you begin, familiarity with the following topics will be helpful when wor
 
 #### Windows Subsystem for Linux
 
-Windows users can use [WSL](https://learn.microsoft.com/windows/wsl/about) which supports a [variety of Linux distributions](https://learn.microsoft.com/en-us/windows/wsl/basic-commands#list-available-linux-distributions). The current default distribution `Ubuntu 22.04 LTS (Jammy Jellyfish)` is recommended. Please note these instructions may vary for different Linux releases and/or distributions.
+Windows users can use [WSL](https://learn.microsoft.com/windows/wsl/about) which supports a [variety of Linux distributions](https://learn.microsoft.com/en-us/windows/wsl/basic-commands#list-available-linux-distributions). The current default distribution `Ubuntu 24.04 LTS (Noble Numbat)` is recommended. Please note these instructions may vary for different Linux releases and/or distributions.
 
 * Windows prerequisites ([Step-By-Step Video](https://youtu.be/Q4dOoQspt90))
   * Install [Visual Studio Code on Windows](https://code.visualstudio.com/docs/setup/windows)
@@ -136,7 +136,7 @@ Windows users can use [WSL](https://learn.microsoft.com/windows/wsl/about) which
     * Install [MySQL Workbench](https://www.mysql.com/products/workbench/) if you plan to complete smoke testing for [terraform-azurerm-mysql](./terraform-azurerm-mysql/)
     * Install [Azure VPN Client](https://www.microsoft.com/store/productId/9NP355QT2SQB) if you plan to complete smoke testing for [terraform-azurerm-vwan](./terraform-azurerm-vwan/).
 * Linux prerequisites ([Step-By-Step Video](https://youtu.be/YW37uG0aX8c))
-  * [Install Linux on Windows with WSL](https://learn.microsoft.com/windows/wsl/install). The current default distribution `Ubuntu 22.04 LTS (Jammy Jellyfish)` is recommended.
+  * [Install Linux on Windows with WSL](https://learn.microsoft.com/windows/wsl/install). The current default distribution `Ubuntu 24.04 LTS (Noble Numbat)` is recommended.
   * Install [pip3](https://pip.pypa.io/en/stable/) Python library package manager and the [PyJWT](https://pyjwt.readthedocs.io/en/latest/) Python library. This is used to determine the id of the security principal for the currently signed in Azure CLI user.
   
     ```bash
