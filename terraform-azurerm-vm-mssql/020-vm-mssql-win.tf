@@ -8,8 +8,8 @@ resource "azurerm_windows_virtual_machine" "vm_mssql_win" {
   admin_password             = data.azurerm_key_vault_secret.adminpassword.value
   network_interface_ids      = [azurerm_network_interface.vm_mssql_win_nic_01.id]
   encryption_at_host_enabled = true
-  enable_automatic_updates   = true
-  patch_mode                 = "AutomaticByOS"
+  patch_assessment_mode      = "AutomaticByPlatform"
+  provision_vm_agent         = true
   tags                       = var.tags
 
   os_disk {
