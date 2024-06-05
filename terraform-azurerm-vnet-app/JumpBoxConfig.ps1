@@ -63,12 +63,6 @@ configuration JumpBoxConfig {
             DependsOn = '[xDSCDomainjoin]JoinDomain'
         }
 
-        cChocoPackageInstaller 'Edge' {
-            Name = 'microsoft-edge'
-            DependsOn = '[cChocoInstaller]Chocolatey'
-            AutoUpgrade = $true
-        }
-
         cChocoPackageInstaller 'VSCode' {
             Name = 'vscode'
             DependsOn = '[cChocoInstaller]Chocolatey'

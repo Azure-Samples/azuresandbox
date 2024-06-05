@@ -1,13 +1,18 @@
 terraform {
   required_providers {
+    azapi = {
+      source  = "azure/azapi"
+      version = "=1.13.1"
+    }
+
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "=3.104.0"
+      version = "=3.106.1"
     }
 
     random = {
       source  = "hashicorp/random"
-      version = "=3.6.1"
+      version = "=3.6.2"
     }
 
     cloudinit = {
@@ -18,6 +23,13 @@ terraform {
 }
 
 # Providers
+provider "azapi" {
+  subscription_id            = var.subscription_id
+  client_id                  = var.arm_client_id
+  client_secret              = var.arm_client_secret
+  tenant_id                  = var.aad_tenant_id
+}
+
 provider "azurerm" {
   subscription_id            = var.subscription_id
   client_id                  = var.arm_client_id

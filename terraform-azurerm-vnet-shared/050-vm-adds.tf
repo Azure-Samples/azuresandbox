@@ -54,6 +54,7 @@ resource "azurerm_network_interface" "vm_adds_nic_01" {
   location            = var.location
   resource_group_name = var.resource_group_name
   tags                = var.tags
+  depends_on          = [azurerm_subnet.vnet_shared_01_subnets]
 
   ip_configuration {
     name                          = "ipc-${var.vm_adds_name}-1"

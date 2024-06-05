@@ -22,12 +22,6 @@ data "cloudinit_config" "vm_jumpbox_linux" {
     content      = file("${path.root}/configure-vm-jumpbox-linux.sh")
     filename     = "configure-vm-jumpbox-linux.sh"
   }
-
-  part {
-    content_type = "text/x-shellscript"
-    content      = file("${path.root}/configure-powershell.ps1")
-    filename     = "configure-powershell.ps1"
-  }
 }
 
 # Linux virtual machine
@@ -38,8 +32,9 @@ resource "azurerm_linux_virtual_machine" "vm_jumpbox_linux" {
   size                       = var.vm_jumpbox_linux_size
   admin_username             = "${data.azurerm_key_vault_secret.adminuser.value}local"
   network_interface_ids      = [azurerm_network_interface.vm_jumbox_linux_nic_01.id]
-  patch_mode                 = "AutomaticByPlatform"
   encryption_at_host_enabled = true
+  patch_assessment_mode      = "AutomaticByPlatform"
+  provision_vm_agent         = true
   depends_on                 = [azurerm_virtual_machine_extension.vm_jumpbox_win_postdeploy_script]
   tags                       = var.tags
 
@@ -81,7 +76,8 @@ resource "azurerm_network_interface" "vm_jumbox_linux_nic_01" {
   }
 
   depends_on = [
-    azurerm_subnet_network_security_group_association.nsg_subnet_associations
+    azurerm_virtual_network_peering.vnet_app_01_to_vnet_shared_01_peering,
+    azurerm_virtual_network_peering.vnet_shared_01_to_vnet_app_01_peering
   ]
 }
 

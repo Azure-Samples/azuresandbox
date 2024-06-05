@@ -2,12 +2,12 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "=3.104.0"
+      version = "=3.106.1"
     }
 
     random = {
       source  = "hashicorp/random"
-      version = "=3.6.1"
+      version = "=3.6.2"
     }
   }
 }
@@ -32,11 +32,6 @@ data "azurerm_key_vault_secret" "adminpassword" {
 
 data "azurerm_key_vault_secret" "adminuser" {
   name         = var.admin_username_secret
-  key_vault_id = var.key_vault_id
-}
-
-data "azurerm_key_vault_secret" "storageaccountkeykerb" {
-  name         = var.storage_account_key_kerb_secret
   key_vault_id = var.key_vault_id
 }
 

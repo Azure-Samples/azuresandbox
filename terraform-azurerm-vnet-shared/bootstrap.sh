@@ -111,6 +111,7 @@ admin_password_secret='adminpassword'
 admin_username_secret='adminuser'
 arm_client_id=''
 arm_client_secret=''
+secret_expiration_days=365
 storage_container_name='scripts'
 
 # Initialize user defaults
@@ -123,6 +124,7 @@ default_location="eastus"
 default_project="#AzureSandbox"
 default_resource_group_name="rg-sandbox-01"
 default_skip_admin_password_gen="no"
+default_skip_storage_kerb_key_gen="no"
 default_subnet_adds_address_prefix="10.1.1.0/24"
 default_subnet_AzureBastionSubnet_address_prefix="10.1.0.0/27"
 default_subnet_misc_address_prefix="10.1.2.0/24"
@@ -150,6 +152,7 @@ read -e -i $default_adds_domain_name                          -p "AD Domain Serv
 read -e -i $default_vm_adds_name                              -p "AD Domain Services virtual machine name (vm_adds_name) ------------------------------: " vm_adds_name
 read -e -i $default_admin_username                            -p "'adminuser' key vault secret value (admin_username) ---------------------------------: " admin_username
 read -e -i $default_skip_admin_password_gen                   -p "Skip 'adminpassword' key vault secret generation (skip_admin_password_gen) yes/no ? -: " skip_admin_password_gen
+read -e -i $default_skip_storage_kerb_key_gen                 -p "Skip storage account kerberos key generation (skip_storage_kerb_key_gen) yes/no ? ---: " skip_storage_kerb_key_gen
 
 # Validate user input
 aad_tenant_id=${aad_tenant_id:-$default_aad_tenant_id}
@@ -165,6 +168,7 @@ owner_object_id=${owner_object_id:-$default_owner_object_id}
 project=${project:-$default_project}
 resource_group_name=${resource_group_name:-$default_resource_group_name}
 skip_admin_password_gen=${skip_admin_password_gen:-$default_skip_admin_password_gen}
+skip_storage_kerb_key_gen=${skip_storage_kerb_key_gen:-$default_skip_storage_kerb_key_gen}
 subnet_adds_address_prefix=${subnet_adds_address_prefix:-$default_subnet_adds_address_prefix}
 subnet_AzureBastionSubnet_address_prefix=${subnet_AzureBastionSubnet_address_prefix:-$default_subnet_AzureBastionSubnet_address_prefix}
 subnet_misc_address_prefix=${subnet_misc_address_prefix:-$default_subnet_misc_address_prefix}
@@ -232,6 +236,13 @@ then
   usage
 fi
 
+# Validate skip_storage_kerb_key_gen input
+if [ "$skip_storage_kerb_key_gen" != 'yes' ] && [ "$skip_storage_kerb_key_gen" != 'no' ]
+then
+  printf "Invalid skip_storage_kerb_key_gen input '$skip_storage_kerb_key_gen'. Valid values are 'yes' or 'no'...\n"
+  usage
+fi
+
 # Bootstrap resource group
 resource_group_id=$(az group list --subscription $subscription_id --query "[?name == '$resource_group_name'] | [0].id" --output tsv)
 
@@ -294,12 +305,16 @@ az keyvault set-policy \
   --secret-permissions get 'set' \
   --spn $arm_client_id
 
+secret_expiration_date=$(date -u -d "+$secret_expiration_days days" +'%Y-%m-%dT%H:%M:%SZ')
+printf "Secrets will expire in '$secret_expiration_days' days on '$secret_expiration_date UTC'...\n"
+
 printf "Setting secret '$admin_username_secret' with value '$admin_username' in keyvault '$key_vault_name'...\n"
 az keyvault secret set \
   --subscription $subscription_id \
   --vault-name $key_vault_name \
   --name $admin_username_secret \
-  --value "$admin_username"
+  --value "$admin_username" \
+  --expires "$secret_expiration_date"
 
 if [ "$skip_admin_password_gen" = 'no' ]
 then
@@ -310,8 +325,18 @@ then
     --vault-name $key_vault_name \
     --name $admin_password_secret \
     --value "$admin_password" \
+    --expires "$secret_expiration_date" \
     --output none
 fi
+
+printf "Setting service principal secret '$arm_client_id' with value length '${#TF_VAR_arm_client_secret}' in keyvault '$key_vault_name'...\n"
+az keyvault secret set \
+  --subscription $subscription_id \
+  --vault-name $key_vault_name \
+  --name $arm_client_id \
+  --value "$TF_VAR_arm_client_secret" \
+  --expires "$secret_expiration_date" \
+  --output none
 
 # Boostrap storage account
 namespace="Microsoft.Storage"
@@ -351,19 +376,24 @@ az keyvault secret set \
   --vault-name $key_vault_name \
   --name $storage_account_name \
   --value "$storage_account_key" \
+  --expires "$secret_expiration_date" \
   --output none
 
 # Create Kerberos key
-printf "Creating kerberos key for storage account '$storage_account_name'...\n"
-storage_account_key_kerb1=$(az storage account keys renew --subscription $subscription_id --resource-group $resource_group_name --account-name $storage_account_name --key key1 --key-type kerb --query "[?keyName == 'kerb1'].value" --output tsv)
+if [ "$skip_storage_kerb_key_gen" = 'no' ]
+then
+  printf "Creating kerberos key for storage account '$storage_account_name'...\n"
+  storage_account_key_kerb1=$(az storage account keys renew --subscription $subscription_id --resource-group $resource_group_name --account-name $storage_account_name --key key1 --key-type kerb --query "[?keyName == 'kerb1'].value" --output tsv)
 
-printf "Setting storage account secret '$storage_account_name-kerb1' with value length '${#storage_account_key_kerb1}' to keyvault '$key_vault_name'...\n"
-az keyvault secret set \
-  --subscription $subscription_id \
-  --vault-name $key_vault_name \
-  --name "$storage_account_name-kerb1" \
-  --value "$storage_account_key_kerb1" \
-  --output none
+  printf "Setting storage account secret '$storage_account_name-kerb1' with value length '${#storage_account_key_kerb1}' to keyvault '$key_vault_name'...\n"
+  az keyvault secret set \
+    --subscription $subscription_id \
+    --vault-name $key_vault_name \
+    --name "$storage_account_name-kerb1" \
+    --value "$storage_account_key_kerb1" \
+    --expires "$secret_expiration_date" \
+    --output none
+fi
 
 # Bootstrap storage account container
 jmespath_query="[? name == '$storage_container_name']|[0].name"
@@ -375,11 +405,19 @@ then
 else
   printf "Creating storage container '$storage_container_name' in storage account '$storage_account_name'...\n"
   az storage container create \
-  --subscription $subscription_id \
-  --name $storage_container_name \
-  --account-name $storage_account_name \
-  --account-key $storage_account_key
+    --subscription $subscription_id \
+    --name $storage_container_name \
+    --account-name $storage_account_name \
+    --account-key $storage_account_key
 fi
+
+# Disable public internet access
+printf "Disabling public internet access to storage account '$storage_account_name'...\n"
+az storage account update \
+  --subscription $subscription_id \
+  --name $storage_account_name \
+  --resource-group $resource_group_name \
+  --public-network-access Disabled
 
 # Build tags map
 tags=""
@@ -400,7 +438,6 @@ printf "key_vault_id                              = \"$key_vault_id\"\n"        
 printf "key_vault_name                            = \"$key_vault_name\"\n"                            >> ./terraform.tfvars
 printf "location                                  = \"$location\"\n"                                  >> ./terraform.tfvars
 printf "resource_group_name                       = \"$resource_group_name\"\n"                       >> ./terraform.tfvars
-printf "storage_account_key_kerb_secret           = \"$storage_account_name-kerb1\"\n"                >> ./terraform.tfvars
 printf "storage_account_name                      = \"$storage_account_name\"\n"                      >> ./terraform.tfvars
 printf "storage_container_name                    = \"$storage_container_name\"\n"                    >> ./terraform.tfvars
 printf "subnet_adds_address_prefix                = \"$subnet_adds_address_prefix\"\n"                >> ./terraform.tfvars

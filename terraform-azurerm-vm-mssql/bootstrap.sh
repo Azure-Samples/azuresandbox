@@ -64,6 +64,17 @@ then
   usage
 fi
 
+# Temporarily enable public internet access
+printf "Temporarily enabling public internet access to storage account '${storage_account_name:1:-1}'...\n"
+az storage account update \
+  --subscription ${subscription_id:1:-1} \
+  --name ${storage_account_name:1:-1} \
+  --resource-group ${resource_group_name:1:-1} \
+  --public-network-access Enabled
+
+printf "Sleeping for 15 seconds to allow storage account settings to propogate...\n"
+sleep 15
+
 # Upload post-deployment scripts
 vm_mssql_win_post_deploy_script_uri="https://${storage_account_name:1:-1}.blob.core.windows.net/${storage_container_name:1:-1}/$vm_mssql_win_post_deploy_script"
 vm_mssql_win_sql_startup_script_uri="https://${storage_account_name:1:-1}.blob.core.windows.net/${storage_container_name:1:-1}/$vm_mssql_win_sql_startup_script"
@@ -71,14 +82,25 @@ vm_mssql_win_sql_startup_script_uri="https://${storage_account_name:1:-1}.blob.c
 printf "Getting storage account key for storage account '${storage_account_name:1:-1}' from key vault '${key_vault_name:1:-1}'...\n"
 storage_account_key=$(az keyvault secret show --name ${storage_account_name:1:-1} --vault-name ${key_vault_name:1:-1} --query value --output tsv)
 
-printf "Uploading post-deployment scripts to container '${storage_container_name:1:-1}' in storage account '${storage_account_name:1:-1}'...\n"
-az storage blob upload-batch \
-    --account-name ${storage_account_name:1:-1} \
-    --account-key "$storage_account_key" \
-    --destination ${storage_container_name:1:-1} \
-    --source '.' \
-    --pattern '*.ps1' \
-    --overwrite
+for i in {1..12}
+do
+  printf "Attempt $i: Uploading post-deployment scripts to container '${storage_container_name:1:-1}' in storage account '${storage_account_name:1:-1}'...\n"
+  az storage blob upload-batch \
+      --account-name ${storage_account_name:1:-1} \
+      --account-key "$storage_account_key" \
+      --destination ${storage_container_name:1:-1} \
+      --source '.' \
+      --pattern '*.ps1' \
+      --overwrite && break || sleep 15
+done
+
+# Disable public internet access
+printf "Disabling public internet access to storage account '${storage_account_name:1:-1}'...\n"
+az storage account update \
+  --subscription ${subscription_id:1:-1} \
+  --name ${storage_account_name:1:-1} \
+  --resource-group ${resource_group_name:1:-1} \
+  --public-network-access Disabled
 
 # Bootstrap auotmation account
 printf "Configuring automation account '${automation_account_name:1:-1}'...\n"

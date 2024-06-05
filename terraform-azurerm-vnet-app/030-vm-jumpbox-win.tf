@@ -4,13 +4,12 @@ locals {
     "TenantId = '${var.aad_tenant_id}'; ",
     "SubscriptionId = '${var.subscription_id}'; ",
     "AppId = '${var.arm_client_id}'; ",
-    "AppSecret = '${nonsensitive(var.arm_client_secret)}'; ",
     "ResourceGroupName = '${var.resource_group_name}'; ",
+    "KeyVaultName = '${var.key_vault_name}'; ",
     "StorageAccountName = '${var.storage_account_name}'; ",
-    "StorageAccountKerbKey = '${nonsensitive(data.azurerm_key_vault_secret.storage_account_kerb_key.value)}'; ",
     "Domain = '${var.adds_domain_name}'; ",
-    "AdminUser = '${nonsensitive(data.azurerm_key_vault_secret.adminuser.value)}'; ",
-    "AdminUserSecret = '${nonsensitive(data.azurerm_key_vault_secret.adminpassword.value)}' ",
+    "AdminUsernameSecret = '${var.admin_username_secret}'; ",
+    "AdminPwdSecret = '${var.admin_password_secret}' ",
     "}"
   ]
 }
@@ -38,6 +37,10 @@ resource "azurerm_windows_virtual_machine" "vm_jumpbox_win" {
     offer     = var.vm_jumpbox_win_image_offer
     sku       = var.vm_jumpbox_win_image_sku
     version   = var.vm_jumpbox_win_image_version
+  }
+
+  identity {
+    type = "SystemAssigned"
   }
 
   depends_on = [azurerm_private_dns_zone_virtual_network_link.private_dns_zone_virtual_network_links_vnet_app_01]
@@ -69,6 +72,11 @@ resource "azurerm_network_interface" "vm_jumpbox_win_nic_01" {
   resource_group_name = var.resource_group_name
   tags                = var.tags
 
+  depends_on = [ 
+    azurerm_virtual_network_peering.vnet_app_01_to_vnet_shared_01_peering, 
+    azurerm_virtual_network_peering.vnet_shared_01_to_vnet_app_01_peering
+  ]
+
   ip_configuration {
     name                          = "ipc-${var.vm_jumpbox_win_name}-1"
     subnet_id                     = azurerm_subnet.vnet_app_01_subnets["snet-app-01"].id
@@ -97,4 +105,11 @@ resource "azurerm_virtual_machine_extension" "vm_jumpbox_win_postdeploy_script" 
       ]
     }
   PROTECTED_SETTINGS
+}
+
+resource "azurerm_key_vault_access_policy" "vm_jumpbox_win_secrets_get" {
+  key_vault_id       = var.key_vault_id
+  tenant_id          = azurerm_windows_virtual_machine.vm_jumpbox_win.identity[0].tenant_id
+  object_id          = azurerm_windows_virtual_machine.vm_jumpbox_win.identity[0].principal_id
+  secret_permissions = ["Get"]
 }

@@ -134,10 +134,12 @@ subscription_id | "00000000-0000-0000-0000-000000000000"
 tags | tomap( { "costcenter" = "10177772" "environment" = "dev" "project" = "#AzureSandbox" } )
 vnet_app_01_subnets | Contains all the subnet definitions including *snet-app-01*, *snet-db-01*, *snet-mysql-01* and *snet-privatelink-01*.
 
-The following PowerShell scripts are uploaded to the *scripts* container in the storage account using the access key stored in the key vault secret *storage_account_key* so they can be referenced by virtual machine extensions:
+Public internet access to the shared storage account is temporarily enabled so the following PowerShell scripts can be uploaded to the *scripts* container in the storage account using the access key stored in the key vault secret *storage_account_key*. These scripts are referenced by virtual machine extensions:
 
 * [configure-vm-mssql.ps1](./configure-vm-mssql.ps1)
 * [sql-startup.ps1](./sql-startup.ps1)
+
+Public internet access to the shared storage account is disabled again.
 
 Configuration of [Azure Automation State Configuration (DSC)](https://learn.microsoft.com/azure/automation/automation-dsc-overview) is performed by [configure-automation.ps1](./configure-automation.ps1) including the following:
 

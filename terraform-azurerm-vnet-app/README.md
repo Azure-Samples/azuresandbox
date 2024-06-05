@@ -78,7 +78,7 @@ This section describes how to provision this configuration using default setting
 
 * Monitor output. Upon completion, you should see a message similar to the following:
 
-  `Apply complete! Resources: 44 added, 0 changed, 0 destroyed.`
+  `Apply complete! Resources: 45 added, 0 changed, 0 destroyed.`
 
 * Inspect `terraform.tfstate`.
 
@@ -266,10 +266,14 @@ tags | tomap( { "costcenter" = "10177772" "environment" = "dev" "project" = "#Az
 vnet_shared_01_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualNetworks/vnet-shared-01"
 vnet_shared_01_name | "vnet-shared-01"
 
-The following PowerShell scripts are uploaded to the *scripts* container in the storage account using the access key stored in the key vault secret *storage_account_key* so they can be referenced by virtual machine extensions:
+Public internet access is temporarily enabled for the shared storage account so the following PowerShell scripts can be uploaded to the *scripts* container in the shared storage account using the access key stored in the key vault secret *storage_account_key*. These scripts are referenced by virtual machine extensions:
 
 * [configure-storage-kerberos.ps1](./configure-storage-kerberos.ps1)
 * [configure-vm-jumpbox-win.ps1](./configure-vm-jumpbox-win.ps1)
+
+Public internet access is disabled again later during Terraform apply.
+
+SSH keys are generated for use with [jumplinux1](#linux-jumpbox-vm). The private key is saved as a secret named `bootstrapadmin-ssh-key-private` in key vault. The secret is set to expire in 365 days.
 
 Configuration of [Azure Automation State Configuration (DSC)](https://learn.microsoft.com/azure/automation/automation-dsc-overview) is performed by [configure-automation.ps1](./configure-automation.ps1) including the following:
 
@@ -294,13 +298,14 @@ Resource name (ARM) | Configuration(s) | Notes
 azurerm_virtual_network . vnet_app_01 (vnet&#x2011;app&#x2011;01) | terraform-azurerm-vnet-app | By default this virtual network is configured with an address space of `10.2.0.0/16` and is configured with DNS server addresses of 10.1.2.4 (the private ip for *azurerm_windows_virtual_machine.vm_adds*) and [168.63.129.16](https://learn.microsoft.com/azure/virtual-network/what-is-ip-address-168-63-129-16).
 azurerm_subnet . vnet_app_01_subnets ["snet-app-01"] | terraform-azurerm-vnet-app | The default address prefix for this subnet is `10.2.0.0/24` and is reserved for web, application and jumpbox servers. A network security group is associated with this subnet that permits ingress and egress from virtual networks, and egress to the Internet.
 azurerm_subnet . vnet_app_01_subnets ["snet-db-01"] | terraform-azurerm-vm-mssql | The default address prefix for this subnet is `10.2.1.0/24` which includes the private ip address for *azurerm_windows_virtual_machine.vm_mssql_win*. A network security group is associated with this subnet that permits ingress and egress from virtual networks, and egress to the Internet.
-azurerm_subnet .vnet_app_01_subnets ["snet-privatelink-01"] | terraform-azurerm-vnet-app, terraform-azurerm-mssql | The default address prefix for this subnet is `10.2.2.0/24`. *private_endpoint_network_policies_enabled* is enabled for use with [PrivateLink](https://learn.microsoft.com/azure/private-link/private-link-overview). A network security group is associated with this subnet that permits ingress and egress from virtual networks.
+azurerm_subnet .vnet_app_01_subnets ["snet-privatelink-01"] | terraform-azurerm-vnet-app, terraform-azurerm-vm-mssql, terraform-azurerm-mssql | The default address prefix for this subnet is `10.2.2.0/24`. *private_endpoint_network_policies_enabled* is enabled for use with [PrivateLink](https://learn.microsoft.com/azure/private-link/private-link-overview). A network security group is associated with this subnet that permits ingress and egress from virtual networks.
 azurerm_subnet . vnet_app_01_subnets ["snet-mysql-01"] | terraform-azurerm-mysql | The default address prefix for this subnet is `10.2.3.0/24`. *service_delegation_name* is set to `Microsoft.DBforMySQL/flexibleServers` for use with [subnet delegation](https://learn.microsoft.com/azure/virtual-network/subnet-delegation-overview). A network security group is associated with this subnet that permits ingress and egress from virtual networks.
 azurerm_virtual_network_peering . vnet_shared_01_to_vnet_app_01_peering | terraform-azurerm-vnet-app | Establishes the [virtual network peering](https://learn.microsoft.com/azure/virtual-network/virtual-network-peering-overview) relationship from *azurerm_virtual_network.vnet_shared_01* to *azurerm_virtual_network.vnet_app_01*.
 azurerm_virtual_network_peering . vnet_app_01_to_vnet_shared_01_peering | terraform-azurerm-vnet-app |Establishes the [virtual network peering](https://learn.microsoft.com/azure/virtual-network/virtual-network-peering-overview) relationship from *azurerm_virtual_network.vnet_app_01* to *azurerm_virtual_network.vnet_shared_01*.
-azurerm_private_dns_zone . private_dns_zones ["privatelink.mysql.database.azure.com"] | terraform-azurerm-mysql | Creates a [private Azure DNS zone](https://learn.microsoft.com/azure/dns/private-dns-privatednszone) for using [Private Network Access for Azure Database for MySQL - Flexible Server](https://learn.microsoft.com/azure/mysql/flexible-server/concepts-networking-vnet).
+azurerm_private_dns_zone . private_dns_zones ["privatelink.blob.core.windows.net"] | terraform-azurerm-vnet-app, terraform-azurerm-vm-mssql | Creates a [private Azure DNS zone](https://learn.microsoft.com/azure/dns/private-dns-privatednszone) to use [Use private endpoints for Azure Storage](https://learn.microsoft.com/en-us/azure/storage/common/storage-private-endpoints).
 azurerm_private_dns_zone . private_dns_zones ["privatelink.database.windows.net"] | terraform-azurerm-mssql | Creates a [private Azure DNS zone](https://learn.microsoft.com/azure/dns/private-dns-privatednszone) for using [Azure Private Link for Azure SQL Database](https://learn.microsoft.com/azure/azure-sql/database/private-endpoint-overview).
 azurerm_private_dns_zone . private_dns_zones ["privatelink.file.core.windows.net"] | terraform-azurerm-vnet-app | Creates a [private Azure DNS zone](https://learn.microsoft.com/azure/dns/private-dns-privatednszone) for using [Azure Private Link for Azure Files](https://learn.microsoft.com/azure/storage/common/storage-private-endpoints).
+azurerm_private_dns_zone . private_dns_zones ["privatelink.mysql.database.azure.com"] | terraform-azurerm-mysql | Creates a [private Azure DNS zone](https://learn.microsoft.com/azure/dns/private-dns-privatednszone) for using [Private Link for Azure Database for MySQL - Flexible Server](https://learn.microsoft.com/en-us/azure/mysql/flexible-server/concepts-networking-private-link).
 azurerm_private_dns_zone_virtual_network_link . private_dns_zone_virtual_network_links_vnet_app_01 [*] | terraform-azurerm-vnet-app, terraform-azurerm-mssql, terraform-azurerm-mysql | Links each of the private DNS zones with azurerm_virtual_network.vnet_app_01
 azurerm_private_dns_zone_virtual_network_link . private_dns_zone_virtual_network_links_vnet_shared_01 [*] | terraform-azurerm-vnet-app, terraform-azurerm-mssql, terraform-azurerm-mysql | Links each of the private DNS zones with *var.remote_virtual_network_id*, which is the shared services virtual network.
 
@@ -313,12 +318,14 @@ Resource name (ARM) | Notes
 azurerm_windows_virtual_machine.vm_jumpbox_win (jumpwin1) | By default, provisions a [Standard_B2s](https://learn.microsoft.com/azure/virtual-machines/sizes-b-series-burstable) virtual machine for use as a jumpbox. See below for more information.
 azurerm_network_interface.vm_jumpbox_win_nic_01 (nic&#x2011;jumpwin1&#x2011;1) | The configured subnet is *azurerm_subnet.vnet_app_01_subnets["snet-app-01"]*.
 azurerm_virtual_machine_extension.vm_jumpbox_win_postdeploy_script | Downloads [configure&#x2011;vm&#x2011;jumpbox-win.ps1](./configure-vm-jumpbox-win.ps1) and [configure&#x2011;storage&#x2011;kerberos.ps1](./configure-storage-kerberos.ps1), then executes [configure&#x2011;vm&#x2011;jumpbox-win.ps1](./configure-vm-jumpbox-win.ps1) using the [Custom Script Extension for Windows](https://learn.microsoft.com/azure/virtual-machines/extensions/custom-script-windows). See below for more details.
+azurerm_key_vault_access_policy.vm_jumpbox_win_secrets_get (jumpwin1) | Allows the VM to get secrets from key vault using a system assigned managed identity.
 
 This Windows Server VM is used as a jumpbox for development and remote server administration.
 
 * Guest OS: Windows Server 2022 Datacenter.
 * By default the [patch orchestration mode](https://learn.microsoft.com/azure/virtual-machines/automatic-vm-guest-patching#patch-orchestration-modes) is set to `AutomaticByPlatform`.
 * *admin_username* and *admin_password* are configured using the key vault secrets *adminuser* and *adminpassword*.
+* A system assigned managed identity is configured by default for use in DevOps related identity and access management scenarios.
 * This resource is configured using a [provisioner](https://www.terraform.io/docs/language/resources/provisioners/syntax.html) that runs [aadsc-register-node.ps1](./aadsc-register-node.ps1) which registers the node with *azurerm_automation_account.automation_account_01* and applies the configuration [JumpBoxConfig](./JumpBoxConfig.ps1).
   * The virtual machine is domain joined  and added to `JumpBoxes` security group.
   * The following [Remote Server Administration Tools (RSAT)](https://learn.microsoft.com/windows-server/remote/remote-server-administration-tools) are installed:
@@ -329,15 +336,14 @@ This Windows Server VM is used as a jumpbox for development and remote server ad
     * Failover Cluster Management Tools (RSAT-Clustering-Mgmt)
     * Failover Cluster Module for for Windows PowerShell (RSAT-Clustering-PowerShell)
   * The following software packages are pre-installed using [Chocolatey](https://chocolatey.org/why-chocolatey):
-    * [az.powershell](https://community.chocolatey.org/packages/az.powershell)
     * [vscode](https://community.chocolatey.org/packages/vscode)
     * [sql-server-management-studio](https://community.chocolatey.org/packages/sql-server-management-studio)
     * [microsoftazurestorageexplorer](https://community.chocolatey.org/packages/microsoftazurestorageexplorer)
     * [azcopy10](https://community.chocolatey.org/packages/azcopy10)
     * [azure-data-studio](https://community.chocolatey.org/packages/azure-data-studio)
     * [mysql.workbench](https://community.chocolatey.org/packages/mysql.workbench)
-* Post-deployment configuration is then performed using a custom script extension that runs [configure&#x2011;vm&#x2011;jumpbox&#x2011;win.ps1](./configure-vm-jumpbox-win.ps1).
-  * [configure&#x2011;storage&#x2011;kerberos.ps1](./configure-storage-kerberos.ps1) is registered as a scheduled task then executed using domain administrator credentials. This script must be run on a domain joined Azure virtual machine, and configures the storage account for kerberos authentication with the Active Directory Domain Services domain used in the configurations.
+* Post-deployment configuration is then performed using a custom script extension that runs [configure&#x2011;vm&#x2011;jumpbox&#x2011;win.ps1](./configure-vm-jumpbox-win.ps1). For security, secrets are retrieved at runtime using system assigned managed identity.
+  * [configure&#x2011;storage&#x2011;kerberos.ps1](./configure-storage-kerberos.ps1) is registered as a scheduled task then executed using domain administrator credentials. This script must be run on a domain joined Azure virtual machine, and configures the storage account for kerberos authentication with the Active Directory Domain Services domain used in the configurations. For security, secrets are retrieved at runtime using system assigned managed identity.
 
 #### Linux Jumpbox VM
 
@@ -351,15 +357,10 @@ azurerm_key_vault_access_policy.vm_jumpbox_linux_secrets_get | Allows the VM to 
 
 This Linux VM is used as a jumpbox for development and remote administration.
 
-* Guest OS: Ubuntu 22.04 LTS (Jammy Jellyfish)
-* By default the [patch orchestration mode](https://learn.microsoft.com/azure/virtual-machines/automatic-vm-guest-patching#patch-orchestration-modes) is set to `AutomaticByPlatform`.
+* Guest OS: Ubuntu 24.04 LTS (Noble Numbat)
+* By default the [patch assessment mode](https://learn.microsoft.com/en-us/azure/update-manager/assessment-options) is set to `AutomaticByPlatform` and `provision_vm_agent` is set to `true` to enable use of [Azure Update Manager Update or Patch Orchestration](https://learn.microsoft.com/en-us/azure/update-manager/updates-maintenance-schedules#update-or-patch-orchestration).
 * A system assigned [managed identity](https://learn.microsoft.com/azure/active-directory/managed-identities-azure-resources/overview) is configured by default for use in DevOps related identity and access management scenarios.
 * A dependency on *azurerm_virtual_machine_extension.vm_jumpbox_win_postdeploy_script* is established. This custom script extension is used to run [configure-storage-kerberos.ps1](./configure-storage-kerberos.ps1) which is required in order to mount the Azure Files share using CIFS.
-* Custom tags are added which are used by [cloud-init](https://learn.microsoft.com/azure/virtual-machines/linux/using-cloud-init#:~:text=%20There%20are%20two%20stages%20to%20making%20cloud-init,is%20already%20configured%20to%20use%20cloud-init.%20More%20) [User-Data Scripts](https://cloudinit.readthedocs.io/en/latest/topics/format.html#user-data-script) to configure the virtual machine.
-  * *adds_domain_name*: Used in cloud-init scripts to join the domain.
-  * *keyvault*: Used in cloud-init scripts to determine which key vault to use for secrets.
-  * *storage_account_name*: Used in cloud-init scripts to mount an Azure Files share.
-  * *storage_share_name*: Used in cloud-init scripts to mount an Azure Files share.
 * This VM is configured with [cloud-init](https://learn.microsoft.com/azure/virtual-machines/linux/using-cloud-init#:~:text=%20There%20are%20two%20stages%20to%20making%20cloud-init,is%20already%20configured%20to%20use%20cloud-init.%20More%20) using a [Mime Multi Part Archive](https://cloudinit.readthedocs.io/en/latest/topics/format.html#mime-multi-part-archive) containing the following files:
   * [configure-vm-jumpbox-linux.yaml](./configure-vm-jumpbox-linux.yaml) is [Cloud Config Data](https://cloudinit.readthedocs.io/en/latest/topics/format.html#cloud-config-data) used to configure the VM.
     * Package updates are performed.
@@ -374,7 +375,6 @@ This Linux VM is used as a jumpbox for development and remote administration.
       * [libnss-winbind](https://packages.ubuntu.com/jammy/libnss-winbind)
       * [libpam-winbind](https://packages.ubuntu.com/jammy/libpam-winbind)
       * [ntp](https://packages.ubuntu.com/jammy/ntp)
-      * [powershell](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-7.1)
       * [python3-pip](https://packages.ubuntu.com/jammy/python3-pip)
       * [samba](https://packages.ubuntu.com/jammy/samba)
       * [terraform](https://www.terraform.io/intro/index.html#what-is-terraform-)
@@ -383,8 +383,6 @@ This Linux VM is used as a jumpbox for development and remote administration.
     * The VM is rebooted if necessary.
     * The file `/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg` is created to ensure that modifications to `/etc/netplan/50-cloud-init.yaml` are not overwritten after a reboot.
     * The file `/etc/azuresandbox-conf.json` is created to initialize variables in the [configure-vm-jumpbox-linux.sh](./configure-vm-jumpbox-linux.sh) script.
-
-  * [configure-powershell.ps1](./configure-powershell.ps1) is a [User-Data Script](https://cloudinit.readthedocs.io/en/latest/topics/format.html#user-data-script) that installs [Azure PowerShell](https://learn.microsoft.com/en-us/powershell/azure/what-is-azure-powershell?view=azps-9.5.0)
   * [configure-vm-jumpbox-linux.sh](./configure-vm-jumpbox-linux.sh) is a [User-Data Script](https://cloudinit.readthedocs.io/en/latest/topics/format.html#user-data-script) used to configure the VM. Runtime values are retrieved using [Instance Metadata](https://cloudinit.readthedocs.io/en/latest/topics/instancedata.html#instance-metadata).
     * Variables are initialized using the configuration file `/etc/azuresandbox-conf.json`.
 
@@ -401,16 +399,17 @@ This Linux VM is used as a jumpbox for development and remote administration.
       * *adminpassword*: The password for the administrative user account.
     * The virtual machine is domain joined using winbind.
       * The SSH server is configured for logins using Active Directory accounts.
-      * The *ntp.conf* file is updated to synchronize the time with the domain controller.
       * The *hosts* file is updated to reference the newly configured host name and domain name.
       * The netplan configuration is modified to configure DNS nameservers and IP addresses.
       * A new DHCP client exit hook script named `/etc/dhcp/dhclient-exit-hooks.d/hook-ddns` to implement dynamic DNS registration.
       * The *krb5.conf* file is modified to configure the domain name.
       * The *smb.conf* file is modified to configure the domain and workgroup names.
       * The virtual machine is domain joined.
+      * The *ntp.conf* file is updated to synchronize the time with the domain controller.
       * The *nsswitch.conf* file is modified to look for users and groups using winbind.
       * Pluggable authentication modules are configured to use winbind and create home directories for domain users.
     * Dynamic mounting of the Azure Files share is enabled using autofs.
+    * PowerShell and the Azure PowerShell Module are installed.
 
 #### Storage resources
 
@@ -419,8 +418,11 @@ The configuration for these resources can be found in [070-storage-share.tf](./0
 Resource name (ARM) | Notes
 --- | ---
 azurerm_storage_share.storage_share_01 | An [Azure Files](https://learn.microsoft.com/azure/storage/files/storage-files-introduction) SMB file share. See below for more information.
+azurerm_private_endpoint.storage_account_01_blob | A private endpoint for connecting to the blob service endpoint of the shared storage account.
+azurerm_private_dns_a_record.storage_account_01_blob | A DNS A record for resolving DNS queries to the blob endpoint of the shared storage account. This resource has a dependency on the *azurerm_private_dns_zone.private_dns_zones["privatelink.blob.core.windows.net"]* resource.
 azurerm_private_endpoint.storage_account_01_file | A private endpoint for connecting to file service endpoint of the shared storage account.
-azurerm_private_dns_a_record.storage_account_01_file | A DNS A record for resolving DNS queries to *azurerm_storage_share.storage_share_01* using PrivateLink. This resource has a dependency on the *azurerm_private_dns_zone.file_core_windows_net* resource.
+azurerm_private_dns_a_record.storage_account_01_file | A DNS A record for resolving DNS queries to *azurerm_storage_share.storage_share_01* using PrivateLink. This resource has a dependency on the *azurerm_private_dns_zone.private_dns_zones["privatelink.file.core.windows.net"]* resource.
+azapi_update_resource.update_storage_account | This resource is used to update the storage account to disable public network access which was temporarily enabled during the bootstrap process in order to upload scripts to the storage container.
 
 * Hosted by the storage account created by [terraform-azurerm-vnet-shared/bootstrap.sh](../terraform-azurerm-vnet-shared/README.md#bootstrap-script).
 * Connectivity using private endpoints is enabled. See [Use private endpoints for Azure Storage](https://learn.microsoft.com/azure/storage/common/storage-private-endpoints) for more information.
