@@ -192,6 +192,7 @@ azurerm_virtual_machine_extension . vm_mssql_win_postdeploy_script (vmext&#x2011
     * The scheduled task [sql-startup.ps1](./sql-startup.ps1) is created to recreate the `D:\SQLTEMP` folder then start SQL Server. The scheduled task is set to run automatically at startup using domain administrator credentials.
   * The data and log files for the *master*, *model* and *msdb* system databases are moved to the data and log disks respectively.
   * The SQL Server errorlog is moved to the data disk.
+  * Windows Update is configured to enable first-party updates for SQL Server patching.
 
 ## Next steps
 

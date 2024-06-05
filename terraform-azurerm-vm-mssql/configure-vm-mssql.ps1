@@ -592,6 +592,19 @@ catch {
     Exit-WithError $_
 }
 
+# Configure Windows Update 
+Write-Log "Configuring Windows Update first-party updates to enable SQL Server patching..."
+$serviceManager = (New-Object -com "Microsoft.Update.ServiceManager")
+$serviceManager.Services
+$serviceID = "7971f918-a847-4430-9279-4a52d1efe18d"
+
+try {
+    $serviceManager.AddService2($serviceID,7,"")
+}
+catch {
+    Exit-WithError $_
+}
+
 Write-Log "'$PSCommandPath' exiting normally..."
 Exit 0
 #endregion
