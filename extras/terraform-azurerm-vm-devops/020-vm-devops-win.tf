@@ -43,7 +43,7 @@ resource "azurerm_windows_virtual_machine" "vm_devops_win" {
           AutomationAccountName   = "${var.automation_account_name}"
           VirtualMachineName      = "${each.key}"
           AppId                   = "${var.arm_client_id}"
-          AppSecret               = "${nonsensitive(var.arm_client_secret)}"
+          AppSecret               = "${var.arm_client_secret}"
           DscConfigurationName    = "${var.vm_devops_win_dsc_config}"
         }
         ${path.root}/aadsc-register-node.ps1 @params 

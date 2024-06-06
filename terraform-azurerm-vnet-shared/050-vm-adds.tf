@@ -39,7 +39,7 @@ resource "azurerm_windows_virtual_machine" "vm_adds" {
         AutomationAccountName = "${azurerm_automation_account.automation_account_01.name}"
         VirtualMachineName = "${var.vm_adds_name}"
         AppId = "${var.arm_client_id}"
-        AppSecret = "${nonsensitive(var.arm_client_secret)}"
+        AppSecret = "${var.arm_client_secret}"
         DscConfigurationName = "LabDomainConfig"
         }
         ${path.root}/aadsc-register-node.ps1 @params 
