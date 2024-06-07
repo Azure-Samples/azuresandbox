@@ -26,8 +26,7 @@ This section describes additional Terraform configurations that can be added to 
 
 This section contains an index of demo videos that were built using aspects of #AzureSandbox.
 
-* [Accessing Azure Files over HTTPS](https://youtu.be/6ft5rxET8Pc) (October 2023)
-* [Fixing a PowerShell script bug with GitHub Copilot](https://youtu.be/xRgdzc_Rl9w) (August 2023)
+* [Improving your security posture with Azure Update Manager (June 2024)](https://youtu.be/QjDE-JdbRD8)
 * Improving your security posture with Microsoft Defender for Cloud (May 2024)
 
   Video | Description
@@ -43,3 +42,6 @@ This section contains an index of demo videos that were built using aspects of #
   [Defender for Cloud (Part 9)](https://youtu.be/BzZxv4i9SK8) | This video covers remediating security recommendations for Key Vault.
   [Defender for Cloud (Part 10)](https://youtu.be/kYDhGpeM04Y) | This video covers remediating security recommendations for Azure Backup.
   [Defender for Cloud (Part 11)](https://youtu.be/O4mNKNuwN44) | This video covers miscellaneous low risk security recommendations.
+
+* [Accessing Azure Files over HTTPS](https://youtu.be/6ft5rxET8Pc) (October 2023)
+* [Fixing a PowerShell script bug with GitHub Copilot](https://youtu.be/xRgdzc_Rl9w) (August 2023)

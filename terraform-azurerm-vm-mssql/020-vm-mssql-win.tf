@@ -8,8 +8,8 @@ resource "azurerm_windows_virtual_machine" "vm_mssql_win" {
   admin_password             = data.azurerm_key_vault_secret.adminpassword.value
   network_interface_ids      = [azurerm_network_interface.vm_mssql_win_nic_01.id]
   encryption_at_host_enabled = true
-  enable_automatic_updates   = true
-  patch_mode                 = "AutomaticByOS"
+  patch_assessment_mode      = "AutomaticByPlatform"
+  provision_vm_agent         = true
   tags                       = var.tags
 
   os_disk {
@@ -36,7 +36,7 @@ resource "azurerm_windows_virtual_machine" "vm_mssql_win" {
           AutomationAccountName   = "${var.automation_account_name}"
           VirtualMachineName      = "${var.vm_mssql_win_name}"
           AppId                   = "${var.arm_client_id}"
-          AppSecret               = "${nonsensitive(var.arm_client_secret)}"
+          AppSecret               = "${var.arm_client_secret}"
           DscConfigurationName    = "MssqlVmConfig"
         }
         ${path.root}/aadsc-register-node.ps1 @params 

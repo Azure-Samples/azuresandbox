@@ -9,8 +9,8 @@ resource "azurerm_windows_virtual_machine" "vm_adds" {
   admin_username             = data.azurerm_key_vault_secret.adminuser.value
   admin_password             = data.azurerm_key_vault_secret.adminpassword.value
   network_interface_ids      = [azurerm_network_interface.vm_adds_nic_01.id]
-  enable_automatic_updates   = true
-  patch_mode                 = "AutomaticByPlatform"
+  patch_assessment_mode      = "AutomaticByPlatform"
+  provision_vm_agent         = true
   encryption_at_host_enabled = true
   tags                       = var.tags
   depends_on                 = [azurerm_automation_account.automation_account_01]
@@ -39,7 +39,7 @@ resource "azurerm_windows_virtual_machine" "vm_adds" {
         AutomationAccountName = "${azurerm_automation_account.automation_account_01.name}"
         VirtualMachineName = "${var.vm_adds_name}"
         AppId = "${var.arm_client_id}"
-        AppSecret = "${nonsensitive(var.arm_client_secret)}"
+        AppSecret = "${var.arm_client_secret}"
         DscConfigurationName = "LabDomainConfig"
         }
         ${path.root}/aadsc-register-node.ps1 @params 
