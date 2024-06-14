@@ -34,6 +34,7 @@ This repository contains a collection of inter-dependent [cloud computing](https
   * [AzAPI Provider](https://registry.terraform.io/providers/Azure/azapi/latest/docs) (azapi) v1.13.1
   * [cloud-init Provider](https://registry.terraform.io/providers/hashicorp/cloudinit/latest/docs) (cloudinit) v2.3.4
   * [Random Provider](https://registry.terraform.io/providers/hashicorp/random/latest/docs) (random) v3.6.2
+  * [Time Provider](https://registry.terraform.io/providers/hashicorp/time/latest/docs) (time) v0.11.2
 
 This repo was created by [Roger Doherty](https://www.linkedin.com/in/roger-doherty-805635b/).
 

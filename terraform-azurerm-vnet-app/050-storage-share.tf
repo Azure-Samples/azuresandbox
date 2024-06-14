@@ -17,8 +17,8 @@ resource "azurerm_private_endpoint" "storage_account_01_blob" {
     subresource_names              = ["blob"]
   }
 
-  depends_on = [ 
-    azurerm_virtual_network_peering.vnet_app_01_to_vnet_shared_01_peering, 
+  depends_on = [
+    azurerm_virtual_network_peering.vnet_app_01_to_vnet_shared_01_peering,
     azurerm_virtual_network_peering.vnet_shared_01_to_vnet_app_01_peering
   ]
 }
@@ -32,17 +32,35 @@ resource "azurerm_private_dns_a_record" "storage_account_01_blob" {
 }
 
 # Azure Files share
+resource "azapi_update_resource" "storage_account_enable_public_access" {
+  type        = "Microsoft.Storage/storageAccounts@2023-05-01"
+  resource_id = local.storage_account_id
+
+  body = jsonencode({
+    properties = {
+      publicNetworkAccess = "Enabled"
+    }
+  })
+}
+
+resource "time_sleep" "wait_60_seconds" {
+  create_duration = "60s"
+  depends_on      = [azapi_update_resource.storage_account_enable_public_access]
+}
+
 resource "azurerm_storage_share" "storage_share_01" {
   name                 = var.storage_share_name
   storage_account_name = var.storage_account_name
   quota                = var.storage_share_quota_gb
+
+  depends_on = [time_sleep.wait_60_seconds]
 }
 
 output "storage_share_name" {
   value = azurerm_storage_share.storage_share_01.name
 }
 
-resource "azapi_update_resource" "update_storage_account" {
+resource "azapi_update_resource" "storage_account_disable_public_access" {
   type        = "Microsoft.Storage/storageAccounts@2023-05-01"
   resource_id = local.storage_account_id
 
@@ -52,7 +70,7 @@ resource "azapi_update_resource" "update_storage_account" {
     }
   })
 
-  depends_on = [ azurerm_storage_share.storage_share_01 ]
+  depends_on = [azurerm_storage_share.storage_share_01]
 }
 
 # Azure Files private endpoint
@@ -70,8 +88,8 @@ resource "azurerm_private_endpoint" "storage_account_01_file" {
     subresource_names              = ["file"]
   }
 
-  depends_on = [ 
-    azurerm_virtual_network_peering.vnet_app_01_to_vnet_shared_01_peering, 
+  depends_on = [
+    azurerm_virtual_network_peering.vnet_app_01_to_vnet_shared_01_peering,
     azurerm_virtual_network_peering.vnet_shared_01_to_vnet_app_01_peering
   ]
 }
