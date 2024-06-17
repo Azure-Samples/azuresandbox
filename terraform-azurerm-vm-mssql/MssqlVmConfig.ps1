@@ -104,5 +104,37 @@ GO
             Ensure = 'Present'
             DependsOn = '[WindowsFeature]RSAT-AD-PowerShell'            
         }
+
+        SqlScriptQuery 'DisableSa' {
+            InstanceName = 'MSSQLSERVER'
+            GetQuery = @'
+SELECT [is_disabled] FROM [master].[sys].[sql_logins] WHERE ([name] = 'sa') FOR JSON AUTO;
+GO
+'@
+            TestQuery = @'
+IF (SELECT [is_disabled] FROM [master].[sys].[sql_logins] WHERE ([name] = 'sa')) = 0 
+BEGIN
+    RAISERROR ('sa login is enabled.', 16, 1 ) ;
+END
+ELSE
+BEGIN
+    PRINT 'sa login is disabled' ;
+END ;
+GO
+'@
+            SetQuery = @'
+ALTER LOGIN sa DISABLE ;
+GO
+USE [master]
+GO
+EXEC xp_instance_regwrite N'HKEY_LOCAL_MACHINE', 
+     N'Software\Microsoft\MSSQLServer\MSSQLServer',
+     N'LoginMode', REG_DWORD, 1 ;
+GO
+'@
+            QueryTimeout = 30
+            PSDscRunAsCredential = $domainAdminCredential
+            DependsOn = '[ADGroup]DatabaseServers'
+        }
     }
 }
