@@ -348,7 +348,7 @@ function Set-Variable {
         try {
             $automationVariable = New-AzAutomationVariable `
                 -Name $VariableName `
-                -Encrypted $false `
+                -Encrypted $true `
                 -Description $VariableName `
                 -Value $VariableValue `
                 -ResourceGroupName $ResourceGroupName `
@@ -363,7 +363,7 @@ function Set-Variable {
         try {
             $automationVariable = Set-AzAutomationVariable `
                 -Name $VariableName `
-                -Encrypted $false `
+                -Encrypted $true `
                 -Value $VariableValue `
                 -ResourceGroupName $ResourceGroupName `
                 -AutomationAccountName $AutomationAccountName `
@@ -676,6 +676,18 @@ try {
     Exit-WithError "Subnet '$subnet_id' does not exist..."
 }
 
+# Temporarily enable public internet access on storage account
+Write-Log "Enabling public internet access on storage account '$storage_account_name'..."
+
+try {
+    Set-AzStorageAccount -ResourceGroupName $resource_group_name -Name $storage_account_name -PublicNetworkAccess "Enabled" | Out-Null 
+} catch {
+    Exit-WithError "Failed to enable public internet access on storage account '$storage_account_name': $_"
+}
+
+Write-Log "Pausing for 60 seconds to allow storage account settings to propogate..."
+Start-Sleep -Seconds 60
+
 # Upload script to storage account
 Write-Log "Uploading script '$vm_devops_win_config_script' to container '$storage_container_name' in '$storage_account_name'..."
 
@@ -696,6 +708,15 @@ try {
     Set-AzStorageBlobContent @blob -Force | Out-Null
 } catch {
     Exit-WithError "Failed to upload script '$vm_devops_win_config_script' to container '$storage_container_name' in storage account '$storage_account_name': $_"
+}
+
+# Disable public internet access on storage account
+Write-Log "Disabling public internet access on storage account '$storage_account_name'..."
+
+try {
+    Set-AzStorageAccount -ResourceGroupName $resource_group_name -Name $storage_account_name -PublicNetworkAccess "Disabled" | Out-Null 
+} catch {
+    Exit-WithError "Failed to disable public internet access on storage account '$storage_account_name': $_"
 }
 
 # Configure automation account
