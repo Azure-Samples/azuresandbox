@@ -365,6 +365,7 @@ else
     --sku Standard_LRS \
     --https-only \
     --min-tls-version TLS1_2 \
+    --public-network-access Disabled \
     --tags costcenter=$costcenter project=$project environment=$environment provisioner="bootstrap.sh"
 fi
 
@@ -395,6 +396,17 @@ then
     --output none
 fi
 
+# Enable public network access
+printf "Temporarily enabling public network access to storage account '$storage_account_name'...\n"
+az storage account update \
+  --subscription $subscription_id \
+  --name $storage_account_name \
+  --resource-group $resource_group_name \
+  --public-network-access Enabled
+
+printf "Sleeping for 60 seconds to allow storage account settings to propogate...\n"
+sleep 60
+
 # Bootstrap storage account container
 jmespath_query="[? name == '$storage_container_name']|[0].name"
 storage_container_name_temp=$(az storage container list --subscription $subscription_id --account-name $storage_account_name --account-key $storage_account_key --query "$jmespath_query" --output tsv)
@@ -411,8 +423,8 @@ else
     --account-key $storage_account_key
 fi
 
-# Disable public internet access
-printf "Disabling public internet access to storage account '$storage_account_name'...\n"
+# Disable public network access
+printf "Disabling public network access to storage account '$storage_account_name'...\n"
 az storage account update \
   --subscription $subscription_id \
   --name $storage_account_name \
