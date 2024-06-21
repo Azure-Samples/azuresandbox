@@ -12,7 +12,7 @@ param (
     [String]$Location,
 
     [Parameter(Mandatory = $true)]
-    [String]$AutomationAccountName,
+    [String]$AutomationAccountId,
 
     [Parameter(Mandatory = $true)]
     [String]$VirtualMachineName,
@@ -47,6 +47,9 @@ function Register-DscNode {
 
         [Parameter(Mandatory = $true)]
         [string] $AutomationAccountName,
+
+        [Parameter(Mandatory = $true)]
+        [string] $VmResourceGroupName,
 
         [Parameter(Mandatory = $true)]
         [string] $VirtualMachineName,
@@ -111,7 +114,7 @@ function Register-DscNode {
         -ResourceGroupName $ResourceGroupName `
         -AutomationAccountName $AutomationAccountName `
         -AzureVMName $VirtualMachineName `
-        -AzureVMResourceGroup $ResourceGroupName `
+        -AzureVMResourceGroup $VmResourceGroupName `
         -AzureVMLocation $Location `
         -NodeConfigurationName $nodeConfigName `
         -ConfigurationModeFrequencyMins 15 `
@@ -149,18 +152,24 @@ catch {
 }
 
 # Get automation account
-$automationAccount = Get-AzAutomationAccount -ResourceGroupName $ResourceGroupName -Name $AutomationAccountName
+$automationAccountParts = $AutomationAccountId.Split("/")
+$automationAccountResourceGroupName = $automationAccountParts[4]
+$automationAccountName = $automationAccountParts[8]
+
+
+$automationAccount = Get-AzAutomationAccount -ResourceGroupName $automationAccountResourceGroupName -Name $automationAccountName
 
 if ($null -eq $automationAccount) {
-    Exit-WithError "Automation account '$AutomationAccountName' was not found..."
+    Exit-WithError "Automation account '$automationAccountName' was not found in resource group '$automationAccountResourceGroupName'..."
 }
 
-Write-Log "Located automation account '$AutomationAccountName' in resource group '$ResourceGroupName'"
+Write-Log "Located automation account '$AutomationAccountName' in resource group '$automationAccountResourceGroupName'"
 
 # Register DSC Node
 Register-DscNode `
-    -ResourceGroupName $ResourceGroupName `
+    -ResourceGroupName $automationAccountResourceGroupName `
     -AutomationAccountName $AutomationAccountName `
+    -VmResourceGroupName $ResourceGroupName `
     -VirtualMachineName $VirtualMachineName `
     -Location $Location `
     -DscConfigurationName $DscConfigurationName

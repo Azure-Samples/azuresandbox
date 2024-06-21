@@ -498,7 +498,7 @@ $aad_tenant_id = $config.aad_tenant_id
 $adds_domain_name = $config.adds_domain_name
 $admin_password_secret = $config.admin_password_secret
 $admin_username_secret = $config.admin_username_secret
-$automation_account_name = $config.automation_account_name
+$automation_account_id = $config.automation_account_id
 $arm_client_id = $config.arm_client_id
 $domain_admin_password_secret = $config.domain_admin_password_secret
 $domain_admin_username_secret = $config.domain_admin_username_secret
@@ -720,38 +720,42 @@ try {
 }
 
 # Configure automation account
-Write-Log "Configuring automation account '$automation_account_name'..."
+$automation_account_parts = $automation_account_id.Split("/")
+$automation_account_resource_group_name = $automation_account_parts[4]
+$automation_account_name = $automation_account_parts[8]
+
+Write-Log "Configuring automation account '$automation_account_name' in resource group '$automation_account_resource_group_name'..."
 
 try {
-    Get-AzAutomationAccount -Name $automation_account_name -ResourceGroupName $resource_group_name | Out-Null
+    Get-AzAutomationAccount -Name $automation_account_name -ResourceGroupName $automation_account_resource_group_name | Out-Null
 } catch {
-    Exit-WithError "Automation account '$automation_account_name' does not exist..."
+    Exit-WithError "Automation account '$automation_account_name' does not exist in resource gruop '$automation_account_resource_group_name'..."
 }
 
 Update-ExistingModule `
-    -ResourceGroupName $resource_group_name `
+    -ResourceGroupName $automation_account_resource_group_name `
     -AutomationAccountName $automation_account_name `
     -ModuleName 'PSDscResources'
 
 Update-ExistingModule `
-    -ResourceGroupName $resource_group_name `
+    -ResourceGroupName $automation_account_resource_group_name `
     -AutomationAccountName $automation_account_name `
     -ModuleName 'xDSCDomainjoin'
 
 Import-Module `
-    -ResourceGroupName $resource_group_name `
+    -ResourceGroupName $automation_account_resource_group_name `
     -AutomationAccountName $automation_account_name `
     -ModuleName 'cChoco' `
     -ModuleUri 'https://www.powershellgallery.com/api/v2/package/cChoco'
 
 Set-Variable `
-    -ResourceGroupName $resource_group_name `
+    -ResourceGroupName $automation_account_resource_group_name `
     -AutomationAccountName $automation_account_name `
     -VariableName 'adds_domain_name' `
     -VariableValue $adds_domain_name
 
 Set-Credential `
-    -ResourceGroupName $resource_group_name `
+    -ResourceGroupName $automation_account_resource_group_name `
     -AutomationAccountName $automation_account_name `
     -Name 'domainadmin' `
     -Description 'Domain admin account credential' `
@@ -759,7 +763,7 @@ Set-Credential `
     -UserSecret $domain_admin_password 
 
 Import-DscConfiguration `
-    -ResourceGroupName $resource_group_name `
+    -ResourceGroupName $automation_account_resource_group_name `
     -AutomationAccountName $automation_account_name `
     -DscConfigurationName $vm_devops_win_dsc_config `
     -DscConfigurationScript "$vm_devops_win_dsc_config.ps1"
@@ -768,7 +772,7 @@ for ($i = $vm_devops_win_instances_start; $i -le ($vm_devops_win_instances_start
     $virtual_machine_name = "$vm_devops_win_name{0:D3}" -f $i
 
     Start-DscCompliationJob `
-        -ResourceGroupName $resource_group_name `
+        -ResourceGroupName $automation_account_resource_group_name `
         -AutomationAccountName $automation_account_name `
         -DscConfigurationName $vm_devops_win_dsc_config `
         -VirtualMachineName $virtual_machine_name
@@ -785,7 +789,7 @@ Write-Log "Generating '$tfvarsPath' file..."
 Set-Content -Path $tfvarsPath -Value "aad_tenant_id = `"$aad_tenant_id`""
 Add-Content -Path $tfvarsPath -Value "admin_password_secret = `"$admin_password_secret`""
 Add-Content -Path $tfvarsPath -Value "admin_username_secret = `"$admin_username_secret`""
-Add-Content -Path $tfvarsPath -Value "automation_account_name = `"$automation_account_name`""
+Add-Content -Path $tfvarsPath -Value "automation_account_id = `"$automation_account_id`""
 Add-Content -Path $tfvarsPath -Value "arm_client_id = `"$arm_client_id`""
 Add-Content -Path $tfvarsPath -Value "key_vault_id = `"$key_vault_id`""
 Add-Content -Path $tfvarsPath -Value "location = `"$location`""

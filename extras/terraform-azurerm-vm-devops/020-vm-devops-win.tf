@@ -1,7 +1,9 @@
 locals {
-  vm_devops_win_names             = formatlist("${var.vm_devops_win_name}%03d", range(var.vm_devops_win_instances_start, (var.vm_devops_win_instances_start + var.vm_devops_win_instances)))
-  vm_devops_win_config_script_uri = "https://${var.storage_account_name}.blob.core.windows.net/${var.storage_container_name}/${var.vm_devops_win_config_script}"
-  vm_devops_win_data_disk_count   = var.vm_devops_win_data_disk_size_gb == 0 ? 0 : 1
+  vm_devops_win_names                    = formatlist("${var.vm_devops_win_name}%03d", range(var.vm_devops_win_instances_start, (var.vm_devops_win_instances_start + var.vm_devops_win_instances)))
+  vm_devops_win_config_script_uri        = "https://${var.storage_account_name}.blob.core.windows.net/${var.storage_container_name}/${var.vm_devops_win_config_script}"
+  vm_devops_win_data_disk_count          = var.vm_devops_win_data_disk_size_gb == 0 ? 0 : 1
+  automation_account_resource_group_name = split("/", var.automation_account_id)[4]
+  automation_account_name                = split("/", var.automation_account_id)[8]
 }
 
 resource "azurerm_windows_virtual_machine" "vm_devops_win" {
@@ -36,15 +38,15 @@ resource "azurerm_windows_virtual_machine" "vm_devops_win" {
   provisioner "local-exec" {
     command     = <<EOT
         $params = @{
-          TenantId                = "${var.aad_tenant_id}"
-          SubscriptionId          = "${var.subscription_id}"
-          ResourceGroupName       = "${var.resource_group_name}"
-          Location                = "${var.location}"
-          AutomationAccountName   = "${var.automation_account_name}"
-          VirtualMachineName      = "${each.key}"
-          AppId                   = "${var.arm_client_id}"
-          AppSecret               = "${var.arm_client_secret}"
-          DscConfigurationName    = "${var.vm_devops_win_dsc_config}"
+          TenantId              = "${var.aad_tenant_id}"
+          SubscriptionId        = "${var.subscription_id}"
+          ResourceGroupName     = "${var.resource_group_name}"
+          Location              = "${var.location}"
+          AutomationAccountId   = "${var.automation_account_id}"
+          VirtualMachineName    = "${each.key}"
+          AppId                 = "${var.arm_client_id}"
+          AppSecret             = "${var.arm_client_secret}"
+          DscConfigurationName  = "${var.vm_devops_win_dsc_config}"
         }
         ${path.root}/aadsc-register-node.ps1 @params 
    EOT
