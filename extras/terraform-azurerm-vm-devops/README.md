@@ -137,7 +137,7 @@ aad_tenant_id | authentication | The ID for the Microsoft Entra ID tenant you ar
 adds_domain_name | authentication | The name of the domain to join the VMs to.
 admin_password_secret | authentication | The name of the keyvault secret that is used to store the local admin username. Default is `adminpassword`.
 admin_username_secret | authentication | The name of the keyvault secret that is used to store the local admin password. Default is `adminuser`.
-automation_account_name | environment | The name of the automation account used for Azure Automation DSC.
+automation_account_id | environment | The resource id of the automation account used for Azure Automation DSC.
 arm_client_id | authentication | The `appId` for the service principal.
 domain_admin_password_secret | authentication | The name of the keyvault secret that is used to store the local admin username. Default is `domainadminpassword`.
 domain_admin_username_secret | authentication | The name of the keyvault secret that is used to store the local admin password. Default is `domainadminuser`.
@@ -173,7 +173,7 @@ Here is an example of a json configuration file:
   "adds_domain_name": "DOMAIN-HERE",
   "admin_password_secret": "SECRET-NAME-HERE",
   "admin_username_secret": "SECRET-NAME-HERE",
-  "automation_account_name": "AUTOMATION-ACCOUNT-NAME-HERE",
+  "automation_account_id": "/subscriptions/GUID-HERE/resourceGroups/RESOURCE-GROUP-NAME-HERE/providers/Microsoft.Automation/automationAccounts/AUTOMATION-ACCOUNT-NAME-HERE",
   "arm_client_id": "GUID-HERE",
   "domain_admin_password_secret": "SECRET-NAME-HERE",
   "domain_admin_username_secret": "SECRET-NAME-HERE",

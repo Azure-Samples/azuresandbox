@@ -175,12 +175,16 @@ azurerm_virtual_machine_extension . vm_mssql_win_postdeploy_script (vmext&#x2011
 * By default the [patch assessment mode](https://learn.microsoft.com/en-us/azure/update-manager/assessment-options) is set to `AutomaticByPlatform` and `provision_vm_agent` is set to `true` to enable use of [Azure Update Manager Update or Patch Orchestration](https://learn.microsoft.com/en-us/azure/update-manager/updates-maintenance-schedules#update-or-patch-orchestration).
 * *admin_username* and *admin_password* are configured using key vault secrets *adminuser* and *adminpassword*.
 * This resource is configured using a [provisioner](https://www.terraform.io/docs/language/resources/provisioners/syntax.html) that runs [aadsc-register-node.ps1](./aadsc-register-node.ps1) which registers the node with *azurerm_automation_account.automation_account_01* and applies the configuration [MssqlVmConfig.ps1](../terraform-azurerm-vnet-shared/MssqlVmConfig.ps1).
-  * The default SQL Server instance is configured to support [mixed mode authentication](https://learn.microsoft.com/sql/relational-databases/security/choose-an-authentication-mode). This is to facilitate post-installation configuration of the default instance before the virtual machine is domain joined, and can be reconfigured to Windows authentication mode if required.
+  * The default SQL Server instance is configured to support [Mixed Mode Authentication](https://learn.microsoft.com/sql/relational-databases/security/choose-an-authentication-mode) temporarily during the bootstrap process. This is to facilitate post-installation configuration of the default instance before the virtual machine is domain joined.
     * The builtin *sa* account is enabled and the password is configured using *adminpassword* key vault secret.
     * The *LoginMode* registry key is modified to support mixed mode authentication.
   * The virtual machine is domain joined.
   * The [Windows Firewall](https://learn.microsoft.com/windows/security/threat-protection/windows-firewall/windows-firewall-with-advanced-security#overview-of-windows-defender-firewall-with-advanced-security) is [Configured to Allow SQL Server Access](https://learn.microsoft.com/sql/sql-server/install/configure-the-windows-firewall-to-allow-sql-server-access). A new firewall rule is created that allows inbound traffic over port 1433.
   * A SQL Server Windows login is added for the domain administrator and added to the SQL Server builtin `sysadmin` role.
+  * The default SQL Server instance is re-configured to support [Windows Authentication](https://learn.microsoft.com/sql/relational-databases/security/choose-an-authentication-mode) only.
+    * The builtin *sa* account is disabled.
+    * The *LoginMode* registry key is modified to support Windows Authentication mode.
+
 * Post-deployment configuration is then implemented using a custom script extension that runs [configure-vm-mssql.ps1](./configure-vm-mssql.ps1) following guidelines established in [Checklist: Best practices for SQL Server on Azure VMs](https://learn.microsoft.com/azure/azure-sql/virtual-machines/windows/performance-guidelines-best-practices-checklist).
   * Data disk metadata is retrieved dynamically using the [Azure Instance Metadata Service (Windows)](https://learn.microsoft.com/azure/virtual-machines/windows/instance-metadata-service?tabs=windows) including:
     * Volume label and drive letter, e.g. *vol_sqldata_M*

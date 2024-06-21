@@ -185,6 +185,14 @@ do
       --overwrite && break || sleep 15
 done
 
+# Disable public internet access
+printf "Disabling public internet access to storage account '${storage_account_name:1:-1}'...\n"
+az storage account update \
+  --subscription ${subscription_id:1:-1} \
+  --name ${storage_account_name:1:-1} \
+  --resource-group ${resource_group_name:1:-1} \
+  --public-network-access Disabled
+
 # Bootstrap auotmation account
 printf "Configuring automation account '${automation_account_name:1:-1}'...\n"
 

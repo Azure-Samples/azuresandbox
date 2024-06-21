@@ -197,12 +197,12 @@ diff "$filename.bak" "$filename" >> $log_file
 servicename='winbind'
 printf "Enabling '$servicename'...\n" >> $log_file
 sudo systemctl enable $servicename &>> $log_file
-printf "Restarting '$servicename'...\n" >> $log_file
-sudo systemctl restart $servicename &>> $log_file
-sudo systemctl status winbind &>> $log_file
 printf "Configuring pluggable authentication (PAM) module for winbind...\n" >> $log_file
 sudo pam-auth-update --enable winbind &>> $log_file
 sudo pam-auth-update --enable mkhomedir &>> $log_file
+printf "Restarting '$servicename'...\n" >> $log_file
+sudo systemctl restart $servicename &>> $log_file
+sudo systemctl status winbind &>> $log_file
 groupname='sudo'
 printf "Adding user '$admin_username' to group '$groupname'...\n" >> $log_file
 sudo usermod -aG $groupname $admin_username &>> $log_file

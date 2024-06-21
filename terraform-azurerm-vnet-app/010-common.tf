@@ -7,7 +7,7 @@ terraform {
 
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "=3.108.0"
+      version = "=3.109.0"
     }
 
     random = {
@@ -16,25 +16,30 @@ terraform {
     }
 
     cloudinit = {
-      source = "hashicorp/cloudinit"
+      source  = "hashicorp/cloudinit"
       version = "=2.3.4"
+    }
+
+    time = {
+      source  = "hashicorp/time"
+      version = "=0.11.2"
     }
   }
 }
 
 # Providers
 provider "azapi" {
-  subscription_id            = var.subscription_id
-  client_id                  = var.arm_client_id
-  client_secret              = var.arm_client_secret
-  tenant_id                  = var.aad_tenant_id
+  subscription_id = var.subscription_id
+  client_id       = var.arm_client_id
+  client_secret   = var.arm_client_secret
+  tenant_id       = var.aad_tenant_id
 }
 
 provider "azurerm" {
-  subscription_id            = var.subscription_id
-  client_id                  = var.arm_client_id
-  client_secret              = var.arm_client_secret
-  tenant_id                  = var.aad_tenant_id
+  subscription_id = var.subscription_id
+  client_id       = var.arm_client_id
+  client_secret   = var.arm_client_secret
+  tenant_id       = var.aad_tenant_id
 
   features {}
 }
@@ -42,6 +47,8 @@ provider "azurerm" {
 provider "random" {}
 
 provider "cloudinit" {}
+
+provider "time" {}
 
 # Secrets
 data "azurerm_key_vault_secret" "adminpassword" {

@@ -24,9 +24,9 @@ variable "arm_client_secret" {
   sensitive   = true
 }
 
-variable "automation_account_name" {
+variable "automation_account_id" {
   type        = string
-  description = "The name of the Azure Automation Account use for state configuration (DSC)."
+  description = "The resource id of the Azure Automation Account used for state configuration (DSC)."
 }
 
 variable "key_vault_id" {
