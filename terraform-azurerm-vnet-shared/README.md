@@ -242,7 +242,7 @@ The configuration for these resources can be found in [050-vm-adds.tf](./050-vm-
 
 Resource name (ARM) | Notes
 --- | ---
-azurerm_windows_virtual_machine.vm_adds (adds1) | By default, provisions a [Standard_B2s](https://learn.microsoft.com/azure/virtual-machines/sizes-b-series-burstable) virtual machine for use as a domain controller and dns server. See below for more information.
+azurerm_windows_virtual_machine.vm_adds (adds1) | By default, provisions a [Standard_B2ls_v2](https://learn.microsoft.com/azure/virtual-machines/bsv2-series) virtual machine for use as a domain controller and dns server. See below for more information.
 azurerm_network_interface.vm_adds_nic_01 (nic&#x2011;adds1&#x2011;1) | The configured subnet is *azurerm_subnet.vnet_shared_01_subnets["snet-adds-01"]*.
 
 This Windows Server VM is used as an [Active Directory Domain Services](https://learn.microsoft.com/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview) [Domain Controller](https://learn.microsoft.com/previous-versions/windows/it-pro/windows-server-2003/cc786438(v=ws.10)) and a DNS Server running in Active Directory-integrated mode.
@@ -279,7 +279,7 @@ automation_account_name | "auto-9a633c2bba9351cc-01"
 dns_server | "10.1.2.4"
 key_vault_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.KeyVault/vaults/kv-XXXXXXXXXXXXXXX"
 key_vault_name | "kv-XXXXXXXXXXXXXXX"
-location | "eastus"
+location | "eastus2"
 log_analytics_workspace_01_name | "log-XXXXXXXXXXXXXXXX-01"
 log_analytics_workspace_01_workspace_id | "00000000-0000-0000-0000-000000000000"
 resource_group_name | "rg-sandbox-01"

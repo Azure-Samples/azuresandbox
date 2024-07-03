@@ -126,7 +126,7 @@ arm_client_id | "00000000-0000-0000-0000-000000000000"
 automation_account_name | "auto-9a633c2bba9351cc-01"
 key_vault_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.KeyVault/vaults/kv-XXXXXXXXXXXXXXX"
 key_vault_name | "kv-XXXXXXXXXXXXXXX"
-location | "eastus"
+location | "eastus2"
 resource_group_name | "rg-sandbox-01"
 storage_account_name | "stXXXXXXXXXXXXXXX"
 storage_container_name | "scripts"
@@ -162,7 +162,7 @@ The configuration for these resources can be found in [020-vm-mssql-win.tf](./02
 
 Resource name (ARM) | Notes
 --- | ---
-azurerm_windows_virtual_machine . vm_mssql_win (mssqlwin1) | By default, provisions a [Standard_B4ms](https://learn.microsoft.com/azure/virtual-machines/sizes-b-series-burstable) virtual machine for use as a database server. See below for more information.
+azurerm_windows_virtual_machine . vm_mssql_win (mssqlwin1) | By default, provisions a [Standard_B4s_v2](https://learn.microsoft.com/azure/virtual-machines/bsv2-series) virtual machine for use as a database server. See below for more information.
 azurerm_network_interface . vm_mssql_win_nic_01 (nic&#x2011;mssqlwin1&#x2011;1) | The configured subnet is *azurerm_subnet.vnet_app_01_subnets["snet-db-01"]*.
 azurerm_managed_disk . vm_mssql_win_data_disks ["sqldata"] (disk&#x2011;mssqlwin1&#x2011;vol_sqldata_M) | By default, provisions an E10 [Standard SSD](https://learn.microsoft.com/azure/virtual-machines/disks-types#standard-ssd) [managed disk](https://learn.microsoft.com/azure/virtual-machines/managed-disks-overview) for storing SQL Server data files. Caching is set to *ReadOnly* by default.
 azurerm_managed_disk . vm_mssql_win_data_disks ["sqllog"] (disk&#x2011;mssqlwin1&#x2011;vol_sqllog_L) | By default, provisions an E4 [Standard SSD](https://learn.microsoft.com/azure/virtual-machines/disks-types#standard-ssd) [managed disk](https://learn.microsoft.com/azure/virtual-machines/managed-disks-overview) for storing SQL Server log files. Caching is set to *None* by default.
