@@ -287,7 +287,7 @@ else
     --tags costcenter=$costcenter project=$project environment=$environment provisioner="bootstrap.sh"
 fi
 
-key_vault_id=$(az keyvault show --subscription $subscription_id --resource-group $resource_group_name --name $key_vault_name --query id --output tsv)
+key_vault_id="/subscriptions/$subscription_id/resourceGroups/$resource_group_name/providers/Microsoft.KeyVault/vaults/$key_vault_name"
 
 printf "Creating key vault secret access policy for Azure CLI logged in user id '$owner_object_id'...\n"
 az keyvault set-policy \
@@ -369,7 +369,15 @@ else
     --tags costcenter=$costcenter project=$project environment=$environment provisioner="bootstrap.sh"
 fi
 
-storage_account_key=$(az storage account keys list --subscription $subscription_id --resource-group $resource_group_name --account-name $storage_account_name --output tsv --query "[0].value")
+for i in {1..10}; do
+    storage_account_key=$(az storage account keys list --subscription $subscription_id --resource-group $resource_group_name --account-name $storage_account_name --output tsv --query "[0].value") && break || echo "Attempt $i failed, retrying in 30 seconds..."
+    sleep 30
+done
+
+if [ -z "$storage_account_key" ]; then
+    echo "Failed to retrieve storage account key after 10 attempts." >&2
+    exit 1
+fi
 
 printf "Setting storage account secret '$storage_account_name' with value length '${#storage_account_key}' to keyvault '$key_vault_name'...\n"
 az keyvault secret set \
