@@ -113,6 +113,7 @@ arm_client_id=''
 arm_client_secret=''
 secret_expiration_days=365
 storage_container_name='scripts'
+vm_adds_size='Standard_B2s'
 
 # Initialize user defaults
 default_adds_domain_name="mysandbox.local"
@@ -226,6 +227,19 @@ location_id=$(az account list-locations --query "[?name=='$location'].id" --outp
 if [ -z "$location_id" ]
 then
   printf "Invalid location '$location'...\n"
+  usage
+fi
+
+# Validate VM size sku availability in location
+printf "Checking for availability of virtual machine sku '$vm_adds_size' in location '$location'...\n"
+
+reason_code=$(az vm list-skus --location $location --size $vm_adds_size --all --query "[?name=='$vm_adds_size']|[0].restrictions|[?type=='Location']|[0].reasonCode" --output tsv)
+
+if [ -z "$reason_code" ]
+then
+  printf "Virtual machine sku '$vm_adds_size' is available in location '$location'...\n"
+else
+  printf "Virtual machine sku '$vm_adds_size' is not available in location '$location' due to reason code '$reason_code'...\n"
   usage
 fi
 
@@ -467,6 +481,7 @@ printf "subnet_misc_02_address_prefix             = \"$subnet_misc_02_address_pr
 printf "subscription_id                           = \"$subscription_id\"\n"                           >> ./terraform.tfvars
 printf "tags                                      = $tags\n"                                          >> ./terraform.tfvars
 printf "vm_adds_name                              = \"$vm_adds_name\"\n"                              >> ./terraform.tfvars
+printf "vm_adds_size                              = \"$vm_adds_size\"\n"                              >> ./terraform.tfvars
 printf "vnet_address_space                        = \"$vnet_address_space\"\n"                        >> ./terraform.tfvars
 
 cat ./terraform.tfvars

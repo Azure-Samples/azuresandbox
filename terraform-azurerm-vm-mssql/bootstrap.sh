@@ -11,6 +11,7 @@ usage() {
 # Set these defaults prior to running the script.
 default_vm_mssql_win_name="mssqlwin1"
 vm_mssql_win_post_deploy_script="configure-vm-mssql.ps1"
+vm_mssql_win_size="Standard_B4ms"
 vm_mssql_win_sql_startup_script="sql-startup.ps1"
 
 # Intialize runtime defaults
@@ -61,6 +62,20 @@ vm_mssql_win_name=${vm_mssql_win_name:-$default_vm_mssql_win_name}
 if [ -z "$TF_VAR_arm_client_secret" ]
 then
   printf "Environment variable 'TF_VAR_arm_client_secret' must be set.\n"
+  usage
+fi
+
+# Validate VM size sku availability in location
+location_noquotes=${location:1:-1}
+printf "Checking for availability of virtual machine sku '$vm_mssql_win_size' in location '$location_noquotes'...\n"
+
+reason_code=$(az vm list-skus --location $location_noquotes --size $vm_mssql_win_size --all --query "[?name=='$vm_mssql_win_size']|[0].restrictions|[?type=='Location']|[0].reasonCode" --output tsv)
+
+if [ -z "$reason_code" ]
+then
+  printf "Virtual machine sku '$vm_mssql_win_size' is available in location '$location_noquotes'...\n"
+else
+  printf "Virtual machine sku '$vm_mssql_win_size' is not available in location '$location_noquotes' due to reason code '$reason_code'...\n"
   usage
 fi
 
@@ -133,6 +148,7 @@ printf "tags                                = $tags\n"                          
 printf "vm_mssql_win_name                   = \"$vm_mssql_win_name\"\n"                   >> ./terraform.tfvars
 printf "vm_mssql_win_post_deploy_script     = \"$vm_mssql_win_post_deploy_script\"\n"     >> ./terraform.tfvars
 printf "vm_mssql_win_post_deploy_script_uri = \"$vm_mssql_win_post_deploy_script_uri\"\n" >> ./terraform.tfvars
+printf "vm_mssql_win_size                   = \"$vm_mssql_win_size\"\n"                   >> ./terraform.tfvars
 printf "vm_mssql_win_sql_startup_script     = \"$vm_mssql_win_sql_startup_script\"\n"     >> ./terraform.tfvars
 printf "vm_mssql_win_sql_startup_script_uri = \"$vm_mssql_win_sql_startup_script_uri\"\n" >> ./terraform.tfvars
 printf "vnet_app_01_subnets                 = $vnet_app_01_subnets\n"                     >> ./terraform.tfvars
