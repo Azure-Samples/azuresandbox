@@ -113,7 +113,7 @@ arm_client_id=''
 arm_client_secret=''
 secret_expiration_days=365
 storage_container_name='scripts'
-vm_adds_size='Standard_B2s'
+vm_adds_size='Standard_B2ls_v2'
 
 # Initialize user defaults
 default_adds_domain_name="mysandbox.local"

@@ -20,10 +20,10 @@ default_subnet_privatelink_address_prefix="10.2.2.0/24"
 default_vm_jumpbox_linux_name="jumplinux1"
 default_vm_jumpbox_win_name="jumpwin1"
 secret_expiration_days=365
-vm_jumpbox_linux_size="Standard_B2s"
+vm_jumpbox_linux_size="Standard_B2ls_v2"
 vm_jumpbox_win_post_deploy_script="configure-vm-jumpbox-win.ps1"
 vm_jumpbox_win_configure_storage_script="configure-storage-kerberos.ps1"
-vm_jumpbox_win_size="Standard_B2s"
+vm_jumpbox_win_size="Standard_B2ls_v2"
 
 # Intialize runtime defaults
 state_file="../terraform-azurerm-vnet-shared/terraform.tfstate"

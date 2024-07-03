@@ -11,7 +11,7 @@ usage() {
 # Set these defaults prior to running the script.
 default_vm_mssql_win_name="mssqlwin1"
 vm_mssql_win_post_deploy_script="configure-vm-mssql.ps1"
-vm_mssql_win_size="Standard_B4ms"
+vm_mssql_win_size="Standard_B4s_v2"
 vm_mssql_win_sql_startup_script="sql-startup.ps1"
 
 # Intialize runtime defaults
