@@ -230,6 +230,16 @@ then
   usage
 fi
 
+# Check host encryption feature
+encryption_feature_state=$(az feature show --subscription $subscription_id --namespace Microsoft.Compute --name EncryptionAtHost --query 'properties.state' --output tsv)
+printf "EncryptionAtHost feature registration status is '$encryption_feature_state' on subscription '$subscription_id'...\n"
+
+if [ "$encryption_feature_state" != "Registered" ]
+then
+    printf "Error: EncryptionAtHost feature is not registered on subscription '$subscription_id'...\n"
+    usage
+fi
+
 # Validate VM size sku availability in location
 printf "Checking for availability of virtual machine sku '$vm_adds_size' in location '$location'...\n"
 
