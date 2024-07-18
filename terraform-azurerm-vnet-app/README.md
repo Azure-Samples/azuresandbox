@@ -257,7 +257,7 @@ automation_account_name | "auto-9a633c2bba9351cc-01"
 dns_server | "10.1.1.4"
 key_vault_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.KeyVault/vaults/kv-XXXXXXXXXXXXXXX"
 key_vault_name | "kv-XXXXXXXXXXXXXXX"
-location | "eastus"
+location | "eastus2"
 resource_group_name | "rg-sandbox-01"
 storage_account_name | "stXXXXXXXXXXXXXXX"
 storage_container_name | "scripts"
@@ -315,7 +315,7 @@ The configuration for these resources can be found in [030-vm-jumpbox-win.tf](./
 
 Resource name (ARM) | Notes
 --- | ---
-azurerm_windows_virtual_machine.vm_jumpbox_win (jumpwin1) | By default, provisions a [Standard_B2s](https://learn.microsoft.com/azure/virtual-machines/sizes-b-series-burstable) virtual machine for use as a jumpbox. See below for more information.
+azurerm_windows_virtual_machine.vm_jumpbox_win (jumpwin1) | By default, provisions a [Standard_B2ls_v2](https://learn.microsoft.com/azure/virtual-machines/bsv2-series) virtual machine for use as a jumpbox. See below for more information.
 azurerm_network_interface.vm_jumpbox_win_nic_01 (nic&#x2011;jumpwin1&#x2011;1) | The configured subnet is *azurerm_subnet.vnet_app_01_subnets["snet-app-01"]*.
 azurerm_virtual_machine_extension.vm_jumpbox_win_postdeploy_script | Downloads [configure&#x2011;vm&#x2011;jumpbox-win.ps1](./configure-vm-jumpbox-win.ps1) and [configure&#x2011;storage&#x2011;kerberos.ps1](./configure-storage-kerberos.ps1), then executes [configure&#x2011;vm&#x2011;jumpbox-win.ps1](./configure-vm-jumpbox-win.ps1) using the [Custom Script Extension for Windows](https://learn.microsoft.com/azure/virtual-machines/extensions/custom-script-windows). See below for more details.
 azurerm_key_vault_access_policy.vm_jumpbox_win_secrets_get (jumpwin1) | Allows the VM to get secrets from key vault using a system assigned managed identity.
@@ -351,7 +351,7 @@ The configuration for these resources can be found in [040-vm-jumpbox-linux.tf](
 
 Resource name (ARM) | Notes
 --- | ---
-azurerm_linux_virtual_machine.vm_jumpbox_linux (jumplinux1) | By default, provisions a [Standard_B2s](https://learn.microsoft.com/azure/virtual-machines/sizes-b-series-burstable) virtual machine for use as a Linux jumpbox virtual machine. See below for more details.
+azurerm_linux_virtual_machine.vm_jumpbox_linux (jumplinux1) | By default, provisions a [Standard_B2ls_v2](https://learn.microsoft.com/azure/virtual-machines/bsv2-series) virtual machine for use as a Linux jumpbox virtual machine. See below for more details.
 azurerm_network_interface.vm_jumpbox_linux_nic_01 | The configured subnet is *azurerm_subnet.vnet_app_01_subnets["snet-app-01"]*.
 azurerm_key_vault_access_policy.vm_jumpbox_linux_secrets_get | Allows the VM to get secrets from key vault using a system assigned managed identity.
 

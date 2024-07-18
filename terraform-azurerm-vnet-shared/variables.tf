@@ -136,7 +136,6 @@ variable "vm_adds_name" {
 variable "vm_adds_size" {
   type        = string
   description = "The size of the virtual machine."
-  default     = "Standard_B2s"
 }
 
 variable "vm_adds_storage_account_type" {

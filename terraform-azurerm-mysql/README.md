@@ -171,7 +171,7 @@ admin_username_secret | "adminuser"
 arm_client_id | "00000000-0000-0000-0000-000000000000"
 key_vault_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.KeyVault/vaults/kv-XXXXXXXXXXXXXXX"
 key_vault_name | "kv-XXXXXXXXXXXXXXX"
-location | "eastus"
+location | "eastus2"
 resource_group_name | "rg-sandbox-01"
 subscription_id | "00000000-0000-0000-0000-000000000000"
 tags | tomap( { "costcenter" = "10177772" "environment" = "dev" "project" = "#AzureSandbox" } )

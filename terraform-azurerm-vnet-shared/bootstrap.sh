@@ -113,6 +113,7 @@ arm_client_id=''
 arm_client_secret=''
 secret_expiration_days=365
 storage_container_name='scripts'
+vm_adds_size='Standard_B2ls_v2'
 
 # Initialize user defaults
 default_adds_domain_name="mysandbox.local"
@@ -120,7 +121,7 @@ default_admin_username="bootstrapadmin"
 default_costcenter="mycostcenter"
 default_dns_server="10.1.1.4"
 default_environment="dev"
-default_location="eastus"
+default_location="eastus2"
 default_project="#AzureSandbox"
 default_resource_group_name="rg-sandbox-01"
 default_skip_admin_password_gen="no"
@@ -229,6 +230,29 @@ then
   usage
 fi
 
+# Check host encryption feature
+encryption_feature_state=$(az feature show --subscription $subscription_id --namespace Microsoft.Compute --name EncryptionAtHost --query 'properties.state' --output tsv)
+printf "EncryptionAtHost feature registration status is '$encryption_feature_state' on subscription '$subscription_id'...\n"
+
+if [ "$encryption_feature_state" != "Registered" ]
+then
+    printf "Error: EncryptionAtHost feature is not registered on subscription '$subscription_id'...\n"
+    usage
+fi
+
+# Validate VM size sku availability in location
+printf "Checking for availability of virtual machine sku '$vm_adds_size' in location '$location'...\n"
+
+reason_code=$(az vm list-skus --location $location --size $vm_adds_size --all --query "[?name=='$vm_adds_size']|[0].restrictions|[?type=='Location']|[0].reasonCode" --output tsv)
+
+if [ -z "$reason_code" ]
+then
+  printf "Virtual machine sku '$vm_adds_size' is available in location '$location'...\n"
+else
+  printf "Virtual machine sku '$vm_adds_size' is not available in location '$location' due to reason code '$reason_code'...\n"
+  usage
+fi
+
 # Validate skip_admin_password_gen input
 if [ "$skip_admin_password_gen" != 'yes' ] && [ "$skip_admin_password_gen" != 'no' ]
 then
@@ -287,7 +311,7 @@ else
     --tags costcenter=$costcenter project=$project environment=$environment provisioner="bootstrap.sh"
 fi
 
-key_vault_id=$(az keyvault show --subscription $subscription_id --resource-group $resource_group_name --name $key_vault_name --query id --output tsv)
+key_vault_id="/subscriptions/$subscription_id/resourceGroups/$resource_group_name/providers/Microsoft.KeyVault/vaults/$key_vault_name"
 
 printf "Creating key vault secret access policy for Azure CLI logged in user id '$owner_object_id'...\n"
 az keyvault set-policy \
@@ -369,7 +393,15 @@ else
     --tags costcenter=$costcenter project=$project environment=$environment provisioner="bootstrap.sh"
 fi
 
-storage_account_key=$(az storage account keys list --subscription $subscription_id --resource-group $resource_group_name --account-name $storage_account_name --output tsv --query "[0].value")
+for i in {1..10}; do
+    storage_account_key=$(az storage account keys list --subscription $subscription_id --resource-group $resource_group_name --account-name $storage_account_name --output tsv --query "[0].value") && break || echo "Attempt $i failed, retrying in 30 seconds..."
+    sleep 30
+done
+
+if [ -z "$storage_account_key" ]; then
+    echo "Failed to retrieve storage account key after 10 attempts." >&2
+    exit 1
+fi
 
 printf "Setting storage account secret '$storage_account_name' with value length '${#storage_account_key}' to keyvault '$key_vault_name'...\n"
 az keyvault secret set \
@@ -459,6 +491,7 @@ printf "subnet_misc_02_address_prefix             = \"$subnet_misc_02_address_pr
 printf "subscription_id                           = \"$subscription_id\"\n"                           >> ./terraform.tfvars
 printf "tags                                      = $tags\n"                                          >> ./terraform.tfvars
 printf "vm_adds_name                              = \"$vm_adds_name\"\n"                              >> ./terraform.tfvars
+printf "vm_adds_size                              = \"$vm_adds_size\"\n"                              >> ./terraform.tfvars
 printf "vnet_address_space                        = \"$vnet_address_space\"\n"                        >> ./terraform.tfvars
 
 cat ./terraform.tfvars

@@ -20,8 +20,10 @@ default_subnet_privatelink_address_prefix="10.2.2.0/24"
 default_vm_jumpbox_linux_name="jumplinux1"
 default_vm_jumpbox_win_name="jumpwin1"
 secret_expiration_days=365
+vm_jumpbox_linux_size="Standard_B2ls_v2"
 vm_jumpbox_win_post_deploy_script="configure-vm-jumpbox-win.ps1"
 vm_jumpbox_win_configure_storage_script="configure-storage-kerberos.ps1"
+vm_jumpbox_win_size="Standard_B2ls_v2"
 
 # Intialize runtime defaults
 state_file="../terraform-azurerm-vnet-shared/terraform.tfstate"
@@ -91,6 +93,35 @@ if [ "$skip_ssh_key_gen" != 'yes' ] && [ "$skip_ssh_key_gen" != 'no' ]
 then
   printf "Invalid skip_ssh_key_gen input '$skip_ssh_key_gen'. Valid values are 'yes' or 'no'...\n"
   usage
+fi
+
+# Validate VM size sku availability in location
+location_noquotes=${location:1:-1}
+printf "Checking for availability of virtual machine sku '$vm_jumpbox_linux_size' in location '$location_noquotes'...\n"
+
+reason_code=$(az vm list-skus --location $location_noquotes --size $vm_jumpbox_linux_size --all --query "[?name=='$vm_jumpbox_linux_size']|[0].restrictions|[?type=='Location']|[0].reasonCode" --output tsv)
+
+if [ -z "$reason_code" ]
+then
+  printf "Virtual machine sku '$vm_jumpbox_linux_size' is available in location '$location_noquotes'...\n"
+else
+  printf "Virtual machine sku '$vm_jumpbox_linux_size' is not available in location '$location_noquotes' due to reason code '$reason_code'...\n"
+  usage
+fi
+
+if [ "$vm_jumpbox_linux_size" != "$vm_jumpbox_win_size" ]
+then
+  printf "Checking for availability of virtual machine sku '$vm_jumpbox_win_size' in location '$location_noquotes'...\n"
+
+  reason_code=$(az vm list-skus --location $location_noquotes --size $vm_jumpbox_win_size --all --query "[?name=='$vm_jumpbox_win_size']|[0].restrictions|[?type=='Location']|[0].reasonCode" --output tsv)
+
+  if [ -z "$reason_code" ]
+  then
+    printf "Virtual machine sku '$vm_jumpbox_win_size' is available in location '$location_noquotes'...\n"
+  else
+    printf "Virtual machine sku '$vm_jumpbox_win_size' is not available in location '$location_noquotes' due to reason code '$reason_code'...\n"
+    usage
+  fi
 fi
 
 # Get key vault secrets
@@ -231,11 +262,13 @@ printf "subnet_privatelink_address_prefix           = \"$subnet_privatelink_addr
 printf "subscription_id                             = $subscription_id\n"                                 >> ./terraform.tfvars
 printf "tags                                        = $tags\n"                                            >> ./terraform.tfvars
 printf "vm_jumpbox_linux_name                       = \"$vm_jumpbox_linux_name\"\n"                       >> ./terraform.tfvars
+printf "vm_jumpbox_linux_size                       = \"$vm_jumpbox_linux_size\"\n"                       >> ./terraform.tfvars
+printf "vm_jumpbox_win_configure_storage_script     = \"$vm_jumpbox_win_configure_storage_script\"\n"     >> ./terraform.tfvars
+printf "vm_jumpbox_win_configure_storage_script_uri = \"$vm_jumpbox_win_configure_storage_script_uri\"\n" >> ./terraform.tfvars
 printf "vm_jumpbox_win_name                         = \"$vm_jumpbox_win_name\"\n"                         >> ./terraform.tfvars
 printf "vm_jumpbox_win_post_deploy_script           = \"$vm_jumpbox_win_post_deploy_script\"\n"           >> ./terraform.tfvars
 printf "vm_jumpbox_win_post_deploy_script_uri       = \"$vm_jumpbox_win_post_deploy_script_uri\"\n"       >> ./terraform.tfvars
-printf "vm_jumpbox_win_configure_storage_script     = \"$vm_jumpbox_win_configure_storage_script\"\n"     >> ./terraform.tfvars
-printf "vm_jumpbox_win_configure_storage_script_uri = \"$vm_jumpbox_win_configure_storage_script_uri\"\n" >> ./terraform.tfvars
+printf "vm_jumpbox_win_size                         = \"$vm_jumpbox_win_size\"\n"                         >> ./terraform.tfvars
 printf "vnet_address_space                          = \"$vnet_address_space\"\n"                          >> ./terraform.tfvars
 printf "vnet_name                                   = \"$vnet_name\"\n"                                   >> ./terraform.tfvars
 

@@ -152,7 +152,6 @@ variable "vm_jumpbox_linux_name" {
 variable "vm_jumpbox_linux_size" {
   type        = string
   description = "The size of the virtual machine"
-  default     = "Standard_B2s"
 }
 
 variable "vm_jumpbox_linux_storage_account_type" {
@@ -213,7 +212,6 @@ variable "vm_jumpbox_win_post_deploy_script_uri" {
 variable "vm_jumpbox_win_size" {
   type        = string
   description = "The size of the virtual machine."
-  default     = "Standard_B2s"
 }
 
 variable "vm_jumpbox_win_storage_account_type" {

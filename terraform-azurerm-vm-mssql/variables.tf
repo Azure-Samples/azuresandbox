@@ -130,7 +130,6 @@ variable "vm_mssql_win_post_deploy_script_uri" {
 variable "vm_mssql_win_size" {
   type        = string
   description = "The size of the virtual machine"
-  default     = "Standard_B4ms"
 }
 
 variable "vm_mssql_win_storage_account_type" {
