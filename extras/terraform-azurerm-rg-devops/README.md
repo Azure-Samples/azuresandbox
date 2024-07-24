@@ -101,7 +101,7 @@ The following sections provide guided smoke testing of each resource provisioned
 
 ### Connect using SSH
 
-* Locate the virtual machine `jumplinux1` in the Azure portal.
+* Locate the virtual machine `jumplinux2` in the Azure portal.
   * Start the virtual machine if it is not currently running.
   * Make a note of the private IP address which will be referred to subsequently as `PrivateIPAddress`
 * Configure SSH identity file on SSH client
@@ -133,7 +133,7 @@ The following sections provide guided smoke testing of each resource provisioned
     pwsh --version
 
     # Verify Azure PowerShell modules are installed
-    pwsh 0 -c "Get-Module -ListAvailable"
+    pwsh -c "Get-Module -ListAvailable"
     ```
 
 ### VS Code remote development over SSH
@@ -150,7 +150,7 @@ The following sections provide guided smoke testing of each resource provisioned
   * Edit the configuration file as follows:
 
     ```text
-    Host jumplinux1
+    Host jumplinux2
         HostName PrivateIPAddress
         User bootstrapadmin
         IdentityFile C:\\Users\\YourUserName\\.ssh\\bootstrapadmin-ssh-key-private.txt
@@ -158,8 +158,8 @@ The following sections provide guided smoke testing of each resource provisioned
 
     * Save the modified configuration file.
 * Navigate to *View > Command Palette...* and enter `Remote-SSH: Connect to Host...`.
-  * Choose `jumplinux1` from the list.
-  * When prompted for *Select the platform of the remote host "jumplinux1"* choose `Linux`
+  * Choose `jumplinux2` from the list.
+  * When prompted for *Select the platform of the remote host "jumplinux2"* choose `Linux`
     * When prompted for *Enter passphrase for ssh key* enter the value of the `adminpassword` secret
 * Navigate to *View > Explorer* and click `Open Folder`
   * Choose the default folder `/home/bootstrapadmin/`
@@ -228,11 +228,11 @@ The configuration for these resources can be found in [030-vm-jumpbox-linux.tf](
 
 Resource name (ARM) | Notes
 --- | ---
-azurerm_linux_virtual_machine.vm_jumpbox_linux (jumplinux1) | By default, provisions a [Standard_B2s](https://learn.microsoft.com/azure/virtual-machines/sizes-b-series-burstable) virtual machine for use as a Linux jumpbox virtual machine. See below for more details.
+azurerm_linux_virtual_machine.vm_jumpbox_linux (jumplinux2) | By default, provisions a [Standard_B2s](https://learn.microsoft.com/azure/virtual-machines/sizes-b-series-burstable) virtual machine for use as a Linux jumpbox virtual machine. See below for more details.
 azurerm_network_interface.vm_jumpbox_linux_nic_01 | The configured subnet is `var.subnet_id`.
 azurerm_key_vault_access_policy.vm_jumpbox_linux_secrets_reader | Allows the VM to get named secrets from key vault using a system assigned managed identity.
 
-This Linux virtual machine is a stripped down down version of [jumplinux1](../../terraform-azurerm-vnet-app/README.md#linux-jumpbox-vm) from `#AzureSandbox` that can be used as a DevOps agent on your private network. The biggest difference is that it is not domain joined or registered with your private DNS, so SSH public key authentication to a private IP address is used for connectivity.
+This Linux virtual machine is a stripped down down version of [jumplinux2](../../terraform-azurerm-vnet-app/README.md#linux-jumpbox-vm) from `#AzureSandbox` that can be used as a DevOps agent on your private network. The biggest difference is that it is not domain joined or registered with your private DNS, so SSH public key authentication to a private IP address is used for connectivity.
 
 * Guest OS: Ubuntu 22.04 LTS (Jammy Jellyfish)
 * By default the [patch orchestration mode](https://learn.microsoft.com/azure/virtual-machines/automatic-vm-guest-patching#patch-orchestration-modes) is set to `AutomaticByPlatform`.
@@ -258,20 +258,20 @@ This Linux virtual machine is a stripped down down version of [jumplinux1](../..
 
 ### Additional use cases
 
-* **Bastion Connectivity**: This configuration is designed to enable SSH connectivity from client computers to [jumplinux1](#linux-jumpbox-vm) on your private network. Connectivity can also be enabled using a [bastion](https://learn.microsoft.com/azure/bastion/bastion-overview) with connectivity to `var.subnet_id`. See [Create an SSH connection to a Linux VM using Azure Bastion](https://learn.microsoft.com/en-us/azure/bastion/bastion-connect-vm-ssh-linux) and [Private key - Azure Key Vault](https://learn.microsoft.com/en-us/azure/bastion/bastion-connect-vm-ssh-linux#private-key---azure-key-vault) for more information.
+* **Bastion Connectivity**: This configuration is designed to enable SSH connectivity from client computers to [jumplinux2](#linux-jumpbox-vm) on your private network. Connectivity can also be enabled using a [bastion](https://learn.microsoft.com/azure/bastion/bastion-overview) with connectivity to `var.subnet_id`. See [Create an SSH connection to a Linux VM using Azure Bastion](https://learn.microsoft.com/en-us/azure/bastion/bastion-connect-vm-ssh-linux) and [Private key - Azure Key Vault](https://learn.microsoft.com/en-us/azure/bastion/bastion-connect-vm-ssh-linux#private-key---azure-key-vault) for more information.
 
 ### DevOps security
 
-This section describes DevOps security best practices for development and deployment of Terraform configurations using [jumplinux1](#linux-jumpbox-vm), and in particular how to avoid the use of shared secrets via managed identities.
+This section describes DevOps security best practices for development and deployment of Terraform configurations using [jumplinux2](#linux-jumpbox-vm), and in particular how to avoid the use of shared secrets via managed identities.
 
 * Configure role assignments for [Managed identities](https://learn.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview).
-  * Add an Azure RBAC `Contributor` role assignment for the system-assigned managed identity associated with [jumplinux1](#linux-jumpbox-vm) to the appropriate Azure subscriptions.  
-  * If use of service principals is required for a specific configuration, add an Microsoft Entra ID `DirectoryReader` role assignment for the system-assigned managed identity associated with [jumplinux1](#linux-jumpbox-vm).
+  * Add an Azure RBAC `Contributor` role assignment for the system-assigned managed identity associated with [jumplinux2](#linux-jumpbox-vm) to the appropriate Azure subscriptions.  
+  * If use of service principals is required for a specific configuration, add an Microsoft Entra ID `DirectoryReader` role assignment for the system-assigned managed identity associated with [jumplinux2](#linux-jumpbox-vm).
 * Authenticate using managed identities
   * **Azure CLI**: Use `az login --identity` to [Sign in with a managed identity](https://learn.microsoft.com/en-us/cli/azure/authenticate-azure-cli#sign-in-with-a-managed-identity).
   * **PowerShell**: Use `Connect-AzAccount -Identity` to [Sign in with a managed identity](https://learn.microsoft.com/en-us/powershell/azure/authenticate-azureps?view=azps-9.5.0#sign-in-using-a-managed-identity).
   * Update your Terraform configurations to support [Authenticating using Managed Identity](https://registry.terraform.io/providers/hashicorp/azuread/latest/docs/guides/managed_service_identity).
-    * Note that `jumplinux1` is pre-configured with the Terraform environment variables `ARM_USE_MSI=true` and `ARM_TENANT_ID=00000000-0000-0000-0000-000000000000` to authenticate using a managed identity.
+    * Note that `jumplinux2` is pre-configured with the Terraform environment variables `ARM_USE_MSI=true` and `ARM_TENANT_ID=00000000-0000-0000-0000-000000000000` to authenticate using a managed identity.
 * [Store Terraform state in Azure Storage](https://learn.microsoft.com/en-us/azure/developer/terraform/store-state-in-azure-storage?tabs=azure-cli)
   * `azurerm_storage_account.st_tfm` is pre-configured with a container `azurerm_storage_container.container_tfstate`.
   * Note this configuration does not use a Terraform state backend to avoid circular dependencies. Once you have provisioned this configuration, you can begin using `azurerm_storage_container.container_tfstate` as a Terraform state backend for other configurations.

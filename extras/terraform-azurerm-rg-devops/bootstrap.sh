@@ -92,7 +92,7 @@ default_aad_tenant_id=$(az account list --query "[? isDefault]|[0].tenantId" --o
 default_admin_username="bootstrapadmin"
 default_cost_center="mycostcenter"
 default_environment="dev"
-default_location="eastus"
+default_location="eastus2"
 default_owner_object_id=$(az account get-access-token --query accessToken --output tsv | tr -d '\n' | python3 -c "import jwt, sys; print(jwt.decode(sys.stdin.read(), algorithms=['RS256'], options={'verify_signature': False})['oid'])")
 default_project="myproject"
 default_resource_group_name="rg-devops-tf"
@@ -100,7 +100,7 @@ default_skip_admin_password_gen="no"
 default_skip_ssh_key_gen="no"
 default_subnet_id="/subscriptions/00000000-0000-0000-0000-000000000000/resourcegroups/someresourcegroup/providers/Microsoft.Network/virtualNetworks/somevirtualnetwork/subnets/somesubnet"
 default_subscription_id=$(az account list --only-show-errors --query "[? isDefault]|[0].id" --output tsv)
-default_vm_name="jumplinux1"
+default_vm_name="jumplinux2"
 
 # User input
 read -e -i $default_aad_tenant_id           -p "Microsoft Entra tenant id (aad_tenant_id) -------------------------------------------: " aad_tenant_id
@@ -195,9 +195,8 @@ else
     --resource-group $resource_group_name \
     --location $location \
     --sku standard \
-    --enabled-for-deployment \
-    --enabled-for-disk-encryption \
-    --enabled-for-template-deployment \
+    --no-self-perms \
+    --enable-rbac-authorization false \
     --tags "Cost Center"=$cost_center project=$project environment=$environment provisioner="bootstrap.sh"
 fi
 
