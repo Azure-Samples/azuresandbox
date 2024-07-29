@@ -14,7 +14,7 @@ Contains additional Terraform configurations and supporting resources.
 
 This section describes additional Terraform configurations that can be added to #AzureSandbox. These configurations are not required to use #AzureSandbox, but may be useful for learning or testing purposes.
 
-* [terraform-azurerm-rg-devops](./extras/terraform-azurerm-rg-devops/) includes the following:
+* [terraform-azurerm-rg-devops](./terraform-azurerm-rg-devops/) includes the following:
   * A [resource group](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#resource-group) which contains DevOps environment resources.
   * A [key vault](https://learn.microsoft.com/azure/key-vault/general/overview) for managing secrets.
   * A [storage account](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#storage-account) for use as a [Terraform azurerm backend](https://developer.hashicorp.com/terraform/language/settings/backends/azurerm).
