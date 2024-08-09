@@ -29,8 +29,9 @@ resource "azurerm_linux_virtual_machine" "vm_jumpbox_linux" {
   size                       = var.vm_size
   admin_username             = data.azurerm_key_vault_secret.adminuser.value
   network_interface_ids      = [azurerm_network_interface.vm_jumpbox_linux_nic_01.id]
-  patch_mode                 = "AutomaticByPlatform"
   encryption_at_host_enabled = true
+  patch_assessment_mode      = "AutomaticByPlatform"
+  provision_vm_agent         = true
   tags                       = merge(var.tags, { keyvault = var.key_vault_name })
 
   admin_ssh_key {

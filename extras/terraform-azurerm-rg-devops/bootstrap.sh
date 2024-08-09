@@ -251,17 +251,7 @@ fi
 
 ssh_public_key_secret_value=$(cat sshkeytemp.pub)
 ssh_private_key_secret_value=$(cat sshkeytemp)
-
-ssh_public_key_secret_name="$admin_username-ssh-key-public"
-ssh_public_key_secret_value=$(cat sshkeytemp.pub)
 ssh_private_key_secret_name="$admin_username-ssh-key-private"
-ssh_private_key_secret_value=$(cat sshkeytemp)
-
-printf "Setting secret '$ssh_public_key_secret_name' with value length \"${#ssh_public_key_secret_value}\" in keyvault '$default_key_vault_name'...\n"
-az keyvault secret set \
-    --vault-name $keyvault_name \
-    --name $ssh_public_key_secret_name \
-    --value "$ssh_public_key_secret_value"
 
 printf "Setting secret '$ssh_private_key_secret_name' with value length \"${#ssh_private_key_secret_value}\" in keyvault '$default_key_vault_name'...\n"
 az keyvault secret set \
