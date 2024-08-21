@@ -315,11 +315,21 @@ function Start-DscCompliationJob {
         ComputerName = $VirtualMachineName
     }
 
+    $configuationData = @{
+        AllNodes = @(
+            @{
+                NodeName = "$VirtualMachineName"
+                PsDscAllowPlainTextPassword = $true
+            }
+        )
+    }
+
     try {
         $dscCompilationJob = Start-AzAutomationDscCompilationJob `
             -ResourceGroupName $ResourceGroupName `
             -AutomationAccountName $AutomationAccountName `
             -ConfigurationName $DscConfigurationName `
+            -ConfigurationData $configuationData `
             -Parameters $params `
             -ErrorAction Stop
     }
