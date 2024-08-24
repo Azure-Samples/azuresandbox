@@ -1,3 +1,18 @@
+locals {
+  commandParamParts = [
+    "$params = @{",
+    "TenantId = '${var.aad_tenant_id}'; ",
+    "SubscriptionId = '${var.subscription_id}'; ",
+    "AppId = '${var.arm_client_id}'; ",
+    "ResourceGroupName = '${var.resource_group_name}'; ",
+    "KeyVaultName = '${var.key_vault_name}'; ",
+    "Domain = '${var.adds_domain_name}'; ",
+    "AdminUsernameSecret = '${var.admin_username_secret}'; ",
+    "AdminPwdSecret = '${var.admin_password_secret}' ",
+    "}"
+  ]
+}
+
 # Database server virtual machine
 resource "azurerm_windows_virtual_machine" "vm_mssql_win" {
   name                       = var.vm_mssql_win_name
@@ -24,6 +39,10 @@ resource "azurerm_windows_virtual_machine" "vm_mssql_win" {
     version   = var.vm_mssql_win_image_version
   }
 
+  identity {
+    type = "SystemAssigned"
+  }
+
   # Apply configuration using Azure Automation DSC
   # Note: To view provisioner output, use the Terraform nonsensitive() function when referencing key vault secrets or variables marked 'sensitive'
   provisioner "local-exec" {
@@ -36,7 +55,7 @@ resource "azurerm_windows_virtual_machine" "vm_mssql_win" {
           AutomationAccountName   = "${var.automation_account_name}"
           VirtualMachineName      = "${var.vm_mssql_win_name}"
           AppId                   = "${var.arm_client_id}"
-          AppSecret               = "${var.arm_client_secret}"
+          AppSecret               = "${nonsensitive(var.arm_client_secret)}"
           DscConfigurationName    = "MssqlVmConfig"
         }
         ${path.root}/aadsc-register-node.ps1 @params 
@@ -96,13 +115,21 @@ resource "azurerm_virtual_machine_extension" "vm_mssql_win_postdeploy_script" {
   protected_settings = <<PROTECTED_SETTINGS
     {
       "commandToExecute": 
-        "powershell.exe -ExecutionPolicy Unrestricted -File \"./${var.vm_mssql_win_post_deploy_script}\" -Domain \"${var.adds_domain_name}\" -Username \"${data.azurerm_key_vault_secret.adminuser.value}\" -UsernameSecret \"${data.azurerm_key_vault_secret.adminpassword.value}\"",
+        "powershell.exe -ExecutionPolicy Unrestricted -Command \"${join("", local.commandParamParts)}; .\\${var.vm_mssql_win_post_deploy_script} @params\"",
       "storageAccountName": "${var.storage_account_name}",
       "storageAccountKey": "${data.azurerm_key_vault_secret.storage_account_key.value}",
       "fileUris": [ 
         "${var.vm_mssql_win_post_deploy_script_uri}", 
+        "${var.vm_mssql_win_configure_mssql_script_uri}",
         "${var.vm_mssql_win_sql_startup_script_uri}" 
       ]
     }
   PROTECTED_SETTINGS
+}
+
+resource "azurerm_key_vault_access_policy" "vm_mssql_win_secrets_get" {
+  key_vault_id       = var.key_vault_id
+  tenant_id          = azurerm_windows_virtual_machine.vm_mssql_win.identity[0].tenant_id
+  object_id          = azurerm_windows_virtual_machine.vm_mssql_win.identity[0].principal_id
+  secret_permissions = ["Get"]
 }
