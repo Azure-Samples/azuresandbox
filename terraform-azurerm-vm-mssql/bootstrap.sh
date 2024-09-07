@@ -66,6 +66,18 @@ then
   usage
 fi
 
+# Check VM size for temp disk
+printf "Checking for temp disk size on virtual machine size '$vm_mssql_win_size'...\n"
+temp_disk_size_mb=$(az vm list-sizes --location $location --query "[?name=='$vm_mssql_win_size']|[0].resourceDiskSizeInMB" --output tsv)
+
+if [ -z "$temp_disk_size_mb" ]
+then
+  printf "Virtual machine size '$vm_mssql_win_size' not found...\n"
+  usage
+fi
+
+printf "Temp disk size for virtual machine size '$vm_mssql_win_size' is '$temp_disk_size_mb' MB...\n"
+
 # Validate VM size sku availability in location
 location_noquotes=${location:1:-1}
 printf "Checking for availability of virtual machine sku '$vm_mssql_win_size' in location '$location_noquotes'...\n"
@@ -147,6 +159,7 @@ printf "resource_group_name                     = $resource_group_name\n"       
 printf "storage_account_name                    = $storage_account_name\n"                        >> ./terraform.tfvars
 printf "subscription_id                         = $subscription_id\n"                             >> ./terraform.tfvars
 printf "tags                                    = $tags\n"                                        >> ./terraform.tfvars
+printf "temp_disk_size_mb                       = $temp_disk_size_mb\n"                           >> ./terraform.tfvars
 printf "vm_mssql_win_configure_mssql_script     = \"$vm_mssql_win_configure_mssql_script\"\n"     >> ./terraform.tfvars
 printf "vm_mssql_win_configure_mssql_script_uri = \"$vm_mssql_win_configure_mssql_script_uri\"\n" >> ./terraform.tfvars
 printf "vm_mssql_win_name                       = \"$vm_mssql_win_name\"\n"                       >> ./terraform.tfvars

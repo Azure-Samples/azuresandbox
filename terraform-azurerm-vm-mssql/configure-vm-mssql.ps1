@@ -21,7 +21,10 @@ param (
     [string]$AdminUsernameSecret,
 
     [Parameter(Mandatory = $true)]
-    [string]$AdminPwdSecret
+    [string]$AdminPwdSecret,
+
+    [Parameter(Mandatory = $true)]
+    [int]$TempDiskSizeMb
 )
 
 #region constants
@@ -116,7 +119,8 @@ $commandParamParts = @(
     '$params = @{',
       "KeyVaultName = '$KeyVaultName'; ",
       "DomainAdminUser = '$domainAdminUser'; ",
-      "AdminPwdSecret = '$AdminPwdSecret'",
+      "AdminPwdSecret = '$AdminPwdSecret'; ",
+      "TempDiskSizeMb = '$TempDiskSizeMb'",
     '}'
 )
 

@@ -8,7 +8,10 @@ param (
     [string]$DomainAdminUser,
 
     [Parameter(Mandatory = $true)]
-    [string]$AdminPwdSecret
+    [string]$AdminPwdSecret,
+
+    [Parameter(Mandatory = $true)]
+    [int]$TempDiskSizeMb
 )
 
 #region constants
@@ -547,6 +550,27 @@ Move-SqlDatabase `
     -SqlDataPath $sqlDataPath `
     -SqlLogPath $sqlLogPath
 
+if ($TempDiskSizeMb -eq 0) {
+    Write-Log "There is no Azure temp disk, moving tempdb data files to '$sqlDataPath' and tempdb log files to '$sqlLogPath'..."
+
+    $filePath = "$sqlDataPath\tempdb.mdf"
+    $sqlCommand = "ALTER DATABASE tempdb MODIFY FILE ( NAME = tempdev, FILENAME = N'$filePath' );"
+    Write-Log "Altering tempdb and setting primary database file location to '$filePath'..."
+    Invoke-Sql $sqlCommand
+
+    $filePath = "$sqlDataPath\tempdb_mssql_2.ndf"
+    $sqlCommand = "ALTER DATABASE tempdb MODIFY FILE ( NAME = temp2, FILENAME = N'$filePath' ) "
+    Write-Log "Altering tempdb and setting secondary database file location to '$filePath'..."
+    Invoke-Sql $sqlCommand
+
+    $filePath = "$sqlLogPath\templog.ldf"
+    $sqlCommand = "ALTER DATABASE tempdb MODIFY FILE ( NAME = templog, FILENAME = N'$filePath' ) "
+    Write-Log "Altering tempdb and setting log file location to '$filePath'..."
+    Invoke-Sql $sqlCommand
+
+    Restart-SqlServer                            
+}
+
 # Update errorlog file location
 $sqlErrorlogPath = "$($sqlDataPath.Substring(0,2))\MSSQL\Log"
 
@@ -575,42 +599,44 @@ catch {
 Restart-SqlServer
 
 # Set SQL for manaual startup 
-Write-Log "Configuring SQL Server services for manual startup..."
+if ($TempDiskSizeMb -ne 0) {
+    Write-Log "Azure temp disk detected. Configuring SQL Server services for manual startup..."
 
-try {
-    Set-Service -Name MSSQLSERVER -StartupType Manual
-    Set-Service -Name SQLSERVERAGENT -StartupType Manual
-}
-catch {
-    Exit-WithError $_
-}
+    try {
+        Set-Service -Name MSSQLSERVER -StartupType Manual
+        Set-Service -Name SQLSERVERAGENT -StartupType Manual
+    }
+    catch {
+        Exit-WithError $_
+    }
 
-# Register scheduled task to recreate SQL Server tempdb folders on ephemeral drive
-$taskName = "SQL-startup"
-$sqlStartupScriptPath = "$((Get-Item $PSCommandPath).DirectoryName)\$taskName.ps1"
+    # Register scheduled task to recreate SQL Server tempdb folders on ephemeral drive
+    $taskName = "SQL-startup"
+    $sqlStartupScriptPath = "$((Get-Item $PSCommandPath).DirectoryName)\$taskName.ps1"
 
-if ( -not (Test-Path $sqlStartupScriptPath) ) {
-    Exit-WithError "Unable to locate '$sqlStartupScriptPath'..."
-}
+    if ( -not (Test-Path $sqlStartupScriptPath) ) {
+        Exit-WithError "Unable to locate '$sqlStartupScriptPath'..."
+    }
 
-$taskAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-ExecutionPolicy Unrestricted -File `"$sqlStartupScriptPath`"" 
-$taskTrigger = New-ScheduledTaskTrigger -AtStartup
+    $taskAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-ExecutionPolicy Unrestricted -File `"$sqlStartupScriptPath`"" 
+    $taskTrigger = New-ScheduledTaskTrigger -AtStartup
 
-Write-Log "Registering scheduled task to execute '$sqlStartupScriptPath' under user '$DomainAdminUser'..."
+    Write-Log "Registering scheduled task to execute '$sqlStartupScriptPath' under user '$DomainAdminUser'..."
 
-try {
-    Register-ScheduledTask `
-        -Force `
-        -Password $adminPwd `
-        -User $DomainAdminUser `
-        -TaskName $taskName `
-        -Action $taskAction `
-        -Trigger $taskTrigger `
-        -RunLevel 'Highest' `
-        -Description "Prepare temp drive folders for tempdb and start SQL Server."
-}
-catch {
-    Exit-WithError $_
+    try {
+        Register-ScheduledTask `
+            -Force `
+            -Password $adminPwd `
+            -User $DomainAdminUser `
+            -TaskName $taskName `
+            -Action $taskAction `
+            -Trigger $taskTrigger `
+            -RunLevel 'Highest' `
+            -Description "Prepare temp drive folders for tempdb and start SQL Server."
+    }
+    catch {
+        Exit-WithError $_
+    }
 }
 
 # Configure Windows Update 

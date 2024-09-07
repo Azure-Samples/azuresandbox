@@ -134,6 +134,8 @@ subscription_id | "00000000-0000-0000-0000-000000000000"
 tags | tomap( { "costcenter" = "10177772" "environment" = "dev" "project" = "#AzureSandbox" } )
 vnet_app_01_subnets | Contains all the subnet definitions including *snet-app-01*, *snet-db-01*, *snet-mysql-01* and *snet-privatelink-01*.
 
+The configured virtual machine size is checked to determine if it includes a temporary disk and that the size is available in the configured location.
+
 Public internet access to the shared storage account is temporarily enabled so the following PowerShell scripts can be uploaded to the *scripts* container in the storage account using the access key stored in the key vault secret *storage_account_key*. These scripts are referenced by virtual machine extensions:
 
 * [configure-vm-mssql.ps1](./configure-vm-mssql.ps1)
@@ -186,9 +188,8 @@ azurerm_key_vault_access_policy . vm_mssql_win_secrets_get | Grants *azurerm_win
     * Size
     * Lun
   * The metadata is then used to partition and format the raw data disks using the SQL Server recommended allocation unit size of 64K.
-  * The *tempdb* database is moved from the OS disk to the Azure local temporary disk (D:) and special logic is implemented to avoid errors if the Azure virtual machine is stopped, deallocated and restarted on a different host. If this occurs the `D:\SQLTEMP` folder must be recreated with appropriate permissions in order to start the SQL Server.
-    * The SQL Server is configured for manual startup
-    * The scheduled task [sql-startup.ps1](./sql-startup.ps1) is created to recreate the `D:\SQLTEMP` folder then start SQL Server. The scheduled task is set to run automatically at startup using domain administrator credentials.
+  * The *tempdb* database is moved from the OS disk to either the the Azure local temporary disk (D:) or to the data (M:) and log disks (L:) depending upon whether the VM size selected includes an Azure local temporary disk.  
+    * If *tempdb* as moved to the Azure local temporary disk (D:) special logic is implemented to avoid errors if the Azure virtual machine is stopped, deallocated and restarted on a different host. If this occurs the `D:\SQLTEMP` folder must be recreated with appropriate permissions in order to start the SQL Server. The SQL Server is configured for manual startup, and the scheduled task [sql-startup.ps1](./sql-startup.ps1) is created to recreate the `D:\SQLTEMP` folder then start SQL Server. The scheduled task is set to run automatically at startup using domain administrator credentials.
   * The data and log files for the *master*, *model* and *msdb* system databases are moved to the data and log disks respectively.
   * The SQL Server errorlog is moved to the data disk.
   * Windows Update is configured to enable first-party updates for SQL Server patching.

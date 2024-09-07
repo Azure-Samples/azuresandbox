@@ -8,7 +8,8 @@ locals {
     "KeyVaultName = '${var.key_vault_name}'; ",
     "Domain = '${var.adds_domain_name}'; ",
     "AdminUsernameSecret = '${var.admin_username_secret}'; ",
-    "AdminPwdSecret = '${var.admin_password_secret}' ",
+    "AdminPwdSecret = '${var.admin_password_secret}'; ",
+    "TempDiskSizeMb = '${var.temp_disk_size_mb}'; ",
     "}"
   ]
 }
@@ -109,7 +110,8 @@ resource "azurerm_virtual_machine_extension" "vm_mssql_win_postdeploy_script" {
   type_handler_version       = "1.10"
   auto_upgrade_minor_version = true
   depends_on = [
-    azurerm_virtual_machine_data_disk_attachment.vm_mssql_win_data_disk_attachments
+    azurerm_virtual_machine_data_disk_attachment.vm_mssql_win_data_disk_attachments,
+    azurerm_key_vault_access_policy.vm_mssql_win_secrets_get
   ]
 
   protected_settings = <<PROTECTED_SETTINGS
