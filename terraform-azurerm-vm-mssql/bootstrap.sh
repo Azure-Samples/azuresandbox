@@ -10,6 +10,7 @@ usage() {
 
 # Set these defaults prior to running the script.
 default_vm_mssql_win_name="mssqlwin1"
+vm_mssql_win_configure_mssql_script="configure-mssql.ps1"
 vm_mssql_win_post_deploy_script="configure-vm-mssql.ps1"
 vm_mssql_win_size="Standard_B4s_v2"
 vm_mssql_win_sql_startup_script="sql-startup.ps1"
@@ -65,6 +66,18 @@ then
   usage
 fi
 
+# Check VM size for temp disk
+printf "Checking for temp disk size on virtual machine size '$vm_mssql_win_size'...\n"
+temp_disk_size_mb=$(az vm list-sizes --location $location --query "[?name=='$vm_mssql_win_size']|[0].resourceDiskSizeInMB" --output tsv)
+
+if [ -z "$temp_disk_size_mb" ]
+then
+  printf "Virtual machine size '$vm_mssql_win_size' not found...\n"
+  usage
+fi
+
+printf "Temp disk size for virtual machine size '$vm_mssql_win_size' is '$temp_disk_size_mb' MB...\n"
+
 # Validate VM size sku availability in location
 location_noquotes=${location:1:-1}
 printf "Checking for availability of virtual machine sku '$vm_mssql_win_size' in location '$location_noquotes'...\n"
@@ -91,6 +104,7 @@ printf "Sleeping for 15 seconds to allow storage account settings to propogate..
 sleep 15
 
 # Upload post-deployment scripts
+vm_mssql_win_configure_mssql_script_uri="https://${storage_account_name:1:-1}.blob.core.windows.net/${storage_container_name:1:-1}/$vm_mssql_win_configure_mssql_script"
 vm_mssql_win_post_deploy_script_uri="https://${storage_account_name:1:-1}.blob.core.windows.net/${storage_container_name:1:-1}/$vm_mssql_win_post_deploy_script"
 vm_mssql_win_sql_startup_script_uri="https://${storage_account_name:1:-1}.blob.core.windows.net/${storage_container_name:1:-1}/$vm_mssql_win_sql_startup_script"
 
@@ -132,26 +146,29 @@ printf "Configuring automation account '${automation_account_name:1:-1}'...\n"
 # Generate terraform.tfvars file
 printf "\nGenerating terraform.tfvars file...\n\n"
 
-printf "aad_tenant_id                       = $aad_tenant_id\n"                           > ./terraform.tfvars
-printf "adds_domain_name                    = $adds_domain_name\n"                        >> ./terraform.tfvars
-printf "admin_password_secret               = $admin_password_secret\n"                   >> ./terraform.tfvars
-printf "admin_username_secret               = $admin_username_secret\n"                   >> ./terraform.tfvars
-printf "arm_client_id                       = $arm_client_id\n"                           >> ./terraform.tfvars
-printf "automation_account_name             = $automation_account_name\n"                 >> ./terraform.tfvars
-printf "key_vault_id                        = $key_vault_id\n"                            >> ./terraform.tfvars
-printf "key_vault_name                      = $key_vault_name\n"                          >> ./terraform.tfvars
-printf "location                            = $location\n"                                >> ./terraform.tfvars
-printf "resource_group_name                 = $resource_group_name\n"                     >> ./terraform.tfvars
-printf "storage_account_name                = $storage_account_name\n"                    >> ./terraform.tfvars
-printf "subscription_id                     = $subscription_id\n"                         >> ./terraform.tfvars
-printf "tags                                = $tags\n"                                    >> ./terraform.tfvars
-printf "vm_mssql_win_name                   = \"$vm_mssql_win_name\"\n"                   >> ./terraform.tfvars
-printf "vm_mssql_win_post_deploy_script     = \"$vm_mssql_win_post_deploy_script\"\n"     >> ./terraform.tfvars
-printf "vm_mssql_win_post_deploy_script_uri = \"$vm_mssql_win_post_deploy_script_uri\"\n" >> ./terraform.tfvars
-printf "vm_mssql_win_size                   = \"$vm_mssql_win_size\"\n"                   >> ./terraform.tfvars
-printf "vm_mssql_win_sql_startup_script     = \"$vm_mssql_win_sql_startup_script\"\n"     >> ./terraform.tfvars
-printf "vm_mssql_win_sql_startup_script_uri = \"$vm_mssql_win_sql_startup_script_uri\"\n" >> ./terraform.tfvars
-printf "vnet_app_01_subnets                 = $vnet_app_01_subnets\n"                     >> ./terraform.tfvars
+printf "aad_tenant_id                           = $aad_tenant_id\n"                               > ./terraform.tfvars
+printf "adds_domain_name                        = $adds_domain_name\n"                            >> ./terraform.tfvars
+printf "admin_password_secret                   = $admin_password_secret\n"                       >> ./terraform.tfvars
+printf "admin_username_secret                   = $admin_username_secret\n"                       >> ./terraform.tfvars
+printf "arm_client_id                           = $arm_client_id\n"                               >> ./terraform.tfvars
+printf "automation_account_name                 = $automation_account_name\n"                     >> ./terraform.tfvars
+printf "key_vault_id                            = $key_vault_id\n"                                >> ./terraform.tfvars
+printf "key_vault_name                          = $key_vault_name\n"                              >> ./terraform.tfvars
+printf "location                                = $location\n"                                    >> ./terraform.tfvars
+printf "resource_group_name                     = $resource_group_name\n"                         >> ./terraform.tfvars
+printf "storage_account_name                    = $storage_account_name\n"                        >> ./terraform.tfvars
+printf "subscription_id                         = $subscription_id\n"                             >> ./terraform.tfvars
+printf "tags                                    = $tags\n"                                        >> ./terraform.tfvars
+printf "temp_disk_size_mb                       = $temp_disk_size_mb\n"                           >> ./terraform.tfvars
+printf "vm_mssql_win_configure_mssql_script     = \"$vm_mssql_win_configure_mssql_script\"\n"     >> ./terraform.tfvars
+printf "vm_mssql_win_configure_mssql_script_uri = \"$vm_mssql_win_configure_mssql_script_uri\"\n" >> ./terraform.tfvars
+printf "vm_mssql_win_name                       = \"$vm_mssql_win_name\"\n"                       >> ./terraform.tfvars
+printf "vm_mssql_win_post_deploy_script         = \"$vm_mssql_win_post_deploy_script\"\n"         >> ./terraform.tfvars
+printf "vm_mssql_win_post_deploy_script_uri     = \"$vm_mssql_win_post_deploy_script_uri\"\n"     >> ./terraform.tfvars
+printf "vm_mssql_win_size                       = \"$vm_mssql_win_size\"\n"                       >> ./terraform.tfvars
+printf "vm_mssql_win_sql_startup_script         = \"$vm_mssql_win_sql_startup_script\"\n"         >> ./terraform.tfvars
+printf "vm_mssql_win_sql_startup_script_uri     = \"$vm_mssql_win_sql_startup_script_uri\"\n"     >> ./terraform.tfvars
+printf "vnet_app_01_subnets                     = $vnet_app_01_subnets\n"                         >> ./terraform.tfvars
 
 cat ./terraform.tfvars
 

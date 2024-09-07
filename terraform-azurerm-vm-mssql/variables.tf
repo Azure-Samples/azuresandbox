@@ -69,6 +69,21 @@ variable "tags" {
   description = "The tags in map format to be used when creating new resources."
 }
 
+variable "temp_disk_size_mb" {
+  type = number
+  description = "The size of the temporary disk in MB."
+}
+
+variable "vm_mssql_win_configure_mssql_script" {
+  type        = string
+  description = "The name of the PowerShell script used to configure SQL Server."
+}
+
+variable "vm_mssql_win_configure_mssql_script_uri" {
+  type        = string
+  description = "The uri of the PowerShell script used to configure SQL Server."
+}
+
 variable "vm_mssql_win_data_disk_config" {
   type        = map(any)
   description = "Data disk configuration for SQL Server virtual machine."

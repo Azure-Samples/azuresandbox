@@ -21,7 +21,11 @@ do {
 
 do {
     $childCertPwd = Read-Host "Child certificate password" -AsSecureString
-} until ($childCertPwd.Trim().Length -gt 0)
+    $plainTextPwd = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($childCertPwd))
+} until ($plainTextPwd.Trim().Length -gt 0)
+
+# Clear the plain text password from memory
+[System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($childCertPwd))
 
 $rootCertDerFilePath = ".\$($rootCertCN)_DER_Encoded.cer"
 $rootCertBase64FilePath = ".\$($rootCertCN)_Base64_Encoded.cer"
