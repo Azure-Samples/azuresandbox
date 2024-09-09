@@ -138,9 +138,19 @@ The following sections provide guided smoke testing of each resource provisioned
 
 * Verify *jumpwin1* node configuration is compliant.
   * From the client environment, navigate to *portal.azure.com* > *Automation Accounts* > *auto-xxxxxxxxxxxxxxxx-01* > *Configuration Management* > *State configuration (DSC)*.
-  * Refresh the data on the *Nodes* tab and verify that all nodes are compliant.
-  * Review the data in the *Configurations* and *Compiled configurations* tabs as well.
-  * Note: *jumplinux1* is configured using cloud-init, and is therefore not shown in the Azure Automation DSC *Nodes* tab.
+  * Refresh the *Nodes* tab until *jumpwin1* reports a status of `Compliant`.
+    * When *jumpwin1* node status is `Compliant`, click the *jumpwin1* node to view details.
+    * Click on the most recent *Consistency* report with the status `Compliant` to view details.
+    * Look for the *Resources* section. If no resources are listed, wait 15 minutes and refresh again until the latest *Consistency* report includes data in *Resources*.
+    * Verify that the *Resources* section includes the following:
+
+      Resource | Status
+      --- | ---
+      WindowsFeature | Compliant
+      cChocoInstaller | Compliant
+      cChocoPackageInstaller | Compliant
+      xDSCDomainjoin | Compliant
+      ADGroup | Compliant
 
 * From the client environment, navigate to *portal.azure.com* > *Virtual machines* > *jumpwin1*
   * Click *Connect*, then click *Connect via Bastion*
