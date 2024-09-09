@@ -175,6 +175,7 @@ The bootstrap script [bootstrap.sh](./bootstrap.sh) is used to initialize variab
   * The name is limited to 15 characters for compatibility with Active Directory Domain Services.
   * A new *scripts* container is created for configurations that leverage the Custom Script Extension for [Windows](https://learn.microsoft.com/azure/virtual-machines/extensions/custom-script-windows) or [Linux](https://learn.microsoft.com/azure/virtual-machines/extensions/custom-script-linux).
   * Public network access is disabled by default.
+  * *enable-hierarchical-namespace* is set to *true* to enable [Azure Data Lake Storage](https://learn.microsoft.com/azure/storage/blobs/data-lake-storage-introduction#what-is-a-data-lake) scenarios.
 * Creates a *terraform.tfvars* file for generating and applying Terraform plans.
 
 The script is idempotent and can be run multiple times even after the Terraform configuration has been applied.
