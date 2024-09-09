@@ -98,9 +98,9 @@ printdiv
 filename=/etc/netplan/50-cloud-init.yaml
 printf "Modifying '$filename'...\n" >> $log_file
 sudo cp -f "$filename" "$filename.bak"
-sudo sudo sed -i '/set-name:/a \            nameservers:' $filename
-sudo sudo sed -i "/nameservers:/a \                addresses: [$dns_server, 168.63.129.16]" $filename
-sudo sudo sed -i "/addresses:/a \                search: [$adds_domain_name, reddog.microsoft.com]" $filename
+sudo sudo sed -i '/set-name:/a \      nameservers:' $filename
+sudo sudo sed -i "/nameservers:/a \        addresses: [$dns_server, 168.63.129.16]" $filename
+sudo sudo sed -i "/addresses:/a \        search: [$adds_domain_name, reddog.microsoft.com]" $filename
 diff "$filename.bak" "$filename" >> $log_file
 printf "Generating netplan...\n" >> $log_file
 sudo netplan generate &>> $log_file
