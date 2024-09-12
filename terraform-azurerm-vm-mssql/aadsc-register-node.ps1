@@ -129,6 +129,9 @@ function Register-DscNode {
         -ActionAfterReboot 'ContinueConfiguration' `
         -ErrorAction SilentlyContinue
 
+    Write-Log "Sleeping for 60 seconds before checking node status..."    
+    Start-Sleep -Seconds 60
+    
     try {
         $dscNodes = Get-AzAutomationDscNode `
             -ResourceGroupName $ResourceGroupName `
@@ -171,7 +174,7 @@ function Register-DscNode {
         $dscNodeStatus = $dscNode.Status
         Write-Log "Retry '$retryCount': DSC node registration id '$dscNodeId' status is '$dscNodeStatus'..."
 
-        if ($dscNodeStatus -ne "Good") {
+        if ($dscNodeStatus -ne $statusCompliant) {
             Write-Log "DSC node status is not '$statusCompliant'. Retrying in 30 seconds..."
             Start-Sleep -Seconds 30
         }
