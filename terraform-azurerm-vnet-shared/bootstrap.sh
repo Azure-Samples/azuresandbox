@@ -387,7 +387,6 @@ else
     --location $location \
     --kind StorageV2 \
     --sku Standard_LRS \
-    --enable-hierarchical-namespace true \
     --https-only \
     --min-tls-version TLS1_2 \
     --public-network-access Disabled \
