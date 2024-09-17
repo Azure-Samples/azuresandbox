@@ -93,7 +93,9 @@ locals {
     "privatelink.blob.core.windows.net",
     "privatelink.database.windows.net",
     "privatelink.file.core.windows.net",
-    "privatelink.mysql.database.azure.com"
+    "privatelink.mysql.database.azure.com",
+    "privatelink.api.azureml.ms",
+    "privatelink.notebooks.azure.net"
   ]
 }
 
