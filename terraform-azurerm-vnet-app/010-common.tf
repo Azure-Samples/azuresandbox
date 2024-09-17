@@ -7,22 +7,22 @@ terraform {
 
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "=4.1.0"
+      version = "=4.2.0"
     }
 
     random = {
       source  = "hashicorp/random"
-      version = "=3.6.2"
+      version = "=3.6.3"
     }
 
     cloudinit = {
       source  = "hashicorp/cloudinit"
-      version = "=2.3.4"
+      version = "=2.3.5"
     }
 
     time = {
       source  = "hashicorp/time"
-      version = "=0.12.0"
+      version = "=0.12.1"
     }
   }
 }
