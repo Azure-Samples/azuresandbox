@@ -92,7 +92,7 @@ default_aad_tenant_id=$(az account list --query "[? isDefault]|[0].tenantId" --o
 default_admin_username="bootstrapadmin"
 default_cost_center="mycostcenter"
 default_environment="dev"
-default_location="eastus2"
+default_location="centralus"
 default_owner_object_id=$(az account get-access-token --query accessToken --output tsv | tr -d '\n' | python3 -c "import jwt, sys; print(jwt.decode(sys.stdin.read(), algorithms=['RS256'], options={'verify_signature': False})['oid'])")
 default_project="myproject"
 default_resource_group_name="rg-devops-tf"

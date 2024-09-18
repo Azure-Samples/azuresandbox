@@ -96,7 +96,7 @@ aad_tenant_id | terraform-azurerm-vnet-shared | "00000000-0000-0000-0000-0000000
 arm_client_id | terraform-azurerm-vnet-shared | "00000000-0000-0000-0000-000000000000"
 key_vault_id | terraform-azurerm-vnet-shared | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.KeyVault/vaults/kv-xxxxxxxxxxxxxxx"
 key_vault_name | terraform-azurerm-vnet-shared | "kv-xxxxxxxxxxxxxxx"
-location | terraform-azurerm-vnet-shared | "eastus"
+location | terraform-azurerm-vnet-shared | "centralus"
 private_dns_zones | terraform-azurerm-vnet-app | json payload
 resource_group_name | terraform-azurerm-vnet-shared | "rg-sandbox-01"
 storage_account_name | terraform-azurerm-vnet-shared | "stxxxxxxxxxxxxx"

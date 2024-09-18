@@ -313,7 +313,7 @@ This section describes DevOps security best practices for development and deploy
 
     resource "azurerm_resource_group" "state-demo-secure" {
       name     = "state-demo"
-      location = "eastus"
+      location = "centralus"
     }
     ```
 
