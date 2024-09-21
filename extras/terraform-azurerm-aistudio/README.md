@@ -6,6 +6,7 @@
 * [Overview](#overview)
 * [Before you start](#before-you-start)
 * [Getting started](#getting-started)
+* [Smoke testing](#smoke-testing)
 * [Documentation](#documentation)
 
 ## Architecture
@@ -30,9 +31,11 @@ The following configurations must be provisioned before starting:
 * [terraform-azurerm-vnet-shared](../../terraform-azurerm-vnet-shared/)
 * [terraform-azurerm-vnet-app](../../terraform-azurerm-vnet-app/)
 
+Review [Azure OpenAI Service quotas and limits](https://learn.microsoft.com/azure/ai-services/openai/quotas-limits) to ensure that the Azure OpenAI models you wish to leverage are available in the region where #AzureSandbox is provisioned. See [Manage and increase quotas for resources with Azure AI Studio](https://learn.microsoft.com/en-us/azure/ai-studio/how-to/quota) to ensure your subscription has the necessary quotas to provision the resources in this configuration.
+
 ## Getting started
 
-This section describes how to provision this configuration using default settings ([Step-By-Step Video](https://youtu.be/yVhdhcelYMU)).
+This section describes how to provision this configuration using default settings.
 
 * Change the working directory.
 
@@ -79,6 +82,38 @@ This section describes how to provision this configuration using default setting
   terraform state list 
   ```
 
+## Smoke testing
+
+Follow the steps in this section to test the functionality of AIStudio hubs, projects and services.
+
+* Verify that the *adds1* and *jumpwin1* virtual machines are running.
+* From the client environment, navigate to *portal.azure.com* > *Virtual machines* > *jumpwin1*
+  * Click *Connect*, then click *Connect via Bastion*
+  * For *Authentication Type* choose `Password from Azure Key Vault`
+  * For *username* enter the UPN of the domain admin, which by default is `bootstrapadmin@mysandbox.local`
+  * For *Azure Key Vault Secret* specify the following values:
+    * For *Subscription* choose the same Azure subscription used to provision the #AzureSandbox.
+    * For *Azure Key Vault* choose the key vault provisioned by [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared/#bootstrap-script), e.g. `kv-xxxxxxxxxxxxxxx`
+    * For *Azure Key Vault Secret* choose `adminpassword`
+  * Click *Connect*
+* From *jumpwin1*, sign into AIStudio and open a project.
+  * Launch Edge
+  * Navigate to `https://ai.azure.com`
+  * Click *Sign in*
+  * Authenticate using a Microsoft Entra ID account that has an Azure RBAC `Owner` role assignment to the sandbox subscription.
+    * Note: Depending upon how your Microsoft Entra ID tenant is configured, this may require device registration for *jumpwin1*.
+  * Click *View all projects*
+  * Verify that the project created in [Getting started](#getting-started) is listed.
+  * Click on the *Resource name* for the project to open it (e.g. `aip-xxxxxxxxxxxxxxx`)
+* From the AIStudio project, create a deployment.
+  * Click on *Components* > *Deployments*
+  * Click on *Deploy model* > *Deploy base model*
+  * Search for `text-embedding-ada-002` and select it
+  * Click *Confirm* then click *Connect and deploy*
+  * When deployment completes, verify that the *Provisioning state* is `Succeeded`.
+* From the AIStudio project, create an index.
+  * TBD
+
 ## Documentation
 
 This section provides additional information on various aspects of this configuration.
@@ -100,9 +135,17 @@ location | terraform-azurerm-vnet-shared | "centralus"
 private_dns_zones | terraform-azurerm-vnet-app | json payload
 resource_group_name | terraform-azurerm-vnet-shared | "rg-sandbox-01"
 storage_account_name | terraform-azurerm-vnet-shared | "stxxxxxxxxxxxxx"
+storage_share_name | terraform-azurerm-vnet-app | "myfileshare"
 subscription_id | terraform-azurerm-vnet-shared | "00000000-0000-0000-0000-000000000000"
 tags | terraform-azurerm-vnet-shared | "tomap( { "costcenter" = "mycostcenter" "environment" = "dev" "project" = "#AzureSandbox" } )"
 vnet_app_01_subnets | terraform-azurerm-vnet-app | json payload
+
+Public internet access is temporarily enabled for the shared storage account so the following documents scripts can be uploaded to the *myfileshare* share in the shared storage account using the access key stored in the key vault secret *storage_account_key*. These documents are used to build an index in AI Studio:
+
+* [OmniServe_Agent_Performance.pdf](./documents/OmniServe_Agent_Performance.pdf)
+* [OmniServe_Agent_Training.pdf](./documents/OmniServe_Agent_Training.pdf)
+* [OmniServe_Compliance_Policy.pdf](./documents/OmniServe_Compliance_Policy.pdf)
+* [OmniServe_CSAT_Guidelines.pdf](./documents/OmniServe_CSAT_Guidelines.pdf)
 
 ### Terraform resources
 
