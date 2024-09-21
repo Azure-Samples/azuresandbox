@@ -29,7 +29,7 @@ resource "random_id" "aistudio_name" {
 resource "azapi_resource" "ai_services_01" {
   type      = "Microsoft.CognitiveServices/accounts@2023-10-01-preview"
   name      = "ais-${random_id.aistudio_name.hex}"
-  location  = var.location
+  location  = var.location_openai
   parent_id = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}"
 
   identity {
