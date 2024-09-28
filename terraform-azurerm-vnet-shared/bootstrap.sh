@@ -480,6 +480,8 @@ else
     --sku Standard_LRS \
     --https-only \
     --min-tls-version TLS1_2 \
+    --bypass AzureServices \
+    --default-action Allow \
     --public-network-access Disabled \
     --tags costcenter=$costcenter project=$project environment=$environment provisioner="bootstrap.sh"
 fi
