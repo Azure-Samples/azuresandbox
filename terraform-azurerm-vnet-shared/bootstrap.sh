@@ -300,26 +300,33 @@ then
 else
   key_vault_name=kv-$(tr -dc "[:lower:][:digit:]" < /dev/urandom | head -c 15)
   printf "Creating keyvault '$key_vault_name' in resource group '$resource_group_name'...\n"
-  az keyvault create \
-    --subscription $subscription_id \
-    --name $key_vault_name \
-    --resource-group $resource_group_name \
-    --location $location \
-    --sku standard \
-    --no-self-perms \
-    --enable-rbac-authorization false \
-    --tags costcenter=$costcenter project=$project environment=$environment provisioner="bootstrap.sh"
+
+  max_retries=10
+  retry_count=0
+
+  while [ $retry_count -lt $max_retries ]; do
+    az keyvault create \
+      --subscription $subscription_id \
+      --name $key_vault_name \
+      --resource-group $resource_group_name \
+      --location $location \
+      --sku standard \
+      --no-self-perms \
+      --enable-rbac-authorization false \
+      --tags costcenter=$costcenter project=$project environment=$environment provisioner="bootstrap.sh" && break
+
+    retry_count=$((retry_count + 1))
+    echo "Attempt $retry_count failed. Retrying in 30 seconds..."
+    sleep 30
+  done
+
+  if [ $retry_count -eq $max_retries ]; then
+      echo "Error: Failed to crette key vault after $max_retries attempts." >&2
+      usage
+  fi
 fi
 
 key_vault_id="/subscriptions/$subscription_id/resourceGroups/$resource_group_name/providers/Microsoft.KeyVault/vaults/$key_vault_name"
-
-printf "Creating key vault secret access policy for Azure CLI logged in user id '$owner_object_id'...\n"
-az keyvault set-policy \
-  --subscription $subscription_id \
-  --name $key_vault_name \
-  --resource-group $resource_group_name \
-  --secret-permissions get list 'set' \
-  --object-id $owner_object_id
 
 printf "Creating key vault secret access policy for Azure CLI logged in user id '$owner_object_id'...\n"
 
