@@ -10,8 +10,6 @@ usage() {
 
 # Set these defaults prior to running the script.
 
-default_location_openai="eastus2"
-
 # Initialize runtime defaults
 state_file="../../terraform-azurerm-vnet-shared/terraform.tfstate"
 
@@ -51,25 +49,12 @@ vnet_app_01_subnets=$(terraform output -json -state=$state_file vnet_app_01_subn
 
 # User input
 
-read -e -i $default_location_openai -p "Azure OpenAI services location (location_openai) -: " location_openai
-
 # Validate user input
-
-location_openai=${location_openai:-$default_location_openai}
 
 # Validate TF_VAR_arm_client_secret
 if [ -z "$TF_VAR_arm_client_secret" ]
 then
   printf "Environment variable 'TF_VAR_arm_client_secret' must be set.\n"
-  usage
-fi
-
-# Validate location
-location_id=$(az account list-locations --query "[?name=='$location_openai'].id" --output tsv)
-
-if [ -z "$location_id" ]
-then
-  printf "Invalid Azure OpenAI services location '$location_openai'...\n"
   usage
 fi
 
@@ -114,7 +99,6 @@ printf "arm_client_id           = $arm_client_id\n"         >> ./terraform.tfvar
 printf "key_vault_id            = $key_vault_id\n"          >> ./terraform.tfvars
 printf "key_vault_name          = $key_vault_name\n"        >> ./terraform.tfvars
 printf "location                = $location\n"              >> ./terraform.tfvars
-printf "location_openai         = \"$location_openai\"\n"   >> ./terraform.tfvars
 printf "private_dns_zones       = $private_dns_zones\n"     >> ./terraform.tfvars
 printf "resource_group_name     = $resource_group_name\n"   >> ./terraform.tfvars
 printf "storage_account_name    = $storage_account_name\n"  >> ./terraform.tfvars

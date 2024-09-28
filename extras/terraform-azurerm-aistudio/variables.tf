@@ -35,11 +35,6 @@ variable "location" {
   description = "The name of the Azure Region where resources will be provisioned."
 }
 
-variable "location_openai" {
-  type        = string
-  description = "The name of the Azure region where Azure OpenAI resources will be provisioned."
-}
-
 variable "private_dns_zones" {
   type = map(any)
   description = "The existing private dns zones defined in the application virtual network."
