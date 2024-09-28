@@ -96,7 +96,9 @@ locals {
     "privatelink.mysql.database.azure.com",
     "privatelink.api.azureml.ms",
     "privatelink.notebooks.azure.net",
-    "privatelink.search.windows.net"
+    "privatelink.search.windows.net",
+    "privatelink.cognitiveservices.azure.com",
+    "privatelink.openai.azure.com"
   ]
 }
 

@@ -78,7 +78,7 @@ This section describes how to provision this configuration using default setting
 
 * Monitor output. Upon completion, you should see a message similar to the following:
 
-  `Apply complete! Resources: 62 added, 0 changed, 0 destroyed.`
+  `Apply complete! Resources: 68 added, 0 changed, 0 destroyed.`
 
 * Inspect `terraform.tfstate`.
 
@@ -319,6 +319,8 @@ azurerm_private_dns_zone . private_dns_zones ["privatelink.mysql.database.azure.
 azurerm_private_dns_zone . private_dns_zones ["privatelink.api.azureml.ms"] | extras/terraform-azurerm-aistudio | Creates a [private Azure DNS zone](https://learn.microsoft.com/azure/dns/private-dns-privatednszone) for using [Private Link for Azure AI Studio hubs](https://learn.microsoft.com/en-us/azure/ai-studio/how-to/configure-private-link?tabs=cli#create-a-hub-that-uses-a-private-endpoint).
 azurerm_private_dns_zone . private_dns_zones ["privatelink.notebooks.azure.net"] | extras/terraform-azurerm-aistudio | Creates a [private Azure DNS zone](https://learn.microsoft.com/azure/dns/private-dns-privatednszone) for using [Private Link for Azure AI Studio hubs](https://learn.microsoft.com/en-us/azure/ai-studio/how-to/configure-private-link?tabs=cli#create-a-hub-that-uses-a-private-endpoint).
 azurerm_private_dns_zone . private_dns_zones ["privatelink.search.windows.net"] | extras/terraform-azurerm-aistudio | Creates a [private Azure DNS zone](https://learn.microsoft.com/azure/dns/private-dns-privatednszone) for using [Create a private endpoint for a secure connection to Azure AI Search](https://learn.microsoft.com/azure/search/service-create-private-endpoint).
+azurerm_private_dns_zone . private_dns_zones ["privatelink.cognitiveservices.azure.com"] | extras/terraform-azurerm-aistudio | Creates a [private Azure DNS zone](https://learn.microsoft.com/azure/dns/private-dns-privatednszone) for using [Azure AI Services private endpoints](https://learn.microsoft.com/en-us/azure/ai-services/cognitive-services-virtual-networks?tabs=portal#use-private-endpoints).
+azurerm_private_dns_zone . private_dns_zones ["privatelink.openai.azure.com"] | extras/terraform-azurerm-aistudio | Creates a [private Azure DNS zone](https://learn.microsoft.com/azure/dns/private-dns-privatednszone) for using [Azure Open AI](https://learn.microsoft.com/azure/ai-services/openai/overview).
 azurerm_private_dns_zone_virtual_network_link . private_dns_zone_virtual_network_links_vnet_app_01 [*] | terraform-azurerm-vnet-app, terraform-azurerm-mssql, terraform-azurerm-mysql | Links each of the private DNS zones with azurerm_virtual_network.vnet_app_01
 azurerm_private_dns_zone_virtual_network_link . private_dns_zone_virtual_network_links_vnet_shared_01 [*] | terraform-azurerm-vnet-app, terraform-azurerm-mssql, terraform-azurerm-mysql | Links each of the private DNS zones with *var.remote_virtual_network_id*, which is the shared services virtual network.
 
