@@ -90,15 +90,16 @@ locals {
   ])
 
   private_dns_zones = [
+    "privatelink.api.azureml.ms",
+    "privatelink.azurecr.io",
     "privatelink.blob.core.windows.net",
+    "privatelink.cognitiveservices.azure.com",
     "privatelink.database.windows.net",
     "privatelink.file.core.windows.net",
     "privatelink.mysql.database.azure.com",
-    "privatelink.api.azureml.ms",
     "privatelink.notebooks.azure.net",
-    "privatelink.search.windows.net",
-    "privatelink.cognitiveservices.azure.com",
-    "privatelink.openai.azure.com"
+    "privatelink.openai.azure.com",
+    "privatelink.search.windows.net"
   ]
 }
 
