@@ -8,8 +8,6 @@ usage() {
     exit 1
 }
 
-# Set these defaults prior to running the script.
-
 # Initialize runtime defaults
 state_file="../../terraform-azurerm-vnet-shared/terraform.tfstate"
 
@@ -46,10 +44,6 @@ fi
 private_dns_zones=$(terraform output -json -state=$state_file private_dns_zones)
 storage_share_name=$(terraform output -state=$state_file storage_share_name)
 vnet_app_01_subnets=$(terraform output -json -state=$state_file vnet_app_01_subnets)
-
-# User input
-
-# Validate user input
 
 # Validate TF_VAR_arm_client_secret
 if [ -z "$TF_VAR_arm_client_secret" ]
