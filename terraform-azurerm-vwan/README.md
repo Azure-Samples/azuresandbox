@@ -291,7 +291,7 @@ Output variable | Sample value
 --- | ---
 aad_tenant_id | "00000000-0000-0000-0000-000000000000"
 arm_client_id | "00000000-0000-0000-0000-000000000000"
-location | "eastus2"
+location | "centralus"
 resource_group_name | "rg-sandbox-01"
 subscription_id | "00000000-0000-0000-0000-000000000000"
 tags | tomap( { "costcenter" = "10177772" "environment" = "dev" "project" = "#AzureSandbox" } )

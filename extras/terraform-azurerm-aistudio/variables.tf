@@ -3,10 +3,16 @@ variable "aad_tenant_id" {
   description = "The Microsoft Entra tenant id."
 }
 
+variable "ai_search_sku" {
+  type        = string
+  description = "The sku name of the Azure AI Search service to create. Choose from: Free, Basic, Standard, StorageOptimized. See https://docs.microsoft.com/en-us/azure/search/search-sku-tier"
+  default     = "basic"
+}
+
 variable "ai_services_sku" {
   type        = string
-    description = "The sku name of the Azure Analysis Services server to create. Choose from: B1, B2, D1, S0, S1, S2, S3, S4, S8, S9. Some skus are region specific. See https://docs.microsoft.com/en-us/azure/analysis-services/analysis-services-overview#availability-by-region"
-    default     = "S0"
+  description = "The sku name of the AI Services sku. Choose from: S0, S1, S2, S3, S4, S5, S6, S7, S8, S9, S10. See https://docs.microsoft.com/en-us/azure/cognitive-services/cognitive-services-apis-create-account-cli?tabs=multiservice%2Cwindows"
+  default     = "S0"
 }
 
 variable "arm_client_id" {
@@ -18,6 +24,12 @@ variable "arm_client_secret" {
   type        = string
   description = "The password for the service principal used for authenticating with Azure. Set interactively or using an environment variable 'TF_VAR_arm_client_secret'."
   sensitive   = true
+}
+
+variable "container_registry_sku" {
+  type        = string
+  description = "The sku name of the Azure Container Registry to create. Choose from: Basic, Standard, Premium. Premium is required for use with AI Studio hubs."
+  default     = "Premium"
 }
 
 variable "key_vault_id" {
@@ -36,7 +48,7 @@ variable "location" {
 }
 
 variable "private_dns_zones" {
-  type = map(any)
+  type        = map(any)
   description = "The existing private dns zones defined in the application virtual network."
 }
 

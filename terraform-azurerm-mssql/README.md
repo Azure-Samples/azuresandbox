@@ -175,7 +175,7 @@ arm_client_id | "00000000-0000-0000-0000-000000000000"
 automation_account_name | "auto-9a633c2bba9351cc-01"
 key_vault_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.KeyVault/vaults/kv-XXXXXXXXXXXXXXX"
 key_vault_name | "kv-XXXXXXXXXXXXXXX"
-location | "eastus2"
+location | "centralus"
 resource_group_name | "rg-sandbox-01"
 subscription_id | "00000000-0000-0000-0000-000000000000"
 tags | tomap( { "costcenter" = "10177772" "environment" = "dev" "project" = "#AzureSandbox" } )

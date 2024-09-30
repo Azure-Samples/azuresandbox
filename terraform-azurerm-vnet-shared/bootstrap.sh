@@ -121,7 +121,7 @@ default_admin_username="bootstrapadmin"
 default_costcenter="mycostcenter"
 default_dns_server="10.1.1.4"
 default_environment="dev"
-default_location="eastus2"
+default_location="centralus"
 default_project="#AzureSandbox"
 default_resource_group_name="rg-sandbox-01"
 default_skip_admin_password_gen="no"
@@ -300,67 +300,158 @@ then
 else
   key_vault_name=kv-$(tr -dc "[:lower:][:digit:]" < /dev/urandom | head -c 15)
   printf "Creating keyvault '$key_vault_name' in resource group '$resource_group_name'...\n"
-  az keyvault create \
-    --subscription $subscription_id \
-    --name $key_vault_name \
-    --resource-group $resource_group_name \
-    --location $location \
-    --sku standard \
-    --no-self-perms \
-    --enable-rbac-authorization false \
-    --tags costcenter=$costcenter project=$project environment=$environment provisioner="bootstrap.sh"
+
+  max_retries=10
+  retry_count=0
+
+  while [ $retry_count -lt $max_retries ]; do
+    az keyvault create \
+      --subscription $subscription_id \
+      --name $key_vault_name \
+      --resource-group $resource_group_name \
+      --location $location \
+      --sku standard \
+      --no-self-perms \
+      --enable-rbac-authorization false \
+      --tags costcenter=$costcenter project=$project environment=$environment provisioner="bootstrap.sh" && break
+
+    retry_count=$((retry_count + 1))
+    echo "Attempt $retry_count failed. Retrying in 30 seconds..."
+    sleep 30
+  done
+
+  if [ $retry_count -eq $max_retries ]; then
+      echo "Error: Failed to crette key vault after $max_retries attempts." >&2
+      usage
+  fi
 fi
 
 key_vault_id="/subscriptions/$subscription_id/resourceGroups/$resource_group_name/providers/Microsoft.KeyVault/vaults/$key_vault_name"
 
 printf "Creating key vault secret access policy for Azure CLI logged in user id '$owner_object_id'...\n"
-az keyvault set-policy \
-  --subscription $subscription_id \
-  --name $key_vault_name \
-  --resource-group $resource_group_name \
-  --secret-permissions get list 'set' \
-  --object-id $owner_object_id
+
+max_retries=10
+retry_count=0
+
+while [ $retry_count -lt $max_retries ]; do
+    az keyvault set-policy \
+        --subscription $subscription_id \
+        --name $key_vault_name \
+        --resource-group $resource_group_name \
+        --secret-permissions get list 'set' \
+        --object-id $owner_object_id && break
+
+    retry_count=$((retry_count + 1))
+    echo "Attempt $retry_count failed. Retrying in 30 seconds..."
+    sleep 30
+done
+
+if [ $retry_count -eq $max_retries ]; then
+    echo "Error: Failed to set key vault secret access policy after $max_retries attempts." >&2
+    usage
+fi
 
 printf "Creating key vault secret access policy for service principal AppId '$arm_client_id'...\n"
-az keyvault set-policy \
-  --subscription $subscription_id \
-  --name $key_vault_name \
-  --resource-group $resource_group_name \
-  --secret-permissions get 'set' \
-  --spn $arm_client_id
+
+max_retries=10
+retry_count=0
+
+while [ $retry_count -lt $max_retries ]; do
+  az keyvault set-policy \
+    --subscription $subscription_id \
+    --name $key_vault_name \
+    --resource-group $resource_group_name \
+    --secret-permissions get 'set' \
+    --spn $arm_client_id && break
+  
+    retry_count=$((retry_count + 1))
+    echo "Attempt $retry_count failed. Retrying in 30 seconds..."
+    sleep 30
+done
+
+if [ $retry_count -eq $max_retries ]; then
+    echo "Error: Failed to set key vault secret access policy after $max_retries attempts." >&2
+    usage
+fi
 
 secret_expiration_date=$(date -u -d "+$secret_expiration_days days" +'%Y-%m-%dT%H:%M:%SZ')
 printf "Secrets will expire in '$secret_expiration_days' days on '$secret_expiration_date UTC'...\n"
 
 printf "Setting secret '$admin_username_secret' with value '$admin_username' in keyvault '$key_vault_name'...\n"
-az keyvault secret set \
-  --subscription $subscription_id \
-  --vault-name $key_vault_name \
-  --name $admin_username_secret \
-  --value "$admin_username" \
-  --expires "$secret_expiration_date"
+
+max_retries=10
+retry_count=0
+
+while [ $retry_count -lt $max_retries ]; do
+  az keyvault secret set \
+    --subscription $subscription_id \
+    --vault-name $key_vault_name \
+    --name $admin_username_secret \
+    --value "$admin_username" \
+    --expires "$secret_expiration_date" && break
+
+  retry_count=$((retry_count + 1))
+  echo "Attempt $retry_count failed. Retrying in 30 seconds..."
+  sleep 30
+done
+
+if [ $retry_count -eq $max_retries ]; then
+    echo "Error: Failed to set key vault secret after $max_retries attempts." >&2
+    usage
+fi
+
 
 if [ "$skip_admin_password_gen" = 'no' ]
 then
   admin_password=$(gen_strong_password)
   printf "Setting secret '$admin_password_secret' with value length '${#admin_password}' in keyvault '$key_vault_name'...\n"
-  az keyvault secret set \
-    --subscription $subscription_id \
-    --vault-name $key_vault_name \
-    --name $admin_password_secret \
-    --value "$admin_password" \
-    --expires "$secret_expiration_date" \
-    --output none
+
+  max_retries=10
+  retry_count=0
+
+  while [ $retry_count -lt $max_retries ]; do
+    az keyvault secret set \
+      --subscription $subscription_id \
+      --vault-name $key_vault_name \
+      --name $admin_password_secret \
+      --value "$admin_password" \
+      --expires "$secret_expiration_date" \
+      --output none && break
+    
+    retry_count=$((retry_count + 1))
+    echo "Attempt $retry_count failed. Retrying in 30 seconds..."
+    sleep 30
+  done
+
+  if [ $retry_count -eq $max_retries ]; then
+      echo "Error: Failed to set key vault secret after $max_retries attempts." >&2
+      usage
+  fi
 fi
 
 printf "Setting service principal secret '$arm_client_id' with value length '${#TF_VAR_arm_client_secret}' in keyvault '$key_vault_name'...\n"
-az keyvault secret set \
-  --subscription $subscription_id \
-  --vault-name $key_vault_name \
-  --name $arm_client_id \
-  --value "$TF_VAR_arm_client_secret" \
-  --expires "$secret_expiration_date" \
-  --output none
+
+max_retries=10
+retry_count=0
+
+while [ $retry_count -lt $max_retries ]; do
+  az keyvault secret set \
+    --subscription $subscription_id \
+    --vault-name $key_vault_name \
+    --name $arm_client_id \
+    --value "$TF_VAR_arm_client_secret" \
+    --expires "$secret_expiration_date" \
+    --output none && break
+
+  retry_count=$((retry_count + 1))
+  echo "Attempt $retry_count failed. Retrying in 30 seconds..."
+  sleep 30
+done
+
+if [ $retry_count -eq $max_retries ]; then
+    echo "Error: Failed to set key vault secret after $max_retries attempts." >&2
+    usage
+fi
 
 # Boostrap storage account
 namespace="Microsoft.Storage"
@@ -389,6 +480,8 @@ else
     --sku Standard_LRS \
     --https-only \
     --min-tls-version TLS1_2 \
+    --bypass AzureServices \
+    --default-action Allow \
     --public-network-access Disabled \
     --tags costcenter=$costcenter project=$project environment=$environment provisioner="bootstrap.sh"
 fi
@@ -400,17 +493,32 @@ done
 
 if [ -z "$storage_account_key" ]; then
     echo "Failed to retrieve storage account key after 10 attempts." >&2
-    exit 1
+    usage
 fi
 
 printf "Setting storage account secret '$storage_account_name' with value length '${#storage_account_key}' to keyvault '$key_vault_name'...\n"
-az keyvault secret set \
-  --subscription $subscription_id \
-  --vault-name $key_vault_name \
-  --name $storage_account_name \
-  --value "$storage_account_key" \
-  --expires "$secret_expiration_date" \
-  --output none
+
+max_retries=10
+retry_count=0
+
+while [ $retry_count -lt $max_retries ]; do
+  az keyvault secret set \
+    --subscription $subscription_id \
+    --vault-name $key_vault_name \
+    --name $storage_account_name \
+    --value "$storage_account_key" \
+    --expires "$secret_expiration_date" \
+    --output none && break
+
+  retry_count=$((retry_count + 1))
+  echo "Attempt $retry_count failed. Retrying in 30 seconds..."
+  sleep 30
+done
+
+if [ $retry_count -eq $max_retries ]; then
+    echo "Error: Failed to set key vault secret after $max_retries attempts." >&2
+    usage
+fi
 
 # Create Kerberos key
 if [ "$skip_storage_kerb_key_gen" = 'no' ]
@@ -419,22 +527,52 @@ then
   storage_account_key_kerb1=$(az storage account keys renew --subscription $subscription_id --resource-group $resource_group_name --account-name $storage_account_name --key key1 --key-type kerb --query "[?keyName == 'kerb1'].value" --output tsv)
 
   printf "Setting storage account secret '$storage_account_name-kerb1' with value length '${#storage_account_key_kerb1}' to keyvault '$key_vault_name'...\n"
-  az keyvault secret set \
-    --subscription $subscription_id \
-    --vault-name $key_vault_name \
-    --name "$storage_account_name-kerb1" \
-    --value "$storage_account_key_kerb1" \
-    --expires "$secret_expiration_date" \
-    --output none
+
+  max_retries=10
+  retry_count=0
+
+  while [ $retry_count -lt $max_retries ]; do
+    az keyvault secret set \
+      --subscription $subscription_id \
+      --vault-name $key_vault_name \
+      --name "$storage_account_name-kerb1" \
+      --value "$storage_account_key_kerb1" \
+      --expires "$secret_expiration_date" \
+      --output none && break
+
+    retry_count=$((retry_count + 1))
+    echo "Attempt $retry_count failed. Retrying in 30 seconds..."
+    sleep 30
+  done
+
+  if [ $retry_count -eq $max_retries ]; then
+      echo "Error: Failed to set key vault secret after $max_retries attempts." >&2
+      usage
+  fi
 fi
 
 # Enable public network access
 printf "Temporarily enabling public network access to storage account '$storage_account_name'...\n"
-az storage account update \
-  --subscription $subscription_id \
-  --name $storage_account_name \
-  --resource-group $resource_group_name \
-  --public-network-access Enabled
+
+max_retries=10
+retry_count=0
+
+while [ $retry_count -lt $max_retries ]; do
+  az storage account update \
+    --subscription $subscription_id \
+    --name $storage_account_name \
+    --resource-group $resource_group_name \
+    --public-network-access Enabled && break
+
+  retry_count=$((retry_count + 1))
+  echo "Attempt $retry_count failed. Retrying in 30 seconds..."
+  sleep 30
+done
+
+if [ $retry_count -eq $max_retries ]; then
+    echo "Error: Failed to enable public network access after $max_retries attempts." >&2
+    usage
+fi
 
 printf "Sleeping for 60 seconds to allow storage account settings to propogate...\n"
 sleep 60
@@ -448,20 +586,50 @@ then
   printf "Found container '$storage_container_name' in storage account '$storage_account_name'...\n"
 else
   printf "Creating storage container '$storage_container_name' in storage account '$storage_account_name'...\n"
-  az storage container create \
-    --subscription $subscription_id \
-    --name $storage_container_name \
-    --account-name $storage_account_name \
-    --account-key $storage_account_key
+
+  max_retries=10
+  retry_count=0
+
+  while [ $retry_count -lt $max_retries ]; do
+    az storage container create \
+      --subscription $subscription_id \
+      --name $storage_container_name \
+      --account-name $storage_account_name \
+      --account-key $storage_account_key && break
+
+    retry_count=$((retry_count + 1))
+    echo "Attempt $retry_count failed. Retrying in 30 seconds..."
+    sleep 30
+  done
+
+  if [ $retry_count -eq $max_retries ]; then
+      echo "Error: Failed to create storage container after $max_retries attempts." >&2
+      usage
+  fi
 fi
 
 # Disable public network access
 printf "Disabling public network access to storage account '$storage_account_name'...\n"
-az storage account update \
-  --subscription $subscription_id \
-  --name $storage_account_name \
-  --resource-group $resource_group_name \
-  --public-network-access Disabled
+
+max_retries=10
+retry_count=0
+
+while [ $retry_count -lt $max_retries ]; do
+  az storage account update \
+    --subscription $subscription_id \
+    --name $storage_account_name \
+    --resource-group $resource_group_name \
+    --public-network-access Disabled && break
+
+  retry_count=$((retry_count + 1))
+  echo "Attempt $retry_count failed. Retrying in 30 seconds..."
+  sleep 30
+done
+
+if [ $retry_count -eq $max_retries ]; then
+    echo "Error: Failed to disable public network access after $max_retries attempts." >&2
+    usage
+fi
 
 # Build tags map
 tags=""

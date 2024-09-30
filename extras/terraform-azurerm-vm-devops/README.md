@@ -246,7 +246,7 @@ azurerm_virtual_machine_extension.vm_devops_win[*] | A collection of virtual mac
   * The starting base 0 number for the virtual machine names is set in the `vm_devops_win_instances_start` variable (e.g. `1`).
   * Using the examples above, the virtual machine names would be `DEVOPSWIN001` and `DEVOPSWIN002`.
 * The resource group is set in the `resource_group_name` variable.
-* The location is set in the `location` variable (e.g. `eastus`).
+* The location is set in the `location` variable (e.g. `centralus`).
 * The size of the virtual machines is set in the `vm_devops_win_size` variable (e.g. `Standard_B2s`).
 * *admin_username* and *admin_password* are configured using key vault secrets `adminuser` and `adminpassword`. These are the local administrator credentials used for the virtual machine before it is domain joined.
 * Automatic updates are enabled. The patch mode is set in the `vm_devops_win_patch_mode` variable (e.g. `AutomaticByOS`).

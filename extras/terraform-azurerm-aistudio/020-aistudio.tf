@@ -1,51 +1,42 @@
-resource "random_id" "app_insights_01_name" {
-  byte_length = 8
+# Adapted from:
+# https://learn.microsoft.com/en-us/azure/ai-studio/how-to/create-hub-terraform?tabs=azure-cli
+# https://learn.microsoft.com/en-us/azure/ai-studio/how-to/configure-private-link?tabs=cli#create-a-hub-that-uses-a-private-endpoint 
+# https://learn.microsoft.com/en-us/azure/ai-studio/how-to/configure-managed-network?tabs=python
+# https://learn.microsoft.com/en-us/azure/ai-studio/how-to/develop/create-hub-project-sdk?tabs=azurecli#tabpanel_2_azurecli
+# https://learn.microsoft.com/en-us/azure/ai-studio/how-to/secure-data-playground?view=azureml-api-2 
+# https://learn.microsoft.com/en-us/azure/ai-studio/how-to/troubleshoot-secure-connection-project 
+# https://learn.microsoft.com/en-us/azure/ai-services/cognitive-services-virtual-networks?tabs=portal#use-private-endpoints 
+# https://learn.microsoft.com/en-us/azure/ai-services/cognitive-services-custom-subdomains
+# https://gmusumeci.medium.com/how-to-deploy-azure-ai-search-with-a-private-endpoint-using-terraform-3b63c8b84f41
+
+locals {
+  resource_group_id  = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}"
+  storage_account_id = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.Storage/storageAccounts/${var.storage_account_name}"
 }
 
-resource "azurerm_application_insights" "app_insights_01" {
-  name                = "aic-${random_id.app_insights_01_name.hex}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  application_type    = "web"
-}
-
-resource "random_id" "container_registry_01_name" {
-  byte_length = 8
-}
-
-resource "azurerm_container_registry" "container_registry_01" {
-  name                     = "acr${random_id.container_registry_01_name.hex}"
-  resource_group_name      = var.resource_group_name
-  location                 = var.location
-  sku                      = "Premium"
-  admin_enabled            = true
-}
-
-// AIServices
 resource "random_id" "aistudio_name" {
   byte_length = 8
 }
 
+# AI Services
+# Note: opted to not use azurerm provider for AI Services to reduce deployment time
 resource "azapi_resource" "ai_services_01" {
-  type      = "Microsoft.CognitiveServices/accounts@2023-10-01-preview"
-  name      = "ais-${random_id.aistudio_name.hex}"
+  type      = "Microsoft.CognitiveServices/accounts@2024-06-01-preview"
+  name      = "ais${random_id.aistudio_name.hex}"
   location  = var.location
-  parent_id = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}"
+  parent_id = local.resource_group_id
 
   identity {
     type = "SystemAssigned"
   }
 
   body = jsonencode({
-    name = "ais-${random_id.aistudio_name.hex}"
-    properties = {
-      //restore = true
-      customSubDomainName = "ais-${random_id.aistudio_name.hex}"
-      apiProperties = {
-        statisticsEnabled = false
-      }
-    }
+    name = "ais${random_id.aistudio_name.hex}"
     kind = "AIServices"
+    properties = {
+      customSubDomainName = "ais${random_id.aistudio_name.hex}"
+      publicNetworkAccess = "Disabled"
+    }
     sku = {
       name = var.ai_services_sku
     }
@@ -54,72 +45,137 @@ resource "azapi_resource" "ai_services_01" {
   response_export_values = ["*"]
 }
 
-// Azure AI Hub
-resource "azapi_resource" "ai_hub_01" {
-  type = "Microsoft.MachineLearningServices/workspaces@2024-04-01-preview"
-  name = "aih-${random_id.aistudio_name.hex}"
-  location = var.location
-  parent_id = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}"
-
-  identity {
-    type = "SystemAssigned"
-  }
-
-  body = jsonencode({
-    properties = {
-      description = "Azure AI hub"
-      friendlyName = "aih-${random_id.aistudio_name.hex}"
-      storageAccount = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.Storage/storageAccounts/${var.storage_account_name}"
-      keyVault = var.key_vault_id
-
-      applicationInsights = azurerm_application_insights.app_insights_01.id
-      containerRegistry = azurerm_container_registry.container_registry_01.id
-
-      /*Optional: To enable Customer Managed Keys, the corresponding 
-      encryption = {
-        status = var.encryption_status
-        keyVaultProperties = {
-            keyVaultArmId = azurerm_key_vault.default.id
-            keyIdentifier = var.cmk_keyvault_key_uri
-        }
-      }
-      */
-      
-    }
-    kind = "hub"
-  })
-}
-
-// Azure AI Project
-resource "azapi_resource" "ai_project_01" {
-  type = "Microsoft.MachineLearningServices/workspaces@2024-04-01-preview"
-  name = "aip-${random_id.aistudio_name.hex}"
-  location = var.location
-  parent_id = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}"
-
-  identity {
-    type = "SystemAssigned"
-  }
-
-  body = jsonencode({
-    properties = {
-      description = "Azure AI Project"
-      friendlyName = "aip-${random_id.aistudio_name.hex}"
-      hubResourceId = azapi_resource.ai_hub_01.id
-    }
-    kind = "project"
-  })
-}
-
-resource "azurerm_private_endpoint" "ai_hub_01" {
-  name                = "pend-aih-${random_id.aistudio_name.hex}"
+resource "azurerm_private_endpoint" "ai_services_01" {
+  name                = "pend-ais${random_id.aistudio_name.hex}"
   resource_group_name = var.resource_group_name
   location            = var.location
   subnet_id           = var.vnet_app_01_subnets["snet-privatelink-01"].id
   tags                = var.tags
 
   private_service_connection {
-    name                           = "aih-${random_id.aistudio_name.hex}"
+    name                           = "ais${random_id.aistudio_name.hex}"
+    private_connection_resource_id = azapi_resource.ai_services_01.id
+    is_manual_connection           = false
+    subresource_names              = ["account"]
+  }
+
+  private_dns_zone_group {
+    name = "ai_services_01"
+    private_dns_zone_ids = [
+      var.private_dns_zones["privatelink.cognitiveservices.azure.com"].id,
+      var.private_dns_zones["privatelink.openai.azure.com"].id
+    ]
+  }
+}
+
+# Azure AI Search
+resource "azurerm_search_service" "search_service_01" {
+  name                          = "search${random_id.aistudio_name.hex}"
+  resource_group_name           = var.resource_group_name
+  location                      = var.location
+  sku                           = var.ai_search_sku
+  public_network_access_enabled = false
+}
+
+resource "azurerm_private_endpoint" "search_service_01" {
+  name                = "pend-search${random_id.aistudio_name.hex}"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  subnet_id           = var.vnet_app_01_subnets["snet-privatelink-01"].id
+  tags                = var.tags
+
+  private_service_connection {
+    name                           = "search${random_id.aistudio_name.hex}"
+    private_connection_resource_id = azurerm_search_service.search_service_01.id
+    is_manual_connection           = false
+    subresource_names              = ["searchService"]
+  }
+
+  private_dns_zone_group {
+    name = "search_service_01"
+    private_dns_zone_ids = [
+      var.private_dns_zones["privatelink.search.windows.net"].id
+    ]
+  }
+}
+
+# Application Insights workspace
+resource "azurerm_application_insights" "app_insights_01" {
+  name                = "aiw${random_id.aistudio_name.hex}"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  application_type    = "web"
+}
+
+# Container Registry
+resource "azurerm_container_registry" "container_registry_01" {
+  name                          = "acr${random_id.aistudio_name.hex}"
+  resource_group_name           = var.resource_group_name
+  location                      = var.location
+  sku                           = var.container_registry_sku
+  admin_enabled                 = true
+  public_network_access_enabled = false
+}
+
+resource "azurerm_private_endpoint" "container_registry_01" {
+  name                = "pend-acr${random_id.aistudio_name.hex}"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  subnet_id           = var.vnet_app_01_subnets["snet-privatelink-01"].id
+  tags                = var.tags
+
+  private_service_connection {
+    name                           = "acr${random_id.aistudio_name.hex}"
+    private_connection_resource_id = azurerm_container_registry.container_registry_01.id
+    is_manual_connection           = false
+    subresource_names              = ["registry"]
+  }
+
+  private_dns_zone_group {
+    name = "container_registry_01"
+    private_dns_zone_ids = [
+      var.private_dns_zones["privatelink.azurecr.io"].id
+    ]
+  }
+}
+
+# AI Studio Hub
+resource "azapi_resource" "ai_hub_01" {
+  type      = "Microsoft.MachineLearningServices/workspaces@2024-07-01-preview"
+  name      = "aih${random_id.aistudio_name.hex}"
+  location  = var.location
+  parent_id = local.resource_group_id
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  body = jsonencode({
+    kind = "Hub"
+    properties = {
+      applicationInsights      = azurerm_application_insights.app_insights_01.id
+      containerRegistry        = azurerm_container_registry.container_registry_01.id
+      description              = "Network isolated Azure AI hub."
+      enableDataIsolation      = true
+      friendlyName             = "aih${random_id.aistudio_name.hex}"
+      keyVault                 = var.key_vault_id
+      managedNetwork           = { isolationMode = "AllowInternetOutbound" }
+      publicNetworkAccess      = "Disabled"
+      storageAccount           = local.storage_account_id
+      systemDatastoresAuthMode = "identity"
+    }
+  })
+}
+
+resource "azurerm_private_endpoint" "ai_hub_01" {
+  name                = "pend-aih${random_id.aistudio_name.hex}"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  subnet_id           = var.vnet_app_01_subnets["snet-privatelink-01"].id
+  tags                = var.tags
+
+  private_service_connection {
+    name                           = "aih${random_id.aistudio_name.hex}"
     private_connection_resource_id = azapi_resource.ai_hub_01.id
     is_manual_connection           = false
     subresource_names              = ["amlworkspace"]
@@ -133,3 +189,36 @@ resource "azurerm_private_endpoint" "ai_hub_01" {
     ]
   }
 }
+
+# AI Studio Project
+# resource "azapi_resource" "ai_project_01" {
+#   type = "Microsoft.MachineLearningServices/workspaces@2024-04-01-preview"
+#   name = "aip-${random_id.aistudio_name.hex}"
+#   location = var.location
+#   parent_id = local.resource_group_id
+
+#   identity {
+#     type = "SystemAssigned"
+#   }
+
+#   body = jsonencode({
+#     properties = {
+#       description = "Azure AI Project"
+#       friendlyName = "aip-${random_id.aistudio_name.hex}"
+#       hubResourceId = azapi_resource.ai_hub_01.id
+#     }
+#     kind = "project"
+#   })
+# }
+
+
+# Private endpoint status messages
+# AOAI error
+# Network Service does not have permission to check resource /subscriptions/8e93423f-d08c-4539-ba3d-8cbc20bc6aa5/resourceGroups/rg-sandbox-01/providers/Microsoft.CognitiveServices/accounts/ais12e19da2b1f40e6b details. Please consider grant Azure Machine Learning (appId: 0736f41a-0425-4b46-bdb5-1563eff02385) read or contributor access to connected resource.
+
+# AI Services error
+# Network Service does not have permission to check resource /subscriptions/8e93423f-d08c-4539-ba3d-8cbc20bc6aa5/resourceGroups/rg-sandbox-01/providers/Microsoft.CognitiveServices/accounts/ais12e19da2b1f40e6b details. Please consider grant Azure Machine Learning (appId: 0736f41a-0425-4b46-bdb5-1563eff02385) read or contributor access to connected resource.
+
+# AI Search error
+# Network Service does not have permission to check resource /subscriptions/8e93423f-d08c-4539-ba3d-8cbc20bc6aa5/resourceGroups/rg-sandbox-01/providers/Microsoft.Search/searchServices/search12e19da2b1f40e6b details. Please consider grant Azure Machine Learning (appId: 0736f41a-0425-4b46-bdb5-1563eff02385) read or contributor access to connected resource.
+

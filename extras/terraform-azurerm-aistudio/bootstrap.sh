@@ -8,8 +8,6 @@ usage() {
     exit 1
 }
 
-# Set these defaults prior to running the script.
-
 # Initialize runtime defaults
 state_file="../../terraform-azurerm-vnet-shared/terraform.tfstate"
 
@@ -44,11 +42,8 @@ then
 fi
 
 private_dns_zones=$(terraform output -json -state=$state_file private_dns_zones)
+storage_share_name=$(terraform output -state=$state_file storage_share_name)
 vnet_app_01_subnets=$(terraform output -json -state=$state_file vnet_app_01_subnets)
-
-# User input
-
-# Validate user input
 
 # Validate TF_VAR_arm_client_secret
 if [ -z "$TF_VAR_arm_client_secret" ]
@@ -57,6 +52,38 @@ then
   usage
 fi
 
+# Upload documents
+printf "Temporarily enabling public internet access to storage account '${storage_account_name:1:-1}'...\n"
+az storage account update \
+  --subscription ${subscription_id:1:-1} \
+  --name ${storage_account_name:1:-1} \
+  --resource-group ${resource_group_name:1:-1} \
+  --public-network-access Enabled
+
+printf "Sleeping for 15 seconds to allow storage account settings to propogate...\n"
+sleep 15
+
+printf "Getting storage account key for storage account '${storage_account_name:1:-1}' from key vault '${key_vault_name:1:-1}'...\n"
+storage_account_key=$(az keyvault secret show --name ${storage_account_name:1:-1} --vault-name ${key_vault_name:1:-1} --query value --output tsv)
+
+for i in {1..12}
+do
+  printf "Attempt $i: Uploading documents to share '${storage_share_name:1:-1}' in storage account '${storage_account_name:1:-1}'...\n"
+  az storage file upload-batch \
+      --account-name ${storage_account_name:1:-1} \
+      --account-key "$storage_account_key" \
+      --destination ${storage_share_name:1:-1} \
+      --destination-path 'documents' \
+      --source './documents/' \
+      --pattern '*.pdf' && break || sleep 15
+done
+
+printf "Disabling public internet access to storage account '${storage_account_name:1:-1}'...\n"
+az storage account update \
+  --subscription ${subscription_id:1:-1} \
+  --name ${storage_account_name:1:-1} \
+  --resource-group ${resource_group_name:1:-1} \
+  --public-network-access Disabled
 
 # Generate terraform.tfvars file
 printf "\nGenerating terraform.tfvars file...\n\n"

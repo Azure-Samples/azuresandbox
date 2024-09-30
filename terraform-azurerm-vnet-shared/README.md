@@ -175,6 +175,7 @@ The bootstrap script [bootstrap.sh](./bootstrap.sh) is used to initialize variab
   * The name is limited to 15 characters for compatibility with Active Directory Domain Services.
   * A new *scripts* container is created for configurations that leverage the Custom Script Extension for [Windows](https://learn.microsoft.com/azure/virtual-machines/extensions/custom-script-windows) or [Linux](https://learn.microsoft.com/azure/virtual-machines/extensions/custom-script-linux).
   * Public network access is disabled by default.
+  * The network exception `AzureServices` is enabled. See [Grant access to trusted Azure services](https://learn.microsoft.com/en-us/azure/storage/common/storage-network-security?toc=%2Fazure%2Fstorage%2Fblobs%2Ftoc.json&bc=%2Fazure%2Fstorage%2Fblobs%2Fbreadcrumb%2Ftoc.json&tabs=azure-portal#grant-access-to-trusted-azure-services) for more information.
 * Creates a *terraform.tfvars* file for generating and applying Terraform plans.
 
 The script is idempotent and can be run multiple times even after the Terraform configuration has been applied.
@@ -279,7 +280,7 @@ automation_account_name | "auto-9a633c2bba9351cc-01"
 dns_server | "10.1.2.4"
 key_vault_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.KeyVault/vaults/kv-XXXXXXXXXXXXXXX"
 key_vault_name | "kv-XXXXXXXXXXXXXXX"
-location | "eastus2"
+location | "centralus"
 log_analytics_workspace_01_name | "log-XXXXXXXXXXXXXXXX-01"
 log_analytics_workspace_01_workspace_id | "00000000-0000-0000-0000-000000000000"
 resource_group_name | "rg-sandbox-01"

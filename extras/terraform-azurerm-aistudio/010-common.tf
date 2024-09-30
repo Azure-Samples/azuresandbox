@@ -7,7 +7,7 @@ terraform {
 
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "=4.2.0"
+      version = "=4.3.0"
     }
 
     random = {
@@ -26,10 +26,10 @@ provider "azapi" {
 }
 
 provider "azurerm" {
-  subscription_id            = var.subscription_id
-  client_id                  = var.arm_client_id
-  client_secret              = var.arm_client_secret
-  tenant_id                  = var.aad_tenant_id
+  subscription_id = var.subscription_id
+  client_id       = var.arm_client_id
+  client_secret   = var.arm_client_secret
+  tenant_id       = var.aad_tenant_id
 
   features {}
 }

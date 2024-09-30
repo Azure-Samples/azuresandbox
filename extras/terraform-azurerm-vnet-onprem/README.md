@@ -264,7 +264,7 @@ automation_account_name | terraform-azurerm-vnet-shared | "auto-xxxxxxxxxxxxxxxx
 dns_server_cloud | terraform-azurerm-vnet-shared | "10.1.2.4"
 key_vault_id | terraform-azurerm-vnet-shared | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.KeyVault/vaults/kv-xxxxxxxxxxxxxxx"
 key_vault_name | terraform-azurerm-vnet-shared | "kv-xxxxxxxxxxxxxxx"
-location | terraform-azurerm-vnet-shared | "eastus"
+location | terraform-azurerm-vnet-shared | "centralus"
 resource_group_name | terraform-azurerm-vnet-shared | "rg-sandbox-01"
 subscription_id | terraform-azurerm-vnet-shared | "00000000-0000-0000-0000-000000000000"
 tags | terraform-azurerm-vnet-shared | "tomap( { "costcenter" = "10177772" "environment" = "dev" "project" = "#AzureSandbox" } )"
