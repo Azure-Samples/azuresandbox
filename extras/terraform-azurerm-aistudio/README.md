@@ -15,14 +15,20 @@
 
 ## Overview
 
-This configuration creates a new [Azure AI Studio](https://learn.microsoft.com/en-us/azure/ai-studio/what-is-ai-studio) hub and project, including:
+This configuration enables the use of [Azure AI Studio](https://learn.microsoft.com/en-us/azure/ai-studio/what-is-ai-studio) in #AzureSandbox, including:
 
-* An [Application Insights](https://learn.microsoft.com/azure/azure-monitor/app/app-insights-overview) workspace.
-* An [Azure Container Registry](https://learn.microsoft.com/azure/container-registry/container-registry-intro).
-* A network isolated [Azure AI Studio Hub](https://learn.microsoft.com/azure/ai-studio/concepts/ai-resources#set-up-and-secure-a-hub-for-your-team).
-* An [Azure AI Studio Project](https://learn.microsoft.com/azure/ai-studio/concepts/ai-resources)
-* [Azure AI Services API access keys](https://learn.microsoft.com/azure/ai-studio/concepts/ai-resources#azure-ai-services-api-access-keys).
-* A [private endpoint](https://learn.microsoft.com/azure/ai-studio/how-to/configure-private-link?tabs=cli#create-a-hub-that-uses-a-private-endpoint) used for network connectivity by the Azure AI Studio Hub.
+* An [Azure AI Studio hub](https://learn.microsoft.com/en-us/azure/ai-studio/concepts/ai-resources) configured for [network isolation](https://learn.microsoft.com/azure/ai-studio/how-to/configure-managed-network). The hub is connected to the shared services storage account and key vault.
+  * An [Application Insights](https://learn.microsoft.com/azure/azure-monitor/app/app-insights-overview) workspace connected to the hub.
+  * An [Azure Container Registry](https://learn.microsoft.com/azure/container-registry/container-registry-intro) connected to the hub.
+* Additional AI services which can be [connected](https://learn.microsoft.com/azure/ai-studio/concepts/connections) to the hub, including:
+  * An [Azure AI Services](https://learn.microsoft.com/azure/ai-services/what-are-ai-services) resource.
+  * An [Azure AI Search](https://learn.microsoft.com/en-us/azure/search/search-what-is-azure-search) resource.
+
+Activity | Estimated time required
+--- | ---
+Bootstrap | ~5 minutes
+Provisioning | ~10 minutes
+Smoke testing | ~30 minutes
 
 ## Before you start
 
@@ -32,6 +38,8 @@ Note that this configuration requires that #AzureSandbox be provisioned in a reg
 * [terraform-azurerm-vnet-app](../../terraform-azurerm-vnet-app/)
 
 Review [Azure OpenAI Service quotas and limits](https://learn.microsoft.com/azure/ai-services/openai/quotas-limits) to ensure that the Azure OpenAI models you wish to leverage are available in the region where #AzureSandbox is provisioned. See [Manage and increase quotas for resources with Azure AI Studio](https://learn.microsoft.com/en-us/azure/ai-studio/how-to/quota) to ensure your subscription has the necessary quotas to provision the resources in this configuration.
+
+The user running [bootstrap.sh](./bootstrap.sh) is assumed to be the same user who will be using AI Studio interactively, and must have an `Owner` Azure RBAC role assignment for the sandbox subscription. The same user must also have the Azure CLI authenticated to the sandbox subscription. This is due to the requirement for Azure RBAC role assignments to be added to support interactive use of the AI Studio hub's integration with the shared services storage account.
 
 ## Getting started
 
@@ -133,28 +141,16 @@ Follow the steps in this section to test the functionality of AIStudio hubs, pro
 * From the AIStudio project, create a deployment.
   * Navigate to *Components* > *Deployments*
   * Click on *Deploy model* > *Deploy base model*
-  * Search for `gpt-4o` and select it. Scroll through the description and verify the version is `2024-08-06`.
-  * Click *Confirm* then click *Deploy*.
+  * Search for `gpt-4o` and select it.
+  * Click *Confirm*.
+  * Examine the defaults then click *Deploy*.
   * When deployment completes, verify that the *Provisioning state* is `Succeeded`.
-* From the AIStudio project, set up a content filter to manage inappropriate content.
-  * Navigate to *Components* > *Content filters*
-  * Click *Crete content filter*
-  * Enter a name for the filter (e.g. `filterxx`)
-  * Set the *Connection* to the Azure AI Services connection (e.g. `aisxx`) and click *Next*
-  * Input filter: Set your desired thresholds for each category of inappropriate content and click *Next*
-    * Enable the *Blocklist* if desired and choose the desired block list (e.g. `Profanity`).
-  * Click *Next*
-  * Output filter: Set your desired thresholds for each category of inappropriate content.
-    * Enable the *Blocklist* if desired and choose the desired block list (e.g. `Profanity`).
-  * Click *Next*
-  * Deployment: Select the `gpt-4o` deployment and click *Next* and click *Replace*.
-  * Review the filter settings and click *Create filter*.
 * From the AIStudio project, test the deployment in the chat playground.
   * Navigate to *Project playground* > *Chat*
   * Confirm the *Deployment* is set to `gpt-4o`.
   * Enter the following in *Give the model instructions and context*
     * `You are an AI assistant to help analyze call center transcripts.`
-  * Click on *Apply changes* and click *Continue*.
+  * Click on *Save* and click *Continue*.
   * Paste the following prompt into the chat window and click *Send*.
 
       ```text
@@ -213,6 +209,11 @@ storage_share_name | terraform-azurerm-vnet-app | "myfileshare"
 subscription_id | terraform-azurerm-vnet-shared | "00000000-0000-0000-0000-000000000000"
 tags | terraform-azurerm-vnet-shared | "tomap( { "costcenter" = "mycostcenter" "environment" = "dev" "project" = "#AzureSandbox" } )"
 vnet_app_01_subnets | terraform-azurerm-vnet-app | json payload
+
+Azure RBAC role assignments are added to support interactive use of the shared services storage account in AI Studio chat playground, including:
+
+* `Storage Blob Data Contributor`
+* `Storage File Data Privileged Contributor`
 
 Public internet access is temporarily enabled for the shared storage account so the following documents scripts can be uploaded to the *myfileshare* share in the shared storage account using the access key stored in the key vault secret *storage_account_key*. These documents are used to build an index in AI Studio:
 

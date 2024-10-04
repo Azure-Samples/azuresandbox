@@ -14,13 +14,13 @@ Contains additional Terraform configurations and supporting resources.
 
 This section describes additional Terraform configurations that can be added to #AzureSandbox. These configurations are not required to use #AzureSandbox, but may be useful for learning or testing purposes.
 
-* [terraform-azurerm-aistudio](./terraform-azurerm-aistudio/) creates a new [Azure AI Studio](https://learn.microsoft.com/en-us/azure/ai-studio/what-is-ai-studio) hub and project, including:
-  * An [Application Insights](https://learn.microsoft.com/azure/azure-monitor/app/app-insights-overview) workspace.
-  * An [Azure Container Registry](https://learn.microsoft.com/azure/container-registry/container-registry-intro).
-  * A network isolated [Azure AI Studio Hub](https://learn.microsoft.com/azure/ai-studio/concepts/ai-resources#set-up-and-secure-a-hub-for-your-team).
-  * An [Azure AI Studio Project](https://learn.microsoft.com/azure/ai-studio/concepts/ai-resources)
-  * [Azure AI Services API access keys](https://learn.microsoft.com/azure/ai-studio/concepts/ai-resources#azure-ai-services-api-access-keys).
-  * A [private endpoint](https://learn.microsoft.com/azure/ai-studio/how-to/configure-private-link?tabs=cli#create-a-hub-that-uses-a-private-endpoint) used for network connectivity by the Azure AI Studio Hub.
+* [terraform-azurerm-aistudio](./terraform-azurerm-aistudio/) enables the use of [Azure AI Studio](https://learn.microsoft.com/en-us/azure/ai-studio/what-is-ai-studio) in #AzureSandbox, including:
+  * An [Azure AI Studio hub](https://learn.microsoft.com/en-us/azure/ai-studio/concepts/ai-resources) configured for [network isolation](https://learn.microsoft.com/azure/ai-studio/how-to/configure-managed-network). The hub is connected to the shared services storage account and key vault.
+    * An [Application Insights](https://learn.microsoft.com/azure/azure-monitor/app/app-insights-overview) workspace connected to the hub.
+    * An [Azure Container Registry](https://learn.microsoft.com/azure/container-registry/container-registry-intro) connected to the hub.
+  * Additional AI services which can be [connected](https://learn.microsoft.com/azure/ai-studio/concepts/connections) to the hub, including:
+    * An [Azure AI Services](https://learn.microsoft.com/azure/ai-services/what-are-ai-services) resource.
+    * An [Azure AI Search](https://learn.microsoft.com/en-us/azure/search/search-what-is-azure-search) resource.
 * [terraform-azurerm-rg-devops](./terraform-azurerm-rg-devops/) includes the following:
   * A [resource group](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#resource-group) which contains DevOps environment resources.
   * A [key vault](https://learn.microsoft.com/azure/key-vault/general/overview) for managing secrets.
