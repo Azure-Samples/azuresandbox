@@ -9,6 +9,7 @@ usage() {
 }
 
 # Initialize runtime defaults
+default_owner_object_id=$(az account get-access-token --query accessToken --output tsv | tr -d '\n' | python3 -c "import jwt, sys; print(jwt.decode(sys.stdin.read(), algorithms=['RS256'], options={'verify_signature': False})['oid'])")
 state_file="../../terraform-azurerm-vnet-shared/terraform.tfstate"
 
 printf "Retrieving runtime defaults from state file '$state_file'...\n"
@@ -45,12 +46,40 @@ private_dns_zones=$(terraform output -json -state=$state_file private_dns_zones)
 storage_share_name=$(terraform output -state=$state_file storage_share_name)
 vnet_app_01_subnets=$(terraform output -json -state=$state_file vnet_app_01_subnets)
 
+# Get user input
+read -e -i $default_owner_object_id -p "Object id for Azure CLI signed in user (owner_object_id) -: " owner_object_id
+
+# Validate user input
+owner_object_id=${owner_object_id:-$default_owner_object_id}
+
 # Validate TF_VAR_arm_client_secret
 if [ -z "$TF_VAR_arm_client_secret" ]
 then
   printf "Environment variable 'TF_VAR_arm_client_secret' must be set.\n"
   usage
 fi
+
+# Validate object id of Azure CLI signed in user
+if [ -z "$owner_object_id" ]
+then
+  printf "Object id for Azure CLI signed in user (owner_object_id) not provided.\n"
+  usage
+fi
+
+# Add role assignments for interactive AI Studio user
+role_name="Storage Blob Data Contributor"
+printf "Adding role assignment '$role_name' to storage account '${storage_account_name:1:-1}' for user '$owner_object_id'...\n"
+az role assignment create \
+  --role "$role_name" \
+  --assignee $owner_object_id \
+  --scope "/subscriptions/${subscription_id:1:-1}/resourceGroups/${resource_group_name:1:-1}/providers/Microsoft.Storage/storageAccounts/${storage_account_name:1:-1}"
+
+role_name="Storage File Data Privileged Contributor"
+printf "Adding role assignment '$role_name' to storage account '${storage_account_name:1:-1}' for user '$owner_object_id'...\n"
+az role assignment create \
+  --role "$role_name" \
+  --assignee $owner_object_id \
+  --scope "/subscriptions/${subscription_id:1:-1}/resourceGroups/${resource_group_name:1:-1}/providers/Microsoft.Storage/storageAccounts/${storage_account_name:1:-1}"
 
 # Upload documents
 printf "Temporarily enabling public internet access to storage account '${storage_account_name:1:-1}'...\n"

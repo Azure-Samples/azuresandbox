@@ -7,6 +7,7 @@
 # https://learn.microsoft.com/en-us/azure/ai-studio/how-to/troubleshoot-secure-connection-project 
 # https://learn.microsoft.com/en-us/azure/ai-services/cognitive-services-virtual-networks?tabs=portal#use-private-endpoints 
 # https://learn.microsoft.com/en-us/azure/ai-services/cognitive-services-custom-subdomains
+# https://learn.microsoft.com/en-us/azure/machine-learning/how-to-enable-studio-virtual-network?view=azureml-api-2 
 # https://gmusumeci.medium.com/how-to-deploy-azure-ai-search-with-a-private-endpoint-using-terraform-3b63c8b84f41
 
 locals {
