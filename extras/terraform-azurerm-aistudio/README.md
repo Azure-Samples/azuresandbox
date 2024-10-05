@@ -8,6 +8,7 @@
 * [Getting started](#getting-started)
 * [Smoke testing](#smoke-testing)
 * [Documentation](#documentation)
+* [Videos](#videos)
 
 ## Architecture
 
@@ -15,7 +16,7 @@
 
 ## Overview
 
-This configuration enables the use of [Azure AI Studio](https://learn.microsoft.com/en-us/azure/ai-studio/what-is-ai-studio) in #AzureSandbox, including:
+This configuration enables the use of [Azure AI Studio](https://learn.microsoft.com/en-us/azure/ai-studio/what-is-ai-studio) in #AzureSandbox, including ([Step-By-Step Video](https://youtu.be/Fl0y5N2vdyw)):
 
 * An [Azure AI Studio hub](https://learn.microsoft.com/en-us/azure/ai-studio/concepts/ai-resources) configured for [network isolation](https://learn.microsoft.com/azure/ai-studio/how-to/configure-managed-network). The hub is connected to the shared services storage account and key vault.
   * An [Application Insights](https://learn.microsoft.com/azure/azure-monitor/app/app-insights-overview) workspace connected to the hub.
@@ -43,7 +44,7 @@ The user running [bootstrap.sh](./bootstrap.sh) is assumed to be the same user w
 
 ## Getting started
 
-This section describes how to provision this configuration using default settings.
+This section describes how to provision this configuration using default settings ([Step-By-Step Video](https://youtu.be/Q1tyxXTlSdI)).
 
 * Change the working directory.
 
@@ -92,7 +93,7 @@ This section describes how to provision this configuration using default setting
 
 ## Smoke testing
 
-Follow the steps in this section to test the functionality of AIStudio hubs, projects and services.
+Follow the steps in this section to test the functionality of AIStudio hubs, projects and services ([Step-By-Step Video](https://youtu.be/yJIjYepGHEw)).
 
 * Verify that the *adds1* and *jumpwin1* virtual machines are running.
 * Verify network isolation of AI Studio hub
@@ -149,7 +150,11 @@ Follow the steps in this section to test the functionality of AIStudio hubs, pro
   * Navigate to *Project playground* > *Chat*
   * Confirm the *Deployment* is set to `gpt-4o`.
   * Enter the following in *Give the model instructions and context*
-    * `You are an AI assistant to help analyze call center transcripts.`
+
+      ```text
+      You are an AI assistant to help analyze call center transcripts.
+      ```
+
   * Click on *Save* and click *Continue*.
   * Paste the following prompt into the chat window and click *Send*.
 
@@ -186,7 +191,7 @@ Follow the steps in this section to test the functionality of AIStudio hubs, pro
 
 ## Documentation
 
-This section provides additional information on various aspects of this configuration.
+This section provides additional information on various aspects of this configuration ([Step-By-Step Video](https://youtu.be/xQcNNfQFE50)).
 
 ### Bootstrap script
 
@@ -245,3 +250,12 @@ azurerm_search_service.search_service_01 (searchxx) | An [Azure AI Search](https
 random_id.aistudio_name | Random id used to name resources in this configuration.
 
 This configuration provisions an [Azure AI Studio hub](https://learn.microsoft.com/azure/ai-studio/concepts/ai-resources#set-up-and-secure-a-hub-for-your-team) in network isolated mode. The AI Studio hub is connected to the existing shared services storage account and key vault. The hub is also connected to a new [Application Insights](https://learn.microsoft.com/azure/azure-monitor/app/app-insights-overview) workspace and [Azure Container Registry](https://learn.microsoft.com/azure/container-registry/container-registry-intro). A new [Azure AI Search](https://learn.microsoft.com/azure/search/search-what-is-azure-search) resource is created as well for use in Azure AI Studio.
+
+## Videos
+
+Video | Section
+--- | ---
+[Azure Sandbox Extras - Azure AI Studio (Part 1)](https://youtu.be/Fl0y5N2vdyw) | [Overview](#overview)
+[Azure Sandbox Extras - Azure AI Studio (Part 2)](https://youtu.be/Q1tyxXTlSdI) | [Getting started](#getting-started)
+[Azure Sandbox Extras - Azure AI Studio (Part 3)](https://youtu.be/yJIjYepGHEw) | [Smoke testing](#smoke-testing)
+[Azure Sandbox Extras - Azure AI Studio (Part 4)](https://youtu.be/xQcNNfQFE50) | [Documentation](#documentation)
