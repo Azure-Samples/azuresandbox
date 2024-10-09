@@ -211,10 +211,11 @@ This configuration makes extensive use of [Azure Automation State Configuration 
 * [configure-automation.ps1](./configure-automation.ps1): This script is run by a provisioner in the *azurerm_automation_account.automation_account_01* resource and does the following:
   * Configures [Azure Automation shared resources](https://learn.microsoft.com/azure/automation/automation-intro#shared-resources) including:
     * [Modules](https://learn.microsoft.com/azure/automation/shared-resources/modules)
-      * Existing modules are updated to the most recent release where possible.
-      * Imports new modules including the following:
+      * Imports modules including the following:
         * [ActiveDirectoryDsc](https://github.com/dsccommunity/ActiveDirectoryDsc)
         * [DnsServerDsc](https://github.com/dsccommunity/DnsServerDsc)
+        * [PSDscResources](https://www.powershellgallery.com/packages/PSDscResources)
+        * [xDSCDomainjoin](https://www.powershellgallery.com/packages/xDscDomainJoin)
     * Bootstraps [Variables](https://learn.microsoft.com/azure/automation/shared-resources/variables)
     * Bootstraps [Credentials](https://learn.microsoft.com/azure/automation/shared-resources/credentials)
   * Configures [Azure Automation State Configuration (DSC)](https://learn.microsoft.com/azure/automation/automation-dsc-overview) which is used to configure Windows Server virtual machines used in the configurations.

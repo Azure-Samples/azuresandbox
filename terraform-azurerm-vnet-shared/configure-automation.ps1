@@ -505,15 +505,17 @@ if ($null -eq $automationAccount) {
 Write-Log "Located automation account '$AutomationAccountName' in resource group '$ResourceGroupName'"
 
 # Bootstrap automation modules
-Update-ExistingModule `
+Import-Module `
     -ResourceGroupName $ResourceGroupName `
     -AutomationAccountName $automationAccount.AutomationAccountName `
-    -ModuleName 'PSDscResources'
+    -ModuleName 'PSDscResources' `
+    -ModuleUri 'https://www.powershellgallery.com/api/v2/package/PSDscResources'
 
-Update-ExistingModule `
+Import-Module `
     -ResourceGroupName $ResourceGroupName `
     -AutomationAccountName $automationAccount.AutomationAccountName `
-    -ModuleName 'xDSCDomainjoin'
+    -ModuleName 'xDSCDomainjoin' `
+    -ModuleUri 'https://www.powershellgallery.com/api/v2/package/xDSCDomainjoin'
 
 Import-Module `
     -ResourceGroupName $ResourceGroupName `
