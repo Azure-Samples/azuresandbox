@@ -215,12 +215,7 @@ subscription_id | terraform-azurerm-vnet-shared | "00000000-0000-0000-0000-00000
 tags | terraform-azurerm-vnet-shared | "tomap( { "costcenter" = "mycostcenter" "environment" = "dev" "project" = "#AzureSandbox" } )"
 vnet_app_01_subnets | terraform-azurerm-vnet-app | json payload
 
-Azure RBAC role assignments are added to support interactive use of the shared services storage account in AI Studio chat playground, including:
-
-* `Storage Blob Data Contributor`
-* `Storage File Data Privileged Contributor`
-
-Public internet access is temporarily enabled for the shared storage account so the following documents scripts can be uploaded to the *myfileshare* share in the shared storage account using the access key stored in the key vault secret *storage_account_key*. These documents are used to build an index in AI Studio:
+Public internet access and shared key access are temporarily enabled for the shared storage account so the following documents scripts can be uploaded to the *myfileshare* share in the shared storage account using the access key stored in the key vault secret *storage_account_key*. These documents are used to build an index in AI Studio:
 
 * [Claim-Reporting-Script-Prompts.PropertyMgmt.pdf](./documents/Claim-Reporting-Script-Prompts.PropertyMgmt.pdf)
 * [OmniServe_Agent_Performance.pdf](./documents/OmniServe_Agent_Performance.pdf)

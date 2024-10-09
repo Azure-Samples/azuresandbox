@@ -66,28 +66,14 @@ then
   usage
 fi
 
-# Add role assignments for interactive AI Studio user
-role_name="Storage Blob Data Contributor"
-printf "Adding role assignment '$role_name' to storage account '${storage_account_name:1:-1}' for user '$owner_object_id'...\n"
-az role assignment create \
-  --role "$role_name" \
-  --assignee $owner_object_id \
-  --scope "/subscriptions/${subscription_id:1:-1}/resourceGroups/${resource_group_name:1:-1}/providers/Microsoft.Storage/storageAccounts/${storage_account_name:1:-1}"
-
-role_name="Storage File Data Privileged Contributor"
-printf "Adding role assignment '$role_name' to storage account '${storage_account_name:1:-1}' for user '$owner_object_id'...\n"
-az role assignment create \
-  --role "$role_name" \
-  --assignee $owner_object_id \
-  --scope "/subscriptions/${subscription_id:1:-1}/resourceGroups/${resource_group_name:1:-1}/providers/Microsoft.Storage/storageAccounts/${storage_account_name:1:-1}"
-
 # Upload documents
-printf "Temporarily enabling public internet access to storage account '${storage_account_name:1:-1}'...\n"
+printf "Temporarily enabling public internet access and shared key access on storage account '${storage_account_name:1:-1}'...\n"
 az storage account update \
   --subscription ${subscription_id:1:-1} \
   --name ${storage_account_name:1:-1} \
   --resource-group ${resource_group_name:1:-1} \
-  --public-network-access Enabled
+  --public-network-access Enabled \
+  --allow-shared-key-access true
 
 printf "Sleeping for 15 seconds to allow storage account settings to propogate...\n"
 sleep 15
@@ -107,12 +93,13 @@ do
       --pattern '*.pdf' && break || sleep 15
 done
 
-printf "Disabling public internet access to storage account '${storage_account_name:1:-1}'...\n"
+printf "Disabling public internet access and shared key access on storage account '${storage_account_name:1:-1}'...\n"
 az storage account update \
   --subscription ${subscription_id:1:-1} \
   --name ${storage_account_name:1:-1} \
   --resource-group ${resource_group_name:1:-1} \
-  --public-network-access Disabled
+  --public-network-access Disabled \
+  --allow-shared-key-access false
 
 # Generate terraform.tfvars file
 printf "\nGenerating terraform.tfvars file...\n\n"

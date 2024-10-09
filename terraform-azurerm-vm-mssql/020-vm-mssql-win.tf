@@ -12,6 +12,8 @@ locals {
     "TempDiskSizeMb = '${var.temp_disk_size_mb}'; ",
     "}"
   ]
+
+  storage_account_id = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.Storage/storageAccounts/${var.storage_account_name}"
 }
 
 # Database server virtual machine
@@ -101,6 +103,21 @@ resource "azurerm_virtual_machine_data_disk_attachment" "vm_mssql_win_data_disk_
   caching            = each.value.caching
 }
 
+# Role assignment for blob storage account
+resource "azurerm_role_assignment" "vm_mssql_win_storage_account_role_assignment" {
+  scope                = local.storage_account_id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_windows_virtual_machine.vm_mssql_win.identity[0].principal_id
+}
+
+# Access policy for key vault
+resource "azurerm_key_vault_access_policy" "vm_mssql_win_secrets_get" {
+  key_vault_id       = var.key_vault_id
+  tenant_id          = azurerm_windows_virtual_machine.vm_mssql_win.identity[0].tenant_id
+  object_id          = azurerm_windows_virtual_machine.vm_mssql_win.identity[0].principal_id
+  secret_permissions = ["Get"]
+}
+
 # Virtual machine extensions
 resource "azurerm_virtual_machine_extension" "vm_mssql_win_postdeploy_script" {
   name                       = "vmext-${azurerm_windows_virtual_machine.vm_mssql_win.name}-postdeploy-script"
@@ -111,27 +128,21 @@ resource "azurerm_virtual_machine_extension" "vm_mssql_win_postdeploy_script" {
   auto_upgrade_minor_version = true
   depends_on = [
     azurerm_virtual_machine_data_disk_attachment.vm_mssql_win_data_disk_attachments,
-    azurerm_key_vault_access_policy.vm_mssql_win_secrets_get
+    azurerm_key_vault_access_policy.vm_mssql_win_secrets_get,
+    azurerm_role_assignment.vm_mssql_win_storage_account_role_assignment
   ]
 
-  protected_settings = <<PROTECTED_SETTINGS
-    {
-      "commandToExecute": 
-        "powershell.exe -ExecutionPolicy Unrestricted -Command \"${join("", local.commandParamParts)}; .\\${var.vm_mssql_win_post_deploy_script} @params\"",
-      "storageAccountName": "${var.storage_account_name}",
-      "storageAccountKey": "${data.azurerm_key_vault_secret.storage_account_key.value}",
-      "fileUris": [ 
-        "${var.vm_mssql_win_post_deploy_script_uri}", 
-        "${var.vm_mssql_win_configure_mssql_script_uri}",
-        "${var.vm_mssql_win_sql_startup_script_uri}" 
-      ]
-    }
-  PROTECTED_SETTINGS
+  settings = jsonencode({
+    fileUris = [
+      var.vm_mssql_win_post_deploy_script_uri,
+      var.vm_mssql_win_configure_mssql_script_uri,
+      var.vm_mssql_win_sql_startup_script_uri
+    ]
+  })
+
+  protected_settings = jsonencode({
+    commandToExecute = "powershell.exe -ExecutionPolicy Unrestricted -Command \"${join("", local.commandParamParts)}; .\\${var.vm_mssql_win_post_deploy_script} @params\""
+    managedIdentity  = {}
+  })
 }
 
-resource "azurerm_key_vault_access_policy" "vm_mssql_win_secrets_get" {
-  key_vault_id       = var.key_vault_id
-  tenant_id          = azurerm_windows_virtual_machine.vm_mssql_win.identity[0].tenant_id
-  object_id          = azurerm_windows_virtual_machine.vm_mssql_win.identity[0].principal_id
-  secret_permissions = ["Get"]
-}

@@ -524,7 +524,28 @@ fi
 if [ "$skip_storage_kerb_key_gen" = 'no' ]
 then
   printf "Creating kerberos key for storage account '$storage_account_name'...\n"
-  storage_account_key_kerb1=$(az storage account keys renew --subscription $subscription_id --resource-group $resource_group_name --account-name $storage_account_name --key key1 --key-type kerb --query "[?keyName == 'kerb1'].value" --output tsv)
+
+  max_retries=10
+  retry_count=0
+  storage_account_key_kerb1=""
+
+  while [ -z $storage_account_key_kerb1 ]; do
+    storage_account_key_kerb1=$(az storage account keys renew --subscription $subscription_id --resource-group $resource_group_name --account-name $storage_account_name --key key1 --key-type kerb --query "[?keyName == 'kerb1'].value" --output tsv) 
+
+    if [ -n "$storage_account_key_kerb1" ]
+    then
+      break
+    else
+      retry_count=$((retry_count + 1))
+      echo "Attempt $retry_count failed. Retrying in 30 seconds..."
+      sleep 30
+    fi
+  done
+
+  if [ $retry_count -eq $max_retries ]; then
+      echo "Error: Failed to create  kerberos key after $max_retries attempts." >&2
+      usage
+  fi
 
   printf "Setting storage account secret '$storage_account_name-kerb1' with value length '${#storage_account_key_kerb1}' to keyvault '$key_vault_name'...\n"
 
@@ -549,6 +570,94 @@ then
       echo "Error: Failed to set key vault secret after $max_retries attempts." >&2
       usage
   fi
+fi
+
+# Add storage role assignments for interactive Azure CLI user and service principal
+role_name="Storage Blob Data Contributor"
+printf "Adding role assignment '$role_name' to storage account '$storage_account_name' for user '$owner_object_id'...\n"
+
+max_retries=10
+retry_count=0
+
+while [ $retry_count -lt $max_retries ]; do
+  az role assignment create \
+    --role "$role_name" \
+    --assignee $owner_object_id \
+    --scope "/subscriptions/$subscription_id/resourceGroups/$resource_group_name/providers/Microsoft.Storage/storageAccounts/$storage_account_name" && break
+      retry_count=$((retry_count + 1))
+
+  retry_count=$((retry_count + 1))
+  echo "Attempt $retry_count failed. Retrying in 30 seconds..."
+  sleep 30
+done
+
+if [ $retry_count -eq $max_retries ]; then
+    echo "Error: Failed to create role assignment after $max_retries attempts." >&2
+    usage
+fi
+
+printf "Adding role assignment '$role_name' to storage account '$storage_account_name' for user '$arm_client_id'...\n"
+
+max_retries=10
+retry_count=0
+
+while [ $retry_count -lt $max_retries ]; do
+  az role assignment create \
+    --role "$role_name" \
+    --assignee $arm_client_id \
+    --scope "/subscriptions/$subscription_id/resourceGroups/$resource_group_name/providers/Microsoft.Storage/storageAccounts/$storage_account_name" && break
+
+  retry_count=$((retry_count + 1))
+  echo "Attempt $retry_count failed. Retrying in 30 seconds..."
+  sleep 30
+done
+
+if [ $retry_count -eq $max_retries ]; then
+    echo "Error: Failed to create role assignment after $max_retries attempts." >&2
+    usage
+fi
+
+role_name="Storage File Data Privileged Contributor"
+printf "Adding role assignment '$role_name' to storage account '$storage_account_name' for user '$owner_object_id'...\n"
+
+max_retries=10
+retry_count=0
+
+while [ $retry_count -lt $max_retries ]; do
+  az role assignment create \
+    --role "$role_name" \
+    --assignee $owner_object_id \
+    --scope "/subscriptions/$subscription_id/resourceGroups/$resource_group_name/providers/Microsoft.Storage/storageAccounts/$storage_account_name" && break
+
+  retry_count=$((retry_count + 1))
+  echo "Attempt $retry_count failed. Retrying in 30 seconds..."
+  sleep 30
+done
+
+if [ $retry_count -eq $max_retries ]; then
+    echo "Error: Failed to create role assignment after $max_retries attempts." >&2
+    usage
+fi
+
+printf "Adding role assignment '$role_name' to storage account '$storage_account_name' for user '$arm_client_id'...\n"
+
+max_retries=10
+retry_count=0
+
+while [ $retry_count -lt $max_retries ]; do
+  az role assignment create \
+    --role "$role_name" \
+    --assignee $arm_client_id \
+    --scope "/subscriptions/$subscription_id/resourceGroups/$resource_group_name/providers/Microsoft.Storage/storageAccounts/$storage_account_name" && break
+
+  retry_count=$((retry_count + 1))
+  echo "Attempt $retry_count failed. Retrying in 30 seconds..."
+  sleep 30
+done
+
+if [ $retry_count -eq $max_retries ]; then
+    echo "Error: Failed to create role assignment after $max_retries attempts." >&2
+    usage
 fi
 
 # Enable public network access
@@ -609,7 +718,7 @@ else
 fi
 
 # Disable public network access
-printf "Disabling public network access to storage account '$storage_account_name'...\n"
+printf "Disabling public network access and shared key access to storage account '$storage_account_name'...\n"
 
 max_retries=10
 retry_count=0
@@ -619,6 +728,7 @@ while [ $retry_count -lt $max_retries ]; do
     --subscription $subscription_id \
     --name $storage_account_name \
     --resource-group $resource_group_name \
+    --allow-shared-key-access false \
     --public-network-access Disabled && break
 
   retry_count=$((retry_count + 1))

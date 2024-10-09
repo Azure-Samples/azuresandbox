@@ -174,8 +174,9 @@ The bootstrap script [bootstrap.sh](./bootstrap.sh) is used to initialize variab
 * Creates a storage account with a randomly generated 15-character name like *stxxxxxxxxxxxxx*.
   * The name is limited to 15 characters for compatibility with Active Directory Domain Services.
   * A new *scripts* container is created for configurations that leverage the Custom Script Extension for [Windows](https://learn.microsoft.com/azure/virtual-machines/extensions/custom-script-windows) or [Linux](https://learn.microsoft.com/azure/virtual-machines/extensions/custom-script-linux).
-  * Public network access is disabled by default.
+  * Public network access and shared key access are disabled by default.
   * The network exception `AzureServices` is enabled. See [Grant access to trusted Azure services](https://learn.microsoft.com/en-us/azure/storage/common/storage-network-security?toc=%2Fazure%2Fstorage%2Fblobs%2Ftoc.json&bc=%2Fazure%2Fstorage%2Fblobs%2Fbreadcrumb%2Ftoc.json&tabs=azure-portal#grant-access-to-trusted-azure-services) for more information.
+  * `Storage Blob Data Contributor` and `Storage File Data Privileged Contributor` Azure RBAC role assignments are created for both the logged in Azure CLI user and the service principal. This is required when shared key access is disabled on the storage account.
 * Creates a *terraform.tfvars* file for generating and applying Terraform plans.
 
 The script is idempotent and can be run multiple times even after the Terraform configuration has been applied.

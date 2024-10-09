@@ -78,7 +78,7 @@ This section describes how to provision this configuration using default setting
 
 * Monitor output. Upon completion, you should see a message similar to the following:
 
-  `Apply complete! Resources: 71 added, 0 changed, 0 destroyed.`
+  `Apply complete! Resources: 72 added, 0 changed, 0 destroyed.`
 
 * Inspect `terraform.tfstate`.
 
@@ -276,7 +276,7 @@ tags | tomap( { "costcenter" = "10177772" "environment" = "dev" "project" = "#Az
 vnet_shared_01_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualNetworks/vnet-shared-01"
 vnet_shared_01_name | "vnet-shared-01"
 
-Public internet access is temporarily enabled for the shared storage account so the following PowerShell scripts can be uploaded to the *scripts* container in the shared storage account using the access key stored in the key vault secret *storage_account_key*. These scripts are referenced by virtual machine extensions:
+Public internet access is temporarily enabled for the shared storage account so the following PowerShell scripts can be uploaded to the *scripts* container in the shared storage account. These scripts are referenced by virtual machine extensions:
 
 * [configure-storage-kerberos.ps1](./configure-storage-kerberos.ps1)
 * [configure-vm-jumpbox-win.ps1](./configure-vm-jumpbox-win.ps1)
@@ -335,6 +335,7 @@ azurerm_windows_virtual_machine.vm_jumpbox_win (jumpwin1) | By default, provisio
 azurerm_network_interface.vm_jumpbox_win_nic_01 (nic&#x2011;jumpwin1&#x2011;1) | The configured subnet is *azurerm_subnet.vnet_app_01_subnets["snet-app-01"]*.
 azurerm_virtual_machine_extension.vm_jumpbox_win_postdeploy_script | Downloads [configure&#x2011;vm&#x2011;jumpbox-win.ps1](./configure-vm-jumpbox-win.ps1) and [configure&#x2011;storage&#x2011;kerberos.ps1](./configure-storage-kerberos.ps1), then executes [configure&#x2011;vm&#x2011;jumpbox-win.ps1](./configure-vm-jumpbox-win.ps1) using the [Custom Script Extension for Windows](https://learn.microsoft.com/azure/virtual-machines/extensions/custom-script-windows). See below for more details.
 azurerm_key_vault_access_policy.vm_jumpbox_win_secrets_get (jumpwin1) | Allows the VM to get secrets from key vault using a system assigned managed identity.
+azurerm_role_assignment . vm_jumpbox_win_storage_account_role_assignment | Assigns the `Storage Blob Data Contributor` role to the system assigned managed identity of *azurerm_windows_virtual_machine.vm_jumpbox_win* on the shared storage account.
 
 This Windows Server VM is used as a jumpbox for development and remote server administration.
 
@@ -358,6 +359,7 @@ This Windows Server VM is used as a jumpbox for development and remote server ad
     * [azcopy10](https://community.chocolatey.org/packages/azcopy10)
     * [azure-data-studio](https://community.chocolatey.org/packages/azure-data-studio)
     * [mysql.workbench](https://community.chocolatey.org/packages/mysql.workbench)
+* A `Storage Blob Data Contributor` role assignment is created for the VM's system assigned managed identity on the shared storage account. This allows the custom script extension to download scripts from the shared storage account.
 * Post-deployment configuration is then performed using a custom script extension that runs [configure&#x2011;vm&#x2011;jumpbox&#x2011;win.ps1](./configure-vm-jumpbox-win.ps1). For security, secrets are retrieved at runtime using system assigned managed identity.
   * [configure&#x2011;storage&#x2011;kerberos.ps1](./configure-storage-kerberos.ps1) is registered as a scheduled task then executed using domain administrator credentials. This script must be run on a domain joined Azure virtual machine, and configures the storage account for kerberos authentication with the Active Directory Domain Services domain used in the configurations. For security, secrets are retrieved at runtime using system assigned managed identity.
 
