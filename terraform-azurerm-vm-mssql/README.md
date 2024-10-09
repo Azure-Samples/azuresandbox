@@ -136,7 +136,7 @@ vnet_app_01_subnets | Contains all the subnet definitions including *snet-app-01
 
 The configured virtual machine size is checked to determine if it includes a temporary disk and that the size is available in the configured location.
 
-Public internet access to the shared storage account is temporarily enabled so the following PowerShell scripts can be uploaded to the *scripts* container in the storage account using the access key stored in the key vault secret *storage_account_key*. These scripts are referenced by virtual machine extensions:
+Public internet access to the shared storage account is temporarily enabled so the following PowerShell scripts can be uploaded to the *scripts* container in the storage account. These scripts are referenced by virtual machine extensions:
 
 * [configure-vm-mssql.ps1](./configure-vm-mssql.ps1)
 * [configure-mssql.ps1](./configure-mssql.ps1)
@@ -172,6 +172,7 @@ azurerm_virtual_machine_data_disk_attachment . vm_mssql_win_data_disk_attachment
 azurerm_virtual_machine_data_disk_attachment . vm_mssql_win_data_disk_attachments ["sqllog"] | Attaches *azurerm_managed_disk.vm_mssql_win_data_disks["sqllog"]* to *azurerm_windows_virtual_machine.vm_mssql_win*
 azurerm_virtual_machine_extension . vm_mssql_win_postdeploy_script (vmext&#x2011;mssqlwin1&#x2011;postdeploy&#x2011;script) | Downloads [configure&#x2011;vm&#x2011;mssql.ps1](./configure-mssql.ps1) and [sql&#x2011;startup.ps1](./sql-startup.ps1) to *azurerm_windows_virtual_machine.vm_mssql_win* and executes [configure&#x2011;vm&#x2011;mssql.ps1](./configure-mssql.ps1) using the [Custom Script Extension for Windows](https://learn.microsoft.com/azure/virtual-machines/extensions/custom-script-windows).
 azurerm_key_vault_access_policy . vm_mssql_win_secrets_get | Grants *azurerm_windows_virtual_machine.vm_mssql_win* access to the key vault secrets *adminuser* and *adminpassword*.
+azurerm_role_assignment . vm_mssql_win_storage_account_role_assignment | Grants `Storage Blob Data Contributor` role to the managed identity for *azurerm_windows_virtual_machine.vm_mssql_win* on the shared storage account.
 
 * Guest OS: Windows Server 2022 Datacenter.
 * Database: Microsoft SQL Server 2022 Developer Edition

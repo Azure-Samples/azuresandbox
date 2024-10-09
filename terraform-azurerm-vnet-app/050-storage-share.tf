@@ -1,7 +1,3 @@
-locals {
-  storage_account_id = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.Storage/storageAccounts/${var.storage_account_name}"
-}
-
 # Azure blob private endpoint
 resource "azurerm_private_endpoint" "storage_account_01_blob" {
   name                = "pend-${var.storage_account_name}-blob"
@@ -38,6 +34,7 @@ resource "azapi_update_resource" "storage_account_enable_public_access" {
 
   body = jsonencode({
     properties = {
+      allowSharedKeyAccess = true 
       publicNetworkAccess = "Enabled"
     }
   })
@@ -66,6 +63,7 @@ resource "azapi_update_resource" "storage_account_disable_public_access" {
 
   body = jsonencode({
     properties = {
+      allowSharedKeyAccess = false 
       publicNetworkAccess = "Disabled"
     }
   })

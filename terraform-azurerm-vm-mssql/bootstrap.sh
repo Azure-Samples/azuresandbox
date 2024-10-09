@@ -108,15 +108,12 @@ vm_mssql_win_configure_mssql_script_uri="https://${storage_account_name:1:-1}.bl
 vm_mssql_win_post_deploy_script_uri="https://${storage_account_name:1:-1}.blob.core.windows.net/${storage_container_name:1:-1}/$vm_mssql_win_post_deploy_script"
 vm_mssql_win_sql_startup_script_uri="https://${storage_account_name:1:-1}.blob.core.windows.net/${storage_container_name:1:-1}/$vm_mssql_win_sql_startup_script"
 
-printf "Getting storage account key for storage account '${storage_account_name:1:-1}' from key vault '${key_vault_name:1:-1}'...\n"
-storage_account_key=$(az keyvault secret show --name ${storage_account_name:1:-1} --vault-name ${key_vault_name:1:-1} --query value --output tsv)
-
 for i in {1..12}
 do
   printf "Attempt $i: Uploading post-deployment scripts to container '${storage_container_name:1:-1}' in storage account '${storage_account_name:1:-1}'...\n"
   az storage blob upload-batch \
       --account-name ${storage_account_name:1:-1} \
-      --account-key "$storage_account_key" \
+      --auth-mode login \
       --destination ${storage_container_name:1:-1} \
       --source '.' \
       --pattern '*.ps1' \
