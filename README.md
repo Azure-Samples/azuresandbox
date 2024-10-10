@@ -128,7 +128,7 @@ Before you begin, familiarity with the following topics will be helpful when wor
 
 #### Windows Subsystem for Linux
 
-Windows users can use [WSL](https://learn.microsoft.com/windows/wsl/about) which supports a [variety of Linux distributions](https://learn.microsoft.com/en-us/windows/wsl/basic-commands#list-available-linux-distributions). The current default distribution `Ubuntu 24.04 LTS (Noble Numbat)` is recommended. Please note these instructions may vary for different Linux releases and/or distributions.
+Windows users can use [WSL](https://learn.microsoft.com/windows/wsl/about) which supports a [variety of Linux distributions](https://learn.microsoft.com/en-us/windows/wsl/basic-commands#list-available-linux-distributions). `Ubuntu 22.04 LTS (Jammy Jellyfish)` is recommended. Please note these instructions may vary for different Linux releases and/or distributions.
 
 * Windows prerequisites ([Step-By-Step Video](https://youtu.be/Q4dOoQspt90))
   * Install [Visual Studio Code on Windows](https://code.visualstudio.com/docs/setup/windows)
@@ -137,7 +137,7 @@ Windows users can use [WSL](https://learn.microsoft.com/windows/wsl/about) which
     * Install [MySQL Workbench](https://www.mysql.com/products/workbench/) if you plan to complete smoke testing for [terraform-azurerm-mysql](./terraform-azurerm-mysql/)
     * Install [Azure VPN Client](https://www.microsoft.com/store/productId/9NP355QT2SQB) if you plan to complete smoke testing for [terraform-azurerm-vwan](./terraform-azurerm-vwan/).
 * Linux prerequisites ([Step-By-Step Video](https://youtu.be/YW37uG0aX8c))
-  * [Install Linux on Windows with WSL](https://learn.microsoft.com/windows/wsl/install). The current default distribution `Ubuntu 24.04 LTS (Noble Numbat)` is recommended.
+  * [Install Linux on Windows with WSL](https://learn.microsoft.com/windows/wsl/install). `Ubuntu 22.04 LTS (Jammy Jellyfish)` is recommended.
   * Install [pip3](https://pip.pypa.io/en/stable/) Python library package manager and the [PyJWT](https://pyjwt.readthedocs.io/en/latest/) Python library. This is used to determine the id of the security principal for the currently signed in Azure CLI user.
   
     ```bash
@@ -386,20 +386,21 @@ Video | Section
 
 ## Known issues
 
-This section documents known issues with these configurations that should be addressed prior to real world usage.
+This section documents known issues with these configurations in addition to GitHub [Issues](https://github.com/Azure-Samples/azuresandbox/issues).
 
 * Client environment
   * If you are experiencing difficulties with WSL, see [Troubleshooting Windows Subsystem for Linux](https://learn.microsoft.com/en-us/windows/wsl/troubleshooting).
   * Some users may not be able to use [Windows subsystem for Linux](#windows-subsystem-for-linux) due to lack of administrative access to their computer or other issues. In these cases consider using [terraform-azurerm-rg-devops](./extras/terraform-azurerm-rg-devops/) and [VS Code remote development over SSH](https://code.visualstudio.com/docs/remote/ssh) as an alternative.
+  * There is a known issue installing PowerShell on Ubuntu 24.04 (Noble) using APT. See [[DSR] - Ubuntu 24.04 x64 #21385](https://github.com/PowerShell/PowerShell/issues/21385#issuecomment-2405668237) for information and workarounds.
 * Configuration management
   * *Terraform*
     * For simplicity, these configurations store [State](https://www.terraform.io/language/state) in a local file named `terraform.tfstate`. For production use, state should be managed in a secure, encrypted [Backend](https://www.terraform.io/language/state/backends) such as [azurerm](https://www.terraform.io/language/settings/backends/azurerm).
     * There is a [known issue](https://github.com/hashicorp/terraform-provider-azurerm/issues/2977) that causes Terraform plan or apply operations to fail after provisioning an Azure Files share behind a private endpoint. If this is causing plan or apply operations to fail you can either whitelist the IP address of the client environment on the storage account firewall or use [Target Resources](https://developer.hashicorp.com/terraform/tutorials/state/resource-targeting) to work around it.
+    * [Azure Verified Modules](https://azure.github.io/Azure-Verified-Modules) were not available when this project was created, and may be used in future releases of #AzureSandbox.
   * *Windows Server*: This configuration uses [Azure Automation State Configuration (DSC)](https://learn.microsoft.com/azure/automation/automation-dsc-overview) for configuring the Windows Server virtual machines, which will be replaced by [Azure Automanage Machine Configuration](https://learn.microsoft.com/azure/governance/machine-configuration/overview). This configuration will be updated to the new implementation in a future release.
     * *configure-automation.ps1*: The performance of this script could be improved by using multi-threading to run Azure Automation operations in parallel.
 * Identity, Access Management and Authentication.
-  * *Authentication*: These configurations use a service principal to authenticate with Azure which requires a client secret to be shared. This is due to the requirement that sandbox users be limited to a *Contributor* Azure RBAC role assignment which is not authorized to do Azure RBAC role assignments. Production environments should consider using [managed identities](https://learn.microsoft.com/azure/active-directory/managed-identities-azure-resources/overview) instead of service principals which eliminates the need to share secrets.
-    * *SQL Server Authentication*: By default this configuration uses mixed mode authentication. Production deployments should use Windows integrated authentication as per best practices.
+  * *Authentication*: These configurations use a service principal to authenticate with Azure which requires a client secret to be shared. Production environments should consider using [managed identities](https://learn.microsoft.com/azure/active-directory/managed-identities-azure-resources/overview) instead of service principals which eliminates the need to share secrets.
     * *Point-to-site VPN gateway authentication*: This configuration uses self-signed certificates for simplicity. Production environments should use certificates generated from a root certificate authority.
   * *Credentials*: For simplicity, these configurations use a single set of user defined credentials when an administrator account is required to provision or configure resources. In production environments these credentials would be different and follow the principal of least privilege for better security. Some user defined credentials may cause failures due to differences in how various resources implement restricted administrator user names and password complexity requirements. Note that the default password expiration policy for Active Directory is 42 days which will require the password for `bootstrapadmin@mysandbox.local` to be changed. It is recommended that you update the related `adminpassword` secret in key vault when changing the password as this does not happen automatically.
   * *Active Directory Domain Services*: A pre-configured AD domain controller *azurerm_windows_virtual_machine.vm_adds* is provisioned.
