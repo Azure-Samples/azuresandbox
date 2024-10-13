@@ -9,7 +9,6 @@ usage() {
 }
 
 # Initialize runtime defaults
-default_owner_object_id=$(az account get-access-token --query accessToken --output tsv | tr -d '\n' | python3 -c "import jwt, sys; print(jwt.decode(sys.stdin.read(), algorithms=['RS256'], options={'verify_signature': False})['oid'])")
 state_file="../../terraform-azurerm-vnet-shared/terraform.tfstate"
 
 printf "Retrieving runtime defaults from state file '$state_file'...\n"
@@ -46,23 +45,11 @@ private_dns_zones=$(terraform output -json -state=$state_file private_dns_zones)
 storage_share_name=$(terraform output -state=$state_file storage_share_name)
 vnet_app_01_subnets=$(terraform output -json -state=$state_file vnet_app_01_subnets)
 
-# Get user input
-read -e -i $default_owner_object_id -p "Object id for Azure CLI signed in user (owner_object_id) -: " owner_object_id
-
-# Validate user input
-owner_object_id=${owner_object_id:-$default_owner_object_id}
 
 # Validate TF_VAR_arm_client_secret
 if [ -z "$TF_VAR_arm_client_secret" ]
 then
   printf "Environment variable 'TF_VAR_arm_client_secret' must be set.\n"
-  usage
-fi
-
-# Validate object id of Azure CLI signed in user
-if [ -z "$owner_object_id" ]
-then
-  printf "Object id for Azure CLI signed in user (owner_object_id) not provided.\n"
   usage
 fi
 
@@ -90,7 +77,7 @@ do
       --destination ${storage_share_name:1:-1} \
       --destination-path 'documents' \
       --source './documents/' \
-      --pattern '*.pdf' && break || sleep 15
+      --pattern '*.*' && break || sleep 15
 done
 
 printf "Disabling public internet access and shared key access on storage account '${storage_account_name:1:-1}'...\n"

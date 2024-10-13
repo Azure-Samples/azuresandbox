@@ -118,6 +118,11 @@ resource "azurerm_key_vault_access_policy" "vm_mssql_win_secrets_get" {
   secret_permissions = ["Get"]
 }
 
+resource "time_sleep" "vm_mssql_win_storage_account_role_assignment" {
+  create_duration = "60s"
+  depends_on      = [azurerm_role_assignment.vm_mssql_win_storage_account_role_assignment]
+}
+
 # Virtual machine extensions
 resource "azurerm_virtual_machine_extension" "vm_mssql_win_postdeploy_script" {
   name                       = "vmext-${azurerm_windows_virtual_machine.vm_mssql_win.name}-postdeploy-script"
@@ -129,7 +134,7 @@ resource "azurerm_virtual_machine_extension" "vm_mssql_win_postdeploy_script" {
   depends_on = [
     azurerm_virtual_machine_data_disk_attachment.vm_mssql_win_data_disk_attachments,
     azurerm_key_vault_access_policy.vm_mssql_win_secrets_get,
-    azurerm_role_assignment.vm_mssql_win_storage_account_role_assignment
+    time_sleep.vm_mssql_win_storage_account_role_assignment
   ]
 
   settings = jsonencode({

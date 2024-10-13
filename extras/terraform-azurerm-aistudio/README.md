@@ -215,8 +215,9 @@ subscription_id | terraform-azurerm-vnet-shared | "00000000-0000-0000-0000-00000
 tags | terraform-azurerm-vnet-shared | "tomap( { "costcenter" = "mycostcenter" "environment" = "dev" "project" = "#AzureSandbox" } )"
 vnet_app_01_subnets | terraform-azurerm-vnet-app | json payload
 
-Public internet access and shared key access are temporarily enabled for the shared storage account so the following documents scripts can be uploaded to the *myfileshare* share in the shared storage account using the access key stored in the key vault secret *storage_account_key*. These documents are used to build an index in AI Studio:
+Public internet access and shared key access are temporarily enabled for the shared storage account so the following files can be uploaded to the *myfileshare* share in the shared storage account using the access key stored in the key vault secret *storage_account_key*. These files are used AI Studio demos:
 
+* [CallScriptAudio.mp3](./documents/CallScriptAudio.mp3)
 * [Claim-Reporting-Script-Prompts.PropertyMgmt.pdf](./documents/Claim-Reporting-Script-Prompts.PropertyMgmt.pdf)
 * [OmniServe_Agent_Performance.pdf](./documents/OmniServe_Agent_Performance.pdf)
 * [OmniServe_Agent_Training.pdf](./documents/OmniServe_Agent_Training.pdf)

@@ -102,6 +102,11 @@ resource "azurerm_key_vault_access_policy" "vm_jumpbox_win_secrets_get" {
   secret_permissions = ["Get"]
 }
 
+resource "time_sleep" "vm_jumpbox_win_storage_account_role_assignment" {
+  create_duration = "60s"
+  depends_on      = [azurerm_role_assignment.vm_jumpbox_win_storage_account_role_assignment]
+}
+
 # Virtual machine extensions
 resource "azurerm_virtual_machine_extension" "vm_jumpbox_win_postdeploy_script" {
   name                       = "vmext-${azurerm_windows_virtual_machine.vm_jumpbox_win.name}-postdeploy-script"
@@ -111,7 +116,7 @@ resource "azurerm_virtual_machine_extension" "vm_jumpbox_win_postdeploy_script" 
   type_handler_version       = "1.10"
   auto_upgrade_minor_version = true
   depends_on = [
-    azurerm_role_assignment.vm_jumpbox_win_storage_account_role_assignment,
+    time_sleep.vm_jumpbox_win_storage_account_role_assignment,
     azurerm_key_vault_access_policy.vm_jumpbox_win_secrets_get
   ]
 
