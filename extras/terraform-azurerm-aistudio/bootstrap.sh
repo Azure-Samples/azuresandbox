@@ -77,7 +77,7 @@ do
       --destination ${storage_share_name:1:-1} \
       --destination-path 'documents' \
       --source './documents/' \
-      --pattern '*.pdf' && break || sleep 15
+      --pattern '*.*' && break || sleep 15
 done
 
 printf "Disabling public internet access and shared key access on storage account '${storage_account_name:1:-1}'...\n"
