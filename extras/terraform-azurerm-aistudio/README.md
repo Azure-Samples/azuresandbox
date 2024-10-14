@@ -12,7 +12,7 @@
 
 ## Architecture
 
-![vnet-onprem-diagram](./aistudio-diagram.drawio.svg)
+![aistudio-diagram](./aistudio-diagram.drawio.svg)
 
 ## Overview
 
