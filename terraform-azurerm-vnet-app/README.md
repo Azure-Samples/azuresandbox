@@ -78,7 +78,7 @@ This section describes how to provision this configuration using default setting
 
 * Monitor output. Upon completion, you should see a message similar to the following:
 
-  `Apply complete! Resources: 73 added, 0 changed, 0 destroyed.`
+  `Apply complete! Resources: 82 added, 0 changed, 0 destroyed.`
 
 * Inspect `terraform.tfstate`.
 
@@ -318,6 +318,7 @@ azurerm_private_dns_zone . private_dns_zones ["privatelink.azurecr.io"] | extras
 azurerm_private_dns_zone . private_dns_zones ["privatelink.blob.core.windows.net"] | terraform-azurerm-vnet-app, terraform-azurerm-vm-mssql | Creates a [private Azure DNS zone](https://learn.microsoft.com/azure/dns/private-dns-privatednszone) to [Use private endpoints for Azure Storage](https://learn.microsoft.com/en-us/azure/storage/common/storage-private-endpoints).
 azurerm_private_dns_zone . private_dns_zones ["privatelink.cognitiveservices.azure.com"] | extras/terraform-azurerm-aistudio | Creates a [private Azure DNS zone](https://learn.microsoft.com/azure/dns/private-dns-privatednszone) for using [Azure AI Services private endpoints](https://learn.microsoft.com/en-us/azure/ai-services/cognitive-services-virtual-networks?tabs=portal#use-private-endpoints).
 azurerm_private_dns_zone . private_dns_zones ["privatelink.database.windows.net"] | terraform-azurerm-mssql | Creates a [private Azure DNS zone](https://learn.microsoft.com/azure/dns/private-dns-privatednszone) for using [Azure Private Link for Azure SQL Database](https://learn.microsoft.com/azure/azure-sql/database/private-endpoint-overview).
+azurerm_private_dns_zone . private_dns_zones ["privatelink.documents.azure.com"] | Reserved for future use. | Creates a [private Azure DNS zone](https://learn.microsoft.com/azure/dns/private-dns-privatednszone) to [Configure Azure Private Link for an Azure Cosmos DB account](https://learn.microsoft.com/azure/cosmos-db/how-to-configure-private-endpoints).
 azurerm_private_dns_zone . private_dns_zones ["privatelink.file.core.windows.net"] | terraform-azurerm-vnet-app | Creates a [private Azure DNS zone](https://learn.microsoft.com/azure/dns/private-dns-privatednszone) for using [Azure Private Link for Azure Files](https://learn.microsoft.com/azure/storage/common/storage-private-endpoints).
 azurerm_private_dns_zone . private_dns_zones ["privatelink.mysql.database.azure.com"] | terraform-azurerm-mysql | Creates a [private Azure DNS zone](https://learn.microsoft.com/azure/dns/private-dns-privatednszone) for using [Private Link for Azure Database for MySQL - Flexible Server](https://learn.microsoft.com/en-us/azure/mysql/flexible-server/concepts-networking-private-link).
 azurerm_private_dns_zone . private_dns_zones ["privatelink.notebooks.azure.net"] | extras/terraform-azurerm-aistudio | Creates a [private Azure DNS zone](https://learn.microsoft.com/azure/dns/private-dns-privatednszone) for using [Private Link for Azure AI Studio hubs](https://learn.microsoft.com/en-us/azure/ai-studio/how-to/configure-private-link?tabs=cli#create-a-hub-that-uses-a-private-endpoint).

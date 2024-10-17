@@ -110,6 +110,7 @@ locals {
     "privatelink.blob.core.windows.net",
     "privatelink.cognitiveservices.azure.com",
     "privatelink.database.windows.net",
+    "privatelink.documents.azure.com",
     "privatelink.file.core.windows.net",
     "privatelink.mysql.database.azure.com",
     "privatelink.notebooks.azure.net",
