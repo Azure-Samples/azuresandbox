@@ -44,12 +44,6 @@ variable "mysql_database_name" {
   description = "The name of the Azure MySQL Database to be provisioned"
 }
 
-variable "mysql_flexible_server_zone" {
-  type        = string
-  description = "The availability zone used to deploy the Azure Database for MySQL - Flexible Server."
-  default     = "1"
-}
-
 variable "private_dns_zones" {
   type = map(any)
   description = "The existing private dns zones defined in the application virtual network."
