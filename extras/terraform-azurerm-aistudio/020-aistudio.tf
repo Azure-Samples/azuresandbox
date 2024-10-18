@@ -46,6 +46,10 @@ resource "azapi_resource" "ai_services_01" {
   response_export_values = ["*"]
 }
 
+output "ai_services_01_name" {
+  value = azapi_resource.ai_services_01.name
+}
+
 resource "azurerm_private_endpoint" "ai_services_01" {
   name                = "pend-ais${random_id.aistudio_name.hex}"
   resource_group_name = var.resource_group_name
@@ -78,6 +82,10 @@ resource "azurerm_search_service" "search_service_01" {
   public_network_access_enabled = false
 }
 
+output "search_service_01_name" {
+  value = azurerm_search_service.search_service_01.name
+}
+
 resource "azurerm_private_endpoint" "search_service_01" {
   name                = "pend-search${random_id.aistudio_name.hex}"
   resource_group_name = var.resource_group_name
@@ -108,6 +116,10 @@ resource "azurerm_application_insights" "app_insights_01" {
   application_type    = "web"
 }
 
+output "app_insights_01_name" {
+  value = azurerm_application_insights.app_insights_01.name
+}
+
 # Container Registry
 resource "azurerm_container_registry" "container_registry_01" {
   name                          = "acr${random_id.aistudio_name.hex}"
@@ -116,6 +128,10 @@ resource "azurerm_container_registry" "container_registry_01" {
   sku                           = var.container_registry_sku
   admin_enabled                 = true
   public_network_access_enabled = false
+}
+
+output "container_registry_01_name" {
+  value = azurerm_container_registry.container_registry_01.name
 }
 
 resource "azurerm_private_endpoint" "container_registry_01" {
@@ -166,6 +182,10 @@ resource "azapi_resource" "ai_hub_01" {
       systemDatastoresAuthMode = "identity"
     }
   })
+
+  lifecycle {
+    ignore_changes = [tags]
+  }
 }
 
 resource "azurerm_private_endpoint" "ai_hub_01" {
@@ -190,36 +210,3 @@ resource "azurerm_private_endpoint" "ai_hub_01" {
     ]
   }
 }
-
-# AI Studio Project
-# resource "azapi_resource" "ai_project_01" {
-#   type = "Microsoft.MachineLearningServices/workspaces@2024-04-01-preview"
-#   name = "aip-${random_id.aistudio_name.hex}"
-#   location = var.location
-#   parent_id = local.resource_group_id
-
-#   identity {
-#     type = "SystemAssigned"
-#   }
-
-#   body = jsonencode({
-#     properties = {
-#       description = "Azure AI Project"
-#       friendlyName = "aip-${random_id.aistudio_name.hex}"
-#       hubResourceId = azapi_resource.ai_hub_01.id
-#     }
-#     kind = "project"
-#   })
-# }
-
-
-# Private endpoint status messages
-# AOAI error
-# Network Service does not have permission to check resource /subscriptions/8e93423f-d08c-4539-ba3d-8cbc20bc6aa5/resourceGroups/rg-sandbox-01/providers/Microsoft.CognitiveServices/accounts/ais12e19da2b1f40e6b details. Please consider grant Azure Machine Learning (appId: 0736f41a-0425-4b46-bdb5-1563eff02385) read or contributor access to connected resource.
-
-# AI Services error
-# Network Service does not have permission to check resource /subscriptions/8e93423f-d08c-4539-ba3d-8cbc20bc6aa5/resourceGroups/rg-sandbox-01/providers/Microsoft.CognitiveServices/accounts/ais12e19da2b1f40e6b details. Please consider grant Azure Machine Learning (appId: 0736f41a-0425-4b46-bdb5-1563eff02385) read or contributor access to connected resource.
-
-# AI Search error
-# Network Service does not have permission to check resource /subscriptions/8e93423f-d08c-4539-ba3d-8cbc20bc6aa5/resourceGroups/rg-sandbox-01/providers/Microsoft.Search/searchServices/search12e19da2b1f40e6b details. Please consider grant Azure Machine Learning (appId: 0736f41a-0425-4b46-bdb5-1563eff02385) read or contributor access to connected resource.
-

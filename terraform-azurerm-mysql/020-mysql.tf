@@ -7,7 +7,6 @@ resource "azurerm_mysql_flexible_server" "mysql_server_01" {
   name                   = "mysql-${random_id.random_id_mysql_server_01_name.hex}"
   resource_group_name    = var.resource_group_name
   location               = var.location
-  zone                   = var.mysql_flexible_server_zone
   administrator_login    = data.azurerm_key_vault_secret.adminuser.value
   administrator_password = data.azurerm_key_vault_secret.adminpassword.value
   sku_name               = "B_Standard_B1s"

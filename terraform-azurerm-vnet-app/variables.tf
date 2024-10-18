@@ -95,6 +95,11 @@ variable "subnet_application_address_prefix" {
   description = "The address prefix for the application subnet."
 }
 
+variable "subnet_appservice_address_prefix" {
+  type        = string
+  description = "The address prefix for the App Service subnet."
+}
+
 variable "subnet_database_address_prefix" {
   type        = string
   description = "The address prefix for the database subnet."

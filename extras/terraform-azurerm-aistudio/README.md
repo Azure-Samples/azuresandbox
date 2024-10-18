@@ -12,7 +12,7 @@
 
 ## Architecture
 
-![vnet-onprem-diagram](./aistudio-diagram.drawio.svg)
+![aistudio-diagram](./aistudio-diagram.drawio.svg)
 
 ## Overview
 
@@ -246,6 +246,17 @@ azurerm_search_service.search_service_01 (searchxx) | An [Azure AI Search](https
 random_id.aistudio_name | Random id used to name resources in this configuration.
 
 This configuration provisions an [Azure AI Studio hub](https://learn.microsoft.com/azure/ai-studio/concepts/ai-resources#set-up-and-secure-a-hub-for-your-team) in network isolated mode. The AI Studio hub is connected to the existing shared services storage account and key vault. The hub is also connected to a new [Application Insights](https://learn.microsoft.com/azure/azure-monitor/app/app-insights-overview) workspace and [Azure Container Registry](https://learn.microsoft.com/azure/container-registry/container-registry-intro). A new [Azure AI Search](https://learn.microsoft.com/azure/search/search-what-is-azure-search) resource is created as well for use in Azure AI Studio.
+
+### Terraform output variables
+
+This section lists the output variables defined in the Terraform configurations in this sample. Some of these may be used for automation in other configurations.
+
+Output variable | Sample value
+--- | ---
+ai_services_01_name | `aisxxxxxxxxxxxxxxxx`
+app_insights_01_name | `aiwxxxxxxxxxxxxxxxx`
+container_registry_01_name | `acrxxxxxxxxxxxxxxxx`
+search_service_01_name | `searchxxxxxxxxxxxxxxxx`
 
 ## Videos
 

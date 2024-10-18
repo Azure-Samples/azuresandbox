@@ -3,14 +3,20 @@ variable "aad_tenant_id" {
   description = "The Microsoft Entra tenant id."
 }
 
-variable "admin_password_secret" {
+variable "ai_services_01_name" {
   type        = string
-  description = "The name of the key vault secret containing the admin password"
+  description = "The name of the AI services resource ."  
 }
 
-variable "admin_username_secret" {
+variable "app_insights_01_name" {
   type        = string
-  description = "The name of the key vault secret containing the admin username"
+  description = "The name of the Application Insights workspace."
+}
+
+variable "app_service_01_sku" {
+  type        = string
+  description = "The SKU of the service plan."
+  default = "B1"
 }
 
 variable "arm_client_id" {
@@ -22,6 +28,17 @@ variable "arm_client_secret" {
   type        = string
   description = "The password for the service principal used for authenticating with Azure. Set interactively or using an environment variable 'TF_VAR_arm_client_secret'."
   sensitive   = true
+}
+
+variable "container_registry_01_name" {
+  type = string
+  default = "The name of the Azure Container Registry."
+}
+
+variable "cosmos_db_01_name" {
+  type = string
+  description = "The name of the CosmosDB database."
+  default = "AICallCenterDB"  
 }
 
 variable "key_vault_id" {
@@ -39,19 +56,25 @@ variable "location" {
   description = "The name of the Azure Region where resources will be provisioned."
 }
 
-variable "mysql_database_name" {
-  type        = string
-  description = "The name of the Azure MySQL Database to be provisioned"
-}
-
 variable "private_dns_zones" {
-  type = map(any)
+  type        = map(any)
   description = "The existing private dns zones defined in the application virtual network."
 }
 
 variable "resource_group_name" {
   type        = string
   description = "The name of the existing resource group for provisioning resources."
+}
+
+variable "search_service_01_name" {
+  type        = string
+  description = "The name of the Azure AI Search service."
+  
+}
+
+variable "storage_account_name" {
+  type        = string
+  description = "The name of the shared storage account."
 }
 
 variable "subscription_id" {

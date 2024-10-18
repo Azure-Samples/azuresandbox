@@ -27,10 +27,10 @@ This repository contains a collection of inter-dependent [cloud computing](https
 * [Bash](https://en.wikipedia.org/wiki/Bash_(Unix_shell)) for scripting.
 * [Azure CLI](https://learn.microsoft.com/cli/azure/what-is-azure-cli?view=azure-cli-latest) is a command line interface for Azure.
 * [PowerShell](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-7.1)
-  * [PowerShell Core](https://learn.microsoft.com/powershell/scripting/whats-new/what-s-new-in-powershell-71?view=powershell-7.1)
+  * [PowerShell 7.x](https://learn.microsoft.com/en-us/powershell/scripting/whats-new/differences-from-windows-powershell)
   * [PowerShell 5.1](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-5.1) for Windows Server configuration.
-* [Terraform](https://www.terraform.io/intro/index.html#what-is-terraform-) v1.9.7 for [Infrastructure as Code](https://en.wikipedia.org/wiki/Infrastructure_as_code) (IaC).
-  * [Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs) (azuerrm) v4.5.0
+* [Terraform](https://www.terraform.io/intro/index.html#what-is-terraform-) v1.9.8 for [Infrastructure as Code](https://en.wikipedia.org/wiki/Infrastructure_as_code) (IaC).
+  * [Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs) (azuerrm) v4.6.0
   * [AzAPI Provider](https://registry.terraform.io/providers/Azure/azapi/latest/docs) (azapi) v1.15.0
   * [cloud-init Provider](https://registry.terraform.io/providers/hashicorp/cloudinit/latest/docs) (cloudinit) v2.3.5
   * [Random Provider](https://registry.terraform.io/providers/hashicorp/random/latest/docs) (random) v3.6.3
@@ -263,7 +263,9 @@ Application | snet-app-01 | 10.2.0.0/24 | 10.2.0.0 | 10.2.0.255 | 256
 Application | snet-db-01 | 10.2.1.0/24 | 10.2.1.0 | 10.2.1.255 | 256
 Application | snet-privatelink-01 | 10.2.2.0/24 | 10.2.2.0 | 10.2.2.255 | 256
 Application | snet-misc-03 | 10.2.3.0/24 | 10.2.3.0 | 10.2.3.255 | 256
-Application | Reserved for future use | 10.2.4.0/22 | 10.2.4.0 | 10.2.7.255 | 1,024
+Application | snet-appservice-01 | 10.2.4.0/24 | 10.2.4.0 | 10.2.4.255 | 256
+Application | Reserved for future use | 10.2.5.0/24 | 10.2.5.0 | 10.2.5.255 | 256
+Application | Reserved for future use | 10.2.6.0/23 | 10.2.6.0 | 10.2.7.255 | 512
 Application | Reserved for future use | 10.2.8.0/21 | 10.2.8.0 | 10.2.15.255 | 2,048
 Application | Reserved for future use | 10.2.16.0/20 | 10.2.16.0 | 10.2.31.255 | 4,096
 Application | Reserved for future use | 10.2.32.0/19 | 10.2.32.0 | 10.2.63.255 | 8,192
@@ -358,7 +360,9 @@ Application | snet-app-01 | 10.73.9.0/27 | 10.73.9.0 | 10.73.9.31 | 32
 Application | snet-db-01 | 10.73.9.32/27 | 10.73.9.32 | 10.73.9.63 | 32
 Application | snet-privatelink-01 | 10.73.9.64/27 | 10.73.9.64 | 10.73.9.95 | 32
 Application | snet-misc-03 | 10.73.9.96/27 | 10.73.9.96 | 10.73.9.127 | 32
-Application | Reserved for future use | 10.73.9.128/25 | 10.73.9.128 | 10.73.9.255 | 128
+Application | snet-appservice-01 | 10.73.9.128/27 | 10.73.9.128 | 10.73.9.159 | 32
+Application | Reserved for future use | 10.73.9.160/27 | 10.73.9.160 | 10.73.9.191 | 32
+Application | Reserved for future use | 10.73.9.192/26 | 10.73.9.192 | 10.73.9.255 | 64
 
 It is recommended to reserve space for future subnets. A blank table is provided here for convenience. Make a copy of this table and change the *TBD* values to your custom values.
 
@@ -373,6 +377,7 @@ Application | snet-app-01 | TBD | TBD | TBD | TBD
 Application | snet-db-01 | TBD | TBD | TBD | TBD
 Application | snet-privatelink-01 | TBD | TBD | TBD | TBD
 Application | snet-misc-03 | TBD | TBD | TBD | TBD
+Application | snet-appservice-01 | TBD | TBD | TBD | TBD
 Application | Reserved for future use | TBD | TBD | TBD | TBD
 
 ## Videos

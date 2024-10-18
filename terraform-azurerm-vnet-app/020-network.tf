@@ -2,6 +2,18 @@ locals {
   subnets = {
     snet-app-01 = {
       address_prefix                    = var.subnet_application_address_prefix
+      delegation = ""
+      private_endpoint_network_policies = "Disabled"
+      nsgrules = [
+        "AllowVirtualNetworkInbound",
+        "AllowVirtualNetworkOutbound",
+        "AllowInternetOutbound"
+      ]
+    }
+
+    snet-appservice-01 = {
+      address_prefix                    = var.subnet_appservice_address_prefix
+      delegation                        = "Microsoft.Web/serverFarms"
       private_endpoint_network_policies = "Disabled"
       nsgrules = [
         "AllowVirtualNetworkInbound",
@@ -12,6 +24,7 @@ locals {
 
     snet-db-01 = {
       address_prefix                    = var.subnet_database_address_prefix
+      delegation = ""
       private_endpoint_network_policies = "Disabled"
       nsgrules = [
         "AllowVirtualNetworkInbound",
@@ -22,6 +35,7 @@ locals {
 
     snet-misc-03 = {
       address_prefix                    = var.subnet_misc_address_prefix
+      delegation = ""
       private_endpoint_network_policies = "Disabled"
       nsgrules = [
         "AllowVirtualNetworkInbound",
@@ -32,6 +46,7 @@ locals {
 
     snet-privatelink-01 = {
       address_prefix                    = var.subnet_privatelink_address_prefix
+      delegation = ""
       private_endpoint_network_policies = "Enabled"
       nsgrules = [
         "AllowVirtualNetworkInbound",
@@ -95,6 +110,7 @@ locals {
     "privatelink.blob.core.windows.net",
     "privatelink.cognitiveservices.azure.com",
     "privatelink.database.windows.net",
+    "privatelink.documents.azure.com",
     "privatelink.file.core.windows.net",
     "privatelink.mysql.database.azure.com",
     "privatelink.notebooks.azure.net",
@@ -128,6 +144,16 @@ resource "azurerm_subnet" "vnet_app_01_subnets" {
   virtual_network_name              = azurerm_virtual_network.vnet_app_01.name
   address_prefixes                  = [each.value.address_prefix]
   private_endpoint_network_policies = each.value.private_endpoint_network_policies
+
+  dynamic "delegation" {
+    for_each = each.value.delegation != "" ? [each.value.delegation] : []
+    content {
+      name = "delegation"
+      service_delegation {
+        name = each.value.delegation
+      }
+    }
+  }
 }
 
 output "vnet_app_01_subnets" {

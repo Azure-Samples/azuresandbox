@@ -14,6 +14,7 @@ default_vnet_address_space="10.2.0.0/16"
 default_skip_ssh_key_gen="no"
 default_storage_share_name="myfileshare"
 default_subnet_application_address_prefix="10.2.0.0/24"
+default_subnet_appservice_address_prefix="10.2.4.0/24"
 default_subnet_database_address_prefix="10.2.1.0/24"
 default_subnet_misc_address_prefix="10.2.3.0/24"
 default_subnet_privatelink_address_prefix="10.2.2.0/24"
@@ -62,6 +63,7 @@ read -e -i $default_subnet_application_address_prefix -p "Application subnet add
 read -e -i $default_subnet_database_address_prefix    -p "Database subnet address prefix (subnet_database_address_prefix) -------: " subnet_database_address_prefix
 read -e -i $default_subnet_privatelink_address_prefix -p "privatelink subnet address prefix (subnet_privatelink_address_prefix) -: " subnet_privatelink_address_prefix
 read -e -i $default_subnet_misc_address_prefix        -p "Miscellaneous subnet address prefix (subnet_misc_address_prefix) ------: " subnet_misc_address_prefix
+read -e -i $default_subnet_appservice_address_prefix  -p "App Service subnet address prefix (subnet_appservice_address_prefix) --: " subnet_appservice_address_prefix
 read -e -i $default_vm_jumpbox_linux_name             -p "Linux jumpbox virtual machine name (vm_jumpbox_linux_name) ------------: " vm_jumpbox_linux_name
 read -e -i $default_skip_ssh_key_gen                  -p "Skip SSH key generation (skip_ssh_key_gen) yes/no ? -------------------: " skip_ssh_key_gen
 read -e -i $default_vm_jumpbox_win_name               -p "Windows jumpbox virtual machine name (vm_jumpbox_win_name) ------------: " vm_jumpbox_win_name
@@ -73,6 +75,7 @@ privatelink_subnet_name=${privatelink_subnet_name:-$default_privatelink_subnet_n
 skip_ssh_key_gen=${skip_ssh_key_gen:-$default_skip_ssh_key_gen}
 storage_share_name=${storage_share_name:-$default_storage_share_name}
 subnet_application_address_prefix=${subnet_application_address_prefix:-$default_subnet_application_address_prefix}
+subnet_appservice_address_prefix=${subnet_appservice_address_prefix:-$default_subnet_appservice_address_prefix}
 subnet_database_address_prefix=${subnet_database_address_prefix:-$default_subnet_database_address_prefix}
 subnet_misc_address_prefix=${subnet_misc_address_prefix:-$default_subnet_misc_address_prefix}
 subnet_privatelink_address_prefix=${subnet_privatelink_address_prefix:-$default_subnet_privatelink_address_prefix}
@@ -253,6 +256,7 @@ printf "ssh_public_key                              = \"$ssh_public_key_secret_v
 printf "storage_account_name                        = $storage_account_name\n"                            >> ./terraform.tfvars
 printf "storage_share_name                          = \"$storage_share_name\"\n"                          >> ./terraform.tfvars
 printf "subnet_application_address_prefix           = \"$subnet_application_address_prefix\"\n"           >> ./terraform.tfvars
+printf "subnet_appservice_address_prefix            = \"$subnet_appservice_address_prefix\"\n"            >> ./terraform.tfvars
 printf "subnet_database_address_prefix              = \"$subnet_database_address_prefix\"\n"              >> ./terraform.tfvars
 printf "subnet_misc_address_prefix                  = \"$subnet_misc_address_prefix\"\n"                  >> ./terraform.tfvars
 printf "subnet_privatelink_address_prefix           = \"$subnet_privatelink_address_prefix\"\n"           >> ./terraform.tfvars
