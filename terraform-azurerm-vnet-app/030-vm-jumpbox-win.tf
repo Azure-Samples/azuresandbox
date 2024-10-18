@@ -103,7 +103,7 @@ resource "azurerm_key_vault_access_policy" "vm_jumpbox_win_secrets_get" {
 }
 
 resource "time_sleep" "vm_jumpbox_win_storage_account_role_assignment" {
-  create_duration = "60s"
+  create_duration = "2m"
   depends_on      = [azurerm_role_assignment.vm_jumpbox_win_storage_account_role_assignment]
 }
 
