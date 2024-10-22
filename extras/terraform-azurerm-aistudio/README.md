@@ -33,7 +33,7 @@ Smoke testing | ~30 minutes
 
 ## Before you start
 
-Note that this configuration requires that #AzureSandbox be provisioned in a region where both the Azure Virtual Machine SKUs used in #AzureSandbox and Azure AI Services are available. At the time of writing, the author used `australiaeast`. The following configurations must be provisioned before starting:
+Note that this configuration requires that #AzureSandbox be provisioned in a region where both the Azure Virtual Machine SKUs used in #AzureSandbox and Azure AI Services are available. At the time of writing, the author used `westus`. The following configurations must be provisioned before starting:
 
 * [terraform-azurerm-vnet-shared](../../terraform-azurerm-vnet-shared/)
 * [terraform-azurerm-vnet-app](../../terraform-azurerm-vnet-app/)
@@ -96,6 +96,9 @@ This section describes how to provision this configuration using default setting
 Follow the steps in this section to test the functionality of AIStudio hubs, projects and services ([Step-By-Step Video](https://youtu.be/yJIjYepGHEw)).
 
 * Verify that the *adds1* and *jumpwin1* virtual machines are running.
+* Make a note of the shared services storage account name
+  * Navigate to *portal.azure.com* > *Home* > *Storage accounts*
+  * Make a note of the storage account name, e.g. `stxxxxxxxxxxxxx`
 * Verify network isolation of AI Studio hub
   * From the client environment, navigate to *portal.azure.com* > *Azure AI Studio* > *aihxxxxxxxxxxxxxxxx*
   * Click *Launch Azure AI Studio*
@@ -109,6 +112,14 @@ Follow the steps in this section to test the functionality of AIStudio hubs, pro
     * For *Azure Key Vault* choose the key vault provisioned by [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared/#bootstrap-script), e.g. `kv-xxxxxxxxxxxxxxx`
     * For *Azure Key Vault Secret* choose `adminpassword`
   * Click *Connect*
+* From *jumpwin1*, map a network drive to Azure Files
+  * Execute the following command from PowerShell:
+  
+    ```powershell
+    # Note: replace stxxxxxxxxxxxxx with the name of the shared services storage account
+    net use z: \\stxxxxxxxxxxxxx.file.core.windows.net\myfileshare
+    ```
+
 * From *jumpwin1*, sign in to AIStudio and open a hub.
   * Launch Edge
   * Edit Edge settings to disable secure DNS
@@ -144,11 +155,30 @@ Follow the steps in this section to test the functionality of AIStudio hubs, pro
   * Click on *Deploy model* > *Deploy base model*
   * Search for `gpt-4o` and select it.
   * Click *Confirm*.
-  * Examine the defaults then click *Deploy*.
+  * Examine the deployment details, then click *Customize*.
+  * Adjust the settings as follows, then click *Deploy*.
+
+    Setting | Value
+    --- | ---
+    Deployment name | gpt-4o-2024-08-06
+    Deployment type | `Global Standard`
+    Model version | 2024-08-06
+    Connected AI resource | aisxxx
+    Tokens per Minute Rate Limit | 66K
+    Content filter | `DefaultV2`
+
   * When deployment completes, verify that the *Provisioning state* is `Succeeded`.
+* From the AIStudio project, use Azure AI Speech to transcribe a call center audio file.
+  * Note: Due to [Issue 120](https://github.com/Azure-Samples/azuresandbox/issues/120) you must temporarily enable public access to AI Services to perform these steps.
+  * Navigate to *Get started* > *AI Services* > *Speech* > > *Try out speech capabilities* > *Real-time speech to text*
+  * Navigate to *Results* > *Choose audio files* and click *Browse file*
+  * Locate `\\stxxxxxxxxxxxxx.file.core.windows.net\myfileshare\documents\CallScriptAudio.mp3` and click *Open*
+  * Navigate to *Results  > *Transcription results* and observe the transcription being generated.
+  * When the transcription is complete, review the results and click *Copy to clipboard*.
+  * Paste the transcription into *Notepad* for use later in this exercise.
 * From the AIStudio project, test the deployment in the chat playground.
   * Navigate to *Project playground* > *Chat*
-  * Confirm the *Deployment* is set to `gpt-4o`.
+  * Confirm the *Deployment* is set to `gpt-4o-2024-08-06`.
   * Enter the following in *Give the model instructions and context*
 
       ```text
@@ -156,37 +186,13 @@ Follow the steps in this section to test the functionality of AIStudio hubs, pro
       ```
 
   * Click on *Save* and click *Continue*.
-  * Paste the following prompt into the chat window and click *Send*.
+  * Enter the following text into the chat window:
 
       ```text
       Please summarize this call center interaction between an agent and the caller (customer):
-      Agent: Thank you for calling Contoso Property Management. My name is Jaime Basilico. How may I help you today? 
-      Customer: Hi, I've got a leaky roof in my apartment. I'm calling to report the issue and see what can be done about it. 
-      Agent: Oh, I am so sorry to hear that you're experiencing this problem. Just to confirm, has anyone been injured as a result of the leak? 
-      Customer: No, nobody's been injured, but there's water damage, and I'm worried it might get worse. 
-      Agent: I'm relieved to hear there are no injuries. Can I have your name, please? 
-      Customer: Yes, my name is Sean Sweeny. 
-      Agent: Thank you, Mr. Sweeny. Can you verify your date of birth for me, please? 
-      Customer: Sure, it's April 14th, 1989. 
-      Agent: One moment while I pull up your information. Please hold on. 
-      (Pause) 
-      Agent: I have your details here. You're in apartment 3A at 525 Oak Street, is that correct? 
-      Customer: That's right. 
-      Agent: Great, and could you please confirm your phone number for me? 
-      Customer: Yes, it's 312-555-1234. 
-      Agent: Thank you. Can you tell me when you first noticed the leak? 
-      Customer: I noticed it last night. There was a heavy storm, and water started dripping from the ceiling in the living room. 
-      Agent: I understand. Have you managed to take any pictures of the damage? 
-      Customer: Yes, I've taken several pictures of the ceiling and where the water was coming in. 
-      Agent: Perfect. I'm going to file a maintenance request for you right now. Please hold on. 
-      (Pause) 
-      Agent: I've created a service ticket for your leaky roof, and our maintenance team will be in touch to arrange a time to inspect the damage and carry out the 
-      necessary repairs. We'll also send you a link via email where you can upload the pictures you've taken. 
-      Agent: Is there anything else I can assist you with today? 
-      Customer: No, that should be it. Thank you for your help. 
-      Agent: My pleasure, Mr. White. We'll get this sorted out for you as quickly as possible. Have a great day!
       ```
 
+  * Paste the call transcript text you previously saved in *Notepad* into the chat window after the previously entered text and click *Send*.
   * Review the response for accuracy and quality.
 
 ## Documentation
@@ -206,7 +212,7 @@ aad_tenant_id | terraform-azurerm-vnet-shared | "00000000-0000-0000-0000-0000000
 arm_client_id | terraform-azurerm-vnet-shared | "00000000-0000-0000-0000-000000000000"
 key_vault_id | terraform-azurerm-vnet-shared | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.KeyVault/vaults/kv-xxxxxxxxxxxxxxx"
 key_vault_name | terraform-azurerm-vnet-shared | "kv-xxxxxxxxxxxxxxx"
-location | terraform-azurerm-vnet-shared | "australiaeast"
+location | terraform-azurerm-vnet-shared | "westus"
 private_dns_zones | terraform-azurerm-vnet-app | json payload
 resource_group_name | terraform-azurerm-vnet-shared | "rg-sandbox-01"
 storage_account_name | terraform-azurerm-vnet-shared | "stxxxxxxxxxxxxx"
