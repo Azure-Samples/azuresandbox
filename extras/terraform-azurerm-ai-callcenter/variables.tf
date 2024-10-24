@@ -91,3 +91,9 @@ variable "vnet_app_01_subnets" {
   type        = map(any)
   description = "The existing subnets defined in the application virtual network."
 }
+
+variable "web_app_node_version" {
+  type = string
+  description = "The node.js runtime version for the web app."
+  default = "18-lts"
+}
