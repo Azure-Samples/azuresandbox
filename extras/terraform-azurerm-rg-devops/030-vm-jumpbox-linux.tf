@@ -4,14 +4,8 @@ data "cloudinit_config" "vm_jumpbox_linux" {
 
   part {
     content_type = "text/cloud-config"
-    content      = file("${path.root}/onfigure-vm-jumpbox-linux.yaml")
+    content      = file("${path.root}/configure-vm-jumpbox-linux.yaml")
     filename     = "cloud-init.yaml"
-  }
-
-  part {
-    content_type = "text/x-shellscript"
-    content      = file("${path.root}/install-pyjwt.sh")
-    filename     = "install-pyjwt.sh"
   }
 
   part {

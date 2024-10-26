@@ -240,19 +240,7 @@ printf "Restarting '$servicename'...\n" >> $log_file
 sudo systemctl restart $servicename &>> $log_file
 printdiv
 
-# Manually install powershell due to issue https://github.com/PowerShell/PowerShell/issues/21385
-printf "Installing PowerShell...\n" >> $log_file
-
-tmpDir=$(mktemp -d)
-curl -sSL 'https://launchpad.net/ubuntu/+archive/primary/+files/libicu72_72.1-3ubuntu3_amd64.deb' -o "$tmpDir/libicu72_72.1-3ubuntu3_amd64.deb"
-dpkg -i "$tmpDir"/libicu72_72.1-3ubuntu3_amd64.deb
-
-downloadUrl=$(curl -sSL "https://api.github.com/repos/PowerShell/PowerShell/releases/latest" |
-	jq -r '[.assets[] | select(.name | endswith("_amd64.deb")) | .browser_download_url][0]')
-curl -sSL "$downloadUrl" -o "$tmpDir/powershell.deb"
-dpkg -i "$tmpDir"/powershell.deb
-
-# Embed and run the PowerShell script
+# Install Azure PowerShell
 printf "Configuring PowerShell...\n" >> $log_file
 pwsh << 'EOF'
 #!/usr/bin/env pwsh
