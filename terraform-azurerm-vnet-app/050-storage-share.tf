@@ -32,12 +32,12 @@ resource "azapi_update_resource" "storage_account_enable_public_access" {
   type        = "Microsoft.Storage/storageAccounts@2023-05-01"
   resource_id = local.storage_account_id
 
-  body = jsonencode({
+  body = {
     properties = {
       allowSharedKeyAccess = true 
       publicNetworkAccess = "Enabled"
     }
-  })
+  }
 }
 
 resource "time_sleep" "wait_60_seconds" {
@@ -61,12 +61,12 @@ resource "azapi_update_resource" "storage_account_disable_public_access" {
   type        = "Microsoft.Storage/storageAccounts@2023-05-01"
   resource_id = local.storage_account_id
 
-  body = jsonencode({
+  body = {
     properties = {
       allowSharedKeyAccess = false 
       publicNetworkAccess = "Disabled"
     }
-  })
+  }
 
   depends_on = [azurerm_storage_share.storage_share_01]
 }

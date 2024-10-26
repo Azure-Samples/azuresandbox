@@ -30,8 +30,8 @@ This repository contains a collection of inter-dependent [cloud computing](https
   * [PowerShell 7.x](https://learn.microsoft.com/en-us/powershell/scripting/whats-new/differences-from-windows-powershell)
   * [PowerShell 5.1](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-5.1) for Windows Server configuration.
 * [Terraform](https://www.terraform.io/intro/index.html#what-is-terraform-) v1.9.8 for [Infrastructure as Code](https://en.wikipedia.org/wiki/Infrastructure_as_code) (IaC).
-  * [Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs) (azuerrm) v4.6.0
-  * [AzAPI Provider](https://registry.terraform.io/providers/Azure/azapi/latest/docs) (azapi) v1.15.0
+  * [Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs) (azuerrm) v4.7.0
+  * [AzAPI Provider](https://registry.terraform.io/providers/Azure/azapi/latest/docs) (azapi) v2.0.1
   * [cloud-init Provider](https://registry.terraform.io/providers/hashicorp/cloudinit/latest/docs) (cloudinit) v2.3.5
   * [Random Provider](https://registry.terraform.io/providers/hashicorp/random/latest/docs) (random) v3.6.3
   * [Time Provider](https://registry.terraform.io/providers/hashicorp/time/latest/docs) (time) v0.12.1
@@ -137,14 +137,14 @@ Windows users can use [WSL](https://learn.microsoft.com/windows/wsl/about) which
     * Install [MySQL Workbench](https://www.mysql.com/products/workbench/) if you plan to complete smoke testing for [terraform-azurerm-mysql](./terraform-azurerm-mysql/)
     * Install [Azure VPN Client](https://www.microsoft.com/store/productId/9NP355QT2SQB) if you plan to complete smoke testing for [terraform-azurerm-vwan](./terraform-azurerm-vwan/).
 * Linux prerequisites ([Step-By-Step Video](https://youtu.be/YW37uG0aX8c))
-  * [Install Linux on Windows with WSL](https://learn.microsoft.com/windows/wsl/install). `Ubuntu 22.04 LTS (Jammy Jellyfish)` is recommended.
+  * [Install Linux on Windows with WSL](https://learn.microsoft.com/windows/wsl/install). `Ubuntu 24.04 LTS (Noble Numbat)` is recommended.
   * Install [pip3](https://pip.pypa.io/en/stable/) Python library package manager and the [PyJWT](https://pyjwt.readthedocs.io/en/latest/) Python library. This is used to determine the id of the security principal for the currently signed in Azure CLI user.
   
     ```bash
-    # Install the must recent PyJWT Python library
+    # Install the most recent PyJWT Python library
     sudo apt update
     sudo apt install python3-pip
-    pip3 install --upgrade pyjwt
+    pip3 show pyjwt
     ```
 
   * [Install the Azure CLI on Linux | apt (Ubuntu, Debian)](https://learn.microsoft.com/cli/azure/install-azure-cli-linux?pivots=apt)

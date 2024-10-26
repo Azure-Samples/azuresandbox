@@ -107,19 +107,19 @@ The following sections provide guided smoke testing of each resource provisioned
 * Configure SSH identity file on SSH client
   * Copy the the value of the secret `bootstrapadmin-ssh-key-private` in key vault.
   * Paste the secret value into a new text file.
-  * Save the new text file as `C:\Users\YourUserName\.ssh\bootstrapadmin-ssh-key-private.txt`.
+  * Save the new text file as `C:\Users\YourUserName\.ssh\devopsbootstrapadmin-ssh-key-private.txt`.
 * Open a PowerShell command prompt and execute the following commands:
 
     ```powershell
     # Change current directory to .ssh
     cd C:\Users\YourUserName\.ssh
 
-    # Open SSH connection using identity file
-    ssh -i .\bootstrapadmin-ssh-key-private.txt bootstrapadmin@PrivateIPAddress
+    # Open SSH connection using identity file, replace `PrivateIPAddress` with the IP address for jumplinux2
+    ssh -i .\bootstrapadmin-ssh-key-private.txt devopsbootstrapadmin@PrivateIPAddress
     ```
 
 * If prompted to continue connecting, answer `yes`.
-* When prompted for the passphrase, enter the value of the `adminpassword` secret from key vault.
+* When prompted for the passphrase, enter the value of the `devopsadminpassword` secret from key vault.
 * Execute the following commands:
 
     ```bash
@@ -143,7 +143,7 @@ The following sections provide guided smoke testing of each resource provisioned
 * Launch VS Code
 * Install the [Remote-SSH](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-ssh) extension.
 * Navigate to *View > Command Palette...* and enter `Remote-SSH: Add New SSH Host`
-  * When prompted for *Enter SSH Connection Command* enter `ssh bootstrapadmin@PrivateIPAddress`
+  * When prompted for *Enter SSH Connection Command* enter `ssh devopsbootstrapadmin@PrivateIPAddress`
   * When promoted for *Enter SSH configuration file to update* select `C:\Users\YourUserName\.ssh\config`.
 * Navigate to *View > Command Palette...* and enter `Remote-SSH: Open SSH Configuration File...`
   * When prompted for *Select SSH configuration file to update* select `C:\Users\YourUserName\.ssh\config`.
@@ -152,18 +152,18 @@ The following sections provide guided smoke testing of each resource provisioned
     ```text
     Host jumplinux2
         HostName PrivateIPAddress
-        User bootstrapadmin
-        IdentityFile C:\\Users\\YourUserName\\.ssh\\bootstrapadmin-ssh-key-private.txt
+        User devopsbootstrapadmin
+        IdentityFile C:\\Users\\YourUserName\\.ssh\\devopsbootstrapadmin-ssh-key-private.txt
     ```
 
     * Save the modified configuration file.
 * Navigate to *View > Command Palette...* and enter `Remote-SSH: Connect to Host...`.
   * Choose `jumplinux2` from the list.
   * When prompted for *Select the platform of the remote host "jumplinux2"* choose `Linux`
-    * When prompted for *Enter passphrase for ssh key* enter the value of the `adminpassword` secret
+    * When prompted for *Enter passphrase for ssh key* enter the value of the `devopsadminpassword` secret
 * Navigate to *View > Explorer* and click `Open Folder`
   * Choose the default folder `/home/bootstrapadmin/`
-  * When prompted for *Enter passphrase for ssh key* enter the value of the `adminpassword` secret in key vault
+  * When prompted for *Enter passphrase for ssh key* enter the value of the `devopsadminpassword` secret in key vault
     * When prompted for *Do you trust the authors of the files in this folder?* enable the checkbox `Trust the authors of all files in the parent folder 'home'` and click `Yes, I trust the authors`.
 * Navigate to *View > Terminal*
   * Execute the following commands:

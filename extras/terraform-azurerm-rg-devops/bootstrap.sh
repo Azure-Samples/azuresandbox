@@ -13,16 +13,21 @@ gen_strong_password () {
     symbol_count=0
 
     # Seed random number generator
-    RANDOM=$(date +%s)
+    RANDOM=$(date +%s%N)
 
     for (( i=1; i<=$password_length; i++))
     do
-        password_category=$(( $RANDOM % 4 ))
+        if [ $i -eq 1 ] || [ $i -eq $password_length ]
+        then
+          password_category=$(( $RANDOM % 3 ))
+        else
+          password_category=$(( $RANDOM % 4 ))
+        fi
 
         case $password_category in
             0 )
                 # Digits
-                if [ $digit_count -le 2 ]
+                if [ $digit_count -le 3 ]
                 then
                     char_ascii=$(( ( $RANDOM % 10 ) + 48 ))
                     (( digit_count+=1 ))
@@ -34,7 +39,7 @@ gen_strong_password () {
 
             1 )
                 # Uppercase letters
-                if [ $uppercase_count -le 2 ]
+                if [ $uppercase_count -le 3 ]
                 then
                     char_ascii=$(( ( $RANDOM % 26 ) + 65 ))
                     (( uppercase_count+=1 ))
@@ -47,7 +52,7 @@ gen_strong_password () {
 
             2 )
                 # Lowercase letters
-                if [ $lowercase_count -le 2 ]
+                if [ $lowercase_count -le 3 ]
                 then
                     char_ascii=$(( ( $RANDOM % 26 ) + 97 ))
                     (( lowercase_count+=1 ))
@@ -84,12 +89,12 @@ usage() {
 }
 
 # Initialize constants
-admin_username_secret="adminuser"
-admin_password_secret="adminpassword"
+admin_username_secret="devopsadminuser"
+admin_password_secret="devopsadminpassword"
 
 # Initialize defaults
 default_aad_tenant_id=$(az account list --query "[? isDefault]|[0].tenantId" --output tsv)
-default_admin_username="bootstrapadmin"
+default_admin_username="devopsbootstrapadmin"
 default_cost_center="mycostcenter"
 default_environment="dev"
 default_location="centralus"
@@ -209,7 +214,7 @@ az keyvault set-policy \
   --resource-group $resource_group_name \
   --name $keyvault_name \
   --object-id $owner_object_id \
-  --secret-permissions backup delete get list purge recover restore 'set'
+  --secret-permissions get list 'set'
 
 printf "Setting secret '$admin_username_secret' with value '$admin_username' in keyvault '$keyvault_name'...\n"
 az keyvault secret set \

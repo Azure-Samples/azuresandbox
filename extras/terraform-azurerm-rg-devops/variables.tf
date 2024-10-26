@@ -63,7 +63,7 @@ variable "tags" {
 variable "vm_image_offer" {
   type        = string
   description = "The offer type of the virtual machine image used to create the VM"
-  default     = "0001-com-ubuntu-server-jammy"
+  default     = "ubuntu-24_04-lts"
 }
 
 variable "vm_image_publisher" {
@@ -75,7 +75,7 @@ variable "vm_image_publisher" {
 variable "vm_image_sku" {
   type        = string
   description = "The sku of the virtual machine image used to create the VM"
-  default     = "22_04-lts-gen2"
+  default     = "server"
 }
 
 variable "vm_image_version" {

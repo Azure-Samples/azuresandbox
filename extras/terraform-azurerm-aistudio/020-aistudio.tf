@@ -31,7 +31,7 @@ resource "azapi_resource" "ai_services_01" {
     type = "SystemAssigned"
   }
 
-  body = jsonencode({
+  body = {
     name = "ais${random_id.aistudio_name.hex}"
     kind = "AIServices"
     properties = {
@@ -41,7 +41,7 @@ resource "azapi_resource" "ai_services_01" {
     sku = {
       name = var.ai_services_sku
     }
-  })
+  }
 
   response_export_values = ["*"]
 }
@@ -167,7 +167,7 @@ resource "azapi_resource" "ai_hub_01" {
     type = "SystemAssigned"
   }
 
-  body = jsonencode({
+  body = {
     kind = "Hub"
     properties = {
       applicationInsights      = azurerm_application_insights.app_insights_01.id
@@ -181,7 +181,7 @@ resource "azapi_resource" "ai_hub_01" {
       storageAccount           = local.storage_account_id
       systemDatastoresAuthMode = "identity"
     }
-  })
+  }
 
   lifecycle {
     ignore_changes = [tags]
