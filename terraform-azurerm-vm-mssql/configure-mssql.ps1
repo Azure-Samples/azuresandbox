@@ -113,11 +113,24 @@ function Invoke-Sql {
     $cxnstring."Integrated Security" = $true
     $cxn = New-Object System.Data.SqlClient.SqlConnection($cxnstring.ConnectionString)    
 
-    try {
-        $cxn.Open()
+    $maxRetries = 10
+    $retryCount = 0
+    $retryDelay = 60 # seconds
+    
+    while ($retryCount -lt $maxRetries) {
+        try {
+            $cxn.Open()
+            break
+        }
+        catch {
+            $retryCount++
+            Write-Log "Invoke-Sql: Attempt $retryCount failed. Retrying in $retryDelay seconds..."
+            Start-Sleep -Seconds $retryDelay
+        }
     }
-    catch {
-        Exit-WithError $_
+    
+    if ($retryCount -eq $maxRetries) {
+        Exit-WithError "Invoke-Sql: Failed to open connection after $maxRetries attempts."
     }
 
     $cmd = $cxn.CreateCommand()
