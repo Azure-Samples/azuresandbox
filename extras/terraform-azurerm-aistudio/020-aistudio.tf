@@ -80,6 +80,10 @@ resource "azurerm_search_service" "search_service_01" {
   location                      = var.location
   sku                           = var.ai_search_sku
   public_network_access_enabled = false
+
+  identity {
+    type = "SystemAssigned"
+  }
 }
 
 output "search_service_01_name" {
@@ -162,6 +166,10 @@ resource "azapi_resource" "ai_hub_01" {
   name      = "aih${random_id.aistudio_name.hex}"
   location  = var.location
   parent_id = local.resource_group_id
+  depends_on = [
+    azurerm_private_endpoint.ai_services_01,
+    azurerm_private_endpoint.search_service_01
+  ]
 
   identity {
     type = "SystemAssigned"
@@ -170,13 +178,35 @@ resource "azapi_resource" "ai_hub_01" {
   body = {
     kind = "Hub"
     properties = {
-      applicationInsights      = azurerm_application_insights.app_insights_01.id
-      containerRegistry        = azurerm_container_registry.container_registry_01.id
-      description              = "Network isolated Azure AI hub."
-      enableDataIsolation      = true
-      friendlyName             = "aih${random_id.aistudio_name.hex}"
-      keyVault                 = var.key_vault_id
-      managedNetwork           = { isolationMode = "AllowInternetOutbound" }
+      applicationInsights = azurerm_application_insights.app_insights_01.id
+      containerRegistry   = azurerm_container_registry.container_registry_01.id
+      description         = "Network isolated Azure AI hub."
+      enableDataIsolation = true
+      friendlyName        = "aih${random_id.aistudio_name.hex}"
+      keyVault            = var.key_vault_id
+      managedNetwork = {
+        isolationMode = "AllowInternetOutbound"
+        outboundRules = {
+          AISearch = {
+            category = "UserDefined"
+            destination = {
+              serviceResourceId = azurerm_search_service.search_service_01.id
+              sparkEnabled      = false
+              subresourceTarget = "searchService"
+            }
+            type = "PrivateEndpoint"
+          }
+          AIServices = {
+            category = "UserDefined"
+            destination = {
+              serviceResourceId = azapi_resource.ai_services_01.id
+              sparkEnabled      = false
+              subresourceTarget = "account"
+            }
+            type = "PrivateEndpoint"
+          }
+        }
+      }
       publicNetworkAccess      = "Disabled"
       storageAccount           = local.storage_account_id
       systemDatastoresAuthMode = "identity"
@@ -208,5 +238,53 @@ resource "azurerm_private_endpoint" "ai_hub_01" {
       var.private_dns_zones["privatelink.api.azureml.ms"].id,
       var.private_dns_zones["privatelink.notebooks.azure.net"].id
     ]
+  }
+}
+
+resource "azapi_resource" "ai_hub_01_connection_aiservices" {
+  type      = "Microsoft.MachineLearningServices/workspaces/connections@2024-07-01-preview"
+  name      = "ais${random_id.aistudio_name.hex}"
+  parent_id = azapi_resource.ai_hub_01.id
+  depends_on = [
+    azurerm_private_endpoint.ai_services_01,
+    azapi_resource.ai_hub_01
+  ]
+
+  body = {
+    properties = {
+      authType = "AAD"
+      category = "AIServices"
+      isSharedToAll = true
+      metadata = {
+        ApiType = "Azure"
+        Location = var.location
+        ResourceId = azapi_resource.ai_services_01.id
+      }
+      target = "${azapi_resource.ai_services_01.name}.cognitiveservices.azure.com" 
+    }
+  }
+}
+
+resource "azapi_resource" "ai_hub_01_connection_aisearch" {
+  type      = "Microsoft.MachineLearningServices/workspaces/connections@2024-07-01-preview"
+  name      = "search${random_id.aistudio_name.hex}"
+  parent_id = azapi_resource.ai_hub_01.id
+  depends_on = [
+    azurerm_private_endpoint.search_service_01,
+    azapi_resource.ai_hub_01
+  ]
+
+  body = {
+    properties = {
+      authType = "AAD"
+      category = "CognitiveSearch"
+      isSharedToAll = true
+      metadata = {
+        ApiType = "Azure"
+        Location = var.location
+        ResourceId = azurerm_search_service.search_service_01.id
+      }
+      target = "${azurerm_search_service.search_service_01.name}.search.windows.net" 
+    }
   }
 }

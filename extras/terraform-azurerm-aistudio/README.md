@@ -82,7 +82,7 @@ This section describes how to provision this configuration using default setting
 
 * Monitor output. Upon completion, you should see a message similar to the following:
 
-  `Apply complete! Resources: 10 added, 0 changed, 0 destroyed.`
+  `Apply complete! Resources: 12 added, 0 changed, 0 destroyed.`
 
 * Inspect `terraform.tfstate`.
 
@@ -131,20 +131,6 @@ Follow the steps in this section to test the functionality of AIStudio hubs, pro
   * Click *All resources & projects*
   * Locate the resource with the type `Hub` and click on it (e.g. `aihxxx`).
   * Examine the *Hub properties* and *Users* panels.
-* From the AI Studio hub, configure AI Services connection.
-  * Locate the *Connected resources* pane and click *New connection*
-  * Click on *Azure AI services*
-  * Locate the AI Services resource provisioned in this configuration (e.g. `aisxx`) and click *Add connection*
-  * Wait util the status is `Connected`, then click *Close*.
-  * Refresh the browser window and verify that two AI Services connection are listed:
-    * Azure OpenAI (e.g. `aisxx_aoai`)
-    * AIServices (e.g. `aisxx`)
-* From the AIStudio hub, configure Azure AI Search connection.
-  * Locate the *Connected resources* pane and click *New connection*
-  * Click on *Azure AI Search*
-  * Locate the AI Search resource provisioned in this configuration (e.g. `searchxx`) and click *Add connection*
-  * Wait util the status is `Connected`, then click *Close*.
-  * Refresh the browser window and verify that the AI Search connection is listed.
 * From the AIStudio hub, create a project.
   * Locate the *Projects* pane and click *New project*
   * Enter a name for the project (e.g. `aipxx`)
