@@ -221,7 +221,7 @@ az keyvault secret set \
   --subscription $subscription_id \
   --vault-name $keyvault_name \
   --name $admin_username_secret \
-  --value "$admin_username"
+  --value="$admin_username"
 
 if [ "$skip_admin_password_gen" = 'no' ]
 then
@@ -231,7 +231,7 @@ then
     --subscription $subscription_id \
     --vault-name $keyvault_name \
     --name $admin_password_secret \
-    --value "$admin_password" \
+    --value="$admin_password" \
     --output none
 fi
 
@@ -262,7 +262,7 @@ printf "Setting secret '$ssh_private_key_secret_name' with value length \"${#ssh
 az keyvault secret set \
     --vault-name $keyvault_name \
     --name $ssh_private_key_secret_name \
-    --value "$ssh_private_key_secret_value" \
+    --value="$ssh_private_key_secret_value" \
     --output none
 
 # Build tags map
