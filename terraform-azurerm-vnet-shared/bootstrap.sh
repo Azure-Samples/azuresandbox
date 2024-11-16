@@ -387,7 +387,7 @@ while [ $retry_count -lt $max_retries ]; do
     --subscription $subscription_id \
     --vault-name $key_vault_name \
     --name $admin_username_secret \
-    --value "$admin_username" \
+    --value="$admin_username" \
     --expires "$secret_expiration_date" && break
 
   retry_count=$((retry_count + 1))
@@ -414,7 +414,7 @@ then
       --subscription $subscription_id \
       --vault-name $key_vault_name \
       --name $admin_password_secret \
-      --value "$admin_password" \
+      --value="$admin_password" \
       --expires "$secret_expiration_date" \
       --output none && break
     
@@ -439,7 +439,7 @@ while [ $retry_count -lt $max_retries ]; do
     --subscription $subscription_id \
     --vault-name $key_vault_name \
     --name $arm_client_id \
-    --value "$TF_VAR_arm_client_secret" \
+    --value="$TF_VAR_arm_client_secret" \
     --expires "$secret_expiration_date" \
     --output none && break
 
@@ -506,7 +506,7 @@ while [ $retry_count -lt $max_retries ]; do
     --subscription $subscription_id \
     --vault-name $key_vault_name \
     --name $storage_account_name \
-    --value "$storage_account_key" \
+    --value="$storage_account_key" \
     --expires "$secret_expiration_date" \
     --output none && break
 
@@ -557,7 +557,7 @@ then
       --subscription $subscription_id \
       --vault-name $key_vault_name \
       --name "$storage_account_name-kerb1" \
-      --value "$storage_account_key_kerb1" \
+      --value="$storage_account_key_kerb1" \
       --expires "$secret_expiration_date" \
       --output none && break
 

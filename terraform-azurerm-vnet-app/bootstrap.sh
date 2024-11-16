@@ -185,7 +185,7 @@ printf "Setting secret '$ssh_private_key_secret_name' with value length '${#ssh_
 az keyvault secret set \
     --vault-name $key_vault_name_noquotes \
     --name $ssh_private_key_secret_name \
-    --value "$ssh_private_key_secret_value" \
+    --value="$ssh_private_key_secret_value" \
     --expires "$secret_expiration_date" \
     --output none
 

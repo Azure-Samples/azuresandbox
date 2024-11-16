@@ -34,8 +34,8 @@ resource "azapi_update_resource" "storage_account_enable_public_access" {
 
   body = {
     properties = {
-      allowSharedKeyAccess = true 
-      publicNetworkAccess = "Enabled"
+      allowSharedKeyAccess = true
+      publicNetworkAccess  = "Enabled"
     }
   }
 }
@@ -46,9 +46,9 @@ resource "time_sleep" "wait_60_seconds" {
 }
 
 resource "azurerm_storage_share" "storage_share_01" {
-  name                 = var.storage_share_name
-  storage_account_name = var.storage_account_name
-  quota                = var.storage_share_quota_gb
+  name               = var.storage_share_name
+  storage_account_id = local.storage_account_id
+  quota              = var.storage_share_quota_gb
 
   depends_on = [time_sleep.wait_60_seconds]
 }
@@ -63,8 +63,8 @@ resource "azapi_update_resource" "storage_account_disable_public_access" {
 
   body = {
     properties = {
-      allowSharedKeyAccess = false 
-      publicNetworkAccess = "Disabled"
+      allowSharedKeyAccess = false
+      publicNetworkAccess  = "Disabled"
     }
   }
 
