@@ -47,6 +47,11 @@ variable "location" {
   description = "The name of the Azure Region where resources will be provisioned."
 }
 
+variable "owner_object_id" {
+  type       = string
+  description = "The object id of the owner of the resources."
+}
+
 variable "private_dns_zones" {
   type        = map(any)
   description = "The existing private dns zones defined in the application virtual network."

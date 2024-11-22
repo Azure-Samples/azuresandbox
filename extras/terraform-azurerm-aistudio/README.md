@@ -82,7 +82,7 @@ This section describes how to provision this configuration using default setting
 
 * Monitor output. Upon completion, you should see a message similar to the following:
 
-  `Apply complete! Resources: 12 added, 0 changed, 0 destroyed.`
+  `Apply complete! Resources: 21 added, 0 changed, 0 destroyed.`
 
 * Inspect `terraform.tfstate`.
 
@@ -238,6 +238,26 @@ azurerm_search_service.search_service_01 (searchxx) | An [Azure AI Search](https
 random_id.aistudio_name | Random id used to name resources in this configuration.
 
 This configuration provisions an [Azure AI Studio hub](https://learn.microsoft.com/azure/ai-studio/concepts/ai-resources#set-up-and-secure-a-hub-for-your-team) in network isolated mode. The AI Studio hub is connected to the existing shared services storage account and key vault. The hub is also connected to a new [Application Insights](https://learn.microsoft.com/azure/azure-monitor/app/app-insights-overview) workspace and [Azure Container Registry](https://learn.microsoft.com/azure/container-registry/container-registry-intro). A new [Azure AI Search](https://learn.microsoft.com/azure/search/search-what-is-azure-search) resource is created as well for use in Azure AI Studio.
+
+The following Azure RBAC role assignments are implemented based upon the guidance in [Use your data securely within the Azure AI Studio playground](https://learn.microsoft.com/en-us/azure/ai-studio/how-to/secure-data-playground).
+
+Number | Scope | Role | Principal | Notes
+--- | --- | --- | --- | ---
+1 | Shared storage account | `Contributor` | Interactive user | Azure CLI authenticated user is `Owner`
+2 | Shared storage account | `Storage Blob Data Contributor` | Interactive user | Azure CLI authenticated user, implemented in [terraform-azurerm-vnet-shared/boostrap.sh](../../terraform-azurerm-vnet-shared/bootstrap.sh)
+3 | Shared storage account | `Storage BLob Data Contributor` | Service principal | Implemented in [terraform-azurerm-vnet-shared/boostrap.sh](../../terraform-azurerm-vnet-shared/bootstrap.sh)
+4 | Shared storage account | `Storage Blob Data Contributor` | AI Services managed identity | Implemented in [020-aistudio.tf](./020-aistudio.tf)
+5 | Shared storage account | `Storage Blob Data Contributor` | AI Search managed identity | Implemented in [020-aistudio.tf](./020-aistudio.tf)
+6 | Shared storage account | `Storage File Data Privileged Contributor` | Interactive user | Implemented in [terraform-azurerm-vnet-shared/boostrap.sh](../../terraform-azurerm-vnet-shared/bootstrap.sh)
+7 | Shared storage account | `Storage File Data Privileged Contributor` | Service principal | Implemented in [terraform-azurerm-vnet-shared/boostrap.sh](../../terraform-azurerm-vnet-shared/bootstrap.sh)
+8 | AI Services | `Cognitive Services OpenAI Contributor` | Interactive user | Implemented in [020-aistudio.tf](./020-aistudio.tf)
+9 | AI Services | `Cognitive Services OpenAI Contributor` | AI Search managed identity | Implemented in [020-aistudio.tf](./020-aistudio.tf)
+10 | AI Services | `Cognitive Services User` | Interactive user | Implemented in [020-aistudio.tf](./020-aistudio.tf)
+11 | AI Search | `Contributor` | Interactive user | Azure CLI authenticated user is `Owner`
+12 | AI Search | `Search Index Data Contributor` | Interactive user | Implemented in [020-aistudio.tf](./020-aistudio.tf)
+13 | AI Search | `Search Index Data Contributor` | AI Services managed identity | Implemented in [020-aistudio.tf](./020-aistudio.tf)
+14 | AI Search | `Search Index Data Reader` | AI Services managed identity | Implemented in [020-aistudio.tf](./020-aistudio.tf)
+15 | AI Search | `Search Service Contributor` | AI Services managed identity | Implemented in [020-aistudio.tf](./020-aistudio.tf)
 
 ### Terraform output variables
 
