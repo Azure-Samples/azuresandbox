@@ -17,7 +17,7 @@ resource "azurerm_storage_account" "st_tfm" {
 # Container for terraform state backend storage 
 resource "azurerm_storage_container" "container_tfstate" {
   name                  = "tfstate"
-  storage_account_name  = azurerm_storage_account.st_tfm.name
+  storage_account_id    = azurerm.storage_account.st_tfm.id
   container_access_type = "private"
 }
 

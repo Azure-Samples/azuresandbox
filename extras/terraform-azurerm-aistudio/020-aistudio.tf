@@ -73,6 +73,30 @@ resource "azurerm_private_endpoint" "ai_services_01" {
   }
 }
 
+resource "azurerm_role_assignment" "role_assignment_04" {
+  scope                = local.storage_account_id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azapi_resource.ai_services_01.identity[0].principal_id
+}
+
+resource "azurerm_role_assignment" "role_assignment_08" {
+  scope                = azapi_resource.ai_services_01.id
+  role_definition_name = "Cognitive Services OpenAI Contributor"
+  principal_id         = var.owner_object_id
+}
+
+resource "azurerm_role_assignment" "role_assignment_09" {
+  scope                = azapi_resource.ai_services_01.id
+  role_definition_name = "Cognitive Services OpenAI Contributor"
+  principal_id         = azurerm_search_service.search_service_01.identity[0].principal_id
+}
+
+resource "azurerm_role_assignment" "role_assignment_10" {
+  scope                = azapi_resource.ai_services_01.id
+  role_definition_name = "Cognitive Services User"
+  principal_id         = var.owner_object_id
+}
+
 # Azure AI Search
 resource "azurerm_search_service" "search_service_01" {
   name                          = "search${random_id.aistudio_name.hex}"
@@ -110,6 +134,36 @@ resource "azurerm_private_endpoint" "search_service_01" {
       var.private_dns_zones["privatelink.search.windows.net"].id
     ]
   }
+}
+
+resource "azurerm_role_assignment" "role_assignment_05" {
+  scope                = local.storage_account_id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_search_service.search_service_01.identity[0].principal_id
+}
+
+resource "azurerm_role_assignment" "role_assignment_12" {
+  scope                = azurerm_search_service.search_service_01.id
+  role_definition_name = "Search Index Data Contributor"
+  principal_id         = var.owner_object_id
+}
+
+resource "azurerm_role_assignment" "role_assignment_13" {
+  scope                = azurerm_search_service.search_service_01.id
+  role_definition_name = "Search Index Data Contributor"
+  principal_id         = azapi_resource.ai_services_01.identity[0].principal_id
+}
+
+resource "azurerm_role_assignment" "role_assignment_14" {
+  scope                = azurerm_search_service.search_service_01.id
+  role_definition_name = "Search Index Data Reader"
+  principal_id         = azapi_resource.ai_services_01.identity[0].principal_id
+}
+
+resource "azurerm_role_assignment" "role_assignment_15" {
+  scope               = azurerm_search_service.search_service_01.id
+  role_definition_name = "Search Service Contributor"
+  principal_id         = azapi_resource.ai_services_01.identity[0].principal_id
 }
 
 # Application Insights workspace
@@ -252,15 +306,15 @@ resource "azapi_resource" "ai_hub_01_connection_aiservices" {
 
   body = {
     properties = {
-      authType = "AAD"
-      category = "AIServices"
+      authType      = "AAD"
+      category      = "AIServices"
       isSharedToAll = true
       metadata = {
-        ApiType = "Azure"
-        Location = var.location
+        ApiType    = "Azure"
+        Location   = var.location
         ResourceId = azapi_resource.ai_services_01.id
       }
-      target = "${azapi_resource.ai_services_01.name}.cognitiveservices.azure.com" 
+      target = "${azapi_resource.ai_services_01.name}.cognitiveservices.azure.com"
     }
   }
 }
@@ -276,15 +330,15 @@ resource "azapi_resource" "ai_hub_01_connection_aisearch" {
 
   body = {
     properties = {
-      authType = "AAD"
-      category = "CognitiveSearch"
+      authType      = "AAD"
+      category      = "CognitiveSearch"
       isSharedToAll = true
       metadata = {
-        ApiType = "Azure"
-        Location = var.location
+        ApiType    = "Azure"
+        Location   = var.location
         ResourceId = azurerm_search_service.search_service_01.id
       }
-      target = "${azurerm_search_service.search_service_01.name}.search.windows.net" 
+      target = "${azurerm_search_service.search_service_01.name}.search.windows.net"
     }
   }
 }
