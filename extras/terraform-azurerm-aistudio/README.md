@@ -163,9 +163,10 @@ Follow the steps in this section to test the functionality of AIStudio hubs, pro
 * From the project, use Azure AI Speech to transcribe a call center audio file.
   * Note: Due to [Issue 120](https://github.com/Azure-Samples/azuresandbox/issues/120) you must temporarily enable public access to AI Services to perform these steps.
   * Navigate to *AI Services* > *Speech* > *Try all Speech capabilities* > *Real-time speech to text*
+  * Navigate to *Configure* > *Show advanced options* and enable `Speaker diarization`
   * Navigate to *Upload files* > *browse files*
   * Locate `\\stxxxxxxxxxxxxx.file.core.windows.net\myfileshare\documents\CallScriptAudio.mp3` and click *Open*
-  * Observe the file being uploaded and processed in real time.
+  * Observe the file being uploaded and transcribed in real time.
   * When the transcription is complete, review the results and click *Copy to clipboard*.
   * Paste the transcription into *Notepad* for use later in this exercise.
 * From the project, test the deployment in the chat playground.
@@ -178,6 +179,13 @@ Follow the steps in this section to test the functionality of AIStudio hubs, pro
       ```
 
   * Click on *Apply changes* and click *Continue*.
+  * Navigate to *Chat playground* > *Setup* > *Parameters* and adjust the following settings:
+
+    Setting | Default value | New value
+    --- | --- | ---
+    Max response | 800 | 1000
+    Temperature | 0.7 | 0.3
+
   * Enter the following text into the chat window:
 
       ```text
