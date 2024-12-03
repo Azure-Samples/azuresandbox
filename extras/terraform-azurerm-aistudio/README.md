@@ -127,43 +127,50 @@ Follow the steps in this section to test the functionality of AIStudio hubs, pro
     * Disable `Use secure DNS to specify how to lookup the network address for websites`
   * Navigate to `https://ai.azure.com`
   * Click *Sign in*
-  * Authenticate using a Microsoft Entra ID account that has an Azure RBAC `Owner` role assignment to the sandbox subscription.
-  * Click *All resources & projects*
-  * Locate the resource with the type `Hub` and click on it (e.g. `aihxxx`).
-  * Examine the *Hub properties* and *Users* panels.
 * From the AIStudio hub, create a project.
-  * Locate the *Projects* pane and click *New project*
+  * Click *Create project*
   * Enter a name for the project (e.g. `aipxx`)
-  * Click *Create a project*
-  * When the project is created, examine the *Overview* page.
-* From the AIStudio project, create a deployment.
-  * Navigate to *Components* > *Deployments*
-  * Click on *Deploy model* > *Deploy base model*
+  * Select the AI hub from the dropdown (e.g. `aihxx`)
+  * Click *Create*
+* Explore the hub
+  * From the project, navigate to *Management center* > *AI hubs + projects*
+  * Click on the AI hub (e.g. `aihxx`)
+  * Examine the hub *Overview* page
+  * Navigate to *Hub (aihxx) > Users* and examine both the *Users* tab and the *Inherited access* tab.
+  * Navigate to *Hub (aihxx) > Connected resources* and examine the connected resources.
+  * Navigate to *Management center* > *All hubs + projects*
+  * Click on the project (e.g. `aipxx`)
+  * Navigate to *Go to project*
+* From the project, create a model deployment.
+  * Navigate to *My assets* > *Models + endpoints*
+  * From the *Model deployments* tab, Click on *Deploy model* > *Deploy base model*
   * Search for `gpt-4o` and select it.
-  * Click *Confirm*.
+  * Review the description, then click *Confirm*.
   * Examine the deployment details, then click *Customize*.
-  * Adjust the settings as follows, then click *Deploy*.
+  * Adjust the settings as follows:
 
     Setting | Value
     --- | ---
     Deployment name | gpt-4o-2024-08-06
     Deployment type | `Global Standard`
-    Model version | 2024-08-06
+    Model version | `2024-08-06`
     Connected AI resource | aisxxx
     Tokens per Minute Rate Limit | 66K
     Content filter | `DefaultV2`
-
+  
+  * Click *Deploy*
   * When deployment completes, verify that the *Provisioning state* is `Succeeded`.
-* From the AIStudio project, use Azure AI Speech to transcribe a call center audio file.
+* From the project, use Azure AI Speech to transcribe a call center audio file.
   * Note: Due to [Issue 120](https://github.com/Azure-Samples/azuresandbox/issues/120) you must temporarily enable public access to AI Services to perform these steps.
-  * Navigate to *Get started* > *AI Services* > *Speech* > > *Try out speech capabilities* > *Real-time speech to text*
-  * Navigate to *Results* > *Choose audio files* and click *Browse file*
+  * Navigate to *AI Services* > *Speech* > *Try all Speech capabilities* > *Real-time speech to text*
+  * Navigate to *Configure* > *Show advanced options* and enable `Speaker diarization`
+  * Navigate to *Upload files* > *browse files*
   * Locate `\\stxxxxxxxxxxxxx.file.core.windows.net\myfileshare\documents\CallScriptAudio.mp3` and click *Open*
-  * Navigate to *Results  > *Transcription results* and observe the transcription being generated.
+  * Observe the file being uploaded and transcribed in real time.
   * When the transcription is complete, review the results and click *Copy to clipboard*.
   * Paste the transcription into *Notepad* for use later in this exercise.
-* From the AIStudio project, test the deployment in the chat playground.
-  * Navigate to *Project playground* > *Chat*
+* From the project, test the deployment in the chat playground.
+  * Navigate to *Playgrounds* and click *Try the Chat playground*
   * Confirm the *Deployment* is set to `gpt-4o-2024-08-06`.
   * Enter the following in *Give the model instructions and context*
 
@@ -171,7 +178,14 @@ Follow the steps in this section to test the functionality of AIStudio hubs, pro
       You are an AI assistant to help analyze call center transcripts.
       ```
 
-  * Click on *Save* and click *Continue*.
+  * Click on *Apply changes* and click *Continue*.
+  * Navigate to *Chat playground* > *Setup* > *Parameters* and adjust the following settings:
+
+    Setting | Default value | New value
+    --- | --- | ---
+    Max response | 800 | 1000
+    Temperature | 0.7 | 0.3
+
   * Enter the following text into the chat window:
 
       ```text
