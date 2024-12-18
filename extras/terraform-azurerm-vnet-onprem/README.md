@@ -186,24 +186,60 @@ This smoke testing uses the RDP connection to *jumpwin2* established previously 
 
 #### Test TDS (port 1433) connectivity to *mssqlwin1* private endpoint (IaaS)
 
-* From a Windows PowerShell command prompt, run the following command:
+* From *mssqlwin1*, temporarily configure the default SQL Server instance  to use SQL Server mixed authentication.
+  * Navigate to *Start* > *Microsoft SQL Server Tools 20* > *Microsoft SQL Server Management Studio 20*
+  * Connect to the default instance of SQL Server installed on the database server virtual machine using the following settings:
+    * Server
+      * Server type: `Database Engine`
+      * Server name: `mssqlwin1`
+      * Authentication: `Windows Authentication` (this will default to *MYSANDBOX\bootstrapadmin*)
+    * Connection security
+      * Encryption: `Optional`
+  * Right click on *mssqlwin1* and select *Properties*.
+  * Select the *Security* tab.
+  * Change *Server authentication* to `SQL Server and Windows Authentication mode`.
+  * Click *OK*.
+  * Right click on *mssqlwin1* and select *Restart*.
+  * Expand *Security* > *Logins*.
+  * Right click on *Logins* and select *New Login...*
+  * Configure the following settings, then click *OK*
 
-  ```powershell
-  # Replace FQDN with the value copied previously.
-  Resolve-DnsName mssqlwin1.mysandbox.local
-  ```
+    Setting | Value
+    --- | ---
+    Login name | *bootstrapadmin*
+    Login type | `SQL Server authentication`
+    Password | Use the value of the *adminpassword* secret in key vault.
+    Enforce password policy | Enabled
+    Enforce password expiration | Enabled
+    User must change password at next login | Disabled
+    Server Roles | `public` and `sysadmin`
 
-* Verify the *IP4Address* returned is within the IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-db-01"]*, e.g. `10.2.1.4`.
-* Navigate to *Start* > *Microsoft SQL Server Tools 19* > *Microsoft SQL Server Management Studio 19*.
-* Connect to the default instance of SQL Server installed on mssqlwin1 using the following values:
-  * Server name: *mssqlwin1.mysandbox.local*
-  * Authentication: *SQL Server Authentication*
-    * Login: `sa`
-    * Password: Use the value of the *adminpassword* secret in key vault.
-* Close SQL Server Management Studio.
+* From *jumpwin2*, test connectivity to the default SQL Server instance on *mssqlwin1*.
+  * From a Windows PowerShell command prompt, run the following command:
+
+    ```powershell
+    # Replace FQDN with the value copied previously.
+    Resolve-DnsName mssqlwin1.mysandbox.local
+    ```
+
+  * Verify the *IP4Address* returned is within the IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-db-01"]*, e.g. `10.2.1.4`.
+  * Navigate to *Start* > *Microsoft SQL Server Tools 20* > *Microsoft SQL Server Management Studio 20*.
+  * Connect to the default instance of SQL Server installed on *mssqlwin1* using the following values:
+    * Server
+      * Server type: `Database Engine`
+      * Server name: *mssqlwin1.mysandbox.local*
+      * Authentication: *SQL Server Authentication*
+      * Login: *bootstrapadmin*
+      * Password: Use the value of the *adminpassword* secret in key vault.
+    * Connection security
+      * Encryption: `Optional`
+  * Close SQL Server Management Studio.
+
+* From *mssqlwin1*, revert the SQL Server instance to use Windows Authentication only.
 
 #### Test TDS (port 1433) connectivity to Azure SQL Database private endpoint (PaaS)
 
+* Note: This test will not work if the `Support only Microsoft Entra authentication for this server` option is enabled. You must temporarily disable this option to complete this test.
 * From the client environment, navigate to *portal.azure.com* > *SQL Servers* > *mssql-xxxxxxxxxxxxxxxx* > *Properties* > *Server name* and copy the the FQDN, e.g. *mssql&#x2011;xxxxxxxxxxxxxxxx.database.windows.net*.
 * From *jumpwin2*, run the following Windows PowerShell command:
 
@@ -213,13 +249,18 @@ This smoke testing uses the RDP connection to *jumpwin2* established previously 
   ```
 
 * Verify the *IP4Address* returned is within the subnet IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-privatelink-01"]*, e.g. `10.2.2.*`.
-* Navigate to *Start* > *Microsoft SQL Server Tools 18* > *Microsoft SQL Server Management Studio 18*
+* Navigate to *Start* > *Microsoft SQL Server Tools 20* > *Microsoft SQL Server Management Studio 20*
 * Connect to the Azure SQL Database server private endpoint
-  * Server name: `mssql-xxxxxxxxxxxxxxxx.database.windows.net`
-  * Authentication: `SQL Server Authentication`
-  * Login: `bootstrapadmin`
-  * Password: Use the value stored in the *adminpassword* key vault secret
+  * Server
+    * Server type: `Database Engine`
+    * Server name: `mssql-xxxxxxxxxxxxxxxx.database.windows.net`
+    * Authentication: `SQL Server Authentication`
+    * Login: `bootstrapadmin`
+    * Password: Use the value stored in the *adminpassword* key vault secret
+  * Connection security
+    * Encryption: `Optional`
 * Expand the *Databases* tab and verify you can see *testdb*.
+* Close SQL Server Management Studio.
 
 #### Test port 3306 connectivity to Azure MySQL Flexible Server private endpoint (PaaS)
 
@@ -240,6 +281,7 @@ This smoke testing uses the RDP connection to *jumpwin2* established previously 
   * Uwername: `bootstrapadmin`
   * Schema: `testdb`
   * Click *OK* and when prompted for *password* use the value of the *adminpassword* secret in key vault.
+* Close MySQL Workbench.
 
 ## Documentation
 
