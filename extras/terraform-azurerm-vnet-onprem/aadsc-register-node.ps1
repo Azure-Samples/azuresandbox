@@ -128,6 +128,61 @@ function Register-DscNode {
         -RebootNodeIfNeeded $true `
         -ActionAfterReboot 'ContinueConfiguration' `
         -ErrorAction SilentlyContinue
+
+    Write-Log "Sleeping for 60 seconds before checking node status..."    
+    Start-Sleep -Seconds 60
+    
+    try {
+        $dscNodes = Get-AzAutomationDscNode `
+            -ResourceGroupName $ResourceGroupName `
+            -AutomationAccountName $AutomationAccountName `
+            -Name $VirtualMachineName `
+            -ErrorAction Stop
+    }
+    catch {
+        Exit-WithError $_
+    }
+
+    if ($null -eq $dscNodes) {
+        Exit-WithError "No existing DSC node registrations for '$VirtualMachineName' with node configuration '$nodeConfigName' found..."
+    }
+
+    $dscNode = $dscNodes[0]
+    $dscNodeId = $dscNode.Id
+    $dscNodeStatus = $dscNode.Status
+    Write-Log "DSC node registration id '$dscNodeId' found with status '$dscNodeStatus'..."    
+    
+    $maxRetries = 30
+    $retryCount = 0
+    $statusCompliant = "Compliant"
+
+    while ($retryCount -lt $maxRetries -and $dscNodeStatus -ne $statusCompliant) {
+        $retryCount++
+        try {
+            $dscNodes = Get-AzAutomationDscNode `
+                -Id $dscNodeId `
+                -ResourceGroupName $ResourceGroupName `
+                -AutomationAccountName $AutomationAccountName `
+                -ErrorAction Stop
+            }
+        catch {
+            Exit-WithError $_
+        }
+
+        $dscNode = $dscNodes[0]
+        $dscNodeId = $dscNode.Id
+        $dscNodeStatus = $dscNode.Status
+        Write-Log "Retry '$retryCount': DSC node registration id '$dscNodeId' status is '$dscNodeStatus'..."
+
+        if ($dscNodeStatus -ne $statusCompliant) {
+            Write-Log "DSC node status is not '$statusCompliant'. Retrying in 30 seconds..."
+            Start-Sleep -Seconds 30
+        }
+    }
+
+    if ($dscNodeStatus -ne $statusCompliant) {
+        Exit-WithError "DSC node status did not reach '$statusCompliant' after $maxRetries attempts."
+    }    
 }
 #endregion
 
