@@ -1,9 +1,10 @@
 locals {
-  vm_devops_win_names                    = formatlist("${var.vm_devops_win_name}%03d", range(var.vm_devops_win_instances_start, (var.vm_devops_win_instances_start + var.vm_devops_win_instances)))
+  automation_account_name                = split("/", var.automation_account_id)[8]
+  automation_account_resource_group_name = split("/", var.automation_account_id)[4]
+  storage_account_id                     = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.Storage/storageAccounts/${var.storage_account_name}"
   vm_devops_win_config_script_uri        = "https://${var.storage_account_name}.blob.core.windows.net/${var.storage_container_name}/${var.vm_devops_win_config_script}"
   vm_devops_win_data_disk_count          = var.vm_devops_win_data_disk_size_gb == 0 ? 0 : 1
-  automation_account_resource_group_name = split("/", var.automation_account_id)[4]
-  automation_account_name                = split("/", var.automation_account_id)[8]
+  vm_devops_win_names                    = formatlist("${var.vm_devops_win_name}%03d", range(var.vm_devops_win_instances_start, (var.vm_devops_win_instances_start + var.vm_devops_win_instances)))
 }
 
 resource "azurerm_windows_virtual_machine" "vm_devops_win" {
@@ -32,6 +33,10 @@ resource "azurerm_windows_virtual_machine" "vm_devops_win" {
     offer     = var.vm_devops_win_image_offer
     sku       = var.vm_devops_win_image_sku
     version   = var.vm_devops_win_image_version
+  }
+
+  identity {
+    type = "SystemAssigned"
   }
 
   # Note: To view provisioner output, use the Terraform nonsensitive() function when referencing key vault secrets or variables marked 'sensitive'
@@ -88,6 +93,19 @@ resource "azurerm_virtual_machine_data_disk_attachment" "vm_devops_win" {
   caching            = "ReadWrite"
 }
 
+# Role assignment for blob storage account
+resource "azurerm_role_assignment" "vm_devops_win_storage_account_role_assignment" {
+  for_each             = azurerm_windows_virtual_machine.vm_devops_win
+  scope                = local.storage_account_id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_windows_virtual_machine.vm_devops_win[each.value.name].identity[0].principal_id
+}
+
+resource "time_sleep" "vm_devops_win_storage_account_role_assignment" {
+  create_duration = "2m"
+  depends_on      = [azurerm_role_assignment.vm_devops_win_storage_account_role_assignment]
+}
+
 # Custom script extension
 resource "azurerm_virtual_machine_extension" "vm_devops_win" {
   for_each                   = azurerm_windows_virtual_machine.vm_devops_win
@@ -97,22 +115,17 @@ resource "azurerm_virtual_machine_extension" "vm_devops_win" {
   type                       = "CustomScriptExtension"
   type_handler_version       = "1.10"
   auto_upgrade_minor_version = true
-  depends_on                 = [azurerm_virtual_machine_data_disk_attachment.vm_devops_win]
+  depends_on = [
+    azurerm_virtual_machine_data_disk_attachment.vm_devops_win,
+    time_sleep.vm_devops_win_storage_account_role_assignment
+  ]
 
-  settings = <<SETTINGS
-    {
-      "fileUris": [ 
-        "${local.vm_devops_win_config_script_uri}" 
-      ],
-      "commandToExecute": 
-        "powershell.exe -ExecutionPolicy Unrestricted -File \"./${var.vm_devops_win_config_script}\""
-    }    
-  SETTINGS
+  settings = jsonencode({
+    fileUris = [local.vm_devops_win_config_script_uri]
+  })
 
-  protected_settings = <<PROTECTED_SETTINGS
-    {
-      "storageAccountName": "${var.storage_account_name}",
-      "storageAccountKey": "${data.azurerm_key_vault_secret.storage_account_key.value}"
-    }
-  PROTECTED_SETTINGS
+  protected_settings = jsonencode({
+    commandToExecute = "powershell.exe -ExecutionPolicy Unrestricted -File \"./${var.vm_devops_win_config_script}\""
+    managedIdentity  = {}
+  })
 }

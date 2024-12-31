@@ -300,11 +300,21 @@ function Start-DscCompliationJob {
         ComputerName = $VirtualMachineName
     }
 
+    $configurationData = @{
+        AllNodes = @(
+            @{
+                NodeName = "$VirtualMachineName"
+                PsDscAllowPlainTextPassword = $true
+            }
+        )
+    }
+
     try {
         $dscCompilationJob = Start-AzAutomationDscCompilationJob `
             -ResourceGroupName $ResourceGroupName `
             -AutomationAccountName $AutomationAccountName `
             -ConfigurationName $DscConfigurationName `
+            -ConfigurationData $configurationData `
             -Parameters $params `
             -ErrorAction Stop
     }
@@ -692,7 +702,7 @@ Start-Sleep -Seconds 60
 Write-Log "Uploading script '$vm_devops_win_config_script' to container '$storage_container_name' in '$storage_account_name'..."
 
 try {
-    $storage_context = New-AzStorageContext -StorageAccountName $storage_account_name -StorageAccountKey $storage_account_key
+    $storage_context = New-AzStorageContext -StorageAccountName $storage_account_name -UseConnectedAccount
 } catch {
     Exit-WithError $_.Exception.Message
 }

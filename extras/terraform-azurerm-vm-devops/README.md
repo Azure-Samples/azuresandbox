@@ -194,7 +194,7 @@ Here is an example of a json configuration file:
   "vm_devops_win_dsc_config": "DevopsVmWin",
   "vm_devops_win_image_offer": "windows-11",
   "vm_devops_win_image_publisher": "MicrosoftWindowsDesktop",
-  "vm_devops_win_image_sku": "win11-22h2-ent",
+  "vm_devops_win_image_sku": "win11-24h2-ent",
   "vm_devops_win_image_version": "latest",
   "vm_devops_win_instances": 2,
   "vm_devops_win_instances_start": 1,
@@ -202,7 +202,7 @@ Here is an example of a json configuration file:
   "vm_devops_win_name": "DEVOPSWIN",
   "vm_devops_win_os_disk_size_gb": 256,
   "vm_devops_win_patch_mode": "AutomaticByOS",
-  "vm_devops_win_size": "Standard_B2s",
+  "vm_devops_win_size": "Standard_B2ls_v2",
   "vm_devops_win_storage_account_type": "Standard_LRS"
 }
 ```
@@ -247,7 +247,7 @@ azurerm_virtual_machine_extension.vm_devops_win[*] | A collection of virtual mac
   * Using the examples above, the virtual machine names would be `DEVOPSWIN001` and `DEVOPSWIN002`.
 * The resource group is set in the `resource_group_name` variable.
 * The location is set in the `location` variable (e.g. `centralus`).
-* The size of the virtual machines is set in the `vm_devops_win_size` variable (e.g. `Standard_B2s`).
+* The size of the virtual machines is set in the `vm_devops_win_size` variable (e.g. `Standard_B2ls_v2`).
 * *admin_username* and *admin_password* are configured using key vault secrets `adminuser` and `adminpassword`. These are the local administrator credentials used for the virtual machine before it is domain joined.
 * Automatic updates are enabled. The patch mode is set in the `vm_devops_win_patch_mode` variable (e.g. `AutomaticByOS`).
 * The license type is set in the `vm_devops_win_license_type` variable (e.g. `Windows_Client`).

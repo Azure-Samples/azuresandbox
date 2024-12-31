@@ -85,31 +85,27 @@ variable "vm_devops_win_data_disk_size_gb" {
 
 variable "vm_devops_win_image_offer" {
   type        = string
-  description = "The offer type of the virtual machine image used to create the database server VM"
-  default     = "WindowsServer"
+  description = "The offer type of the virtual machine image used to create the devops VM"
 }
 
 variable "vm_devops_win_image_publisher" {
   type        = string
-  description = "The publisher for the virtual machine image used to create the database server VM"
-  default     = "MicrosoftWindowsServer"
+  description = "The publisher for the virtual machine image used to create the devops VM"
 }
 
 variable "vm_devops_win_image_sku" {
   type        = string
-  description = "The sku of the virtual machine image used to create the database server VM"
-  default     = "2022-datacenter-g2"
+  description = "The sku of the virtual machine image used to create the devops VM"
 }
 
 variable "vm_devops_win_image_version" {
   type        = string
-  description = "The version of the virtual machine image used to create the database server VM"
-  default     = "Latest"
+  description = "The version of the virtual machine image used to create the devops VM"
 }
 
 variable "vm_devops_win_instances" {
   type        = number
-  description = "The nunber of devops agent VMs to provision."
+  description = "The number of devops agent VMs to provision."
 }
 
 variable "vm_devops_win_instances_start" {
@@ -140,11 +136,9 @@ variable "vm_devops_win_patch_mode" {
 variable "vm_devops_win_size" {
   type        = string
   description = "The size of the virtual machine"
-  default     = "Standard_B2s"
 }
 
 variable "vm_devops_win_storage_account_type" {
   type        = string
   description = "The storage replication type to be used for the VMs OS disk"
-  default     = "StandardSSD_LRS"
 }
