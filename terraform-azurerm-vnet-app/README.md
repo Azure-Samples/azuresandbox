@@ -341,7 +341,7 @@ azurerm_role_assignment . vm_jumpbox_win_storage_account_role_assignment | Assig
 
 This Windows Server VM is used as a jumpbox for development and remote server administration.
 
-* Guest OS: Windows Server 2022 Datacenter.
+* Guest OS: Windows Server 2025 Datacenter Azure Edition.
 * By default the [patch assessment mode](https://learn.microsoft.com/en-us/azure/update-manager/assessment-options) is set to `AutomaticByPlatform` and `provision_vm_agent` is set to `true` to enable use of [Azure Update Manager Update or Patch Orchestration](https://learn.microsoft.com/en-us/azure/update-manager/updates-maintenance-schedules#update-or-patch-orchestration).
 * *admin_username* and *admin_password* are configured using the key vault secrets *adminuser* and *adminpassword*.
 * A system assigned managed identity is configured by default for use in DevOps related identity and access management scenarios.

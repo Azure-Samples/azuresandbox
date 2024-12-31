@@ -119,7 +119,7 @@ variable "vm_adds_image_publisher" {
 variable "vm_adds_image_sku" {
   type        = string
   description = "The sku of the virtual machine image used to create the VM"
-  default     = "2022-datacenter-core-g2"
+  default     = "2025-datacenter-azure-edition-core"
 }
 
 variable "vm_adds_image_version" {
