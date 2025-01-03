@@ -377,7 +377,7 @@ This Windows Server VM is used as an [Active Directory Domain Services](https://
   * The `AD-Domain-Services` feature (which includes DNS) is installed.
   * A new *myonprem.local* domain is configured
     * The domain admin credentials are configured using the *adminusername* and *adminpassword* key vault secrets.
-    * The forest functional level is set to `WinThreshhold`
+    * The forest functional level is set to `WinThreshold`
     * A DNS Server is automatically configured
       * *myonprem.local* DNS forward lookup zone configuration
         * Zone type: Primary / Active Directory-Integrated
