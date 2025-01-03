@@ -369,7 +369,7 @@ azurerm_network_interface.vm_adds_nic_01 (nic-adds2-1) | The configured subnet i
 
 This Windows Server VM is used as an [Active Directory Domain Services](https://learn.microsoft.com/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview) [Domain Controller](https://learn.microsoft.com/previous-versions/windows/it-pro/windows-server-2003/cc786438(v=ws.10)) and a DNS Server running in Active Directory-integrated mode.
 
-* Guest OS: Windows Server 2022 Datacenter Core
+* Guest OS: Windows Server 2025 Datacenter Azure Edition Core
 * By default the [Patch orchestration mode](https://learn.microsoft.com/azure/virtual-machines/automatic-vm-guest-patching#patch-orchestration-modes) is set to `AutomaticByPlatform`.
 * *admin_username* and *admin_password* are configured using the key vault secrets *adminuser* and *adminpassword*.
 * This resource has a dependency on *azurerm_automation_account.automation_account_01*.
@@ -377,7 +377,7 @@ This Windows Server VM is used as an [Active Directory Domain Services](https://
   * The `AD-Domain-Services` feature (which includes DNS) is installed.
   * A new *myonprem.local* domain is configured
     * The domain admin credentials are configured using the *adminusername* and *adminpassword* key vault secrets.
-    * The forest functional level is set to `WinThreshhold`
+    * The forest functional level is set to `WinThreshold`
     * A DNS Server is automatically configured
       * *myonprem.local* DNS forward lookup zone configuration
         * Zone type: Primary / Active Directory-Integrated
@@ -401,7 +401,7 @@ azurerm_network_interface.vm_jumpbox_win_nic_01 (nic-jumpwin2-1) | The configure
 
 This Windows Server VM is used as a jumpbox for development and remote server administration.
 
-* Guest OS: Windows Server 2022 Datacenter.
+* Guest OS: Windows Server 2025 Datacenter Azure Edition.
 * By default the [patch orchestration mode](https://learn.microsoft.com/azure/virtual-machines/automatic-vm-guest-patching#patch-orchestration-modes) is set to `AutomaticByPlatform`.
 * *admin_username* and *admin_password* are configured using the key vault secrets *adminuser* and *adminpassword*.
 * This resource is configured using a [provisioner](https://www.terraform.io/docs/language/resources/provisioners/syntax.html) that runs [aadsc-register-node.ps1](./aadsc-register-node.ps1) which registers the node with *azurerm_automation_account.automation_account_01* and applies the configuration [JumpBoxConfig2](./JumpBoxConfig2.ps1).

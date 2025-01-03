@@ -7,8 +7,10 @@ resource "azurerm_windows_virtual_machine" "vm_jumpbox_win" {
   admin_username             = data.azurerm_key_vault_secret.adminuser.value
   admin_password             = data.azurerm_key_vault_secret.adminpassword.value
   network_interface_ids      = [azurerm_network_interface.vm_jumpbox_win_nic_01.id]
-  encryption_at_host_enabled = true
+  patch_assessment_mode      = "AutomaticByPlatform"
   patch_mode                 = "AutomaticByPlatform"
+  provision_vm_agent         = true
+  encryption_at_host_enabled = true
   tags                       = var.tags
 
   os_disk {

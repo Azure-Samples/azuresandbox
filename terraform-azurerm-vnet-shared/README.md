@@ -250,7 +250,7 @@ azurerm_network_interface.vm_adds_nic_01 (nic&#x2011;adds1&#x2011;1) | The confi
 
 This Windows Server VM is used as an [Active Directory Domain Services](https://learn.microsoft.com/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview) [Domain Controller](https://learn.microsoft.com/previous-versions/windows/it-pro/windows-server-2003/cc786438(v=ws.10)) and a DNS Server running in Active Directory-integrated mode.
 
-* Guest OS: Windows Server 2022 Datacenter Core
+* Guest OS: Windows Server 2025 Datacenter Azure Edition Core
 * `encryption_at_host_enabled` is set to `true`
 * By default the [patch assessment mode](https://learn.microsoft.com/en-us/azure/update-manager/assessment-options) is set to `AutomaticByPlatform` and `provision_vm_agent` is set to `true` to enable use of [Azure Update Manager Update or Patch Orchestration](https://learn.microsoft.com/en-us/azure/update-manager/updates-maintenance-schedules#update-or-patch-orchestration).
 * *admin_username* and *admin_password* are configured using the key vault secrets *adminuser* and *adminpassword*.
