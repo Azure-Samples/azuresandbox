@@ -82,6 +82,11 @@ variable "subnet_AzureBastionSubnet_address_prefix" {
   description = "The address prefix for the AzureBastionSubnet subnet."
 }
 
+variable "subnet_AzureFirewallSubnet_address_prefix" {
+  type        = string
+  description = "The address prefix for the AzureFirewallSubnet subnet."
+}
+
 variable "subnet_misc_address_prefix" {
   type        = string
   description = "The address prefix for the miscellaneous subnet."

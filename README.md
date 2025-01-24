@@ -50,6 +50,7 @@ This repo was created by [Roger Doherty](https://www.linkedin.com/in/roger-doher
   * An [automation account](https://learn.microsoft.com/azure/automation/automation-intro) for configuration management.
   * A [virtual network](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vnet) for hosting [virtual machines](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm).
   * A [bastion](https://learn.microsoft.com/azure/bastion/bastion-overview) for secure RDP and SSH access to virtual machines.
+  * A [firewall](https://learn.microsoft.com/en-us/azure/firewall/overview) for network security.
   * A Windows Server [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) running [Active Directory Domain Services](https://learn.microsoft.com/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview) with a pre-configured domain and DNS server.
 * [terraform-azurerm-vnet-app](./terraform-azurerm-vnet-app/) includes the following:
   * A [virtual network](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vnet) for hosting [virtual machines](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) and private endpoints implemented using [PrivateLink](https://learn.microsoft.com/azure/private-link/private-link-overview). [Virtual network peering](https://learn.microsoft.com/azure/virtual-network/virtual-network-peering-overview) with [terraform-azurerm-vnet-shared](./terraform-azurerm-vnet-shared/) is automatically configured.
@@ -253,7 +254,11 @@ Shared services | Reserved for future use | 10.1.0.128/25 | 10.1.0.128 | 10.1.0.
 Shared services | snet-adds-01 | 10.1.1.0/24 | 10.1.1.0 | 10.1.1.255 | 256
 Shared services | snet-misc-01 | 10.1.2.0/24 | 10.1.2.0 | 10.1.2.255 | 256
 Shared services | snet-misc-02 | 10.1.3.0/24 | 10.1.3.0 | 10.1.3.255 | 256
-Shared services | Reserved for future use | 10.1.4.0/22 | 10.1.4.0 | 10.1.7.255 | 1,024
+Shared services | AzureFirewallSubnet | 10.1.4.0/26 | 10.1.4.0 | 10.1.4.63 | 64
+Shared services | Reserved for future use | 10.1.4.64/26 | 10.1.4.64 | 10.1.4.127 | 64
+Shared services | Reserved for future use | 10.1.4.128/25 | 10.1.4.128 | 10.1.4.255 | 128
+Shared services | Reserved for future use | 10.1.5.0/24 | 10.1.5.0 | 10.1.5.255 | 256
+Shared services | Reserved for future use | 10.1.6.0/23 | 10.1.6.0 | 10.1.7.255 | 512
 Shared services | Reserved for future use | 10.1.8.0/21 | 10.1.8.0 | 10.1.15.255 | 2,048
 Shared services | Reserved for future use | 10.1.16.0/20 | 10.1.16.0 | 10.1.31.255 | 4,096
 Shared services | Reserved for future use | 10.1.32.0/19 | 10.1.32.0 | 10.1.63.255 | 8,192
@@ -355,7 +360,8 @@ Shared services | AzureBastionSubnet | 10.73.8.0/27 | 10.73.8.0 | 10.73.8.31 | 3
 Shared services | snet-adds-01 | 10.73.8.32/27 | 10.73.8.32 | 10.73.8.63 | 32
 Shared services | snet-misc-01 | 10.73.8.64/27 | 10.73.8.64 | 10.73.8.95 | 32
 Shared services | snet-misc-02 | 10.73.8.96/27 | 10.73.8.96 | 10.73.8.127 | 32
-Shared services | Reserved for future use | 10.73.8.128/25 | 10.73.8.128 | 10.73.8.255 | 128
+Shared services | AzureFirewallSubnet | 10.73.8.128/26 | 10.73.8.128 | 10.73.8.191 | 64
+Shared services | Reserved for future use | 10.73.8.192/26 | 10.73.8.192 | 10.73.8.255 | 64
 Application | snet-app-01 | 10.73.9.0/27 | 10.73.9.0 | 10.73.9.31 | 32
 Application | snet-db-01 | 10.73.9.32/27 | 10.73.9.32 | 10.73.9.63 | 32
 Application | snet-privatelink-01 | 10.73.9.64/27 | 10.73.9.64 | 10.73.9.95 | 32
@@ -372,6 +378,8 @@ Shared services | AzureBastionSubnet | TBD | TBD | TBD | TBD
 Shared services | snet-adds-01 | TBD | TBD | TBD | TBD
 Shared services | snet-misc-01 | TBD | TBD | TBD | TBD
 Shared services | snet-misc-02 | TBD | TBD | TBD | TBD
+Shared services | AzureFirewallSubnet |TBD | TBD| TBD | TBD
+Shared services | AzureFirewallManagementSubnet | TBD | TBD | TBD | TBD
 Shared services | Reserved for future use | TBD | TBD | TBD | TBD
 Application | snet-app-01 | TBD | TBD | TBD | TBD
 Application | snet-db-01 | TBD | TBD | TBD | TBD

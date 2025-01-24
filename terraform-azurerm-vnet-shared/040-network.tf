@@ -13,6 +13,7 @@ locals {
         "AllowBastionCommunicationOutbound",
         "AllowGetSessionInformationOutbound"
       ]
+      route_table = null
     }
 
     snet-adds-01 = {
@@ -23,6 +24,7 @@ locals {
         "AllowVirtualNetworkOutbound",
         "AllowInternetOutbound"
       ]
+      route_table = "firewall_01"
     }
 
     snet-misc-01 = {
@@ -33,6 +35,7 @@ locals {
         "AllowVirtualNetworkOutbound",
         "AllowInternetOutbound"
       ]
+      route_table = "firewall_01"
     }
 
     snet-misc-02 = {
@@ -43,6 +46,14 @@ locals {
         "AllowVirtualNetworkOutbound",
         "AllowInternetOutbound"
       ]
+      route_table = "firewall_01"
+    }
+
+    AzureFirewallSubnet = {
+      address_prefix                    = var.subnet_AzureFirewallSubnet_address_prefix
+      private_endpoint_network_policies = "Disabled"
+      nsgrules                          = []
+      route_table                       = null
     }
   }
 
@@ -201,6 +212,7 @@ resource "azurerm_subnet" "vnet_shared_01_subnets" {
   virtual_network_name              = azurerm_virtual_network.vnet_shared_01.name
   address_prefixes                  = [each.value.address_prefix]
   private_endpoint_network_policies = each.value.private_endpoint_network_policies
+  default_outbound_access_enabled   = false
 }
 
 output "vnet_shared_01_subnets" {
@@ -208,7 +220,7 @@ output "vnet_shared_01_subnets" {
 }
 
 resource "azurerm_network_security_group" "network_security_groups" {
-  for_each = azurerm_subnet.vnet_shared_01_subnets
+  for_each = { for k, v in local.subnets : k => v if length(v.nsgrules) > 0 }
 
   name                = "nsg-${var.vnet_name}.${each.key}"
   location            = var.location
@@ -217,15 +229,13 @@ resource "azurerm_network_security_group" "network_security_groups" {
 }
 
 resource "azurerm_subnet_network_security_group_association" "nsg_subnet_associations" {
-  for_each = azurerm_subnet.vnet_shared_01_subnets
+  for_each = azurerm_network_security_group.network_security_groups
 
   subnet_id                 = azurerm_subnet.vnet_shared_01_subnets[each.key].id
   network_security_group_id = azurerm_network_security_group.network_security_groups[each.key].id
 
-  # Note: This depedency is a workaround for an issue that arises when existing NSG rules do not exactly match what Azure Bastion wants, even if the rules are correct.
-  # The NSG rules in this configuration functionally match what is reccomended, however the name and priority of the rules are different.
-  # See https://docs.microsoft.com/en-us/azure/bastion/bastion-nsg?msclkid=b12f8b18ac6e11ecb11e8f00c2bce23d for more information.
   depends_on = [
+    azurerm_subnet.vnet_shared_01_subnets,
     azurerm_bastion_host.bastion_host_01
   ]
 }
@@ -260,26 +270,105 @@ resource "random_id" "bastion_host_01_name" {
 }
 
 resource "azurerm_bastion_host" "bastion_host_01" {
-  name                = "bst-${random_id.bastion_host_01_name.hex}-1"
+  name                = "bst-${random_id.bastion_host_01_name.hex}"
   location            = var.location
   resource_group_name = var.resource_group_name
   tags                = var.tags
   depends_on          = [azurerm_subnet.vnet_shared_01_subnets]
 
   ip_configuration {
-    name                 = "ipc-${random_id.bastion_host_01_name.hex}-1"
+    name                 = "ipc-${random_id.bastion_host_01_name.hex}"
     subnet_id            = azurerm_subnet.vnet_shared_01_subnets["AzureBastionSubnet"].id
     public_ip_address_id = azurerm_public_ip.bastion_host_01.id
   }
 }
 
-# Dedicated public ip for bastion
-resource "random_id" "public_ip_bastion_host_01_name" {
+resource "azurerm_public_ip" "bastion_host_01" {
+  name                = "pip-${random_id.bastion_host_01_name.hex}"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  allocation_method   = "Static"
+  sku                 = "Standard"
+  tags                = var.tags
+}
+
+# Firewall
+resource "random_id" "firewall_01" {
   byte_length = 8
 }
 
-resource "azurerm_public_ip" "bastion_host_01" {
-  name                = "pip-${random_id.public_ip_bastion_host_01_name.hex}-1"
+resource "azurerm_firewall" "firewall_01" {
+  name                = "fw-${random_id.firewall_01.hex}"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  sku_name            = "AZFW_VNet"
+  sku_tier            = "Standard"
+  firewall_policy_id  = azurerm_firewall_policy.firewall_01.id
+
+  ip_configuration {
+    name                 = "fw-${random_id.firewall_01.hex}"
+    subnet_id            = azurerm_subnet.vnet_shared_01_subnets["AzureFirewallSubnet"].id
+    public_ip_address_id = azurerm_public_ip.firewall_01.id
+  }
+}
+
+resource "azurerm_firewall_policy" "firewall_01" {
+  name                     = "fwp-${random_id.firewall_01.hex}-1"
+  resource_group_name      = var.resource_group_name
+  location                 = var.location
+  sku                      = "Standard"
+  threat_intelligence_mode = "Deny"
+}
+
+resource "azurerm_firewall_policy_rule_collection_group" "firewall_01" {
+  name               = "fwr-${random_id.firewall_01.hex}-1"
+  firewall_policy_id = azurerm_firewall_policy.firewall_01.id
+  priority           = 500
+  network_rule_collection {
+    name     = "AllowOutboundInternet"
+    priority = 400
+    action   = "Allow"
+
+    rule {
+      name                  = "AllowAllOutbound"
+      source_addresses      = ["*"]
+      destination_addresses = ["0.0.0.0/0"]
+      destination_ports     = ["80", "443"]
+      protocols             = ["Any"]
+    }
+  }
+}
+
+resource "azurerm_route_table" "firewall_01" {
+  name                = "rt-${random_id.firewall_01.hex}"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+
+  route {
+    name                   = "route-to-firewall"
+    address_prefix         = "0.0.0.0/0"
+    next_hop_type          = "VirtualAppliance"
+    next_hop_in_ip_address = azurerm_firewall.firewall_01.ip_configuration[0].private_ip_address
+  }
+}
+
+output "firewall_01_route_table_id" {
+  value = azurerm_route_table.firewall_01.id
+}
+
+resource "azurerm_subnet_route_table_association" "firewall_01" {
+  for_each = {
+    for subnet_key, subnet in local.subnets : subnet_key => subnet if subnet.route_table == "firewall_01"
+  }
+
+  subnet_id      = azurerm_subnet.vnet_shared_01_subnets[each.key].id
+  route_table_id = azurerm_route_table.firewall_01.id
+
+  depends_on = [ azurerm_subnet_network_security_group_association.nsg_subnet_associations ]
+}
+
+resource "azurerm_public_ip" "firewall_01" {
+  name                = "pip-${random_id.firewall_01.hex}-1"
   location            = var.location
   resource_group_name = var.resource_group_name
   allocation_method   = "Static"

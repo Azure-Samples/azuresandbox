@@ -26,7 +26,7 @@ vm_jumpbox_win_post_deploy_script="configure-vm-jumpbox-win.ps1"
 vm_jumpbox_win_configure_storage_script="configure-storage-kerberos.ps1"
 vm_jumpbox_win_size="Standard_B2ls_v2"
 
-# Intialize runtime defaults
+# Initialize runtime defaults
 state_file="../terraform-azurerm-vnet-shared/terraform.tfstate"
 
 printf "Retrieving runtime defaults from state file '$state_file'...\n"
@@ -45,6 +45,7 @@ admin_username_secret=$(terraform output -state=$state_file admin_username_secre
 arm_client_id=$(terraform output -state=$state_file arm_client_id)
 automation_account_name=$(terraform output -state=$state_file automation_account_name)
 dns_server=$(terraform output -state=$state_file dns_server)
+firewall_01_route_table_id=$(terraform output -state=$state_file firewall_01_route_table_id)
 key_vault_id=$(terraform output -state=$state_file key_vault_id)
 key_vault_name=$(terraform output -state=$state_file key_vault_name)
 location=$(terraform output -state=$state_file location)
@@ -246,6 +247,7 @@ printf "admin_username_secret                       = $admin_username_secret\n" 
 printf "arm_client_id                               = $arm_client_id\n"                                   >> ./terraform.tfvars
 printf "automation_account_name                     = $automation_account_name\n"                         >> ./terraform.tfvars
 printf "dns_server                                  = $dns_server\n"                                      >> ./terraform.tfvars
+printf "firewall_01_route_table_id                  = $firewall_01_route_table_id\n"                      >> ./terraform.tfvars
 printf "key_vault_id                                = $key_vault_id\n"                                    >> ./terraform.tfvars
 printf "key_vault_name                              = $key_vault_name\n"                                  >> ./terraform.tfvars
 printf "location                                    = $location\n"                                        >> ./terraform.tfvars

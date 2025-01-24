@@ -9,6 +9,7 @@ locals {
         "AllowVirtualNetworkOutbound",
         "AllowInternetOutbound"
       ]
+      route_table = "firewall_01"
     }
 
     snet-appservice-01 = {
@@ -20,6 +21,7 @@ locals {
         "AllowVirtualNetworkOutbound",
         "AllowInternetOutbound"
       ]
+      route_table = "firewall_01"
     }
 
     snet-db-01 = {
@@ -31,6 +33,7 @@ locals {
         "AllowVirtualNetworkOutbound",
         "AllowInternetOutbound"
       ]
+      route_table = "firewall_01"
     }
 
     snet-misc-03 = {
@@ -42,6 +45,7 @@ locals {
         "AllowVirtualNetworkOutbound",
         "AllowInternetOutbound"
       ]
+      route_table = "firewall_01"
     }
 
     snet-privatelink-01 = {
@@ -52,6 +56,7 @@ locals {
         "AllowVirtualNetworkInbound",
         "AllowVirtualNetworkOutbound"
       ]
+      route_table = "firewall_01"
     }
   }
 
@@ -144,7 +149,7 @@ resource "azurerm_subnet" "vnet_app_01_subnets" {
   virtual_network_name              = azurerm_virtual_network.vnet_app_01.name
   address_prefixes                  = [each.value.address_prefix]
   private_endpoint_network_policies = each.value.private_endpoint_network_policies
-
+  default_outbound_access_enabled   = false
   dynamic "delegation" {
     for_each = each.value.delegation != "" ? [each.value.delegation] : []
     content {
@@ -253,4 +258,14 @@ resource "azurerm_private_dns_zone_virtual_network_link" "private_dns_zone_virtu
   virtual_network_id    = var.remote_virtual_network_id
   tags                  = var.tags
   depends_on            = [azurerm_virtual_network_peering.vnet_app_01_to_vnet_shared_01_peering, azurerm_virtual_network_peering.vnet_shared_01_to_vnet_app_01_peering]
+}
+
+# Route table associations
+resource "azurerm_subnet_route_table_association" "firewall_01" {
+  for_each = {
+    for subnet_key, subnet in local.subnets : subnet_key => subnet if subnet.route_table == "firewall_01"
+  }
+
+  subnet_id      = azurerm_subnet.vnet_app_01_subnets[each.key].id
+  route_table_id = var.firewall_01_route_table_id
 }
