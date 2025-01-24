@@ -1,5 +1,5 @@
 # AD DS virtual machine
-# Important: For production use you should deploy two domain controller VMs in an availability set or in different Availablity Groups.
+# Important: For production use you should deploy two domain controller VMs in an availability set or in different Availability Zones
 
 resource "azurerm_windows_virtual_machine" "vm_adds" {
   name                       = var.vm_adds_name
@@ -55,7 +55,7 @@ resource "azurerm_network_interface" "vm_adds_nic_01" {
   location            = var.location
   resource_group_name = var.resource_group_name
   tags                = var.tags
-  depends_on          = [azurerm_subnet.vnet_shared_01_subnets]
+  depends_on          = [azurerm_subnet_route_table_association.firewall_01]
 
   ip_configuration {
     name                          = "ipc-${var.vm_adds_name}-1"

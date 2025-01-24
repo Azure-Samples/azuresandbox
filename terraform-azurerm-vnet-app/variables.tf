@@ -39,6 +39,11 @@ variable "dns_server" {
   description = "The IP address of the DNS server. This should be the first non-reserved IP address in the subnet where the AD DS domain controller is hosted."
 }
 
+variable "firewall_01_route_table_id" {
+  type        = string
+  description = "The id of the firewall route table."
+}
+
 variable "key_vault_id" {
   type        = string
   description = "The existing key vault where secrets are stored"

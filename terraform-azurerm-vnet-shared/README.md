@@ -26,6 +26,7 @@ This configuration implements a virtual network with shared services used by all
 * An [automation account](https://learn.microsoft.com/azure/automation/automation-intro) for configuration management.
 * A [virtual network](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vnet) for hosting [virtual machines](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm).
 * A [bastion](https://learn.microsoft.com/azure/bastion/bastion-overview) for secure RDP and SSH access to virtual machines.
+* A [firewall](https://learn.microsoft.com/en-us/azure/firewall/overview) for network security.
 * A Windows Server [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) running [Active Directory Domain Services](https://learn.microsoft.com/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview) with a pre-configured domain and DNS server.
 
 Activity | Estimated time required
@@ -121,7 +122,7 @@ This section describes how to provision this configuration using default setting
 
 * Monitor output. Upon completion, you should see a message similar to the following:
 
-  `Apply complete! Resources: 42 added, 0 changed, 0 destroyed.`
+  `Apply complete! Resources: 51 added, 0 changed, 0 destroyed.`
 
 * Inspect `terraform.tfstate`.
 
@@ -231,13 +232,20 @@ Resource name (ARM) | Notes
 --- | ---
 azurerm_virtual_network.vnet_shared_01 (vnet&#x2011;shared&#x2011;01) | By default this virtual network is configured with an address space of `10.1.0.0/16` and is configured with DNS server addresses of `10.1.1.4` (the private ip for *azurerm_windows_virtual_machine.vm_adds*) and [168.63.129.16](https://learn.microsoft.com/azure/virtual-network/what-is-ip-address-168-63-129-16). This DNS configuration supports both the default Azure DNS behavior required to initially configure *azurerm_windows_virtual_machine.vm_adds*, as well as the custom DNS behavior provided by the AD integrated DNS server running on *azurerm_windows_virtual_machine.vm_adds* after it is fully configured.
 azurerm_subnet.vnet_shared_01_subnets["AzureBastionSubnet"] | The default address prefix for this subnet is 10.1.0.0/27 which includes the private ip addresses for *azurerm_bastion_host.bastion_host_01*. A network security group is associated with this subnet and is configured according to [Working with NSG access and Azure Bastion](https://learn.microsoft.com/azure/bastion/bastion-nsg).
+azurerm_subnet.vnet_shared_01_subnets["AzureFirewallSubnet"] | The default address prefix for this subnet is 10.1.4.0/26. This subnet is reserved for use by Azure Firewall and does not have an associated network security group.
 azurerm_subnet.vnet_shared_01_subnets["snet-adds-01"] | The default address prefix for this subnet is 10.1.1.0/24 which includes the private ip address for *azurerm_windows_virtual_machine.vm_adds*. A network security group is associated with this subnet that permits ingress and egress from virtual networks, and egress to the Internet.
-azurerm_bastion_host.bastion_host_01 (bst&#x2011;xxxxxxxxxxxxxxxx&#x2011;1) | Used for secure RDP and SSH access to VMs.
 [azurerm_subnet.vnet_shared_01_subnets["snet-misc-01"]| The default address prefix for this subnet is 10.1.2.0/24 and is intended for use by optional configurations which require connectivity in the shared services virtual network.
 [azurerm_subnet.vnet_shared_01_subnets["snet-misc-02"]| The default address prefix for this subnet is 10.1.3.0/24 and is intended for use by optional configurations which require connectivity in the shared services virtual network.
+azurerm_bastion_host.bastion_host_01 (bst&#x2011;xxxxxxxxxxxxxxxx) | Used for secure RDP and SSH access to VMs.
+azurerm_public_ip.bastion_host_01 (pip&#x2011;xxxxxxxxxxxxxxxx) | Public ip used by *azurerm_bastion_host.bastion_host_01*.
 random_id.bastion_host_01_name | Used to generate a random name for *azurerm_bastion_host.bastion_host_01*.
-azurerm_public_ip.bastion_host_01 (pip&#x2011;xxxxxxxxxxxxxxxx&#x2011;1) | Public ip used by *azurerm_bastion_host.bastion_host_01*.
-random_id.public_ip_bastion_host_01_name | Used to generate a random name for *azurerm_public_ip.bastion_host_01*.
+azurerm_firewall.firewall_01 (fw&#x2011;xxxxxxxxxxxxxxxx) | Used for network security.
+azurerm_firewall_policy.firewall_01 (fwp&#x2011;xxxxxxxxxxxxxxxx&#x2011;1) | Firewall policy used by *azurerm_firewall.firewall_01*. Threat intelligence is enabled by default.
+azurerm_firewall_policy_rule_collection_group.firewall_01_rule_collection_group_01 (fwr&#x2011;xxxxxxxxxxxxxxxx&#x2011;01) | Rule collection group used by *azurerm_firewall_policy.firewall_01*. Outbound internet access is enabled by default.
+random_id.firewall_01 | Used to generate a random name for *azurerm_firewall.firewall_01*.
+azurerm_public_ip.firewall_01 (pip&#x2011;xxxxxxxxxxxxxxxx&#x2011;1) | Public ip used by *azurerm_firewall.firewall_01*.
+azurerm_route_table.firewall_01 (rt&#x2011;xxxxxxxxxxxxxxxx) | Route table used to modify the default route for outbound internet traffic and direct it to *azurerm_firewall.firewall_01*.
+azurerm_subnet_route_table_association.firewall_01[*] | Associates *azurerm_route_table.firewall_01* with subnets *snet-adds-01*, *snet-misc-01* and *snet-misc-02*.
 
 #### AD DS Domain Controller VM
 
@@ -259,7 +267,7 @@ This Windows Server VM is used as an [Active Directory Domain Services](https://
   * The `AD-Domain-Services` feature (which includes DNS) is installed.
   * A new *mysandbox.local* domain is configured
     * The domain admin credentials are configured using the *adminusername* and *adminpassword* key vault secrets. The password is set to never expire.
-    * The forest functional level is set to `WinThreshhold`
+    * The forest functional level is set to `WinThreshold`
     * A DNS Server is automatically configured
       * *mysandbox.local* DNS forward lookup zone configuration
         * Zone type: Primary / Active Directory-Integrated
@@ -280,6 +288,7 @@ admin_username_secret | "adminuser"
 arm_client_id | "00000000-0000-0000-0000-000000000000"
 automation_account_name | "auto-9a633c2bba9351cc-01"
 dns_server | "10.1.2.4"
+firewall_01_route_table_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/routeTables/rt-XXXXXXXXXXXXXXX"
 key_vault_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.KeyVault/vaults/kv-XXXXXXXXXXXXXXX"
 key_vault_name | "kv-XXXXXXXXXXXXXXX"
 location | "centralus"
@@ -289,7 +298,7 @@ resource_group_name | "rg-sandbox-01"
 storage_account_name | "stXXXXXXXXXXXXXXX"
 storage_container_name | "scripts"
 subscription_id | "00000000-0000-0000-0000-000000000000"
-tags | tomap( { "costcenter" = "10177772" "environment" = "dev" "project" = "#AzureSandbox" } )
+tags | tomap( { "costcenter" = "mycostcenter" "environment" = "dev" "project" = "#AzureSandbox" } )
 vnet_shared_01_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualNetworks/vnet-shared-01"
 vnet_shared_01_name | "vnet-shared-01"
 vnet_shared_01_subnets | Contains all the subnet definitions.

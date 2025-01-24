@@ -128,6 +128,7 @@ default_skip_admin_password_gen="no"
 default_skip_storage_kerb_key_gen="no"
 default_subnet_adds_address_prefix="10.1.1.0/24"
 default_subnet_AzureBastionSubnet_address_prefix="10.1.0.0/27"
+default_subnet_AzureFirewallSubnet_address_prefix="10.1.4.0/26"
 default_subnet_misc_address_prefix="10.1.2.0/24"
 default_subnet_misc_02_address_prefix="10.1.3.0/24"
 default_vm_adds_name="adds1"
@@ -148,6 +149,7 @@ read -e -i $default_subnet_AzureBastionSubnet_address_prefix  -p "Bastion subnet
 read -e -i $default_subnet_adds_address_prefix                -p "AD Domain Services subnet address prefix (subnet_adds_address_prefix) ---------------: " subnet_adds_address_prefix
 read -e -i $default_subnet_misc_address_prefix                -p "Miscellaneous subnet address prefix (subnet_misc_address_prefix) --------------------: " subnet_misc_address_prefix
 read -e -i $default_subnet_misc_02_address_prefix             -p "Miscellaneous subnet 2 address prefix (subnet_misc_02_address_prefix) ---------------: " subnet_misc_02_address_prefix
+read -e -i $default_subnet_AzureFirewallSubnet_address_prefix -p "Firewall subnet address prefix (subnet_AzureFirewallSubnet_address_prefix) ----------: " subnet_AzureFirewallSubnet_address_prefix
 read -e -i $default_dns_server                                -p "DNS server ip address (dns_server) --------------------------------------------------: " dns_server
 read -e -i $default_adds_domain_name                          -p "AD Domain Services domain name (adds_domain_name) -----------------------------------: " adds_domain_name
 read -e -i $default_vm_adds_name                              -p "AD Domain Services virtual machine name (vm_adds_name) ------------------------------: " vm_adds_name
@@ -172,6 +174,7 @@ skip_admin_password_gen=${skip_admin_password_gen:-$default_skip_admin_password_
 skip_storage_kerb_key_gen=${skip_storage_kerb_key_gen:-$default_skip_storage_kerb_key_gen}
 subnet_adds_address_prefix=${subnet_adds_address_prefix:-$default_subnet_adds_address_prefix}
 subnet_AzureBastionSubnet_address_prefix=${subnet_AzureBastionSubnet_address_prefix:-$default_subnet_AzureBastionSubnet_address_prefix}
+subnet_AzureFirewallSubnet_address_prefix=${subnet_AzureFirewallSubnet_address_prefix:-$default_subnet_AzureFirewallSubnet_address_prefix}
 subnet_misc_address_prefix=${subnet_misc_address_prefix:-$default_subnet_misc_address_prefix}
 subnet_misc_02_address_prefix=${subnet_misc_02_address_prefix:-$default_subnet_misc_02_address_prefix}
 subscription_id=${subscription_id:-$default_subscription_id}
@@ -321,7 +324,7 @@ else
   done
 
   if [ $retry_count -eq $max_retries ]; then
-      echo "Error: Failed to crette key vault after $max_retries attempts." >&2
+      echo "Error: Failed to create key vault after $max_retries attempts." >&2
       usage
   fi
 fi
@@ -453,7 +456,7 @@ if [ $retry_count -eq $max_retries ]; then
     usage
 fi
 
-# Boostrap storage account
+# Bootstrap storage account
 namespace="Microsoft.Storage"
 registration_state=$(az provider show --namespace $namespace --query "registrationState" --output tsv)
 
@@ -683,7 +686,7 @@ if [ $retry_count -eq $max_retries ]; then
     usage
 fi
 
-printf "Sleeping for 60 seconds to allow storage account settings to propogate...\n"
+printf "Sleeping for 60 seconds to allow storage account settings to propagate...\n"
 sleep 60
 
 # Bootstrap storage account container
@@ -764,6 +767,7 @@ printf "storage_account_name                      = \"$storage_account_name\"\n"
 printf "storage_container_name                    = \"$storage_container_name\"\n"                    >> ./terraform.tfvars
 printf "subnet_adds_address_prefix                = \"$subnet_adds_address_prefix\"\n"                >> ./terraform.tfvars
 printf "subnet_AzureBastionSubnet_address_prefix  = \"$subnet_AzureBastionSubnet_address_prefix\"\n"  >> ./terraform.tfvars
+printf "subnet_AzureFirewallSubnet_address_prefix = \"$subnet_AzureFirewallSubnet_address_prefix\"\n" >> ./terraform.tfvars
 printf "subnet_misc_address_prefix                = \"$subnet_misc_address_prefix\"\n"                >> ./terraform.tfvars
 printf "subnet_misc_02_address_prefix             = \"$subnet_misc_02_address_prefix\"\n"             >> ./terraform.tfvars
 printf "subscription_id                           = \"$subscription_id\"\n"                           >> ./terraform.tfvars

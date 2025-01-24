@@ -78,7 +78,7 @@ This section describes how to provision this configuration using default setting
 
 * Monitor output. Upon completion, you should see a message similar to the following:
 
-  `Apply complete! Resources: 82 added, 0 changed, 0 destroyed.`
+  `Apply complete! Resources: 87 added, 0 changed, 0 destroyed.`
 
 * Inspect `terraform.tfstate`.
 
@@ -265,6 +265,7 @@ admin_username_secret | "adminuser"
 arm_client_id | "00000000-0000-0000-0000-000000000000"
 automation_account_name | "auto-9a633c2bba9351cc-01"
 dns_server | "10.1.1.4"
+firewall_01_route_table_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/routeTables/rt-XXXXXXXXXXXXXXX"
 key_vault_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.KeyVault/vaults/kv-XXXXXXXXXXXXXXX"
 key_vault_name | "kv-XXXXXXXXXXXXXXX"
 location | "australiaeast"
@@ -313,6 +314,7 @@ azurerm_subnet . vnet_app_01_subnets ["snet-misc-03"] | Reserved for future use.
 azurerm_subnet . vnet_app_01_subnets ["snet-appservice-01"] | Reserved for future use. | The default address prefix for this subnet is `10.2.4.0/24`. *delegation* is set to `Microsoft.Web/serverFarms` for use with [Azure App Service](https://learn.microsoft.com/azure/app-service/configure-vnet-integration-enable). A network security group is associated with this subnet that permits ingress and egress from virtual networks.
 azurerm_virtual_network_peering . vnet_shared_01_to_vnet_app_01_peering | terraform-azurerm-vnet-app | Establishes the [virtual network peering](https://learn.microsoft.com/azure/virtual-network/virtual-network-peering-overview) relationship from *azurerm_virtual_network.vnet_shared_01* to *azurerm_virtual_network.vnet_app_01*.
 azurerm_virtual_network_peering . vnet_app_01_to_vnet_shared_01_peering | terraform-azurerm-vnet-app |Establishes the [virtual network peering](https://learn.microsoft.com/azure/virtual-network/virtual-network-peering-overview) relationship from *azurerm_virtual_network.vnet_app_01* to *azurerm_virtual_network.vnet_shared_01*.
+azurerm_subnet_route_table_association.firewall_01[*] | terraform-azurerm-vnet-app | Enables outbound internet access via the firewall in the shared services virtual network by associating the route table *var.firewall_01_route_table_id* with each subnet in *azurerm_subnet.vnet_app_01_subnets[*]*.
 azurerm_private_dns_zone . private_dns_zones ["privatelink.api.azureml.ms"] | extras/terraform-azurerm-aistudio | Creates a [private Azure DNS zone](https://learn.microsoft.com/azure/dns/private-dns-privatednszone) for using [Private Link for Azure AI Studio hubs](https://learn.microsoft.com/en-us/azure/ai-studio/how-to/configure-private-link?tabs=cli#create-a-hub-that-uses-a-private-endpoint).
 azurerm_private_dns_zone . private_dns_zones ["privatelink.azurecr.io"] | extras/terraform-azurerm-aistudio | Creates a [private Azure DNS zone](https://learn.microsoft.com/azure/dns/private-dns-privatednszone) to [Connect privately to an Azure container registry using Azure Private Link](https://learn.microsoft.com/azure/container-registry/container-registry-private-link).
 azurerm_private_dns_zone . private_dns_zones ["privatelink.blob.core.windows.net"] | terraform-azurerm-vnet-app, terraform-azurerm-vm-mssql | Creates a [private Azure DNS zone](https://learn.microsoft.com/azure/dns/private-dns-privatednszone) to [Use private endpoints for Azure Storage](https://learn.microsoft.com/en-us/azure/storage/common/storage-private-endpoints).
