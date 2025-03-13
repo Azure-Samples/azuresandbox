@@ -2,27 +2,27 @@ terraform {
   required_providers {
     azapi = {
       source  = "azure/azapi"
-      version = "=2.2.0"
+      version = "=2.3.0"
     }
 
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "=4.19.0"
+      version = "=4.22.0"
     }
 
     random = {
       source  = "hashicorp/random"
-      version = "=3.6.3"
+      version = "=3.7.1"
     }
 
     cloudinit = {
       source  = "hashicorp/cloudinit"
-      version = "=2.3.5"
+      version = "=2.3.6"
     }
 
     time = {
       source  = "hashicorp/time"
-      version = "=0.12.1"
+      version = "=0.13.0"
     }
   }
 }
