@@ -29,12 +29,12 @@ This repository contains a collection of inter-dependent [cloud computing](https
 * [PowerShell](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-7.1)
   * [PowerShell 7.x](https://learn.microsoft.com/en-us/powershell/scripting/whats-new/differences-from-windows-powershell)
   * [PowerShell 5.1](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-5.1) for Windows Server configuration.
-* [Terraform](https://www.terraform.io/intro/index.html#what-is-terraform-) v1.10.4 for [Infrastructure as Code](https://en.wikipedia.org/wiki/Infrastructure_as_code) (IaC).
-  * [Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs) (azuerrm) v4.16.0
-  * [AzAPI Provider](https://registry.terraform.io/providers/Azure/azapi/latest/docs) (azapi) v2.1.0
-  * [cloud-init Provider](https://registry.terraform.io/providers/hashicorp/cloudinit/latest/docs) (cloudinit) v2.3.5
-  * [Random Provider](https://registry.terraform.io/providers/hashicorp/random/latest/docs) (random) v3.6.3
-  * [Time Provider](https://registry.terraform.io/providers/hashicorp/time/latest/docs) (time) v0.12.1
+* [Terraform](https://www.terraform.io/intro/index.html#what-is-terraform-) v1.11.2 for [Infrastructure as Code](https://en.wikipedia.org/wiki/Infrastructure_as_code) (IaC).
+  * [Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs) (azuerrm) v4.22.0
+  * [AzAPI Provider](https://registry.terraform.io/providers/Azure/azapi/latest/docs) (azapi) v2.3.0
+  * [cloud-init Provider](https://registry.terraform.io/providers/hashicorp/cloudinit/latest/docs) (cloudinit) v2.3.6
+  * [Random Provider](https://registry.terraform.io/providers/hashicorp/random/latest/docs) (random) v3.7.1
+  * [Time Provider](https://registry.terraform.io/providers/hashicorp/time/latest/docs) (time) v0.13.0
 
 This repo was created by [Roger Doherty](https://www.linkedin.com/in/roger-doherty-805635b/).
 
