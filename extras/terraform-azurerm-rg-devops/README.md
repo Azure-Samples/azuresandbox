@@ -105,7 +105,7 @@ The following sections provide guided smoke testing of each resource provisioned
   * Start the virtual machine if it is not currently running.
   * Make a note of the private IP address which will be referred to subsequently as `PrivateIPAddress`
 * Configure SSH identity file on SSH client
-  * Copy the the value of the secret `bootstrapadmin-ssh-key-private` in key vault.
+  * Copy the the value of the secret `devopsbootstrapadmin-ssh-key-private` in key vault.
   * Paste the secret value into a new text file.
   * Save the new text file as `C:\Users\YourUserName\.ssh\devopsbootstrapadmin-ssh-key-private.txt`.
 * Open a PowerShell command prompt and execute the following commands:
@@ -115,7 +115,7 @@ The following sections provide guided smoke testing of each resource provisioned
     cd C:\Users\YourUserName\.ssh
 
     # Open SSH connection using identity file, replace `PrivateIPAddress` with the IP address for jumplinux2
-    ssh -i .\bootstrapadmin-ssh-key-private.txt devopsbootstrapadmin@PrivateIPAddress
+    ssh -i .\devopsbootstrapadmin-ssh-key-private devopsbootstrapadmin@PrivateIPAddress
     ```
 
 * If prompted to continue connecting, answer `yes`.
