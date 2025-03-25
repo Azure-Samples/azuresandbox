@@ -241,7 +241,7 @@ azurerm_public_ip.bastion_host_01 (pip&#x2011;xxxxxxxxxxxxxxxx) | Public ip used
 random_id.bastion_host_01_name | Used to generate a random name for *azurerm_bastion_host.bastion_host_01*.
 azurerm_firewall.firewall_01 (fw&#x2011;xxxxxxxxxxxxxxxx) | Used for network security.
 azurerm_firewall_policy.firewall_01 (fwp&#x2011;xxxxxxxxxxxxxxxx&#x2011;1) | Firewall policy used by *azurerm_firewall.firewall_01*. Threat intelligence is enabled by default.
-azurerm_firewall_policy_rule_collection_group.firewall_01_rule_collection_group_01 (fwr&#x2011;xxxxxxxxxxxxxxxx&#x2011;01) | Rule collection group used by *azurerm_firewall_policy.firewall_01*. Outbound internet access is enabled by default.
+azurerm_firewall_policy_rule_collection_group.firewall_01_rule_collection_group_01 (fwr&#x2011;xxxxxxxxxxxxxxxx&#x2011;01) | Rule collection group used by *azurerm_firewall_policy.firewall_01*. Outbound internet access is enabled by default for ports 80 (http), 443 (https) and 1688 ([Windows Virtual Machine activation](https://learn.microsoft.com/en-us/troubleshoot/azure/virtual-machines/windows/windows-activation-stopped-working)).
 random_id.firewall_01 | Used to generate a random name for *azurerm_firewall.firewall_01*.
 azurerm_public_ip.firewall_01 (pip&#x2011;xxxxxxxxxxxxxxxx&#x2011;1) | Public ip used by *azurerm_firewall.firewall_01*.
 azurerm_route_table.firewall_01 (rt&#x2011;xxxxxxxxxxxxxxxx) | Route table used to modify the default route for outbound internet traffic and direct it to *azurerm_firewall.firewall_01*.
