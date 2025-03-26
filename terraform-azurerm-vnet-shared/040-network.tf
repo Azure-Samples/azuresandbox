@@ -333,7 +333,7 @@ resource "azurerm_firewall_policy_rule_collection_group" "firewall_01" {
       name                  = "AllowAllOutbound"
       source_addresses      = ["*"]
       destination_addresses = ["0.0.0.0/0"]
-      destination_ports     = ["80", "443"]
+      destination_ports     = ["80", "443","1688"]
       protocols             = ["Any"]
     }
   }
