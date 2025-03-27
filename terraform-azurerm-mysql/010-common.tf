@@ -4,11 +4,6 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "=4.24.0"
     }
-
-    random = {
-      source  = "hashicorp/random"
-      version = "=3.7.1"
-    }
   }
 }
 
@@ -21,8 +16,6 @@ provider "azurerm" {
 
   features {}
 }
-
-provider "random" {}
 
 # Secrets
 data "azurerm_key_vault_secret" "adminpassword" {

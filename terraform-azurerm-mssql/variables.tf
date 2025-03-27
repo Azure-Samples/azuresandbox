@@ -44,6 +44,11 @@ variable "mssql_database_name" {
   description = "The name of the Azure SQL Database to be provisioned"
 }
 
+variable "random_id" {
+  type        = string
+  description = "A random identifier used for resource names."
+}
+
 variable "resource_group_name" {
   type        = string
   description = "The name of the existing resource group for provisioning resources."

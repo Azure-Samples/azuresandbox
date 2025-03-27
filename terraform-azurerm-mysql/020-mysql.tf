@@ -1,10 +1,6 @@
-resource "random_id" "random_id_mysql_server_01_name" {
-  byte_length = 8
-}
-
 # Azure Database for MySQL Flexible Server
 resource "azurerm_mysql_flexible_server" "mysql_server_01" {
-  name                   = "mysql-${random_id.random_id_mysql_server_01_name.hex}"
+  name                   = "mysql-${var.random_id}"
   resource_group_name    = var.resource_group_name
   location               = var.location
   administrator_login    = data.azurerm_key_vault_secret.adminuser.value

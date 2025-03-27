@@ -1,10 +1,6 @@
 # Shared log analytics workspace
-resource "random_id" "log_analytics_workspace_01_name" {
-  byte_length = 8
-}
-
 resource "azurerm_log_analytics_workspace" "log_analytics_workspace_01" {
-  name                = "log-${random_id.log_analytics_workspace_01_name.hex}-01"
+  name                = "log-${var.random_id}-01"
   location            = var.location
   resource_group_name = var.resource_group_name
   sku                 = "PerGB2018"

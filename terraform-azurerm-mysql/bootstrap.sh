@@ -29,6 +29,7 @@ arm_client_id=$(terraform output -state=$state_file arm_client_id)
 key_vault_id=$(terraform output -state=$state_file key_vault_id)
 key_vault_name=$(terraform output -state=$state_file key_vault_name)
 location=$(terraform output -state=$state_file location)
+random_id=$(terraform output -state=$state_file random_id)
 resource_group_name=$(terraform output -state=$state_file resource_group_name)
 subscription_id=$(terraform output -state=$state_file subscription_id)
 tags=$(terraform output -json -state=$state_file tags)
@@ -84,6 +85,7 @@ printf "key_vault_name        = $key_vault_name\n"          >> ./terraform.tfvar
 printf "location              = $location\n"                >> ./terraform.tfvars
 printf "mysql_database_name   = \"$mysql_database_name\"\n" >> ./terraform.tfvars
 printf "private_dns_zones     = $private_dns_zones\n"       >> ./terraform.tfvars
+printf "random_id             = $random_id\n"               >> ./terraform.tfvars
 printf "resource_group_name   = $resource_group_name\n"     >> ./terraform.tfvars
 printf "subscription_id       = $subscription_id\n"         >> ./terraform.tfvars
 printf "tags                  = $tags\n"                    >> ./terraform.tfvars

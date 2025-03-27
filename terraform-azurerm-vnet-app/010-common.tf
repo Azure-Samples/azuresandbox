@@ -10,11 +10,6 @@ terraform {
       version = "=4.24.0"
     }
 
-    random = {
-      source  = "hashicorp/random"
-      version = "=3.7.1"
-    }
-
     cloudinit = {
       source  = "hashicorp/cloudinit"
       version = "=2.3.6"
@@ -43,8 +38,6 @@ provider "azurerm" {
 
   features {}
 }
-
-provider "random" {}
 
 provider "cloudinit" {}
 

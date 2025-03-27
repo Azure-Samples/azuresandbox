@@ -69,7 +69,7 @@ This section describes how to provision this configuration using default setting
 
 * Monitor output. Upon completion, you should see a message similar to the following:
 
-  `Apply complete! Resources: 5 added, 0 changed, 0 destroyed.`
+  `Apply complete! Resources: 4 added, 0 changed, 0 destroyed.`
 
 * Inspect `terraform.tfstate`.
 
@@ -176,6 +176,7 @@ automation_account_name | "auto-9a633c2bba9351cc-01"
 key_vault_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.KeyVault/vaults/kv-XXXXXXXXXXXXXXX"
 key_vault_name | "kv-XXXXXXXXXXXXXXX"
 location | "centralus"
+random_id | "xxxxxxxxxxxxxxx"
 resource_group_name | "rg-sandbox-01"
 subscription_id | "00000000-0000-0000-0000-000000000000"
 tags | tomap( { "costcenter" = "10177772" "environment" = "dev" "project" = "#AzureSandbox" } )

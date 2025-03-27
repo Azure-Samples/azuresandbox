@@ -1,11 +1,7 @@
 # Virtual wan
 
-resource "random_id" "random_id_vwan_01_name" {
-  byte_length = 8
-}
-
 resource "azurerm_virtual_wan" "vwan_01" {
-  name                = "vwan-${random_id.random_id_vwan_01_name.hex}-01"
+  name                = "vwan-${var.random_id}"
   resource_group_name = var.resource_group_name
   location            = var.location
   tags                = var.tags
@@ -16,12 +12,8 @@ output "vwan_01_id" {
 }
 
 # Virtual wan hub
-resource "random_id" "random_id_vwan_01_hub_01_name" {
-  byte_length = 8
-}
-
 resource "azurerm_virtual_hub" "vwan_01_hub_01" {
-  name                = "vhub-${random_id.random_id_vwan_01_hub_01_name.hex}-01"
+  name                = "vhub-${var.random_id}"
   resource_group_name = var.resource_group_name
   location            = var.location
   virtual_wan_id      = azurerm_virtual_wan.vwan_01.id
