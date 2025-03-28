@@ -331,7 +331,7 @@ else
       --location $location \
       --sku standard \
       --no-self-perms \
-      --enable-rbac-authorization false \
+      --enable-rbac-authorization true \
       --tags costcenter=$costcenter project=$project environment=$environment && break
 
     retry_count=$((retry_count + 1))
@@ -343,51 +343,50 @@ else
       echo "Error: Failed to create key vault after $max_retries attempts." >&2
       usage
   fi
+  
+  key_vault_id="/subscriptions/$subscription_id/resourceGroups/$resource_group_name/providers/Microsoft.KeyVault/vaults/$key_vault_name"
 fi
 
-printf "Creating key vault secret access policy for Azure CLI logged in user id '$owner_object_id'...\n"
+role_name="Key Vault Secrets Officer"
+printf "Adding role assignment '$role_name' to Key Vault '$key_vault_name' for Azure CLI logged in user id '$owner_object_id'...\n"
 
 max_retries=10
 retry_count=0
 
 while [ $retry_count -lt $max_retries ]; do
-    az keyvault set-policy \
-        --subscription $subscription_id \
-        --name $key_vault_name \
-        --resource-group $resource_group_name \
-        --secret-permissions get list 'set' \
-        --object-id $owner_object_id && break
+  az role assignment create \
+    --role "$role_name" \
+    --assignee $owner_object_id \
+    --scope "/subscriptions/$subscription_id/resourceGroups/$resource_group_name/providers/Microsoft.KeyVault/vaults/$key_vault_name" && break
 
-    retry_count=$((retry_count + 1))
-    echo "Attempt $retry_count failed. Retrying in 30 seconds..."
-    sleep 30
+  retry_count=$((retry_count + 1))
+  echo "Attempt $retry_count failed. Retrying in 30 seconds..."
+  sleep 30
 done
 
 if [ $retry_count -eq $max_retries ]; then
-    echo "Error: Failed to set key vault secret access policy after $max_retries attempts." >&2
+    echo "Error: Failed to create role assignment after $max_retries attempts." >&2
     usage
 fi
 
-printf "Creating key vault secret access policy for service principal AppId '$arm_client_id'...\n"
+printf "Adding role assignment '$role_name' to Key Vault '$key_vault_name' for service principal AppId '$arm_client_id'...\n"
 
 max_retries=10
 retry_count=0
 
 while [ $retry_count -lt $max_retries ]; do
-  az keyvault set-policy \
-    --subscription $subscription_id \
-    --name $key_vault_name \
-    --resource-group $resource_group_name \
-    --secret-permissions get 'set' \
-    --spn $arm_client_id && break
-  
-    retry_count=$((retry_count + 1))
-    echo "Attempt $retry_count failed. Retrying in 30 seconds..."
-    sleep 30
+  az role assignment create \
+    --role "$role_name" \
+    --assignee $arm_client_id \
+    --scope "/subscriptions/$subscription_id/resourceGroups/$resource_group_name/providers/Microsoft.KeyVault/vaults/$key_vault_name" && break
+
+  retry_count=$((retry_count + 1))
+  echo "Attempt $retry_count failed. Retrying in 30 seconds..."
+  sleep 30
 done
 
 if [ $retry_count -eq $max_retries ]; then
-    echo "Error: Failed to set key vault secret access policy after $max_retries attempts." >&2
+    echo "Error: Failed to create role assignment after $max_retries attempts." >&2
     usage
 fi
 
@@ -567,7 +566,6 @@ while [ $retry_count -lt $max_retries ]; do
     --role "$role_name" \
     --assignee $owner_object_id \
     --scope "/subscriptions/$subscription_id/resourceGroups/$resource_group_name/providers/Microsoft.Storage/storageAccounts/$storage_account_name" && break
-      retry_count=$((retry_count + 1))
 
   retry_count=$((retry_count + 1))
   echo "Attempt $retry_count failed. Retrying in 30 seconds..."

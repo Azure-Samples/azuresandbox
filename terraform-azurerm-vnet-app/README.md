@@ -338,8 +338,8 @@ Resource name (ARM) | Notes
 azurerm_windows_virtual_machine.vm_jumpbox_win (jumpwin1) | By default, provisions a [Standard_B2ls_v2](https://learn.microsoft.com/azure/virtual-machines/bsv2-series) virtual machine for use as a jumpbox. See below for more information.
 azurerm_network_interface.vm_jumpbox_win_nic_01 (nic&#x2011;jumpwin1&#x2011;1) | The configured subnet is *azurerm_subnet.vnet_app_01_subnets["snet-app-01"]*.
 azurerm_virtual_machine_extension.vm_jumpbox_win_postdeploy_script | Downloads [configure&#x2011;vm&#x2011;jumpbox-win.ps1](./configure-vm-jumpbox-win.ps1) and [configure&#x2011;storage&#x2011;kerberos.ps1](./configure-storage-kerberos.ps1), then executes [configure&#x2011;vm&#x2011;jumpbox-win.ps1](./configure-vm-jumpbox-win.ps1) using the [Custom Script Extension for Windows](https://learn.microsoft.com/azure/virtual-machines/extensions/custom-script-windows). See below for more details.
-azurerm_key_vault_access_policy.vm_jumpbox_win_secrets_get (jumpwin1) | Allows the VM to get secrets from key vault using a system assigned managed identity.
-azurerm_role_assignment . vm_jumpbox_win_storage_account_role_assignment | Assigns the `Storage Blob Data Contributor` role to the system assigned managed identity of *azurerm_windows_virtual_machine.vm_jumpbox_win* on the shared storage account.
+azurerm_role_assignment . vm_jumpbox_win_storage_account_role_assignment | Assigns the `Storage Blob Data Reader` role to the system assigned managed identity of *azurerm_windows_virtual_machine.vm_jumpbox_win* on the shared storage account.
+azurerm_role_assignment . vm_jumpbox_win_key_vault_role_assignment | Assigns the `Key Vault Secrets User` role to the system assigned managed identity of *azurerm_windows_virtual_machine.vm_jumpbox_win* on the shared key vault.
 
 This Windows Server VM is used as a jumpbox for development and remote server administration.
 
