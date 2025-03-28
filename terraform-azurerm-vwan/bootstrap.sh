@@ -36,6 +36,7 @@ aad_tenant_id=$(terraform output -state=$state_file aad_tenant_id)
 arm_client_id=$(terraform output -state=$state_file arm_client_id)
 dns_server=$(terraform output -state=$state_file dns_server)
 location=$(terraform output -state=$state_file location)
+random_id=$(terraform output -state=$state_file random_id)
 resource_group_name=$(terraform output -state=$state_file resource_group_name)
 subscription_id=$(terraform output -state=$state_file subscription_id)
 tags=$(terraform output -json -state=$state_file tags)
@@ -74,6 +75,7 @@ printf "arm_client_id           = $arm_client_id\n"                 >> ./terrafo
 printf "client_address_pool     = \"$client_address_pool\"\n"       >> ./terraform.tfvars
 printf "dns_server              = $dns_server\n"                    >> ./terraform.tfvars
 printf "location                = $location\n"                      >> ./terraform.tfvars
+printf "random_id               = $random_id\n"                     >> ./terraform.tfvars
 printf "resource_group_name     = $resource_group_name\n"           >> ./terraform.tfvars
 printf "subscription_id         = $subscription_id\n"               >> ./terraform.tfvars
 printf "tags                    = $tags\n"                          >> ./terraform.tfvars

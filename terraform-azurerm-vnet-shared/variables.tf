@@ -57,6 +57,11 @@ variable "log_analytics_workspace_retention_days" {
   default     = "30"
 }
 
+variable "random_id" {
+  type        = string
+  description = "A random id used to create unique resource names."
+}
+
 variable "resource_group_name" {
   type        = string
   description = "The name of the new resource group to be provisioned."

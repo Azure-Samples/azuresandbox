@@ -111,6 +111,7 @@ admin_password_secret='adminpassword'
 admin_username_secret='adminuser'
 arm_client_id=''
 arm_client_secret=''
+random_id=$(tr -dc "[:lower:][:digit:]" < /dev/urandom | head -c 15)
 secret_expiration_days=365
 storage_container_name='scripts'
 vm_adds_size='Standard_B2ls_v2'
@@ -123,7 +124,7 @@ default_dns_server="10.1.1.4"
 default_environment="dev"
 default_location="centralus"
 default_project="#AzureSandbox"
-default_resource_group_name=rg-sandbox-$(tr -dc "[:lower:][:digit:]" < /dev/urandom | head -c 15)
+default_resource_group_name=rg-sandbox-$random_id
 default_skip_admin_password_gen="no"
 default_skip_storage_kerb_key_gen="no"
 default_subnet_adds_address_prefix="10.1.1.0/24"
@@ -217,6 +218,13 @@ else
   usage
 fi
 
+# Validate format of resource group name
+if [[ ! $resource_group_name =~ ^rg-sandbox-[a-z0-9]{15}$ ]]
+then
+  printf "Invalid format for resource group name '$resource_group_name'. Expected format is 'rg-sandbox-<random_id>'...\n"
+  usage
+fi
+
 # Validate object id of Azure CLI signed in user
 if [ -z "$owner_object_id" ]
 then
@@ -276,6 +284,14 @@ resource_group_id=$(az group list --subscription $subscription_id --query "[?nam
 if [ -n "$resource_group_id" ]
 then
   printf "Found resource group '$resource_group_name'...\n"
+  random_id=${resource_group_name#*rg-sandbox-}
+  # Validate random_id
+  if [ -z "$random_id" ] || [ ${#random_id} -lt 15 ]; then
+    printf "Invalid format for resource group name '$resource_group_name'. Expected format is 'rg-sandbox-<random_id>'...\n"
+    usage
+  fi
+
+  printf "Random id set to '$random_id'...\n"
 else
   printf "Creating resource group '$resource_group_name'...\n"
   az group create \
@@ -295,13 +311,13 @@ then
   az provider register --namespace $namespace --wait
 fi
 
-key_vault_name=$(az keyvault list --subscription $subscription_id --resource-group $resource_group_name --query "[?tags.provisioner == 'bootstrap.sh'] | [0].name" --output tsv)
+key_vault_name=kv-$random_id
+key_vault_id=$(az keyvault list --subscription $subscription_id --resource-group $resource_group_name --query "[?name == '$key_vault_name'] | [0].id" --output tsv)
 
-if [ -n "$key_vault_name" ]
+if [ -n "$key_vault_id" ]
 then
   printf "Found key vault '$key_vault_name'...\n"
 else
-  key_vault_name=kv-$(tr -dc "[:lower:][:digit:]" < /dev/urandom | head -c 15)
   printf "Creating keyvault '$key_vault_name' in resource group '$resource_group_name'...\n"
 
   max_retries=10
@@ -315,8 +331,8 @@ else
       --location $location \
       --sku standard \
       --no-self-perms \
-      --enable-rbac-authorization false \
-      --tags costcenter=$costcenter project=$project environment=$environment provisioner="bootstrap.sh" && break
+      --enable-rbac-authorization true \
+      --tags costcenter=$costcenter project=$project environment=$environment && break
 
     retry_count=$((retry_count + 1))
     echo "Attempt $retry_count failed. Retrying in 30 seconds..."
@@ -327,53 +343,50 @@ else
       echo "Error: Failed to create key vault after $max_retries attempts." >&2
       usage
   fi
+  
+  key_vault_id="/subscriptions/$subscription_id/resourceGroups/$resource_group_name/providers/Microsoft.KeyVault/vaults/$key_vault_name"
 fi
 
-key_vault_id="/subscriptions/$subscription_id/resourceGroups/$resource_group_name/providers/Microsoft.KeyVault/vaults/$key_vault_name"
-
-printf "Creating key vault secret access policy for Azure CLI logged in user id '$owner_object_id'...\n"
+role_name="Key Vault Secrets Officer"
+printf "Adding role assignment '$role_name' to Key Vault '$key_vault_name' for Azure CLI logged in user id '$owner_object_id'...\n"
 
 max_retries=10
 retry_count=0
 
 while [ $retry_count -lt $max_retries ]; do
-    az keyvault set-policy \
-        --subscription $subscription_id \
-        --name $key_vault_name \
-        --resource-group $resource_group_name \
-        --secret-permissions get list 'set' \
-        --object-id $owner_object_id && break
+  az role assignment create \
+    --role "$role_name" \
+    --assignee $owner_object_id \
+    --scope "/subscriptions/$subscription_id/resourceGroups/$resource_group_name/providers/Microsoft.KeyVault/vaults/$key_vault_name" && break
 
-    retry_count=$((retry_count + 1))
-    echo "Attempt $retry_count failed. Retrying in 30 seconds..."
-    sleep 30
+  retry_count=$((retry_count + 1))
+  echo "Attempt $retry_count failed. Retrying in 30 seconds..."
+  sleep 30
 done
 
 if [ $retry_count -eq $max_retries ]; then
-    echo "Error: Failed to set key vault secret access policy after $max_retries attempts." >&2
+    echo "Error: Failed to create role assignment after $max_retries attempts." >&2
     usage
 fi
 
-printf "Creating key vault secret access policy for service principal AppId '$arm_client_id'...\n"
+printf "Adding role assignment '$role_name' to Key Vault '$key_vault_name' for service principal AppId '$arm_client_id'...\n"
 
 max_retries=10
 retry_count=0
 
 while [ $retry_count -lt $max_retries ]; do
-  az keyvault set-policy \
-    --subscription $subscription_id \
-    --name $key_vault_name \
-    --resource-group $resource_group_name \
-    --secret-permissions get 'set' \
-    --spn $arm_client_id && break
-  
-    retry_count=$((retry_count + 1))
-    echo "Attempt $retry_count failed. Retrying in 30 seconds..."
-    sleep 30
+  az role assignment create \
+    --role "$role_name" \
+    --assignee $arm_client_id \
+    --scope "/subscriptions/$subscription_id/resourceGroups/$resource_group_name/providers/Microsoft.KeyVault/vaults/$key_vault_name" && break
+
+  retry_count=$((retry_count + 1))
+  echo "Attempt $retry_count failed. Retrying in 30 seconds..."
+  sleep 30
 done
 
 if [ $retry_count -eq $max_retries ]; then
-    echo "Error: Failed to set key vault secret access policy after $max_retries attempts." >&2
+    echo "Error: Failed to create role assignment after $max_retries attempts." >&2
     usage
 fi
 
@@ -402,7 +415,6 @@ if [ $retry_count -eq $max_retries ]; then
     echo "Error: Failed to set key vault secret after $max_retries attempts." >&2
     usage
 fi
-
 
 if [ "$skip_admin_password_gen" = 'no' ]
 then
@@ -466,13 +478,13 @@ then
   az provider register --namespace $namespace --wait
 fi
 
-storage_account_name=$(az storage account list --subscription $subscription_id --resource-group $resource_group_name --query "[?tags.provisioner == 'bootstrap.sh'] | [0].name" --output tsv)
+storage_account_name=st$random_id
+storage_account_id=$(az storage account list --subscription $subscription_id --resource-group $resource_group_name --query "[?name == '$storage_account_name'] | [0].id" --output tsv)
 
-if [ -n "$storage_account_name" ]
+if [ -n "$storage_account_id" ]
 then
   printf "Found storage account '$storage_account_name' in '$resource_group_name'...\n"
 else
-  storage_account_name=st$(tr -dc "[:lower:][:digit:]" < /dev/urandom | head -c 13)
   printf "Creating storage account '$storage_account_name' in '$resource_group_name'...\n"
   az storage account create \
     --subscription $subscription_id \
@@ -486,41 +498,8 @@ else
     --bypass AzureServices \
     --default-action Allow \
     --public-network-access Disabled \
-    --tags costcenter=$costcenter project=$project environment=$environment provisioner="bootstrap.sh"
-fi
-
-for i in {1..10}; do
-    storage_account_key=$(az storage account keys list --subscription $subscription_id --resource-group $resource_group_name --account-name $storage_account_name --output tsv --query "[0].value") && break || echo "Attempt $i failed, retrying in 30 seconds..."
-    sleep 30
-done
-
-if [ -z "$storage_account_key" ]; then
-    echo "Failed to retrieve storage account key after 10 attempts." >&2
-    usage
-fi
-
-printf "Setting storage account secret '$storage_account_name' with value length '${#storage_account_key}' to keyvault '$key_vault_name'...\n"
-
-max_retries=10
-retry_count=0
-
-while [ $retry_count -lt $max_retries ]; do
-  az keyvault secret set \
-    --subscription $subscription_id \
-    --vault-name $key_vault_name \
-    --name $storage_account_name \
-    --value="$storage_account_key" \
-    --expires "$secret_expiration_date" \
-    --output none && break
-
-  retry_count=$((retry_count + 1))
-  echo "Attempt $retry_count failed. Retrying in 30 seconds..."
-  sleep 30
-done
-
-if [ $retry_count -eq $max_retries ]; then
-    echo "Error: Failed to set key vault secret after $max_retries attempts." >&2
-    usage
+    --allow-shared-key-access false \
+    --tags costcenter=$costcenter project=$project environment=$environment
 fi
 
 # Create Kerberos key
@@ -587,7 +566,6 @@ while [ $retry_count -lt $max_retries ]; do
     --role "$role_name" \
     --assignee $owner_object_id \
     --scope "/subscriptions/$subscription_id/resourceGroups/$resource_group_name/providers/Microsoft.Storage/storageAccounts/$storage_account_name" && break
-      retry_count=$((retry_count + 1))
 
   retry_count=$((retry_count + 1))
   echo "Attempt $retry_count failed. Retrying in 30 seconds..."
@@ -664,7 +642,7 @@ if [ $retry_count -eq $max_retries ]; then
 fi
 
 # Enable public network access
-printf "Temporarily enabling public network access to storage account '$storage_account_name'...\n"
+printf "Temporarily enabling public network access for storage account '$storage_account_name'...\n"
 
 max_retries=10
 retry_count=0
@@ -690,8 +668,13 @@ printf "Sleeping for 60 seconds to allow storage account settings to propagate..
 sleep 60
 
 # Bootstrap storage account container
-jmespath_query="[? name == '$storage_container_name']|[0].name"
-storage_container_name_temp=$(az storage container list --subscription $subscription_id --account-name $storage_account_name --account-key $storage_account_key --query "$jmespath_query" --output tsv)
+printf "Looking for storage container '$storage_container_name' in storage account '$storage_account_name'...\n"
+storage_container_name_temp=$(az storage container list --subscription $subscription_id --account-name $storage_account_name --auth-mode login --query "[? name == '$storage_container_name']|[0].name" --output tsv)
+
+if [ $? -ne 0 ]; then
+  echo "Error: The az storage container list command failed."
+  usage
+fi
 
 if [ -n "$storage_container_name_temp" ]
 then
@@ -706,8 +689,8 @@ else
     az storage container create \
       --subscription $subscription_id \
       --name $storage_container_name \
-      --account-name $storage_account_name \
-      --account-key $storage_account_key && break
+      --auth-mode login \
+      --account-name $storage_account_name && break
 
     retry_count=$((retry_count + 1))
     echo "Attempt $retry_count failed. Retrying in 30 seconds..."
@@ -721,7 +704,7 @@ else
 fi
 
 # Disable public network access
-printf "Disabling public network access and shared key access to storage account '$storage_account_name'...\n"
+printf "Disabling public network access for storage account '$storage_account_name'...\n"
 
 max_retries=10
 retry_count=0
@@ -731,7 +714,6 @@ while [ $retry_count -lt $max_retries ]; do
     --subscription $subscription_id \
     --name $storage_account_name \
     --resource-group $resource_group_name \
-    --allow-shared-key-access false \
     --public-network-access Disabled && break
 
   retry_count=$((retry_count + 1))
@@ -762,6 +744,7 @@ printf "dns_server                                = \"$dns_server\"\n"          
 printf "key_vault_id                              = \"$key_vault_id\"\n"                              >> ./terraform.tfvars
 printf "key_vault_name                            = \"$key_vault_name\"\n"                            >> ./terraform.tfvars
 printf "location                                  = \"$location\"\n"                                  >> ./terraform.tfvars
+printf "random_id                                 = \"$random_id\"\n"                                 >> ./terraform.tfvars
 printf "resource_group_name                       = \"$resource_group_name\"\n"                       >> ./terraform.tfvars
 printf "storage_account_name                      = \"$storage_account_name\"\n"                      >> ./terraform.tfvars
 printf "storage_container_name                    = \"$storage_container_name\"\n"                    >> ./terraform.tfvars

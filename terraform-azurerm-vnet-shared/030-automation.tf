@@ -1,11 +1,7 @@
 # Azure Automation account
 
-resource "random_id" "automation_account_01_name" {
-  byte_length = 8
-}
-
 resource "azurerm_automation_account" "automation_account_01" {
-  name                = "auto-${random_id.automation_account_01_name.hex}-01"
+  name                = "auto-${var.random_id}-01"
   location            = var.location
   resource_group_name = var.resource_group_name
   sku_name            = "Basic"

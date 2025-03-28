@@ -265,26 +265,22 @@ resource "azurerm_network_security_rule" "network_security_rules" {
 }
 
 # Bastion
-resource "random_id" "bastion_host_01_name" {
-  byte_length = 8
-}
-
 resource "azurerm_bastion_host" "bastion_host_01" {
-  name                = "bst-${random_id.bastion_host_01_name.hex}"
+  name                = "bst-${var.random_id}"
   location            = var.location
   resource_group_name = var.resource_group_name
   tags                = var.tags
   depends_on          = [azurerm_subnet.vnet_shared_01_subnets]
 
   ip_configuration {
-    name                 = "ipc-${random_id.bastion_host_01_name.hex}"
+    name                 = "bst-${var.random_id}"
     subnet_id            = azurerm_subnet.vnet_shared_01_subnets["AzureBastionSubnet"].id
     public_ip_address_id = azurerm_public_ip.bastion_host_01.id
   }
 }
 
 resource "azurerm_public_ip" "bastion_host_01" {
-  name                = "pip-${random_id.bastion_host_01_name.hex}"
+  name                = "pip-${var.random_id}-1"
   location            = var.location
   resource_group_name = var.resource_group_name
   allocation_method   = "Static"
@@ -293,12 +289,8 @@ resource "azurerm_public_ip" "bastion_host_01" {
 }
 
 # Firewall
-resource "random_id" "firewall_01" {
-  byte_length = 8
-}
-
 resource "azurerm_firewall" "firewall_01" {
-  name                = "fw-${random_id.firewall_01.hex}"
+  name                = "fw-${var.random_id}"
   resource_group_name = var.resource_group_name
   location            = var.location
   sku_name            = "AZFW_VNet"
@@ -306,14 +298,14 @@ resource "azurerm_firewall" "firewall_01" {
   firewall_policy_id  = azurerm_firewall_policy.firewall_01.id
 
   ip_configuration {
-    name                 = "fw-${random_id.firewall_01.hex}"
+    name                 = "fw-${var.random_id}"
     subnet_id            = azurerm_subnet.vnet_shared_01_subnets["AzureFirewallSubnet"].id
     public_ip_address_id = azurerm_public_ip.firewall_01.id
   }
 }
 
 resource "azurerm_firewall_policy" "firewall_01" {
-  name                     = "fwp-${random_id.firewall_01.hex}-1"
+  name                     = "fwp-${var.random_id}-1"
   resource_group_name      = var.resource_group_name
   location                 = var.location
   sku                      = "Standard"
@@ -321,7 +313,7 @@ resource "azurerm_firewall_policy" "firewall_01" {
 }
 
 resource "azurerm_firewall_policy_rule_collection_group" "firewall_01" {
-  name               = "fwr-${random_id.firewall_01.hex}-1"
+  name               = "fwr-${var.random_id}-1"
   firewall_policy_id = azurerm_firewall_policy.firewall_01.id
   priority           = 500
   network_rule_collection {
@@ -340,7 +332,7 @@ resource "azurerm_firewall_policy_rule_collection_group" "firewall_01" {
 }
 
 resource "azurerm_route_table" "firewall_01" {
-  name                = "rt-${random_id.firewall_01.hex}"
+  name                = "rt-${var.random_id}"
   resource_group_name = var.resource_group_name
   location            = var.location
 
@@ -368,7 +360,7 @@ resource "azurerm_subnet_route_table_association" "firewall_01" {
 }
 
 resource "azurerm_public_ip" "firewall_01" {
-  name                = "pip-${random_id.firewall_01.hex}-1"
+  name                = "pip-${var.random_id}-2"
   location            = var.location
   resource_group_name = var.resource_group_name
   allocation_method   = "Static"

@@ -94,7 +94,7 @@ This section describes how to provision this configuration using default setting
 
 * Monitor output. Upon completion, you should see a message similar to the following:
 
-  `Apply complete! Resources: 8 added, 0 changed, 0 destroyed.`
+  `Apply complete! Resources: 6 added, 0 changed, 0 destroyed.`
 
 * Inspect `terraform.tfstate`.
 
@@ -292,6 +292,7 @@ Output variable | Sample value
 aad_tenant_id | "00000000-0000-0000-0000-000000000000"
 arm_client_id | "00000000-0000-0000-0000-000000000000"
 location | "centralus"
+random_id | "xxxxxxxxxxxxxxxx"
 resource_group_name | "rg-sandbox-01"
 subscription_id | "00000000-0000-0000-0000-000000000000"
 tags | tomap( { "costcenter" = "10177772" "environment" = "dev" "project" = "#AzureSandbox" } )
@@ -325,8 +326,8 @@ This section lists the output variables defined in the Terraform configurations 
 
 Output variable | Sample value
 --- | ---
-vwan_01_hub_01_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualHubs/vhub-xxxxxxxxxxxxxxxx-01"
-vwan_01_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualWans/vwan-xxxxxxxxxxxxxxxx-01"
+vwan_01_hub_01_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualHubs/vhub-xxxxxxxxxxxxxxxx"
+vwan_01_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualWans/vwan-xxxxxxxxxxxxxxxx"
 
 ## Next steps
 

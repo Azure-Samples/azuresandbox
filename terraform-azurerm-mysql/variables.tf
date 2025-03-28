@@ -49,6 +49,12 @@ variable "private_dns_zones" {
   description = "The existing private dns zones defined in the application virtual network."
 }
 
+variable "random_id" {
+  type        = string
+  description = "The random id used to create unique resource names."
+  
+}
+
 variable "resource_group_name" {
   type        = string
   description = "The name of the existing resource group for provisioning resources."

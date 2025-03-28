@@ -1,10 +1,6 @@
 # Azure SQL Database logical server
-resource "random_id" "random_id_mssql_server_01_name" {
-  byte_length = 8
-}
-
 resource "azurerm_mssql_server" "mssql_server_01" {
-  name                          = "mssql-${random_id.random_id_mssql_server_01_name.hex}"
+  name                          = "mssql-${var.random_id}"
   resource_group_name           = var.resource_group_name
   location                      = var.location
   version                       = "12.0"
