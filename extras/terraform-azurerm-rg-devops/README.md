@@ -7,6 +7,7 @@
 * [Getting started](#getting-started)
 * [Smoke testing](#smoke-testing)
 * [Documentation](#documentation)
+* [Samples](#samples)
 * [Next steps](#next-steps)
 
 ## Overview
@@ -318,6 +319,10 @@ This section describes DevOps security best practices for development and deploy
     ```
 
 **Note**: See [Use GitHub Actions to connect to Azure](https://learn.microsoft.com/en-us/azure/developer/github/connect-from-azure?tabs=azure-portal%2Cwindows) to use OpenID Connect and federated credentials to authenticate. This is ideal for applying Terraform configurations in DevOps pipelines.
+
+## Samples
+
+The [samples](./samples) folder includes configurations that can be used as a starting point for your own DevOps projects.
 
 ## Next steps
 
