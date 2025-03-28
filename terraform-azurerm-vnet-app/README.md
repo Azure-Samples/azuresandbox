@@ -375,7 +375,7 @@ Resource name (ARM) | Notes
 --- | ---
 azurerm_linux_virtual_machine.vm_jumpbox_linux (jumplinux1) | By default, provisions a [Standard_B2ls_v2](https://learn.microsoft.com/azure/virtual-machines/bsv2-series) virtual machine for use as a Linux jumpbox virtual machine. See below for more details.
 azurerm_network_interface.vm_jumpbox_linux_nic_01 | The configured subnet is *azurerm_subnet.vnet_app_01_subnets["snet-app-01"]*.
-azurerm_key_vault_access_policy.vm_jumpbox_linux_secrets_get | Allows the VM to get secrets from key vault using a system assigned managed identity.
+azurerm_role_assignment.vm_jumpbox_linux_key_vault_role_assignment | Allows the VM to get secrets from key vault using a system assigned managed identity.
 
 This Linux VM is used as a jumpbox for development and remote administration.
 

@@ -81,9 +81,9 @@ resource "azurerm_network_interface" "vm_jumbox_linux_nic_01" {
   ]
 }
 
-resource "azurerm_key_vault_access_policy" "vm_jumpbox_linux_secrets_get" {
-  key_vault_id       = var.key_vault_id
-  tenant_id          = azurerm_linux_virtual_machine.vm_jumpbox_linux.identity[0].tenant_id
-  object_id          = azurerm_linux_virtual_machine.vm_jumpbox_linux.identity[0].principal_id
-  secret_permissions = ["Get"]
+# Role assignment for key vault
+resource "azurerm_role_assignment" "vm_jumpbox_linux_key_vault_role_assignment" {
+  scope                = var.key_vault_id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = azurerm_linux_virtual_machine.vm_jumpbox_linux.identity[0].principal_id
 }
