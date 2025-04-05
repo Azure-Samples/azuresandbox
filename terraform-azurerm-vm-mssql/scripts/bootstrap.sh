@@ -115,7 +115,7 @@ do
       --account-name ${storage_account_name:1:-1} \
       --auth-mode login \
       --destination ${storage_container_name:1:-1} \
-      --source '.' \
+      --source './scripts' \
       --pattern '*.ps1' \
       --overwrite && break || sleep 15
 done
@@ -128,10 +128,10 @@ az storage account update \
   --resource-group ${resource_group_name:1:-1} \
   --public-network-access Disabled
 
-# Bootstrap auotmation account
+# Bootstrap automation account
 printf "Configuring automation account '${automation_account_name:1:-1}'...\n"
 
-./configure-automation.ps1 \
+./scripts/configure-automation.ps1 \
   -TenantId ${aad_tenant_id:1:-1} \
   -SubscriptionId ${subscription_id:1:-1} \
   -ResourceGroupName ${resource_group_name:1:-1} \

@@ -13,7 +13,7 @@
 
 ## Architecture
 
-![vm-mssql-diagram](./vm-mssql-diagram.drawio.svg)
+![vm-mssql-diagram](./images/vm-mssql-diagram.drawio.svg)
 
 ## Overview
 
@@ -27,7 +27,7 @@ Smoke testing | ~10 minutes
 
 ## Before you start
 
-[terraform-azurerm-vnet-app](../terraform-azurerm-vnet-app) must be provisioned first before starting. This configuration is optional and can be skipped to reduce costs. Proceed with [terraform-azurerm-mssql](../terraform-azurerm-mssql) if you wish to skip it.
+[terraform-azurerm-vnet-app](../terraform-azurerm-vnet-app) must be provisioned first before starting. This configuration is optional and can be skipped to reduce costs. Proceed with [terraform-azurerm-mssql](../terraform-azurerm-mssql) if you wish to skip this configuration.
 
 ## Getting started
 
@@ -42,13 +42,13 @@ This section describes how to provision this configuration using default setting
 * Add an environment variable containing the password for the service principal.
 
   ```bash
-  export TF_VAR_arm_client_secret=YourServicePrincipalSecret
+  export TF_VAR_arm_client_secret=YOUR-SERVICE-PRINCIPAL-PASSWORD
   ```
 
-* Run [bootstrap.sh](./bootstrap.sh) using the default settings or custom settings.
+* Run [bootstrap.sh](./scripts/bootstrap.sh) using the default settings or custom settings.
 
   ```bash
-  ./bootstrap.sh
+  ./scripts/bootstrap.sh
   ```
 
 * Apply the Terraform configuration.
@@ -69,7 +69,7 @@ This section describes how to provision this configuration using default setting
 
 * Monitor output. Upon completion, you should see a message similar to the following:
 
-  `Apply complete! Resources: 9 added, 0 changed, 0 destroyed.`
+  `Apply complete! Resources: 10 added, 0 changed, 0 destroyed.`
 
 * Inspect `terraform.tfstate`.
 
@@ -114,7 +114,7 @@ This section provides additional information on various aspects of this configur
 
 ### Bootstrap script
 
-This configuration uses the script [bootstrap.sh](./bootstrap.sh) to create a *terraform.tfvars* file for generating and applying Terraform plans ([Step-By-Step Video](https://youtu.be/Jzi58S7lBJ8)). For simplified deployment, several runtime defaults are initialized using output variables stored in the *terraform.tfstate* file associated with the [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared;) and [terraform-azurerm-vnet-app](../terraform-azurerm-vnet-app/) configurations, including:
+This configuration uses the script [bootstrap.sh](./scripts/bootstrap.sh) to create a *terraform.tfvars* file for generating and applying Terraform plans ([Step-By-Step Video](https://youtu.be/Jzi58S7lBJ8)). For simplified deployment, several runtime defaults are initialized using output variables stored in the *terraform.tfstate* file associated with the [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared;) and [terraform-azurerm-vnet-app](../terraform-azurerm-vnet-app/) configurations, including:
 
 Output variable | Sample value
 --- | ---
@@ -138,20 +138,20 @@ The configured virtual machine size is checked to determine if it includes a tem
 
 Public internet access to the shared storage account is temporarily enabled so the following PowerShell scripts can be uploaded to the *scripts* container in the storage account. These scripts are referenced by virtual machine extensions:
 
-* [configure-vm-mssql.ps1](./configure-vm-mssql.ps1)
-* [configure-mssql.ps1](./configure-mssql.ps1)
-* [sql-startup.ps1](./sql-startup.ps1)
+* [configure-vm-mssql.ps1](./scripts/configure-vm-mssql.ps1)
+* [configure-mssql.ps1](./scripts/configure-mssql.ps1)
+* [sql-startup.ps1](./scripts/sql-startup.ps1)
 
 Public internet access to the shared storage account is disabled again.
 
-Configuration of [Azure Automation State Configuration (DSC)](https://learn.microsoft.com/azure/automation/automation-dsc-overview) is performed by [configure-automation.ps1](./configure-automation.ps1) including the following:
+Configuration of [Azure Automation State Configuration (DSC)](https://learn.microsoft.com/azure/automation/automation-dsc-overview) is performed by [configure-automation.ps1](./scripts/configure-automation.ps1) including the following:
 
 * Configures [Azure Automation shared resources](https://learn.microsoft.com/azure/automation/automation-intro#shared-resources) including:
   * [Modules](https://learn.microsoft.com/azure/automation/shared-resources/modules)
     * Imports new modules including the following:
       * [NetworkingDsc](https://github.com/dsccommunity/NetworkingDsc)
       * [SqlServerDsc](https://github.com/dsccommunity/SqlServerDsc)
-  * Imports [DSC Configuration](https://learn.microsoft.com/azure/automation/automation-dsc-getting-started#create-a-dsc-configuration) [MssqlVmConfig.ps1](./MssqlVmConfig.ps1).
+  * Imports [DSC Configuration](https://learn.microsoft.com/azure/automation/automation-dsc-getting-started#create-a-dsc-configuration) [MssqlVmConfig.ps1](./scripts/MssqlVmConfig.ps1).
   * [Compiles DSC Configuration](https://learn.microsoft.com/azure/automation/automation-dsc-compile) so it can be used later to [Register a VM to be managed by State Configuration](https://learn.microsoft.com/azure/automation/tutorial-configure-servers-desired-state#register-a-vm-to-be-managed-by-state-configuration).
 
 ### Terraform Resources
@@ -160,7 +160,7 @@ This section lists the resources included in this configuration.
 
 #### Database server virtual machine
 
-The configuration for these resources can be found in [020-vm-mssql-win.tf](./020-vm-mssql-win.tf) ([Step-By-Step Video](https://youtu.be/RXkPVOZZBwU)).
+The configuration for these resources can be found in [compute.tf](./compute.tf) ([Step-By-Step Video](https://youtu.be/RXkPVOZZBwU)).
 
 Resource name (ARM) | Notes
 --- | ---
@@ -170,7 +170,7 @@ azurerm_managed_disk . vm_mssql_win_data_disks ["sqldata"] (disk&#x2011;mssqlwin
 azurerm_managed_disk . vm_mssql_win_data_disks ["sqllog"] (disk&#x2011;mssqlwin1&#x2011;vol_sqllog_L) | By default, provisions an E4 [Standard SSD](https://learn.microsoft.com/azure/virtual-machines/disks-types#standard-ssd) [managed disk](https://learn.microsoft.com/azure/virtual-machines/managed-disks-overview) for storing SQL Server log files. Caching is set to *None* by default.
 azurerm_virtual_machine_data_disk_attachment . vm_mssql_win_data_disk_attachments ["sqldata"] | Attaches *azurerm_managed_disk.vm_mssql_win_data_disks["sqldata"]* to *azurerm_windows_virtual_machine.vm_mssql_win*.
 azurerm_virtual_machine_data_disk_attachment . vm_mssql_win_data_disk_attachments ["sqllog"] | Attaches *azurerm_managed_disk.vm_mssql_win_data_disks["sqllog"]* to *azurerm_windows_virtual_machine.vm_mssql_win*
-azurerm_virtual_machine_extension . vm_mssql_win_postdeploy_script (vmext&#x2011;mssqlwin1&#x2011;postdeploy&#x2011;script) | Downloads [configure&#x2011;vm&#x2011;mssql.ps1](./configure-mssql.ps1) and [sql&#x2011;startup.ps1](./sql-startup.ps1) to *azurerm_windows_virtual_machine.vm_mssql_win* and executes [configure&#x2011;vm&#x2011;mssql.ps1](./configure-mssql.ps1) using the [Custom Script Extension for Windows](https://learn.microsoft.com/azure/virtual-machines/extensions/custom-script-windows).
+azurerm_virtual_machine_extension . vm_mssql_win_postdeploy_script (vmext&#x2011;mssqlwin1&#x2011;postdeploy&#x2011;script) | Downloads [configure&#x2011;vm&#x2011;mssql.ps1](./scripts/configure-mssql.ps1) and [sql&#x2011;startup.ps1](./scripts/sql-startup.ps1) to *azurerm_windows_virtual_machine.vm_mssql_win* and executes [configure&#x2011;vm&#x2011;mssql.ps1](./scripts/configure-mssql.ps1) using the [Custom Script Extension for Windows](https://learn.microsoft.com/azure/virtual-machines/extensions/custom-script-windows).
 azurerm_role_assignment . vm_mssql_win_storage_account_role_assignment | Grants `Storage Blob Data Reader` role to the managed identity for *azurerm_windows_virtual_machine.vm_mssql_win* on the shared storage account.
 azurerm_role_assignment . vm_mssql_win_key_vault_role_assignment | Grants `Key Vault Secrets User` role to the managed identity for *azurerm_windows_virtual_machine.vm_mssql_win* on the shared key vault.
 
@@ -178,19 +178,19 @@ azurerm_role_assignment . vm_mssql_win_key_vault_role_assignment | Grants `Key V
 * Database: Microsoft SQL Server 2022 Developer Edition
 * By default the [patch assessment mode](https://learn.microsoft.com/en-us/azure/update-manager/assessment-options) is set to `AutomaticByPlatform` and `provision_vm_agent` is set to `true` to enable use of [Azure Update Manager Update or Patch Orchestration](https://learn.microsoft.com/en-us/azure/update-manager/updates-maintenance-schedules#update-or-patch-orchestration).
 * *admin_username* and *admin_password* are configured using key vault secrets *adminuser* and *adminpassword*.
-* This resource is configured using a [provisioner](https://www.terraform.io/docs/language/resources/provisioners/syntax.html) that runs [aadsc-register-node.ps1](./aadsc-register-node.ps1) which registers the node with *azurerm_automation_account.automation_account_01* and applies the configuration [MssqlVmConfig.ps1](../terraform-azurerm-vnet-shared/MssqlVmConfig.ps1). Retry logic is implemented to wait until the node registration is compliant as multiple attempts to apply the configuration are sometimes required.
+* This resource is configured using a [provisioner](https://www.terraform.io/docs/language/resources/provisioners/syntax.html) that runs [aadsc-register-node.ps1](./scripts/aadsc-register-node.ps1) which registers the node with *azurerm_automation_account.automation_account_01* and applies the configuration [MssqlVmConfig.ps1](./scripts/MssqlVmConfig.ps1). Retry logic is implemented to wait until the node registration is compliant as multiple attempts to apply the configuration are sometimes required.
   * The virtual machine is domain joined.
   * The [Windows Firewall](https://learn.microsoft.com/windows/security/threat-protection/windows-firewall/windows-firewall-with-advanced-security#overview-of-windows-defender-firewall-with-advanced-security) is [Configured to Allow SQL Server Access](https://learn.microsoft.com/sql/sql-server/install/configure-the-windows-firewall-to-allow-sql-server-access). A new firewall rule is created that allows inbound traffic over port 1433.
   * A SQL Server Windows login is added for the domain administrator and added to the SQL Server builtin `sysadmin` role.
-* Post-deployment configuration is then implemented using a custom script extension that runs [configure-vm-mssql.ps1](./configure-vm-mssql.ps1) which registers [configure-mssql.ps1](./configure-mssql.ps1) as a scheduled task and executes it using domain administrator credentials.
-* [configure-mssql.ps1](./configure-mssql.ps1) configures SQL Server following guidelines established in [Checklist: Best practices for SQL Server on Azure VMs](https://learn.microsoft.com/azure/azure-sql/virtual-machines/windows/performance-guidelines-best-practices-checklist).
+* Post-deployment configuration is then implemented using a custom script extension that runs [configure-vm-mssql.ps1](./scripts/configure-vm-mssql.ps1) which registers [configure-mssql.ps1](./scripts/configure-mssql.ps1) as a scheduled task and executes it using domain administrator credentials.
+* [configure-mssql.ps1](./scripts/configure-mssql.ps1) configures SQL Server following guidelines established in [Checklist: Best practices for SQL Server on Azure VMs](https://learn.microsoft.com/azure/azure-sql/virtual-machines/windows/performance-guidelines-best-practices-checklist).
   * Data disk metadata is retrieved dynamically using the [Azure Instance Metadata Service (Windows)](https://learn.microsoft.com/azure/virtual-machines/windows/instance-metadata-service?tabs=windows) including:
     * Volume label and drive letter, e.g. *vol_sqldata_M*
     * Size
     * Lun
   * The metadata is then used to partition and format the raw data disks using the SQL Server recommended allocation unit size of 64K.
   * The *tempdb* database is moved from the OS disk to either the the Azure local temporary disk (D:) or to the data (M:) and log disks (L:) depending upon whether the VM size selected includes an Azure local temporary disk.  
-    * If *tempdb* as moved to the Azure local temporary disk (D:) special logic is implemented to avoid errors if the Azure virtual machine is stopped, deallocated and restarted on a different host. If this occurs the `D:\SQLTEMP` folder must be recreated with appropriate permissions in order to start the SQL Server. The SQL Server is configured for manual startup, and the scheduled task [sql-startup.ps1](./sql-startup.ps1) is created to recreate the `D:\SQLTEMP` folder then start SQL Server. The scheduled task is set to run automatically at startup using domain administrator credentials.
+    * If *tempdb* as moved to the Azure local temporary disk (D:) special logic is implemented to avoid errors if the Azure virtual machine is stopped, deallocated and restarted on a different host. If this occurs the `D:\SQLTEMP` folder must be recreated with appropriate permissions in order to start the SQL Server. The SQL Server is configured for manual startup, and the scheduled task [sql-startup.ps1](./scripts/sql-startup.ps1) is created to recreate the `D:\SQLTEMP` folder then start SQL Server. The scheduled task is set to run automatically at startup using domain administrator credentials.
   * The data and log files for the *master*, *model* and *msdb* system databases are moved to the data and log disks respectively.
   * The SQL Server errorlog is moved to the data disk.
   * Windows Update is configured to enable first-party updates for SQL Server patching.
