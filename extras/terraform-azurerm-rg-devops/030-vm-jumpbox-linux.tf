@@ -10,7 +10,7 @@ data "cloudinit_config" "vm_jumpbox_linux" {
 
   part {
     content_type = "text/x-shellscript"
-    content      = file("${path.root}/configure-powershell.ps1")
+    content      = file("${path.root}/scripts/configure-powershell.ps1")
     filename     = "configure-powershell.ps1"
   }
 }
