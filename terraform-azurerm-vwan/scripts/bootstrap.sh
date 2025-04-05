@@ -3,16 +3,21 @@
 # Bootstraps deployment with pre-requisites for applying Terraform configurations
 # Script is idempotent and can be run multiple times
 
+#region functions
 usage() {
     printf "Usage: $0 \n" 1>&2
     exit 1
 }
+#endregion
 
+#region constants
 # Set these defaults prior to running the script.
 default_client_address_pool="10.4.0.0/16"
 default_client_root_certificate="MyP2SVPNRootCert_Base64_Encoded.cer"
 default_vwan_hub_address_prefix="10.3.0.0/16"
+#endregion
 
+#region main
 # Check for client root certificate
 if [ ! -f "./$default_client_root_certificate" ]
 then
@@ -23,7 +28,7 @@ fi
 
 tail -n +2 $default_client_root_certificate | head -n-1 > public_cert_data.cer
 
-# Intialize runtime defaults
+# Initialize runtime defaults
 state_file="../terraform-azurerm-vnet-shared/terraform.tfstate"
 if [ ! -f "./$state_file" ]
 then
@@ -88,3 +93,4 @@ printf "\nReview defaults in \"variables.tf\" prior to applying Terraform config
 printf "\nBootstrapping complete...\n"
 
 exit 0
+#endregion

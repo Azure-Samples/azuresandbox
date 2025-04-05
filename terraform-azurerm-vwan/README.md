@@ -13,7 +13,7 @@
 
 ## Architecture
 
-![vnet-shared-diagram](./vwan-diagram.drawio.svg)
+![vnet-shared-diagram](./images/vwan-diagram.drawio.svg)
 
 ## Overview
 
@@ -39,7 +39,7 @@ This configuration only supports the [Windows Subsystem for Linux](../README.md#
 This section describes how to provision this configuration using default settings ([Step-By-Step Video](https://youtu.be/jFkW6GDdg1I)).
 
 * From the client environment, generate self-signed certificates to use for P2S VPN certificate authentication.
-  * Download [genp2svpncerts.ps1](./genp2svpncerts.ps1) into a folder named `C:\scripts`.
+  * Download [genp2svpncerts.ps1](./scripts/genp2svpncerts.ps1) into a folder named `C:\scripts`.
   * Open a Windows PowerShell command prompt using `Run as administrator`.
   * Execute the following commands to to generate the self-signed certificates required for setting up a P2S VPN:
   
@@ -67,13 +67,13 @@ This section describes how to provision this configuration using default setting
 * Add an environment variable containing the password for the service principal.
 
   ```bash
-  export TF_VAR_arm_client_secret=YourServicePrincipalSecret
+  export TF_VAR_arm_client_secret=YOUR-SERVICE-PRINCIPAL-PASSWORD
   ```
 
-* Run [bootstrap.sh](./bootstrap.sh) using the default settings or custom settings.
+* Run [bootstrap.sh](./scripts/bootstrap.sh) using the default settings or custom settings.
 
   ```bash
-  ./bootstrap.sh
+  ./scripts/bootstrap.sh
   ```
 
 * Apply the Terraform configuration.
@@ -285,7 +285,7 @@ This section provides additional information on various aspects of this configur
 
 ### Bootstrap script
 
-This configuration uses the script [bootstrap.sh](./bootstrap.sh) to create a *terraform.tfvars* file for generating and applying Terraform plans. For simplified deployment, several runtime defaults are initialized using output variables stored in the *terraform.tfstate* files associated with the [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared) and [terraform-azurerm-vnet-app](../terraform-azurerm-vnet-app) configurations, including:
+This configuration uses the script [bootstrap.sh](./scripts/bootstrap.sh) to create a *terraform.tfvars* file for generating and applying Terraform plans. For simplified deployment, several runtime defaults are initialized using output variables stored in the *terraform.tfstate* files associated with the [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared) and [terraform-azurerm-vnet-app](../terraform-azurerm-vnet-app) configurations, including:
 
 Output variable | Sample value
 --- | ---
@@ -307,7 +307,7 @@ This section lists the resources included in this configuration.
 
 #### Network resources
 
-The configuration for these resources can be found in [020-network.tf](./020-network.tf).
+The configuration for these resources can be found in [network.tf](./network.tf).
 
 Resource name (ARM) | Notes
 --- | ---
