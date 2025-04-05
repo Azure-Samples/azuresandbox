@@ -3,12 +3,14 @@
 # Bootstraps deployment with pre-requisites for applying Terraform configurations
 # Script is idempotent and can be run multiple times
 
+#region functions
 usage() {
     printf "Usage: $0 \n" 1>&2
     exit 1
 }
+#endregion
 
-# Set these defaults prior to running the script.
+#region constants
 default_vnet_name="vnet-app-01"
 default_vnet_address_space="10.2.0.0/16"
 default_skip_ssh_key_gen="no"
@@ -25,6 +27,9 @@ vm_jumpbox_linux_size="Standard_B2ls_v2"
 vm_jumpbox_win_post_deploy_script="configure-vm-jumpbox-win.ps1"
 vm_jumpbox_win_configure_storage_script="configure-storage-kerberos.ps1"
 vm_jumpbox_win_size="Standard_B2ls_v2"
+#endregion
+
+#region main
 
 # Initialize runtime defaults
 state_file="../terraform-azurerm-vnet-shared/terraform.tfstate"
@@ -212,7 +217,7 @@ do
       --account-name ${storage_account_name:1:-1} \
       --auth-mode login \
       --destination ${storage_container_name:1:-1} \
-      --source '.' \
+      --source './scripts' \
       --pattern '*.ps1' \
       --overwrite && break || sleep 15
 done
@@ -225,10 +230,10 @@ az storage account update \
   --resource-group ${resource_group_name:1:-1} \
   --public-network-access Disabled
 
-# Bootstrap auotmation account
+# Bootstrap automation account
 printf "Configuring automation account '${automation_account_name:1:-1}'...\n"
 
-./configure-automation.ps1 \
+./scripts/configure-automation.ps1 \
   -TenantId ${aad_tenant_id:1:-1} \
   -SubscriptionId ${subscription_id:1:-1} \
   -ResourceGroupName ${resource_group_name:1:-1} \
@@ -281,3 +286,4 @@ printf "\nReview defaults in \"variables.tf\" prior to applying Terraform config
 printf "\nBootstrapping complete...\n"
 
 exit 0
+#endregion

@@ -1,130 +1,4 @@
-locals {
-  subnets = {
-    snet-app-01 = {
-      address_prefix                    = var.subnet_application_address_prefix
-      delegation = ""
-      private_endpoint_network_policies = "Disabled"
-      nsgrules = [
-        "AllowVirtualNetworkInbound",
-        "AllowVirtualNetworkOutbound",
-        "AllowInternetOutbound"
-      ]
-      route_table = "firewall_01"
-    }
-
-    snet-appservice-01 = {
-      address_prefix                    = var.subnet_appservice_address_prefix
-      delegation                        = "Microsoft.Web/serverFarms"
-      private_endpoint_network_policies = "Disabled"
-      nsgrules = [
-        "AllowVirtualNetworkInbound",
-        "AllowVirtualNetworkOutbound",
-        "AllowInternetOutbound"
-      ]
-      route_table = "firewall_01"
-    }
-
-    snet-db-01 = {
-      address_prefix                    = var.subnet_database_address_prefix
-      delegation = ""
-      private_endpoint_network_policies = "Disabled"
-      nsgrules = [
-        "AllowVirtualNetworkInbound",
-        "AllowVirtualNetworkOutbound",
-        "AllowInternetOutbound"
-      ]
-      route_table = "firewall_01"
-    }
-
-    snet-misc-03 = {
-      address_prefix                    = var.subnet_misc_address_prefix
-      delegation = ""
-      private_endpoint_network_policies = "Disabled"
-      nsgrules = [
-        "AllowVirtualNetworkInbound",
-        "AllowVirtualNetworkOutbound",
-        "AllowInternetOutbound"
-      ]
-      route_table = "firewall_01"
-    }
-
-    snet-privatelink-01 = {
-      address_prefix                    = var.subnet_privatelink_address_prefix
-      delegation = ""
-      private_endpoint_network_policies = "Enabled"
-      nsgrules = [
-        "AllowVirtualNetworkInbound",
-        "AllowVirtualNetworkOutbound"
-      ]
-      route_table = "firewall_01"
-    }
-  }
-
-  nsgrules = {
-    AllowInternetOutbound = {
-      access                     = "Allow"
-      destination_address_prefix = "Internet"
-      destination_port_ranges    = ["*"]
-      direction                  = "Outbound"
-      protocol                   = "*"
-      source_address_prefix      = "*"
-      source_port_ranges         = ["*"]
-    }
-
-    AllowVirtualNetworkInbound = {
-      access                     = "Allow"
-      destination_address_prefix = "VirtualNetwork"
-      destination_port_ranges    = ["*"]
-      direction                  = "Inbound"
-      protocol                   = "*"
-      source_address_prefix      = "VirtualNetwork"
-      source_port_ranges         = ["*"]
-    }
-
-    AllowVirtualNetworkOutbound = {
-      access                     = "Allow"
-      destination_address_prefix = "VirtualNetwork"
-      destination_port_ranges    = ["*"]
-      direction                  = "Outbound"
-      protocol                   = "*"
-      source_address_prefix      = "VirtualNetwork"
-      source_port_ranges         = ["*"]
-    }
-  }
-
-  network_security_group_rules = flatten([
-    for subnet_key, subnet in local.subnets : [
-      for nsgrule_key in subnet.nsgrules : {
-        subnet_name                = subnet_key
-        nsgrule_name               = nsgrule_key
-        access                     = local.nsgrules[nsgrule_key].access
-        destination_address_prefix = local.nsgrules[nsgrule_key].destination_address_prefix
-        destination_port_ranges    = local.nsgrules[nsgrule_key].destination_port_ranges
-        direction                  = local.nsgrules[nsgrule_key].direction
-        priority                   = 100 + (index(subnet.nsgrules, nsgrule_key) * 10)
-        protocol                   = local.nsgrules[nsgrule_key].protocol
-        source_address_prefix      = local.nsgrules[nsgrule_key].source_address_prefix
-        source_port_ranges         = local.nsgrules[nsgrule_key].source_port_ranges
-      }
-    ]
-  ])
-
-  private_dns_zones = [
-    "privatelink.api.azureml.ms",
-    "privatelink.azurecr.io",
-    "privatelink.blob.core.windows.net",
-    "privatelink.cognitiveservices.azure.com",
-    "privatelink.database.windows.net",
-    "privatelink.documents.azure.com",
-    "privatelink.file.core.windows.net",
-    "privatelink.mysql.database.azure.com",
-    "privatelink.notebooks.azure.net",
-    "privatelink.openai.azure.com",
-    "privatelink.search.windows.net"
-  ]
-}
-
-# Application virtual network, subnets and network security groups
+#region virtual-network
 resource "azurerm_virtual_network" "vnet_app_01" {
   name                = var.vnet_name
   location            = var.location
@@ -132,14 +6,6 @@ resource "azurerm_virtual_network" "vnet_app_01" {
   address_space       = [var.vnet_address_space]
   dns_servers         = [var.dns_server, "168.63.129.16"]
   tags                = var.tags
-}
-
-output "vnet_app_01_id" {
-  value = azurerm_virtual_network.vnet_app_01.id
-}
-
-output "vnet_app_01_name" {
-  value = azurerm_virtual_network.vnet_app_01.name
 }
 
 resource "azurerm_subnet" "vnet_app_01_subnets" {
@@ -159,10 +25,6 @@ resource "azurerm_subnet" "vnet_app_01_subnets" {
       }
     }
   }
-}
-
-output "vnet_app_01_subnets" {
-  value = azurerm_subnet.vnet_app_01_subnets
 }
 
 resource "azurerm_network_security_group" "network_security_groups" {
@@ -227,17 +89,14 @@ resource "azurerm_virtual_network_peering" "vnet_app_01_to_vnet_shared_01_peerin
   allow_gateway_transit        = true
   depends_on                   = [azurerm_virtual_network_peering.vnet_shared_01_to_vnet_app_01_peering]
 }
+#endregion
 
-# Private DNS zones
+#region private-dns-zones
 resource "azurerm_private_dns_zone" "private_dns_zones" {
   for_each            = toset(local.private_dns_zones)
   name                = each.value
   resource_group_name = var.resource_group_name
   tags                = var.tags
-}
-
-output "private_dns_zones" {
-  value = azurerm_private_dns_zone.private_dns_zones
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "private_dns_zone_virtual_network_links_vnet_app_01" {
@@ -259,8 +118,9 @@ resource "azurerm_private_dns_zone_virtual_network_link" "private_dns_zone_virtu
   tags                  = var.tags
   depends_on            = [azurerm_virtual_network_peering.vnet_app_01_to_vnet_shared_01_peering, azurerm_virtual_network_peering.vnet_shared_01_to_vnet_app_01_peering]
 }
+#endregion
 
-# Route table associations
+#region route-tables
 resource "azurerm_subnet_route_table_association" "firewall_01" {
   for_each = {
     for subnet_key, subnet in local.subnets : subnet_key => subnet if subnet.route_table == "firewall_01"
@@ -269,3 +129,4 @@ resource "azurerm_subnet_route_table_association" "firewall_01" {
   subnet_id      = azurerm_subnet.vnet_app_01_subnets[each.key].id
   route_table_id = var.firewall_01_route_table_id
 }
+#endregion 
