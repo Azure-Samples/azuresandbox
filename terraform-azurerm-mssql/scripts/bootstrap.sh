@@ -3,15 +3,19 @@
 # Bootstraps deployment with pre-requisites for applying Terraform configurations
 # Script is idempotent and can be run multiple times
 
+#region functions
 usage() {
     printf "Usage: $0 \n" 1>&2
     exit 1
 }
+#endregion
 
-# Set these defaults prior to running the script.
+#region constants
 default_mssql_database_name="testdb"
+#endregion
 
-# Intialize runtime defaults
+#region main
+# Initialize runtime defaults
 state_file="../terraform-azurerm-vnet-shared/terraform.tfstate"
 
 printf "Retrieving runtime defaults from state file '$state_file'...\n"
@@ -96,3 +100,4 @@ printf "\nReview defaults in \"variables.tf\" prior to applying Terraform config
 printf "\nBootstrapping complete...\n"
 
 exit 0
+#endregion 

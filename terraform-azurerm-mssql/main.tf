@@ -1,4 +1,16 @@
-# Azure SQL Database logical server
+#region data
+data "azurerm_key_vault_secret" "adminpassword" {
+  name         = var.admin_password_secret
+  key_vault_id = var.key_vault_id
+}
+
+data "azurerm_key_vault_secret" "adminuser" {
+  name         = var.admin_username_secret
+  key_vault_id = var.key_vault_id
+}
+#endregion
+
+#region mssql-server
 resource "azurerm_mssql_server" "mssql_server_01" {
   name                          = "mssql-${var.random_id}"
   resource_group_name           = var.resource_group_name
@@ -11,15 +23,6 @@ resource "azurerm_mssql_server" "mssql_server_01" {
   tags                          = var.tags
 }
 
-# Azure SQL Database test database
-resource "azurerm_mssql_database" "mssql_database_01" {
-  name         = var.mssql_database_name
-  server_id    = azurerm_mssql_server.mssql_server_01.id
-  license_type = "LicenseIncluded"
-  tags         = var.tags
-}
-
-# Private endpoint for Azure SQL Database logical server
 resource "azurerm_private_endpoint" "mssql_server_01" {
   name                = "pend-${azurerm_mssql_server.mssql_server_01.name}"
   resource_group_name = var.resource_group_name
@@ -42,3 +45,13 @@ resource "azurerm_private_dns_a_record" "sql_server_01" {
   ttl                 = 300
   records             = [azurerm_private_endpoint.mssql_server_01.private_service_connection[0].private_ip_address]
 }
+#endregion
+
+#region mssql-database
+resource "azurerm_mssql_database" "mssql_database_01" {
+  name         = var.mssql_database_name
+  server_id    = azurerm_mssql_server.mssql_server_01.id
+  license_type = "LicenseIncluded"
+  tags         = var.tags
+}
+#endregion 
