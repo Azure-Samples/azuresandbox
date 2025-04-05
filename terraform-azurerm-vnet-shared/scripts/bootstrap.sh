@@ -3,8 +3,7 @@
 # Bootstraps deployment with pre-requisites for applying Terraform configurations
 # Script is idempotent and can be run multiple times
 
-# Functions
-
+#region functions
 gen_strong_password () {
     # Define constants
     password_length=12
@@ -89,23 +88,9 @@ usage() {
     printf "Usage: $0 \n" 1>&2
     exit 1
 }
+#endregion
 
-# Main
-
-# Get runtime defaults
-printf "Retrieving runtime defaults ...\n"
-
-default_subscription_id=$(az account list --only-show-errors --query "[? isDefault]|[0].id" --output tsv)
-
-if [ -z $default_subscription_id ]
-then
-  printf "Unable to retrieve Azure subscription details. Please run 'az login' first.\n"
-  usage
-fi
-
-default_owner_object_id=$(az account get-access-token --query accessToken --output tsv | tr -d '\n' | python3 -c "import jwt, sys; print(jwt.decode(sys.stdin.read(), algorithms=['RS256'], options={'verify_signature': False})['oid'])")
-default_aad_tenant_id=$(az account show --query tenantId --output tsv)
-
+#region constants
 # Initialize constants
 admin_password_secret='adminpassword'
 admin_username_secret='adminuser'
@@ -134,6 +119,23 @@ default_subnet_misc_address_prefix="10.1.2.0/24"
 default_subnet_misc_02_address_prefix="10.1.3.0/24"
 default_vm_adds_name="adds1"
 default_vnet_address_space="10.1.0.0/16"
+#endregion
+
+#region main
+
+# Get runtime defaults
+printf "Retrieving runtime defaults ...\n"
+
+default_subscription_id=$(az account list --only-show-errors --query "[? isDefault]|[0].id" --output tsv)
+
+if [ -z $default_subscription_id ]
+then
+  printf "Unable to retrieve Azure subscription details. Please run 'az login' first.\n"
+  usage
+fi
+
+default_owner_object_id=$(az account get-access-token --query accessToken --output tsv | tr -d '\n' | python3 -c "import jwt, sys; print(jwt.decode(sys.stdin.read(), algorithms=['RS256'], options={'verify_signature': False})['oid'])")
+default_aad_tenant_id=$(az account show --query tenantId --output tsv)
 
 # Get user input
 read -e                                                       -p "Service principal appId (arm_client_id) ---------------------------------------------: " arm_client_id
@@ -285,6 +287,7 @@ if [ -n "$resource_group_id" ]
 then
   printf "Found resource group '$resource_group_name'...\n"
   random_id=${resource_group_name#*rg-sandbox-}
+
   # Validate random_id
   if [ -z "$random_id" ] || [ ${#random_id} -lt 15 ]; then
     printf "Invalid format for resource group name '$resource_group_name'. Expected format is 'rg-sandbox-<random_id>'...\n"
@@ -764,3 +767,5 @@ cat ./terraform.tfvars
 printf "\nReview defaults in \"variables.tf\" prior to applying Terraform configurations...\n"
 printf "\nBootstrapping complete...\n"
 exit 0
+
+#endregion

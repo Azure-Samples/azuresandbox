@@ -590,7 +590,7 @@ Import-DscConfiguration `
     -ResourceGroupName $ResourceGroupName `
     -AutomationAccountName $automationAccount.AutomationAccountName `
     -DscConfigurationName 'LabDomainConfig' `
-    -DscConfigurationScript 'LabDomainConfig.ps1'
+    -DscConfigurationScript './LabDomainConfig.ps1'
 
 # Compile DSC Configurations
 Start-DscCompliationJob `
