@@ -85,7 +85,6 @@ printf "admin_password_secret = $admin_password_secret\n"   >> ./terraform.tfvar
 printf "admin_username_secret = $admin_username_secret\n"   >> ./terraform.tfvars
 printf "arm_client_id         = $arm_client_id\n"           >> ./terraform.tfvars
 printf "key_vault_id          = $key_vault_id\n"            >> ./terraform.tfvars
-printf "key_vault_name        = $key_vault_name\n"          >> ./terraform.tfvars
 printf "location              = $location\n"                >> ./terraform.tfvars
 printf "mssql_database_name   = \"$mssql_database_name\"\n" >> ./terraform.tfvars
 printf "random_id             = $random_id\n"               >> ./terraform.tfvars

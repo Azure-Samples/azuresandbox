@@ -124,7 +124,7 @@ resource "azurerm_firewall_policy_rule_collection_group" "firewall_01" {
       name                  = "AllowAllOutbound"
       source_addresses      = ["*"]
       destination_addresses = ["0.0.0.0/0"]
-      destination_ports     = ["80", "443","1688"]
+      destination_ports     = ["80", "443", "1688"]
       protocols             = ["Any"]
     }
   }
@@ -151,7 +151,7 @@ resource "azurerm_subnet_route_table_association" "firewall_01" {
   subnet_id      = azurerm_subnet.vnet_shared_01_subnets[each.key].id
   route_table_id = azurerm_route_table.firewall_01.id
 
-  depends_on = [ azurerm_subnet_network_security_group_association.nsg_subnet_associations ]
+  depends_on = [azurerm_subnet_network_security_group_association.nsg_subnet_associations]
 }
 
 resource "azurerm_public_ip" "firewall_01" {

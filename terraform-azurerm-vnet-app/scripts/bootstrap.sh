@@ -271,7 +271,6 @@ printf "subscription_id                             = $subscription_id\n"       
 printf "tags                                        = $tags\n"                                            >> ./terraform.tfvars
 printf "vm_jumpbox_linux_name                       = \"$vm_jumpbox_linux_name\"\n"                       >> ./terraform.tfvars
 printf "vm_jumpbox_linux_size                       = \"$vm_jumpbox_linux_size\"\n"                       >> ./terraform.tfvars
-printf "vm_jumpbox_win_configure_storage_script     = \"$vm_jumpbox_win_configure_storage_script\"\n"     >> ./terraform.tfvars
 printf "vm_jumpbox_win_configure_storage_script_uri = \"$vm_jumpbox_win_configure_storage_script_uri\"\n" >> ./terraform.tfvars
 printf "vm_jumpbox_win_name                         = \"$vm_jumpbox_win_name\"\n"                         >> ./terraform.tfvars
 printf "vm_jumpbox_win_post_deploy_script           = \"$vm_jumpbox_win_post_deploy_script\"\n"           >> ./terraform.tfvars

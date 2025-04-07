@@ -81,7 +81,7 @@ locals {
   subnets = {
     snet-app-01 = {
       address_prefix                    = var.subnet_application_address_prefix
-      delegation = ""
+      delegation                        = ""
       private_endpoint_network_policies = "Disabled"
       nsgrules = [
         "AllowVirtualNetworkInbound",
@@ -105,7 +105,7 @@ locals {
 
     snet-db-01 = {
       address_prefix                    = var.subnet_database_address_prefix
-      delegation = ""
+      delegation                        = ""
       private_endpoint_network_policies = "Disabled"
       nsgrules = [
         "AllowVirtualNetworkInbound",
@@ -117,7 +117,7 @@ locals {
 
     snet-misc-03 = {
       address_prefix                    = var.subnet_misc_address_prefix
-      delegation = ""
+      delegation                        = ""
       private_endpoint_network_policies = "Disabled"
       nsgrules = [
         "AllowVirtualNetworkInbound",
@@ -129,7 +129,7 @@ locals {
 
     snet-privatelink-01 = {
       address_prefix                    = var.subnet_privatelink_address_prefix
-      delegation = ""
+      delegation                        = ""
       private_endpoint_network_policies = "Enabled"
       nsgrules = [
         "AllowVirtualNetworkInbound",
