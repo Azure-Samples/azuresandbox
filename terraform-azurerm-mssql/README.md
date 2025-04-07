@@ -13,7 +13,7 @@
 
 ## Architecture
 
-![mssql-diagram](./mssql-diagram.drawio.svg)
+![mssql-diagram](./images/mssql-diagram.drawio.svg)
 
 ## Overview
 
@@ -42,13 +42,13 @@ This section describes how to provision this configuration using default setting
 * Add an environment variable containing the password for the service principal.
 
   ```bash
-  export TF_VAR_arm_client_secret=YourServicePrincipalSecret
+  export TF_VAR_arm_client_secret=YOUR-SERVICE-PRINCIPAL-PASSWORD
   ```
 
-* Run [bootstrap.sh](./bootstrap.sh) using the default settings or custom settings.
+* Run [bootstrap.sh](./scripts/bootstrap.sh) using the default settings or custom settings.
 
   ```bash
-  ./bootstrap.sh
+  ./scripts/bootstrap.sh
   ```
 
 * Apply the Terraform configuration.
@@ -163,7 +163,7 @@ This section provides additional information on various aspects of this configur
 
 ### Bootstrap script
 
-This configuration uses the script [bootstrap.sh](./bootstrap.sh) to create a *terraform.tfvars* file for generating and applying Terraform plans ([Step-By-Step Video](https://youtu.be/sD6ySES0fJQ)). For simplified deployment, several runtime defaults are initialized using output variables stored in the *terraform.tfstate* file associated with the [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared;) and [terraform-azurerm-vnet-app](../terraform-azurerm-vnet-app/) configurations, including:
+This configuration uses the script [bootstrap.sh](./scripts/bootstrap.sh) to create a *terraform.tfvars* file for generating and applying Terraform plans ([Step-By-Step Video](https://youtu.be/sD6ySES0fJQ)). For simplified deployment, several runtime defaults are initialized using output variables stored in the *terraform.tfstate* file associated with the [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared;) and [terraform-azurerm-vnet-app](../terraform-azurerm-vnet-app/) configurations, including:
 
 Output variable | Sample value
 --- | ---
@@ -188,7 +188,7 @@ This section lists the resources included in this configuration ([Step-By-Step V
 
 #### Azure SQL Database
 
-The configuration for these resources can be found in [020-mssql.tf](./020-mssql.tf).
+The configuration for these resources can be found in [main.tf](./main.tf).
 
 Resource name (ARM) | Notes
 --- | ---

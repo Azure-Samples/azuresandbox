@@ -13,7 +13,7 @@
 
 ## Architecture
 
-![diagram](./diagram.drawio.svg)
+![diagram](./images/azuresandbox.drawio.svg)
 
 ## Overview
 
@@ -120,7 +120,7 @@ Before you begin, familiarity with the following topics will be helpful when wor
 
 ---
 
-\#AzureSandbox automation scripts are written in Linux [Bash](https://en.wikipedia.org/wiki/Bash_(Unix_shell)) and Linux [PowerShell](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-linux?view=powershell-7.3). In order to deploy \#AzureSandbox you will need to configure a Linux client environment to execute these scripts. Detailed guidance is provided for users who are unfamiliar with Linux. Three different client environment options are described in this section, including:
+\#AzureSandbox automation scripts are written in Linux [Bash](https://en.wikipedia.org/wiki/Bash_(Unix_shell)) and Linux [PowerShell](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-linux?view=powershell-7.3). In order to deploy #AzureSandbox you will need to configure a Linux client environment to execute these scripts. Detailed guidance is provided for users who are unfamiliar with Linux. Three different client environment options are described in this section, including:
 
 * [Windows Subsystem for Linux](#windows-subsystem-for-linux) (preferred for completing smoke testing)
 * [Azure Cloud Shell](#azure-cloud-shell) (zero configuration required but not optimal for serious use)
@@ -154,7 +154,7 @@ Windows users can use [WSL](https://learn.microsoft.com/windows/wsl/about) which
 
       ```bash
       # Download and execute PowerShell configuration script
-      wget https://raw.githubusercontent.com/Azure-Samples/azuresandbox/main/configure-powershell.ps1
+      wget https://raw.githubusercontent.com/Azure-Samples/azuresandbox/main/scripts/configure-powershell.ps1
       chmod 755 configure-powershell.ps1
       sudo ./configure-powershell.ps1
       ```
@@ -298,11 +298,11 @@ While a default sandbox deployment is fine for testing, it may not work with an 
 1. [terraform-azurerm-vnet-app](./terraform-azurerm-vnet-app/)
 1. [terraform-azurerm-vnet-shared](./terraform-azurerm-vnet-shared/). Note: Resources provisioned by `bootstrap.sh` must be deleted manually.
 
-Alternatively, for speed, simply delete rg-sandbox-01`. You can run [cleanterraformtemp.sh](./cleanterraformtemp.sh) to clean up temporary files and directories.
+Alternatively, for speed, simply delete the sandbox resource group. You can run [cleanterraformtemp.sh](./scripts/cleanterraformtemp.sh) to clean up temporary files and directories.
 
 ```bash
 # Warning: This command will delete an entire resource group and should be used with great caution.
-az group delete -g rg-sandbox-01
+az group delete -g rg-sandbox-xxxxxxxxxxxxxxx
 ```
 
 ### Perform custom sandbox deployment
@@ -408,7 +408,7 @@ This section documents known issues with these configurations in addition to Git
   * *Terraform*
     * For simplicity, these configurations store [State](https://www.terraform.io/language/state) in a local file named `terraform.tfstate`. For production use, state should be managed in a secure, encrypted [Backend](https://www.terraform.io/language/state/backends) such as [azurerm](https://www.terraform.io/language/settings/backends/azurerm).
     * There is a [known issue](https://github.com/hashicorp/terraform-provider-azurerm/issues/2977) that causes Terraform plan or apply operations to fail after provisioning an Azure Files share behind a private endpoint. If this is causing plan or apply operations to fail you can either whitelist the IP address of the client environment on the storage account firewall or use [Target Resources](https://developer.hashicorp.com/terraform/tutorials/state/resource-targeting) to work around it.
-    * [Azure Verified Modules](https://azure.github.io/Azure-Verified-Modules) were not available when this project was created, and may be used in future releases of #AzureSandbox.
+    * [Modules](https://developer.hashicorp.com/terraform/language/modules) were not available when this project was created, and may be used in future releases of #AzureSandbox.
   * *Windows Server*: This configuration uses [Azure Automation State Configuration (DSC)](https://learn.microsoft.com/azure/automation/automation-dsc-overview) for configuring the Windows Server virtual machines, which will be replaced by [Azure Automanage Machine Configuration](https://learn.microsoft.com/azure/governance/machine-configuration/overview). This configuration will be updated to the new implementation in a future release.
     * *configure-automation.ps1*: The performance of this script could be improved by using multi-threading to run Azure Automation operations in parallel.
 * Identity, Access Management and Authentication.
@@ -422,8 +422,7 @@ This section documents known issues with these configurations in addition to Git
     * *Least privilege*: The current design uses a single Azure RBAC role assignment to grant the *Contributor* role to the currently logged in Azure CLI user and the service principal used by Terraform. *Owner* privileges are only required for a few prerequisites. Since the *Contributor* role cannot change role assignments, all dependencies on Azure RBAC roles for data plane access were intentionally avoided. As a result, key vault access policies and storage account keys are used for access control to those resources instead of Azure RBAC role assignments. Production environments should consider leveraging best practices as described in [Azure role-based access control (Azure RBAC) best practices](https://docs.microsoft.com/azure/role-based-access-control/best-practices) which recommends using multiple role assignments to grant the least privilege required to perform a task. Additionally, production environments should also consider leveraging Azure RBAC roles for data plane access to key vault and storage accounts.
     * *ARM provider registration*: As described in [issue #4440](https://github.com/hashicorp/terraform-provider-azurerm/issues/4440), some controlled environments may not permit automatic registration of ARM resource providers by Terraform. In these cases some ARM providers may need to be registered manually. See [Azure resource providers and types](https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/resource-providers-and-types) and the azurerm provider [skip_provider_registration](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs#skip_provider_registration) optional argument for more information.
 * Storage
-  * *Azure Storage*: For simplicity, this configuration uses the [Authorize with Shared Key](https://learn.microsoft.com/rest/api/storageservices/authorize-with-shared-key) approach for [Authorizing access to data in Azure Storage](https://learn.microsoft.com/azure/storage/common/authorize-data-access?toc=/azure/storage/blobs/toc.json). For production environments, consider using [shared access signatures](https://learn.microsoft.com/azure/storage/common/storage-sas-overview?toc=/azure/storage/blobs/toc.json) instead.
-    * There is a [known issue](https://github.com/hashicorp/terraform-provider-azurerm/issues/2977) when attempting to apply Terraform plans against Azure Storage containers that sit behind a firewall such as a private endpoint. This may prevent the ability to apply changes to configurations that contain this type of dependency, such as [terraform-azurerm-vnet-app](./terraform-azurerm-vnet-app/). To work around this you use [Resource Targeting](https://www.hashicorp.com/blog/resource-targeting-in-terraform) to avoid issues with storage containers.
+  * *Azure Storage*: There is a [known issue](https://github.com/hashicorp/terraform-provider-azurerm/issues/2977) when attempting to apply Terraform plans against Azure Storage containers that sit behind a firewall such as a private endpoint. This may prevent the ability to apply changes to configurations that contain this type of dependency, such as [terraform-azurerm-vnet-app](./terraform-azurerm-vnet-app/). To work around this you use [Resource Targeting](https://www.hashicorp.com/blog/resource-targeting-in-terraform) to avoid issues with storage containers.
   * *Standard SSD vs. Premium SSD*: By default, this configuration uses Standard SSD for SQL Server data and log disks instead of Premium SSD for reduced cost. Production deployments should use Premium SSD as per best practices.
 * Networking
   * *azurerm_subnet.vnet_shared_01_subnets["snet-adds-01"]*: This subnet is protected by an NSG as per best practices described in described in [Deploy AD DS in an Azure virtual network](https://learn.microsoft.com/azure/architecture/reference-architectures/identity/adds-extend-domain), however the network security rules permit ingress and egress from the Virtual Network on all ports to allow for flexibility in the configurations. Production implementations of this subnet should follow the guidance in [How to configure a firewall for Active Directory domains and trusts](https://learn.microsoft.com/troubleshoot/windows-server/identity/config-firewall-for-ad-domains-and-trusts).
