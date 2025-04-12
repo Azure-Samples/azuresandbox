@@ -131,8 +131,8 @@ printf "aad_tenant_id   = \"$aad_tenant_id\"\n"   > ./terraform.tfvars
 printf "arm_client_id   = \"$arm_client_id\"\n"   >> ./terraform.tfvars
 printf "location        = \"$location\"\n"        >> ./terraform.tfvars
 printf "subscription_id = \"$subscription_id\"\n" >> ./terraform.tfvars
-printf "tags            = $tags\n"                >> ./terraform.tfvars
 printf "user_object_id  = \"$user_object_id\"\n"  >> ./terraform.tfvars
+printf "\ntags = $tags\n"                         >> ./terraform.tfvars
 
 cat ./terraform.tfvars
 

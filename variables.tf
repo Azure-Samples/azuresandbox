@@ -29,15 +29,42 @@ variable "arm_client_secret" {
   }
 }
 
+variable "create_vnet_app" {
+  type        = bool
+  description = "Set to true to create the vnet_app module, false to skip it."
+  default     = true
+}
+
 variable "location" {
   type        = string
   description = "The name of the Azure Region where resources will be provisioned."
 
   validation {
     condition     = can(regex("^[a-z0-9-]+$", var.location))
-    error_message = "The 'location' must be a valid Azure region name. It should only contain lowercase letters, numbers, and dashes (e.g., 'eastus', 'westus2', 'centralus')."
+    error_message = "The 'location' must be a valid Azure region name. It should only contain lowercase letters, numbers, and dashes."
   }
 }
+
+variable "log_analytics_workspace_retention_days" {
+  type        = string
+  description = "The retention period for the new log analytics workspace."
+  default     = "30"
+
+  validation {
+    condition     = can(regex("^(30|31|60|90|120|180|270|365|550|730)$", var.log_analytics_workspace_retention_days))
+    error_message = "The 'log_analytics_workspace_retention_days' must be one of the valid retention periods: 30, 31, 60, 90, 120, 180, 270, 365, 550, or 730 days."
+  }
+}
+
+# variable "spn_object_id" {
+#   type        = string
+#   description = "The object id of the service principal."
+
+#   validation {
+#     condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.spn_object_id))
+#     error_message = "The 'spn_object_id' must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
+#   }
+# }
 
 variable "subscription_id" {
   type        = string
@@ -52,8 +79,7 @@ variable "subscription_id" {
 variable "tags" {
   type        = map(any)
   description = "The tags in map format to be used when creating new resources."
-
-  default = { costcenter = "MyCostCenter", division = "MyDivision", group = "MyGroup" }
+  default     = { costcenter = "mycostcenter", environment = "dev", project = "sand" }
 
   validation {
     condition = alltrue([
@@ -73,5 +99,4 @@ variable "user_object_id" {
     condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.user_object_id))
     error_message = "The 'user_object_id' must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
   }
-
 }

@@ -1,17 +1,45 @@
 locals {
-  commandParamParts = [
-    "$params = @{",
-    "TenantId = '${var.aad_tenant_id}'; ",
-    "SubscriptionId = '${var.subscription_id}'; ",
-    "AppId = '${var.arm_client_id}'; ",
-    "ResourceGroupName = '${var.resource_group_name}'; ",
-    "KeyVaultName = '${var.key_vault_name}'; ",
-    "StorageAccountName = '${var.storage_account_name}'; ",
-    "Domain = '${var.adds_domain_name}'; ",
-    "AdminUsernameSecret = '${var.admin_username_secret}'; ",
-    "AdminPwdSecret = '${var.admin_password_secret}' ",
-    "}"
+  blobs_to_upload = [
+    "configure-vm-jumpbox-win.ps1",
+    "configure-storage-kerberos.ps1"
   ]
+
+  storage_roles = {
+    blob_contributor_spn = {
+      principal_id         = data.azurerm_client_config.current.object_id
+      principal_type       = "ServicePrincipal"
+      role_definition_name = "Storage Blob Data Contributor"
+    }
+    blob_contributor_user = {
+      principal_id         = var.user_object_id
+      principal_type       = "User"
+      role_definition_name = "Storage Blob Data Contributor"
+    }
+    file_contributor_spn = {
+      principal_id         = data.azurerm_client_config.current.object_id
+      principal_type       = "ServicePrincipal"
+      role_definition_name = "Storage File Data Privileged Contributor"
+    }
+    file_contributor_user = {
+      principal_id         = var.user_object_id
+      principal_type       = "User"
+      role_definition_name = "Storage File Data Privileged Contributor"
+    }
+  }
+
+  #   commandParamParts = [
+  #     "$params = @{",
+  #     "TenantId = '${var.aad_tenant_id}'; ",
+  #     "SubscriptionId = '${var.subscription_id}'; ",
+  #     "AppId = '${var.arm_client_id}'; ",
+  #     "ResourceGroupName = '${var.resource_group_name}'; ",
+  #     "KeyVaultName = '${var.key_vault_name}'; ",
+  #     "StorageAccountName = '${var.storage_account_name}'; ",
+  #     "Domain = '${var.adds_domain_name}'; ",
+  #     "AdminUsernameSecret = '${var.admin_username_secret}'; ",
+  #     "AdminPwdSecret = '${var.admin_password_secret}' ",
+  #     "}"
+  #   ]
 
   network_security_group_rules = flatten([
     for subnet_key, subnet in local.subnets : [
@@ -76,7 +104,7 @@ locals {
     "privatelink.search.windows.net"
   ]
 
-  storage_account_id = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.Storage/storageAccounts/${var.storage_account_name}"
+  #   storage_account_id = "/subscriptions/${var.subscription_id}/resourceGroups/${var.resource_group_name}/providers/Microsoft.Storage/storageAccounts/${var.storage_account_name}"
 
   subnets = {
     snet-app-01 = {
@@ -88,7 +116,7 @@ locals {
         "AllowVirtualNetworkOutbound",
         "AllowInternetOutbound"
       ]
-      route_table = "firewall_01"
+      route_table = "firewall"
     }
 
     snet-appservice-01 = {
@@ -100,7 +128,7 @@ locals {
         "AllowVirtualNetworkOutbound",
         "AllowInternetOutbound"
       ]
-      route_table = "firewall_01"
+      route_table = "firewall"
     }
 
     snet-db-01 = {
@@ -112,7 +140,7 @@ locals {
         "AllowVirtualNetworkOutbound",
         "AllowInternetOutbound"
       ]
-      route_table = "firewall_01"
+      route_table = "firewall"
     }
 
     snet-misc-03 = {
@@ -124,7 +152,7 @@ locals {
         "AllowVirtualNetworkOutbound",
         "AllowInternetOutbound"
       ]
-      route_table = "firewall_01"
+      route_table = "firewall"
     }
 
     snet-privatelink-01 = {
@@ -135,8 +163,22 @@ locals {
         "AllowVirtualNetworkInbound",
         "AllowVirtualNetworkOutbound"
       ]
-      route_table = "firewall_01"
+      route_table = "firewall"
+    }
+  }
+
+  vm_windows_roles = {
+    kv_secrets_officer_vm_win = {
+      principal_id         = azurerm_windows_virtual_machine.this.identity[0].principal_id
+      principal_type       = "ServicePrincipal"
+      role_definition_name = "Key Vault Secrets Officer"
+      scope                = var.key_vault_id
+    }
+    st_blob_reader_vm_win = {
+      principal_id         = azurerm_windows_virtual_machine.this.identity[0].principal_id
+      principal_type       = "ServicePrincipal"
+      role_definition_name = "Storage Blob Data Reader"
+      scope                = azurerm_storage_account.this.id
     }
   }
 }
-

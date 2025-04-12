@@ -62,26 +62,22 @@ This section describes how to provision this configuration using default setting
   # Clear cached credentials (skip if using cloudshell)
   az account clear
 
-  # Log into Azure (skip if using cloudshell)
-  az login
+  # Log into Azure and select the subscription (skip if using cloudshell)
+  az login --use-device-code
+  ```
+
+  ```pwsh
+  # Log out of Azure and clear cached credentials (skip if using cloudshell)
+  Disconnect-AzAccount -Scope CurrentUser
+
+  # Log into Azure and select the default subscription (skip if using cloudshell)
+  Connect-AzAccount -UseDeviceAuthentication
   ```
 
 * Change the current directory to the correct configuration
 
   ```bash
-  cd ~/azuresandbox/terraform-azurerm-vnet-shared
-  ```
-
-* Find and copy the *Subscription Id* to be used for the configurations.
-
-  ```bash
-  az account list -o table
-  ```
-
-* Set the default Azure subscription using the *Subscription Id* from the previous step.
-
-  ```bash
-  az account set -s YOUR-SUBSCRIPTION-ID
+  cd ~/azuresandbox
   ```
 
 * Add an environment variable containing the password for your service principal.
@@ -90,10 +86,18 @@ This section describes how to provision this configuration using default setting
   export TF_VAR_arm_client_secret=YOUR-SERVICE-PRINCIPAL-PASSWORD
   ```
 
-* Run [bootstrap.sh](./scripts/bootstrap.sh) using the default settings or your own custom settings.
+  ```pwsh
+  $env:TF_VAR_arm_client_secret = "YOUR-SERVICE-PRINCIPAL-PASSWORD"
+  ```
+
+* Run [bootstrap.sh](./scripts/bootstrap.sh) or [bootstrap.ps1](./scripts/bootstrap.ps1) using the default settings or your own custom settings.
 
   ```bash
   ./scripts/bootstrap.sh
+  ```
+
+  ```pwsh
+  ./scripts/bootstrap.ps1
   ```
 
   * When prompted for *arm_client_id*, use the *appId* for the service principal created by the subscription owner.
@@ -122,7 +126,7 @@ This section describes how to provision this configuration using default setting
 
 * Monitor output. Upon completion, you should see a message similar to the following:
 
-  `Apply complete! Resources: 47 added, 0 changed, 0 destroyed.`
+  `Apply complete! Resources: 60 added, 0 changed, 0 destroyed.`
 
 * Inspect `terraform.tfstate`.
 
@@ -130,8 +134,13 @@ This section describes how to provision this configuration using default setting
   # Review provisioned resources
   terraform state list
 
-  # Review output variables
+  # Review output variables from root module
   terraform output
+
+  # Review output variables from vnet_shared module
+  terraform console
+  > module.vnet_shared.resource_ids
+  > exit
   ```
 
 ## Smoke testing

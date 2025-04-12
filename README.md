@@ -1,4 +1,4 @@
-# #AzureSandbox
+# AzureSandbox
 
 ## Contents
 
@@ -7,7 +7,7 @@
 * [Sandbox index](#sandbox-index)
 * [Prerequisites](#prerequisites)
 * [Getting started](#getting-started)
-* [Next steps](#next-steps)
+<!-- * [Smoke testing](#smoke-testing) -->
 * [Videos](#videos)
 * [Known issues](#known-issues)
 
@@ -17,41 +17,37 @@
 
 ## Overview
 
-This repository contains a collection of inter-dependent [cloud computing](https://azure.microsoft.com/overview/what-is-cloud-computing) configurations for implementing common [Microsoft Azure](https://azure.microsoft.com/overview/what-is-azure/) services on a single [subscription](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#subscription). Collectively these configurations provide a flexible and cost effective sandbox environment useful for experimenting with various Azure services and capabilities. Depending upon your Azure offer type and region, a fully provisioned #AzureSandbox environment costs approximately $50 USD / day. These costs can be further reduced by stopping / deallocating virtual machines when not in use, or by skipping optional configurations that you do not plan to use ([Step-By-Step Video](https://youtu.be/2TN4SEq4wzM)).
+This repository contains a [cloud computing](https://azure.microsoft.com/overview/what-is-cloud-computing) configuration for implementing common [Microsoft Azure](https://azure.microsoft.com/overview/what-is-azure/) services on a single [subscription](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#subscription). This configuration provides a flexible and cost effective sandbox environment useful for experimenting with various Azure services and capabilities. Depending upon your Azure offer type and region, a fully provisioned #AzureSandbox environment costs approximately $80 USD / day. These costs can be further reduced by stopping / deallocating virtual machines when not in use, or by skipping optional configurations that you do not plan to use <!-- ([Step-By-Step Video](https://youtu.be/2TN4SEq4wzM))..>.
 
-*Disclaimer:* #AzureSandbox is not intended for production use. While some best practices are used, others are intentionally not used in favor of simplicity and cost. See [Known issues](#known-issues) for more information.
+*Disclaimer:* AzureSandbox is not intended for production use. While some best practices are used, others are intentionally not used in favor of simplicity and cost. See [Known issues](#known-issues) for more information.
 
-\#AzureSandbox is implemented using popular open source tools that are supported on Windows, macOS and Linux including:
+AzureSandbox is implemented using popular open source tools that are supported on Windows, macOS and Linux including:
 
 * [git](https://git-scm.com/) for source control.
-* [Bash](https://en.wikipedia.org/wiki/Bash_(Unix_shell)) for scripting.
-* [Azure CLI](https://learn.microsoft.com/cli/azure/what-is-azure-cli?view=azure-cli-latest) is a command line interface for Azure.
-* [PowerShell](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-7.1)
-  * [PowerShell 7.x](https://learn.microsoft.com/en-us/powershell/scripting/whats-new/differences-from-windows-powershell)
-  * [PowerShell 5.1](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-5.1) for Windows Server configuration.
-* [Terraform](https://www.terraform.io/intro/index.html#what-is-terraform-) v1.11 for [Infrastructure as Code](https://en.wikipedia.org/wiki/Infrastructure_as_code) (IaC).
-  * [Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs) (azuerrm) v4.26
-  * [AzAPI Provider](https://registry.terraform.io/providers/Azure/azapi/latest/docs) (azapi) v2.3
-  * [cloud-init Provider](https://registry.terraform.io/providers/hashicorp/cloudinit/latest/docs) (cloudinit) v2.3
-  * [Time Provider](https://registry.terraform.io/providers/hashicorp/time/latest/docs) (time) v0.13
+* [Bash](https://en.wikipedia.org/wiki/Bash_(Unix_shell)) for Linux general purpose scripting.
+  * [Azure CLI](https://learn.microsoft.com/cli/azure/what-is-azure-cli?view=azure-cli-latest) for use with Bash.
+* [PowerShell 7.x](https://learn.microsoft.com/powershell/scripting/overview?view=powershell-7.1) for Windows general purpose scripting.
+  * [Az PowerShell](https://learn.microsoft.com/powershell/azure/new-azureps-module-az) for use with PowerShell.
+* [Terraform](https://www.terraform.io/intro/index.html#what-is-terraform-) for [Infrastructure as Code](https://en.wikipedia.org/wiki/Infrastructure_as_code) (IaC).
 
 This repo was created by [Roger Doherty](https://www.linkedin.com/in/roger-doherty-805635b/).
 
 ## Sandbox index
 
-\#AzureSandbox features a modular design and can be deployed as a whole or incrementally depending upon your requirements.
+AzureSandbox is composed of several modules and can can be deployed as a whole or incrementally depending upon your requirements.
 
-* [terraform-azurerm-vnet-shared](./terraform-azurerm-vnet-shared/) includes the following:
+* The [root](./) module includes the following:
   * A [resource group](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#resource-group) which contains all the sandbox resources.
   * A [key vault](https://learn.microsoft.com/azure/key-vault/general/overview) for managing secrets.
   * A [log analytics workspace](https://learn.microsoft.com/azure/azure-monitor/data-platform#collect-monitoring-data) for log data and metrics.
-  * A [storage account](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#storage-account) for blob storage.
+* The [vnet-shared](./modules/vnet-shared/) module includes the following:
   * An [automation account](https://learn.microsoft.com/azure/automation/automation-intro) for configuration management.
   * A [virtual network](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vnet) for hosting [virtual machines](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm).
   * A [bastion](https://learn.microsoft.com/azure/bastion/bastion-overview) for secure RDP and SSH access to virtual machines.
   * A [firewall](https://learn.microsoft.com/en-us/azure/firewall/overview) for network security.
   * A Windows Server [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) running [Active Directory Domain Services](https://learn.microsoft.com/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview) with a pre-configured domain and DNS server.
-* [terraform-azurerm-vnet-app](./terraform-azurerm-vnet-app/) includes the following:
+* The [vnet-app](./modules/vnet-app/) module includes the following:
+  * A [storage account](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#storage-account) for blob storage.
   * A [virtual network](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vnet) for hosting [virtual machines](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) and private endpoints implemented using [PrivateLink](https://learn.microsoft.com/azure/private-link/private-link-overview). [Virtual network peering](https://learn.microsoft.com/azure/virtual-network/virtual-network-peering-overview) with [terraform-azurerm-vnet-shared](./terraform-azurerm-vnet-shared/) is automatically configured.
   * A Windows Server [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) for use as a jumpbox.
   * A Linux [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) for use as a DevOps agent.
@@ -106,29 +102,17 @@ Static Public IP Addresses  | ~2 | *az network list-usages*
 
 *Note:* This list is not comprehensive. Quotas vary by Azure subscription offer type and environment. More than one quota may need to be increased for a single resource type, such as [public ip addresses](https://learn.microsoft.com/azure/virtual-network/public-ip-addresses).
 
-## Getting started
+## Configure client environment
 
-Before you begin, familiarity with the following topics will be helpful when working with \#AzureSandbox:
-
-* Familiarize yourself with Terraform [Input Variables](https://www.terraform.io/docs/configuration/variables.html)  
-* Familiarize yourself with Terraform [Output Values](https://www.terraform.io/docs/configuration/outputs.html) also referred to as *Output Variables*
-* See [Authenticating to Azure using a Service Principal and a Client Secret](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/guides/service_principal_client_secret) to understand the type of authentication used by Terraform in \#AzureSandbox
-* Familiarize yourself with [Recommended naming and tagging conventions](https://learn.microsoft.com/azure/cloud-adoption-framework/ready/azure-best-practices/naming-and-tagging)
-* Familiarize yourself with [Naming rules and restrictions for Azure resources](https://learn.microsoft.com/azure/azure-resource-manager/management/resource-name-rules)
-
-### Configure client environment
-
----
-
-\#AzureSandbox automation scripts are written in Linux [Bash](https://en.wikipedia.org/wiki/Bash_(Unix_shell)) and Linux [PowerShell](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-linux?view=powershell-7.3). In order to deploy #AzureSandbox you will need to configure a Linux client environment to execute these scripts. Detailed guidance is provided for users who are unfamiliar with Linux. Three different client environment options are described in this section, including:
+AzureSandbox automation scripts are written in both [Bash](https://en.wikipedia.org/wiki/Bash_(Unix_shell)) and  [PowerShell](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-linux?view=powershell-7.3). In order to deploy AzureSandbox you will need to configure either a Linux or Windows client environment to execute these scripts. Detailed guidance is provided for users who are unfamiliar with Linux. Three different client environment options are described in this section, including:
 
 * [Windows Subsystem for Linux](#windows-subsystem-for-linux) (preferred for completing smoke testing)
 * [Azure Cloud Shell](#azure-cloud-shell) (zero configuration required but not optimal for serious use)
 * [Linux / MacOS](#linux--macos)
 
-#### Windows Subsystem for Linux
+### Windows Subsystem for Linux
 
-Windows users can use [WSL](https://learn.microsoft.com/windows/wsl/about) which supports a [variety of Linux distributions](https://learn.microsoft.com/en-us/windows/wsl/basic-commands#list-available-linux-distributions). `Ubuntu 22.04 LTS (Jammy Jellyfish)` is recommended. Please note these instructions may vary for different Linux releases and/or distributions.
+This is the preferred client environment for best flexibility offering the best of Windows and Linux. Windows users can use [WSL](https://learn.microsoft.com/windows/wsl/about) which supports a [variety of Linux distributions](https://learn.microsoft.com/en-us/windows/wsl/basic-commands#list-available-linux-distributions). [Ubuntu 24.04 LTS (Noble Numbat)](https://www.releases.ubuntu.com/noble/) is recommended. Please note these instructions may vary for different Linux releases and/or distributions.
 
 * Windows prerequisites ([Step-By-Step Video](https://youtu.be/Q4dOoQspt90))
   * Install [Visual Studio Code on Windows](https://code.visualstudio.com/docs/setup/windows)
@@ -165,17 +149,19 @@ Windows users can use [WSL](https://learn.microsoft.com/windows/wsl/about) which
   * Install the [HashiCorp Terraform](https://marketplace.visualstudio.com/items?itemName=HashiCorp.terraform) VS Code Extension in WSL.
   * Install the [PowerShell](https://marketplace.visualstudio.com/items?itemName=ms-vscode.PowerShell) VS Code extension in WSL.
 
-#### Azure Cloud Shell
+### Windows only
 
-[Azure Cloud Shell](https://aka.ms/cloudshell) is a free pre-configured cloud hosted container with a full complement of [tools](https://learn.microsoft.com/azure/cloud-shell/features#tools) needed to use \#AzureSandbox. This option will be preferred for users who do not wish to install any software and don't mind a web based command line user experience. Review the following content to get started:
+This is the preferred environment for users with no Linux experience.
 
-* [Bash in Azure Cloud Shell](https://learn.microsoft.com/azure/cloud-shell/quickstart)
-* [Persist files in Azure Cloud Shell](https://learn.microsoft.com/azure/cloud-shell/persisting-shell-storage)
-* [Using the Azure Cloud Shell editor](https://learn.microsoft.com/azure/cloud-shell/using-cloud-shell-editor)
+* Install [Visual Studio Code on Windows](https://code.visualstudio.com/docs/setup/windows)
+* Install the latest LTS release of [Powershell 7.x](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.4)
+* Install the latest LTS release of the [Az PowerShell Module](https://learn.microsoft.com/en-us/powershell/azure/new-azureps-module-az?view=azps-12.5.0)
+* Optional Windows software
+  * Install [SQL Server Management Studio with Azure Data Studio](https://learn.microsoft.com/sql/ssms/download-sql-server-management-studio-ssms?view=sql-server-ver15) if you plan to complete smoke testing for either [terraform-azurerm-vm-mssql](./terraform-azurerm-vm-mssql/) or [terraform-azurerm-mssql](./terraform-azurerm-mssql/).
+  * Install [MySQL Workbench](https://www.mysql.com/products/workbench/) if you plan to complete smoke testing for [terraform-azurerm-mysql](./terraform-azurerm-mysql/)
+  * Install [Azure VPN Client](https://www.microsoft.com/store/productId/9NP355QT2SQB) if you plan to complete smoke testing for [terraform-azurerm-vwan](./terraform-azurerm-vwan/).
 
-*Warning:* Cloud shell containers are ephemeral. Anything not saved in `~/clouddrive` will not be retained when your cloud shell session ends. Also, cloud shell sessions expire. This can interrupt a long running process.
-
-#### Linux / macOS
+### Linux / macOS
 
 Linux and macOS users can deploy the configurations natively by installing the following tools:
 
@@ -204,22 +190,123 @@ Linux and macOS users can deploy the configurations natively by installing the f
 
 Note the Bash scripts used in the configurations were developed and tested using *GNU bash, version 5.0.17(1)-release (x86_64-pc-linux-gnu)* and have not been tested on other popular shells like [zsh](https://www.zsh.org/).
 
-## Next steps
+### Azure Cloud Shell
 
-Now that the client environment has been configured, here's how to clone a copy of this repo and start working with the latest release of code ([Step-By-Step Video](https://youtu.be/EtNrzs4ZCvM)).
+[Azure Cloud Shell](https://aka.ms/cloudshell) is a free pre-configured cloud hosted container with a full complement of [tools](https://learn.microsoft.com/azure/cloud-shell/features#tools) needed to use \#AzureSandbox. This option will be preferred for users who do not wish to install any software and don't mind a web based command line user experience. Review the following content to get started:
 
-```bash
-# Run this command on cloudshell clients only
-cd clouddrive
+* [Bash in Azure Cloud Shell](https://learn.microsoft.com/azure/cloud-shell/quickstart)
+* [Persist files in Azure Cloud Shell](https://learn.microsoft.com/azure/cloud-shell/persisting-shell-storage)
+* [Using the Azure Cloud Shell editor](https://learn.microsoft.com/azure/cloud-shell/using-cloud-shell-editor)
 
-# Run these commands on all clients, including cloudshell 
-git clone https://github.com/Azure-Samples/azuresandbox
-cd azuresandbox
-latestTag=$(git describe --tags $(git rev-list --tags --max-count=1))
-git checkout $latestTag
-```
+*Warning:* Cloud shell containers are ephemeral. Anything not saved in `~/clouddrive` will not be retained when your cloud shell session ends. Also, cloud shell sessions expire. This can interrupt a long running process.
 
-### Perform default sandbox deployment
+## Getting started
+
+Before you begin, familiarity with the following topics will be helpful when working with \#AzureSandbox:
+
+* Familiarize yourself with Terraform [Input Variables](https://www.terraform.io/docs/configuration/variables.html)  
+* Familiarize yourself with Terraform [Output Values](https://www.terraform.io/docs/configuration/outputs.html) also referred to as *Output Variables*
+* See [Authenticating to Azure using a Service Principal and a Client Secret](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/guides/service_principal_client_secret) to understand the type of authentication used by Terraform in \#AzureSandbox
+* Familiarize yourself with [Recommended naming and tagging conventions](https://learn.microsoft.com/azure/cloud-adoption-framework/ready/azure-best-practices/naming-and-tagging)
+* Familiarize yourself with [Naming rules and restrictions for Azure resources](https://learn.microsoft.com/azure/azure-resource-manager/management/resource-name-rules)
+* Clone a copy of this repo and start working with the latest release of code:
+
+  ```bash
+  # Run this command on cloudshell clients only
+  cd clouddrive
+
+  # Run these commands on all clients, including cloudshell 
+  git clone https://github.com/Azure-Samples/azuresandbox
+  cd azuresandbox
+  latestTag=$(git describe --tags $(git rev-list --tags --max-count=1))
+  git checkout $latestTag
+  ```
+
+* Open a terminal in your client environment and execute the following commands.
+
+  ```bash
+  # Log out of Azure and clear cached credentials (skip if using cloudshell)
+  az logout
+
+  # Clear cached credentials (skip if using cloudshell)
+  az account clear
+
+  # Log into Azure and select the subscription (skip if using cloudshell)
+  az login --use-device-code
+  ```
+
+  ```pwsh
+  # Log out of Azure and clear cached credentials (skip if using cloudshell)
+  Disconnect-AzAccount -Scope CurrentUser
+
+  # Log into Azure and select the default subscription (skip if using cloudshell)
+  Connect-AzAccount -UseDeviceAuthentication
+  ```
+
+* Add an environment variable containing the password for your service principal.
+
+  ```bash
+  export TF_VAR_arm_client_secret=YOUR-SERVICE-PRINCIPAL-PASSWORD
+  ```
+
+  ```pwsh
+  $env:TF_VAR_arm_client_secret = "YOUR-SERVICE-PRINCIPAL-PASSWORD"
+  ```
+
+* Run [bootstrap.sh](./scripts/bootstrap.sh) or [bootstrap.ps1](./scripts/bootstrap.ps1) using the default settings or your own custom settings.
+
+  ```bash
+  ./scripts/bootstrap.sh
+  ```
+
+  ```pwsh
+  ./scripts/bootstrap.ps1
+  ```
+
+  * When prompted for *arm_client_id*, use the *appId* for the service principal created by the subscription owner.
+  * When prompted for *resource_group_name* use a custom value if there are other sandbox users using the same subscription.
+  * When prompted for *adminuser*, the default is *bootstrapadmin*.
+    * *Important*: If you use a custom value, avoid using [restricted usernames](https://learn.microsoft.com/azure/virtual-machines/windows/faq#what-are-the-username-requirements-when-creating-a-vm-).
+  * When prompted for *skip_admin_password_gen*, accept the default which is `no`.
+    * *Important*: A strong password will be generated for you and stored in the *adminpassword* key vault secret.
+  * When prompted for *skip_storage_kerb_key_gen*, accept the default which is `no`.
+    * *Important*: A secret generated for you and stored in the *STORAGE-ACCOUNT-kerb1* key vault secret.
+* Apply the Terraform configuration.
+
+  ```bash
+  # Initialize providers
+  terraform init
+  
+  # Check configuration for syntax errors
+  terraform validate
+
+  # Review plan output
+  terraform plan
+
+  # Apply plan
+  terraform apply
+  ```
+
+* Monitor output. Upon completion, you should see a message similar to the following:
+
+  `Apply complete! Resources: 60 added, 0 changed, 0 destroyed.`
+
+* Inspect `terraform.tfstate`.
+
+  ```bash
+  # Review provisioned resources
+  terraform state list
+
+  # Review output variables from root module
+  terraform output
+
+  # Review output variables from vnet_shared module
+  terraform console
+  > module.vnet_shared.resource_ids
+  > exit
+  ```
+
+<!-- ### Perform default sandbox deployment
 
 ---
 
@@ -385,17 +472,17 @@ Application | snet-db-01 | TBD | TBD | TBD | TBD
 Application | snet-privatelink-01 | TBD | TBD | TBD | TBD
 Application | snet-misc-03 | TBD | TBD | TBD | TBD
 Application | snet-appservice-01 | TBD | TBD | TBD | TBD
-Application | Reserved for future use | TBD | TBD | TBD | TBD
+Application | Reserved for future use | TBD | TBD | TBD | TBD -->
 
 ## Videos
 
 Video | Section
 --- | ---
 [Overview](https://youtu.be/2TN4SEq4wzM) | [Overview](#overview)  
-[Configure Client Environment (Part 1)](https://youtu.be/Q4dOoQspt90) | [Getting started \| Configure client environment \| Windows Subsystem for Linux \| Windows prerequisites](#windows-subsystem-for-linux)
+<!-- [Configure Client Environment (Part 1)](https://youtu.be/Q4dOoQspt90) | [Getting started \| Configure client environment \| Windows Subsystem for Linux \| Windows prerequisites](#windows-subsystem-for-linux)
 [Configure Client Environment (Part 2)](https://youtu.be/YW37uG0aX8c) | [Getting started \| Configure client environment \| Windows Subsystem for Linux \| Linux prerequisites](#windows-subsystem-for-linux)
 [Next Steps](https://youtu.be/EtNrzs4ZCvM) | [Next steps](#next-steps)
-
+ -->
 ## Known issues
 
 This section documents known issues with these configurations in addition to GitHub [Issues](https://github.com/Azure-Samples/azuresandbox/issues).

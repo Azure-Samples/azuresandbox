@@ -24,7 +24,7 @@ locals {
         "AllowVirtualNetworkOutbound",
         "AllowInternetOutbound"
       ]
-      route_table = "firewall_01"
+      route_table = "firewall"
     }
 
     snet-misc-01 = {
@@ -35,7 +35,7 @@ locals {
         "AllowVirtualNetworkOutbound",
         "AllowInternetOutbound"
       ]
-      route_table = "firewall_01"
+      route_table = "firewall"
     }
 
     snet-misc-02 = {
@@ -46,7 +46,7 @@ locals {
         "AllowVirtualNetworkOutbound",
         "AllowInternetOutbound"
       ]
-      route_table = "firewall_01"
+      route_table = "firewall"
     }
 
     AzureFirewallSubnet = {
