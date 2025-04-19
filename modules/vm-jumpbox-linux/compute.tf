@@ -3,14 +3,14 @@ resource "azurerm_linux_virtual_machine" "this" {
   resource_group_name        = var.resource_group_name
   location                   = var.location
   size                       = var.vm_jumpbox_linux_size
-  admin_username             = data.azurerm_key_vault_secret.adminuser.value
+  admin_username             = "${data.azurerm_key_vault_secret.adminuser.value}local"
   network_interface_ids      = [azurerm_network_interface.this.id]
   encryption_at_host_enabled = true
   patch_assessment_mode      = "AutomaticByPlatform"
   provision_vm_agent         = true
 
   admin_ssh_key {
-    username   = data.azurerm_key_vault_secret.adminuser.value
+    username   = "${data.azurerm_key_vault_secret.adminuser.value}local"
     public_key = tls_private_key.ssh_key.public_key_openssh
   }
 
