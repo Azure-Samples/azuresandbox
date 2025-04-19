@@ -29,9 +29,15 @@ variable "arm_client_secret" {
   }
 }
 
-variable "create_vnet_app" {
+variable "enable_module_vm_jumpbox_linux" {
   type        = bool
-  description = "Set to true to create the vnet_app module, false to skip it."
+  description = "Set to true to enable the vm_jumpbox_linux module, false to skip it."
+  default     = true
+}
+
+variable "enable_module_vnet_app" {
+  type        = bool
+  description = "Set to true to enable the vnet_app module, false to skip it."
   default     = true
 }
 
@@ -55,16 +61,6 @@ variable "log_analytics_workspace_retention_days" {
     error_message = "The 'log_analytics_workspace_retention_days' must be one of the valid retention periods: 30, 31, 60, 90, 120, 180, 270, 365, 550, or 730 days."
   }
 }
-
-# variable "spn_object_id" {
-#   type        = string
-#   description = "The object id of the service principal."
-
-#   validation {
-#     condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.spn_object_id))
-#     error_message = "The 'spn_object_id' must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
-#   }
-# }
 
 variable "subscription_id" {
   type        = string

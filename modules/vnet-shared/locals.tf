@@ -1,63 +1,55 @@
 locals {
-  subnets = {
-    AzureBastionSubnet = {
-      address_prefix                    = var.subnet_AzureBastionSubnet_address_prefix
-      private_endpoint_network_policies = "Disabled"
-      nsgrules = [
-        "AllowHttpsInbound",
-        "AllowGatewayManagerInbound",
-        "AllowAzureLoadBalancerInbound",
-        "AllowBastionCommunicationInbound",
-        "AllowSshRdpOutbound",
-        "AllowAzureCloudOutbound",
-        "AllowBastionCommunicationOutbound",
-        "AllowGetSessionInformationOutbound"
+  network_security_group_rules = flatten([
+    for subnet_key, subnet in local.subnets : [
+      for nsg_rule_key in subnet.nsg_rules : {
+        subnet_name                = subnet_key
+        nsg_rule_name              = nsg_rule_key
+        access                     = local.nsg_rules[nsg_rule_key].access
+        destination_address_prefix = local.nsg_rules[nsg_rule_key].destination_address_prefix
+        destination_port_ranges    = local.nsg_rules[nsg_rule_key].destination_port_ranges
+        direction                  = local.nsg_rules[nsg_rule_key].direction
+        priority                   = 100 + (index(subnet.nsg_rules, nsg_rule_key) * 10)
+        protocol                   = local.nsg_rules[nsg_rule_key].protocol
+        source_address_prefix      = local.nsg_rules[nsg_rule_key].source_address_prefix
+        source_port_ranges         = local.nsg_rules[nsg_rule_key].source_port_ranges
+      }
+    ]
+  ])
+
+  local_scripts = {
+    provisioner_automation_account = {
+      name = "Set-AutomationAccountConfiguration.ps1"
+      parameters = [
+        "TenantId = '${data.azurerm_client_config.current.tenant_id}';",
+        "SubscriptionId = '${data.azurerm_client_config.current.subscription_id}';",
+        "ResourceGroupName = '${var.resource_group_name}';",
+        "AutomationAccountName = '${module.naming.automation_account.name}';",
+        "Domain = '${var.adds_domain_name}';",
+        "VmAddsName = '${var.vm_adds_name}';",
+        "AdminUserName = '${var.admin_username}';",
+        "AdminPwd = '${data.azurerm_key_vault_secret.adminpassword.value}';",
+        "AppId = '${data.azurerm_client_config.current.client_id}';",
+        "AppSecret = '${data.azurerm_key_vault_secret.arm_client_secret.value}'"
       ]
-      route_table = null
     }
 
-    snet-adds-01 = {
-      address_prefix                    = var.subnet_adds_address_prefix
-      private_endpoint_network_policies = "Disabled"
-      nsgrules = [
-        "AllowVirtualNetworkInbound",
-        "AllowVirtualNetworkOutbound",
-        "AllowInternetOutbound"
+    provisioner_vm_windows = {
+      name = "Register-DscNode.ps1"
+      parameters = [
+        "TenantId = '${data.azurerm_client_config.current.tenant_id}';",
+        "SubscriptionId = '${data.azurerm_client_config.current.subscription_id}';",
+        "ResourceGroupName = '${var.resource_group_name}';",
+        "Location = '${var.location}';",
+        "AutomationAccountName = '${module.naming.automation_account.name}';",
+        "VirtualMachineName = '${var.vm_adds_name}';",
+        "AppId = '${data.azurerm_client_config.current.client_id}';",
+        "AppSecret = '${data.azurerm_key_vault_secret.arm_client_secret.value}';",
+        "DscConfigurationName = 'DomainControllerConfiguration'",
       ]
-      route_table = "firewall"
-    }
-
-    snet-misc-01 = {
-      address_prefix                    = var.subnet_misc_address_prefix
-      private_endpoint_network_policies = "Disabled"
-      nsgrules = [
-        "AllowVirtualNetworkInbound",
-        "AllowVirtualNetworkOutbound",
-        "AllowInternetOutbound"
-      ]
-      route_table = "firewall"
-    }
-
-    snet-misc-02 = {
-      address_prefix                    = var.subnet_misc_02_address_prefix
-      private_endpoint_network_policies = "Disabled"
-      nsgrules = [
-        "AllowVirtualNetworkInbound",
-        "AllowVirtualNetworkOutbound",
-        "AllowInternetOutbound"
-      ]
-      route_table = "firewall"
-    }
-
-    AzureFirewallSubnet = {
-      address_prefix                    = var.subnet_AzureFirewallSubnet_address_prefix
-      private_endpoint_network_policies = "Disabled"
-      nsgrules                          = []
-      route_table                       = null
     }
   }
 
-  nsgrules = {
+  nsg_rules = {
     AllowAzureCloudOutbound = {
       access                     = "Allow"
       destination_address_prefix = "AzureCloud"
@@ -169,20 +161,61 @@ locals {
     }
   }
 
-  network_security_group_rules = flatten([
-    for subnet_key, subnet in local.subnets : [
-      for nsgrule_key in subnet.nsgrules : {
-        subnet_name                = subnet_key
-        nsgrule_name               = nsgrule_key
-        access                     = local.nsgrules[nsgrule_key].access
-        destination_address_prefix = local.nsgrules[nsgrule_key].destination_address_prefix
-        destination_port_ranges    = local.nsgrules[nsgrule_key].destination_port_ranges
-        direction                  = local.nsgrules[nsgrule_key].direction
-        priority                   = 100 + (index(subnet.nsgrules, nsgrule_key) * 10)
-        protocol                   = local.nsgrules[nsgrule_key].protocol
-        source_address_prefix      = local.nsgrules[nsgrule_key].source_address_prefix
-        source_port_ranges         = local.nsgrules[nsgrule_key].source_port_ranges
-      }
-    ]
-  ])
+  subnets = {
+    AzureBastionSubnet = {
+      address_prefix                    = var.subnet_AzureBastionSubnet_address_prefix
+      private_endpoint_network_policies = "Disabled"
+      nsg_rules = [
+        "AllowHttpsInbound",
+        "AllowGatewayManagerInbound",
+        "AllowAzureLoadBalancerInbound",
+        "AllowBastionCommunicationInbound",
+        "AllowSshRdpOutbound",
+        "AllowAzureCloudOutbound",
+        "AllowBastionCommunicationOutbound",
+        "AllowGetSessionInformationOutbound"
+      ]
+      route_table = null
+    }
+
+    snet-adds-01 = {
+      address_prefix                    = var.subnet_adds_address_prefix
+      private_endpoint_network_policies = "Disabled"
+      nsg_rules = [
+        "AllowVirtualNetworkInbound",
+        "AllowVirtualNetworkOutbound",
+        "AllowInternetOutbound"
+      ]
+      route_table = "firewall"
+    }
+
+    snet-misc-01 = {
+      address_prefix                    = var.subnet_misc_address_prefix
+      private_endpoint_network_policies = "Disabled"
+      nsg_rules = [
+        "AllowVirtualNetworkInbound",
+        "AllowVirtualNetworkOutbound",
+        "AllowInternetOutbound"
+      ]
+      route_table = "firewall"
+    }
+
+    snet-misc-02 = {
+      address_prefix                    = var.subnet_misc_02_address_prefix
+      private_endpoint_network_policies = "Disabled"
+      nsg_rules = [
+        "AllowVirtualNetworkInbound",
+        "AllowVirtualNetworkOutbound",
+        "AllowInternetOutbound"
+      ]
+      route_table = "firewall"
+    }
+
+    AzureFirewallSubnet = {
+      address_prefix                    = var.subnet_AzureFirewallSubnet_address_prefix
+      private_endpoint_network_policies = "Disabled"
+      nsg_rules                         = []
+      route_table                       = null
+    }
+  }
 }

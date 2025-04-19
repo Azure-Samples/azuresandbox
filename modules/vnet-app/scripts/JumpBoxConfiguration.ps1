@@ -1,4 +1,4 @@
-configuration JumpBoxConfig {
+configuration JumpBoxConfiguration {
     param (
         [Parameter(Mandatory = $true)]
         [String]$ComputerName

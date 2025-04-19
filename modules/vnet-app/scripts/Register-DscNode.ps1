@@ -1,3 +1,6 @@
+#!/usr/bin/env pwsh
+
+#region parameters
 param (
     [Parameter(Mandatory = $true)]
     [String]$TenantId,
@@ -26,6 +29,7 @@ param (
     [Parameter(Mandatory = $true)]
     [string]$DscConfigurationName
 )
+#endregion
 
 #region functions
 function Write-Log {
@@ -128,10 +132,10 @@ function Register-DscNode {
         -RebootNodeIfNeeded $true `
         -ActionAfterReboot 'ContinueConfiguration' `
         -ErrorAction SilentlyContinue
-
+    
     Write-Log "Sleeping for 60 seconds before checking node status..."    
     Start-Sleep -Seconds 60
-    
+
     try {
         $dscNodes = Get-AzAutomationDscNode `
             -ResourceGroupName $ResourceGroupName `
@@ -182,11 +186,22 @@ function Register-DscNode {
 
     if ($dscNodeStatus -ne $statusCompliant) {
         Exit-WithError "DSC node status did not reach '$statusCompliant' after $maxRetries attempts."
-    }    
+    }        
 }
 #endregion
 
 #region main
+Write-Log "Running '$PSScriptRoot/Set-AutomationAccountConfiguration.ps1'..."
+
+.$PSScriptRoot/Set-AutomationAccountConfiguration.ps1 `
+    -TenantId $TenantId `
+    -SubscriptionId $SubscriptionId `
+    -ResourceGroupName $ResourceGroupName `
+    -AutomationAccountName $AutomationAccountName `
+    -VmJumpboxWinName $VirtualMachineName `
+    -AppId $AppId `
+    -AppSecret $AppSecret
+
 Write-Log "Running '$PSCommandPath'..."
 
 Write-Log "Logging into Azure using service principal id '$AppId'..."

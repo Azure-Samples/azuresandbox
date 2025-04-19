@@ -1,3 +1,4 @@
+#region parameters
 param (
     [Parameter(Mandatory = $true)]
     [String]$TenantId,
@@ -26,9 +27,10 @@ param (
     [Parameter(Mandatory = $true)]
     [string]$AdminPwdSecret
 )
+#endregion
 
 #region constants
-$TaskName = 'configure-storage-kerberos'
+$TaskName = 'Set-AzureFilesConfiguration'
 $MaxTaskAttempts = 10
 $SCHED_S_TASK_RUNNING = 0x00041301
 #endregion
@@ -139,7 +141,7 @@ try {
         -TaskName $TaskName `
         -Action $taskAction `
         -RunLevel 'Highest' `
-        -Description "Configure Azure Storage for kerberos authentication with domain." `
+        -Description "Configure Azure Files for kerberos authentication with domain." `
         -ErrorAction Stop
 }
 catch {
@@ -203,5 +205,4 @@ catch {
 
 Write-Log "'$PSCommandPath' exiting normally..."
 Exit 0
-
 #endregion

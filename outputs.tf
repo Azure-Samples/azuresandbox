@@ -5,8 +5,9 @@ output "resource_names" {
       log_analytics_workspace = azurerm_log_analytics_workspace.this.name
       resource_group          = azurerm_resource_group.this.name
     },
-    module.vnet_shared.resource_names,                                   # Merging resource names from the vnet_shared module
-    length(module.vnet_app) > 0 ? module.vnet_app[0].resource_names : {} # Check if vnet_app exists
+    module.vnet_shared.resource_names,
+    length(module.vnet_app) > 0 ? module.vnet_app[0].resource_names : {},
+    length(module.vm_jumpbox_linux) > 0 ? module.vm_jumpbox_linux[0].resource_names : {}
   )
 }
 
@@ -17,7 +18,8 @@ output "resource_ids" {
       log_analytics_workspace = azurerm_log_analytics_workspace.this.id
       resource_group          = azurerm_resource_group.this.id
     },
-    module.vnet_shared.resource_ids,                                   # Merging resource IDs from the vnet_shared module
-    length(module.vnet_app) > 0 ? module.vnet_app[0].resource_ids : {} # Check if vnet_app exists
+    module.vnet_shared.resource_ids,
+    length(module.vnet_app) > 0 ? module.vnet_app[0].resource_ids : {},
+    length(module.vm_jumpbox_linux) > 0 ? module.vm_jumpbox_linux[0].resource_ids : {}
   )
 }

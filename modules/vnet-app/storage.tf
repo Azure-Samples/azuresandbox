@@ -11,6 +11,8 @@ resource "azurerm_storage_account" "this" {
   https_traffic_only_enabled    = true
   min_tls_version               = "TLS1_2"
   public_network_access_enabled = false
+
+  lifecycle { ignore_changes = [azure_files_authentication] }
 }
 
 resource "azurerm_role_assignment" "storage_roles" {
@@ -32,14 +34,14 @@ resource "azurerm_storage_container" "this" {
   depends_on = [time_sleep.wait_for_roles_and_public_access]
 }
 
-resource "azurerm_storage_blob" "uploads" {
-  for_each = tomap({ for idx, filename in local.blobs_to_upload : filename => filename })
+resource "azurerm_storage_blob" "remote_scripts" {
+  for_each = local.remote_scripts
 
-  name                   = each.key
+  name                   = each.value.name
   storage_account_name   = azurerm_storage_account.this.name
   storage_container_name = azurerm_storage_container.this.name
   type                   = "Block"
-  source                 = "${path.module}/scripts/${each.key}"
+  source                 = "./${path.module}/scripts/${each.value.name}"
 
   depends_on = [time_sleep.wait_for_roles_and_public_access]
 }
@@ -55,32 +57,29 @@ resource "azurerm_storage_share" "this" {
 }
 #endregion
 
-# #region utility resources
-
-# Public access is ephemerally enabled to allow storage account data plane operations.
+#region utility-resources
 resource "azapi_update_resource" "storage_account_enable_public_access" {
   type        = "Microsoft.Storage/storageAccounts@2023-05-01"
   resource_id = azurerm_storage_account.this.id
 
-  body = {properties = {publicNetworkAccess = "Enabled"}}
+  body = { properties = { publicNetworkAccess = "Enabled" } }
 
-  lifecycle {ignore_changes = all}
+  lifecycle { ignore_changes = all }
 }
 
-# Public access is ephemerally disabled after storage account data plane operations are complete.
 resource "azapi_update_resource" "storage_account_disable_public_access" {
   type        = "Microsoft.Storage/storageAccounts@2023-05-01"
   resource_id = azurerm_storage_account.this.id
-  depends_on  = [azurerm_storage_blob.uploads, azurerm_storage_share.this]
 
-  body = {properties = {publicNetworkAccess = "Disabled"}}
+  depends_on = [azurerm_storage_blob.remote_scripts, azurerm_storage_share.this]
 
-  lifecycle {ignore_changes = all}
+  body = { properties = { publicNetworkAccess = "Disabled" } }
+
+  lifecycle { ignore_changes = all }
 }
 
-# Data plane operations must wait for public access settings and role assignments to propagate.
 resource "time_sleep" "wait_for_roles_and_public_access" {
   create_duration = "2m"
   depends_on      = [azurerm_role_assignment.storage_roles, azapi_update_resource.storage_account_enable_public_access]
 }
-# #endregion
+#endregion

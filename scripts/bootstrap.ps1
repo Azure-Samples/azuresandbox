@@ -57,6 +57,14 @@ $defaultLocation = "centralus"
 $defaultProject = "sand"
 #endregion
 
+#region main
+
+# Check if environment variables are set
+if (-not $env:TF_VAR_arm_client_secret) {
+    Write-Host "Environment variable 'TF_VAR_arm_client_secret' must be set." -ForegroundColor Red
+    Show-Usage
+}
+
 # Ensure Azure PowerShell module is installed
 if (-not (Get-Module -ListAvailable -Name Az)) {
     Write-Host "Azure PowerShell module is not installed. Please install it using 'Install-Module -Name Az'." -ForegroundColor Red
@@ -135,11 +143,6 @@ if (-not $armClientId) {
     Show-Usage
 }
 
-if (-not $env:TF_VAR_arm_client_secret) {
-    Write-Host "Environment variable 'TF_VAR_arm_client_secret' must be set." -ForegroundColor Red
-    Show-Usage
-}
-
 # Validate service principal
 $armClientDisplayName = (Get-AzADServicePrincipal -AppId $armClientId).DisplayName
 if ($armClientDisplayName) {
@@ -195,3 +198,4 @@ Get-Content ./terraform.tfvars
 
 Write-Host "`nBootstrapping complete..."
 exit 0
+#endregion

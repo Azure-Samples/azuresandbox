@@ -25,20 +25,7 @@ resource "azurerm_windows_virtual_machine" "this" {
   }
 
   provisioner "local-exec" {
-    command     = <<EOT
-      $params = @{
-        TenantId = "${data.azurerm_client_config.current.tenant_id}"
-        SubscriptionId = "${data.azurerm_client_config.current.subscription_id}"
-        ResourceGroupName = "${var.resource_group_name}"
-        Location = "${var.location}"
-        AutomationAccountName = "${azurerm_automation_account.this.name}"
-        VirtualMachineName = "${var.vm_adds_name}"
-        AppId = "${data.azurerm_client_config.current.client_id}"
-        AppSecret = "${data.azurerm_key_vault_secret.arm_client_secret.value}"
-        DscConfigurationName = "LabDomainConfig"
-      }
-      ./${path.module}/scripts/aadsc-register-node.ps1 @params 
-      EOT
+    command     = "$params = @{ ${join(" ", local.local_scripts["provisioner_vm_windows"].parameters)}}; ./${path.module}/scripts/${local.local_scripts["provisioner_vm_windows"].name} @params"
     interpreter = ["pwsh", "-Command"]
   }
 }

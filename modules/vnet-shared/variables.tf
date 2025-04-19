@@ -26,7 +26,7 @@ variable "admin_username" {
   default     = "bootstrapadmin"
 
   validation {
-    condition = can(regex("^[a-zA-Z0-9._-]{1,20}$", var.admin_username))
+    condition     = can(regex("^[a-zA-Z0-9._-]{1,20}$", var.admin_username))
     error_message = "Must conform to Active Directory user name requirements: it can only contain alphanumeric characters, periods (.), underscores (_), and hyphens (-), and must be between 1 and 20 characters long."
   }
 }
@@ -49,16 +49,6 @@ variable "key_vault_id" {
   validation {
     condition     = can(regex("^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[a-zA-Z0-9-_()]+/providers/Microsoft.KeyVault/vaults/[a-zA-Z0-9-]+$", var.key_vault_id))
     error_message = "Must be a valid Azure Resource ID for a Key Vault. It should follow the format '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.KeyVault/vaults/{keyVaultName}'."
-  }
-}
-
-variable "key_vault_name" {
-  type        = string
-  description = "The existing key vault where secrets are stored"
-
-  validation {
-    condition     = can(regex("^[a-zA-Z0-9-]{3,24}$", var.key_vault_name))
-    error_message = "Must conform to Azure Key Vault naming requirements: it can only contain alphanumeric characters and hyphens, must start with a letter, and must be between 3 and 24 characters long."
   }
 }
 

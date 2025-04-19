@@ -1,5 +1,4 @@
-# This script must be run on a domain joined Azure VM
-
+#region parameters
 param(
     [Parameter(Mandatory = $true)]
     [string]$TenantId,
@@ -22,6 +21,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Domain
 )
+#endregion
 
 #region constants
 $defaultPermission = "StorageFileDataSmbShareContributor"
@@ -73,24 +73,9 @@ if ([string]::IsNullOrEmpty($appSecret)) {
 
 Write-Log "The length of secret '$AppId' is '$($appSecret.Length)'..."
 
-Write-Log "Getting secret '$StorageAccountName-kerb1' from key vault '$KeyVaultName'..."
-
-try {
-    $storageAccountKerbKey = Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name "$StorageAccountName-kerb1" -AsPlainText
-}
-catch {
-    Exit-WithError $_
-}
-
-if ([string]::IsNullOrEmpty($storageAccountKerbKey)) {
-    Exit-WithError "Secret '$StorageAccountName-kerb1' not found in key vault '$KeyVaultName'..."
-}
-
-Write-Log "The length of secret '$StorageAccountName-kerb1' is '$($storageAccountKerbKey.Length)'..."
-
 Disconnect-AzAccount
 
-# Configure Identity-based access for storage account
+# Configure identity-based access for storage account using service principal (not managed identity)
 $xDot500Path = "DC=$($Domain.Split('.')[0]),DC=$($Domain.Split('.')[1])"
 $spnValue = "cifs/$StorageAccountName.file.core.windows.net"
 
@@ -111,6 +96,46 @@ else {
         Exit-WithError $_
     }
 }
+
+Write-Log "Logging into Azure using service principal id '$AppId'..."
+
+$appSecretSecure = ConvertTo-SecureString $appSecret -AsPlainText -Force
+$spCredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $AppId, $appSecretSecure
+
+try {
+    Connect-AzAccount -Credential $spCredential -Tenant $TenantId -ServicePrincipal -ErrorAction Stop | Out-Null
+}
+catch {
+    Exit-WithError $_
+}
+
+Write-Log "Setting default subscription to '$SubscriptionId'..."
+
+try {
+    Set-AzContext -Subscription $SubscriptionId | Out-Null
+}
+catch {
+    Exit-WithError $_
+}
+
+Write-Log "Creating 'kerb1' key for storage account '$StorageAccountName' in resource group '$ResourceGroupName'..."
+
+try {
+    New-AzStorageAccountKey -ResourceGroupName $ResourceGroupName -Name $StorageAccountName -KeyName "kerb1" | Out-Null
+}
+catch {
+    Exit-WithError $_
+}
+
+Write-Log "Getting 'kerb1' key for storage account '$StorageAccountName' in resource group '$ResourceGroupName'..."
+
+$storageAccountKerbKey = Get-AzStorageAccountKey -ListKerbKey -ResourceGroupName $ResourceGroupName -Name $StorageAccountName | Where-Object { $_.KeyName -eq "kerb1" } | Select-Object -ExpandProperty Value
+
+if ([string]::IsNullOrEmpty($storageAccountKerbKey)) {
+    Exit-WithError "Key 'kerb1' not found for storage account '$StorageAccountName' in resource group '$ResourceGroupName'..."
+}
+
+Write-Log "The length of key 'kerb1' for storage account '$StorageAccountName' is '$($storageAccountKerbKey.Length)'..."
 
 Write-Log "Adding computer account for storage account '$StorageAccountName' to domain '$Domain'..."
 $storageAccountKerbKeySecure = ConvertTo-SecureString $storageAccountKerbKey -AsPlainText -Force
@@ -148,27 +173,6 @@ $domainName = $domainInformation.DNSRoot
 $domainSid = $domainInformation.DomainSID.Value
 $forestName = $domainInformation.Forest
 $netBiosDomainName = $domainInformation.DnsRoot
-
-Write-Log "Logging into Azure using service principal id '$AppId'..."
-
-$appSecretSecure = ConvertTo-SecureString $appSecret -AsPlainText -Force
-$spCredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $AppId, $appSecretSecure
-
-try {
-    Connect-AzAccount -Credential $spCredential -Tenant $TenantId -ServicePrincipal -ErrorAction Stop | Out-Null
-}
-catch {
-    Exit-WithError $_
-}
-
-Write-Log "Setting default subscription to '$SubscriptionId'..."
-
-try {
-    Set-AzContext -Subscription $SubscriptionId | Out-Null
-}
-catch {
-    Exit-WithError $_
-}
 
 Write-Log "Configuring storage account '$StorageAccountName' for Kerberos authentication with domain '$Domain'..."
 

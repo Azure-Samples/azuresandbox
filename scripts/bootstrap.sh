@@ -28,6 +28,13 @@ default_project="sand"
 # Get runtime defaults
 printf "Retrieving runtime defaults ...\n"
 
+# Validate TF_VAR_arm_client_secret
+if [ -z "$TF_VAR_arm_client_secret" ]
+then
+  printf "Environment variable 'TF_VAR_arm_client_secret' must be set.\n"
+  usage
+fi
+
 # Set default subscription from currently logged in Azure CLI user.
 default_subscription_id=$(az account list --only-show-errors --query "[? isDefault]|[0].id" --output tsv)
 

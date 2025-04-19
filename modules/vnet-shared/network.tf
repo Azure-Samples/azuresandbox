@@ -4,7 +4,7 @@ resource "azurerm_virtual_network" "this" {
   location            = var.location
   resource_group_name = var.resource_group_name
   address_space       = [var.vnet_address_space]
-  dns_servers         = [cidrhost(var.subnet_adds_address_prefix,4), "168.63.129.16"]
+  dns_servers         = [cidrhost(var.subnet_adds_address_prefix, 4), "168.63.129.16"]
 }
 
 resource "azurerm_subnet" "subnets" {
@@ -17,8 +17,8 @@ resource "azurerm_subnet" "subnets" {
   default_outbound_access_enabled   = false
 }
 
-resource "azurerm_network_security_group" "nsgs" {
-  for_each = { for k, v in local.subnets : k => v if length(v.nsgrules) > 0 }
+resource "azurerm_network_security_group" "groups" {
+  for_each = { for k, v in local.subnets : k => v if length(v.nsg_rules) > 0 }
 
   name                = "${module.naming.network_security_group.name}.${each.key}"
   location            = var.location
@@ -26,10 +26,10 @@ resource "azurerm_network_security_group" "nsgs" {
 }
 
 resource "azurerm_subnet_network_security_group_association" "associations" {
-  for_each = azurerm_network_security_group.nsgs
+  for_each = azurerm_network_security_group.groups
 
   subnet_id                 = azurerm_subnet.subnets[each.key].id
-  network_security_group_id = azurerm_network_security_group.nsgs[each.key].id
+  network_security_group_id = azurerm_network_security_group.groups[each.key].id
 
   depends_on = [
     azurerm_network_security_rule.rules,
@@ -38,14 +38,14 @@ resource "azurerm_subnet_network_security_group_association" "associations" {
 }
 
 resource "azurerm_network_security_rule" "rules" {
-  for_each = {for network_security_group_rule in local.network_security_group_rules : "${network_security_group_rule.subnet_name}.${network_security_group_rule.nsgrule_name}" => network_security_group_rule}
+  for_each = { for network_security_group_rule in local.network_security_group_rules : "${network_security_group_rule.subnet_name}.${network_security_group_rule.nsg_rule_name}" => network_security_group_rule }
 
   access                      = each.value.access
   destination_address_prefix  = each.value.destination_address_prefix
   destination_port_range      = length(each.value.destination_port_ranges) == 1 ? each.value.destination_port_ranges[0] : null
   destination_port_ranges     = length(each.value.destination_port_ranges) > 1 ? each.value.destination_port_ranges : null
   direction                   = each.value.direction
-  name                        = each.value.nsgrule_name
+  name                        = each.value.nsg_rule_name
   network_security_group_name = "${module.naming.network_security_group.name}.${each.value.subnet_name}"
   priority                    = each.value.priority
   protocol                    = each.value.protocol
@@ -55,7 +55,7 @@ resource "azurerm_network_security_rule" "rules" {
   source_port_ranges          = length(each.value.source_port_ranges) > 1 ? each.value.source_port_ranges : null
 
   depends_on = [
-    azurerm_network_security_group.nsgs
+    azurerm_network_security_group.groups
   ]
 }
 #endregion

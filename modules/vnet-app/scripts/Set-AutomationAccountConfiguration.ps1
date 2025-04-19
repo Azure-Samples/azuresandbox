@@ -1,4 +1,6 @@
 #!/usr/bin/env pwsh
+
+#region parameters
 param (
     [Parameter(Mandatory = $true)]
     [String]$TenantId,
@@ -21,6 +23,7 @@ param (
     [Parameter(Mandatory = $true)]
     [string]$AppSecret
 )
+#endregion
 
 #region functions
 function Write-Log {
@@ -117,7 +120,7 @@ function Import-DscConfiguration {
         Exit-WithError $_
     }
 }
-function Start-DscCompliationJob {
+function Start-DscCompilationJob {
     param(
         [Parameter(Mandatory = $true)]
         [String]$ResourceGroupName,
@@ -132,13 +135,13 @@ function Start-DscCompliationJob {
         [String]$VirtualMachineName
     )
 
-    Write-Log "Compliling DSC Configuration '$DscConfigurationName'..."
+    Write-Log "Compiling DSC Configuration '$DscConfigurationName'..."
 
     $params = @{
         ComputerName = $VirtualMachineName
     }
 
-    $configuationData = @{
+    $configurationData = @{
         AllNodes = @(
             @{
                 NodeName = "$VirtualMachineName"
@@ -152,7 +155,7 @@ function Start-DscCompliationJob {
             -ResourceGroupName $ResourceGroupName `
             -AutomationAccountName $AutomationAccountName `
             -ConfigurationName $DscConfigurationName `
-            -ConfigurationData $configuationData `
+            -ConfigurationData $configurationData `
             -Parameters $params `
             -ErrorAction Stop
     }
@@ -162,7 +165,7 @@ function Start-DscCompliationJob {
     
     $jobId = $dscCompilationJob.Id
     
-    while ($null -eq $dscCompilationJob.EndTime -and $null -eq $dscCompilationJob.Exception) {
+    while ($dscCompilationJob.Status -ne "Completed" -and -not $dscCompilationJob.Exception) {
         $dscCompilationJob = $dscCompilationJob | Get-AzAutomationDscCompilationJob
         Write-Log "DSC compilation job ID '$jobId' status is '$($dscCompilationJob.Status)'..."
         Start-Sleep -Seconds 10
@@ -171,8 +174,6 @@ function Start-DscCompliationJob {
     if ($dscCompilationJob.Exception) {
         Exit-WithError "DSC compilation job ID '$jobId' failed..."
     }
-    
-    Write-Log "DSC compilation job ID '$jobId' status is '$($dscCompilationJob.Status)'..."    
 }
 #endregion
 
@@ -222,14 +223,14 @@ Import-Module-Custom `
 Import-DscConfiguration `
     -ResourceGroupName $ResourceGroupName `
     -AutomationAccountName $automationAccount.AutomationAccountName `
-    -DscConfigurationName 'JumpBoxConfig' `
-    -DscConfigurationScript 'JumpBoxConfig.ps1'
+    -DscConfigurationName 'JumpBoxConfiguration' `
+    -DscConfigurationScript 'JumpBoxConfiguration.ps1'
 
 # Compile DSC Configurations
-Start-DscCompliationJob `
+Start-DscCompilationJob `
     -ResourceGroupName $ResourceGroupName `
     -AutomationAccountName $automationAccount.AutomationAccountName `
-    -DscConfigurationName 'JumpBoxConfig' `
+    -DscConfigurationName 'JumpBoxConfiguration' `
     -VirtualMachineName $VmJumpboxWinName
 
 Exit 0

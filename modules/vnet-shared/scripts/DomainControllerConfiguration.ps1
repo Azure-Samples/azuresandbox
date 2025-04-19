@@ -1,4 +1,4 @@
-configuration LabDomainConfig {
+configuration DomainControllerConfiguration {
     param (
         [Parameter(Mandatory = $true)]
         [String]$ComputerName

@@ -1,3 +1,10 @@
+provider "azapi" {
+  subscription_id = var.subscription_id
+  client_id       = var.arm_client_id
+  client_secret   = var.arm_client_secret
+  tenant_id       = var.aad_tenant_id
+}
+
 provider "azurerm" {
   subscription_id                 = var.subscription_id
   client_id                       = var.arm_client_id
@@ -11,11 +18,4 @@ provider "azurerm" {
       prevent_deletion_if_contains_resources = false # This is to handle policy driven resource creation.
     }
   }
-}
-
-provider "azapi" {
-  subscription_id = var.subscription_id
-  client_id       = var.arm_client_id
-  client_secret   = var.arm_client_secret
-  tenant_id       = var.aad_tenant_id
 }

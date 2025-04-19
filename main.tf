@@ -2,16 +2,6 @@
 data "azurerm_client_config" "current" {}
 #endregion
 
-#region utilities
-module "naming" {
-  source                 = "Azure/naming/azurerm"
-  version                = "0.4.2"
-  suffix                 = [var.tags["project"], var.tags["environment"]]
-  unique-include-numbers = true
-  unique-length          = 8
-}
-#endregion
-
 #region resource-group
 resource "azurerm_resource_group" "this" {
   name     = module.naming.resource_group.name_unique
@@ -90,11 +80,18 @@ resource "azurerm_log_analytics_workspace" "this" {
 #endregion
 
 #region modules
+module "naming" {
+  source                 = "Azure/naming/azurerm"
+  version                = "~> 0.4.2"
+  suffix                 = [var.tags["project"], var.tags["environment"]]
+  unique-include-numbers = true
+  unique-length          = 8
+}
+
 module "vnet_shared" {
   source = "./modules/vnet-shared"
 
   key_vault_id        = azurerm_key_vault.this.id
-  key_vault_name      = azurerm_key_vault.this.name
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
   tags                = var.tags
@@ -108,23 +105,45 @@ module "vnet_shared" {
 module "vnet_app" {
   source = "./modules/vnet-app"
 
-  count = var.create_vnet_app ? 1 : 0
+  count = var.enable_module_vnet_app ? 1 : 0
 
+  adds_domain_name            = module.vnet_shared.adds_domain_name
   admin_password_secret       = module.vnet_shared.admin_password_secret
   admin_username_secret       = module.vnet_shared.admin_username_secret
   automation_account_name     = module.vnet_shared.resource_names["automation_account"]
   dns_server                  = module.vnet_shared.dns_server
   firewall_route_table_id     = module.vnet_shared.resource_ids["firewall_route_table"]
   key_vault_id                = azurerm_key_vault.this.id
+  key_vault_name              = azurerm_key_vault.this.name
   location                    = azurerm_resource_group.this.location
   resource_group_name         = azurerm_resource_group.this.name
   tags                        = var.tags
   unique_seed                 = module.naming.unique-seed
   user_object_id              = var.user_object_id
-  virtual_network_shared_name = module.vnet_shared.resource_names["virtual_network_shared"]
   virtual_network_shared_id   = module.vnet_shared.resource_ids["virtual_network_shared"]
+  virtual_network_shared_name = module.vnet_shared.resource_names["virtual_network_shared"]
 
-  depends_on = [ azurerm_key_vault_secret.spn_password ]
+  depends_on = [module.vnet_shared]
+}
+
+module "vm_jumpbox_linux" {
+  source = "./modules/vm-jumpbox-linux"
+
+  count = var.enable_module_vm_jumpbox_linux ? 1 : 0
+
+  adds_domain_name      = module.vnet_shared.adds_domain_name
+  admin_username_secret = module.vnet_shared.admin_username_secret
+  dns_server            = module.vnet_shared.dns_server
+  key_vault_id          = azurerm_key_vault.this.id
+  key_vault_name        = azurerm_key_vault.this.name
+  location              = azurerm_resource_group.this.location
+  resource_group_name   = azurerm_resource_group.this.name
+  storage_account_name  = module.vnet_app[0].resource_names["storage_account"]
+  storage_share_name    = module.vnet_app[0].storage_share_name
+  subnet_id             = module.vnet_app[0].subnets["snet-app-01"].id
+  tags                  = var.tags
+
+  depends_on = [module.vnet_app[0]]
 }
 #endregion
 

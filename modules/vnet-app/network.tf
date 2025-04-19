@@ -27,11 +27,11 @@ resource "azurerm_subnet" "subnets" {
   }
 
   lifecycle {
-    ignore_changes = [ delegation[0].service_delegation[0].actions ] 
+    ignore_changes = [delegation[0].service_delegation[0].actions]
   }
 }
 
-resource "azurerm_network_security_group" "nsgs" {
+resource "azurerm_network_security_group" "groups" {
   for_each = azurerm_subnet.subnets
 
   name                = "${module.naming.network_security_group.name}.${each.key}"
@@ -39,15 +39,15 @@ resource "azurerm_network_security_group" "nsgs" {
   resource_group_name = var.resource_group_name
 }
 
-resource "azurerm_network_security_rule" "network_security_rules" {
-  for_each = { for network_security_group_rule in local.network_security_group_rules : "${network_security_group_rule.subnet_name}.${network_security_group_rule.nsgrule_name}" => network_security_group_rule }
+resource "azurerm_network_security_rule" "rules" {
+  for_each = { for network_security_group_rule in local.network_security_group_rules : "${network_security_group_rule.subnet_name}.${network_security_group_rule.nsg_rule_name}" => network_security_group_rule }
 
   access                      = each.value.access
   destination_address_prefix  = each.value.destination_address_prefix
   destination_port_range      = length(each.value.destination_port_ranges) == 1 ? each.value.destination_port_ranges[0] : null
   destination_port_ranges     = length(each.value.destination_port_ranges) > 1 ? each.value.destination_port_ranges : null
   direction                   = each.value.direction
-  name                        = each.value.nsgrule_name
+  name                        = each.value.nsg_rule_name
   network_security_group_name = "${module.naming.network_security_group.name}.${each.value.subnet_name}"
   priority                    = each.value.priority
   protocol                    = each.value.protocol
@@ -57,7 +57,7 @@ resource "azurerm_network_security_rule" "network_security_rules" {
   source_port_ranges          = length(each.value.source_port_ranges) > 1 ? each.value.source_port_ranges : null
 
   depends_on = [
-    azurerm_network_security_group.nsgs
+    azurerm_network_security_group.groups
   ]
 }
 
@@ -65,7 +65,7 @@ resource "azurerm_subnet_network_security_group_association" "associations" {
   for_each = azurerm_subnet.subnets
 
   subnet_id                 = azurerm_subnet.subnets[each.key].id
-  network_security_group_id = azurerm_network_security_group.nsgs[each.key].id
+  network_security_group_id = azurerm_network_security_group.groups[each.key].id
 }
 
 # Peering with shared services virtual network
@@ -90,9 +90,9 @@ resource "azurerm_virtual_network_peering" "app_to_shared" {
   allow_gateway_transit        = false
   depends_on                   = [azurerm_virtual_network_peering.shared_to_app]
 }
-# #endregion
+#endregion
 
-# #region private-dns-zones
+#region private-dns-zones
 resource "azurerm_private_dns_zone" "zones" {
   for_each            = toset(local.private_dns_zones)
   name                = each.value
@@ -116,7 +116,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "vnet_shared_links" {
   virtual_network_id    = var.virtual_network_shared_id
   depends_on            = [azurerm_virtual_network_peering.app_to_shared, azurerm_virtual_network_peering.shared_to_app]
 }
-# #endregion
+#endregion
 
 #region route-tables
 resource "azurerm_subnet_route_table_association" "associations" {
@@ -125,7 +125,7 @@ resource "azurerm_subnet_route_table_association" "associations" {
   subnet_id      = azurerm_subnet.subnets[each.key].id
   route_table_id = var.firewall_route_table_id
 }
-# #endregion 
+#endregion 
 
 #region private-endpoints
 resource "azurerm_private_endpoint" "storage_blob" {
@@ -149,7 +149,7 @@ resource "azurerm_private_endpoint" "storage_blob" {
 }
 
 resource "azurerm_private_dns_a_record" "storage_blob" {
-  name                = "${module.naming.private_dns_a_record.name}-storage-blob"
+  name                = azurerm_storage_account.this.name
   zone_name           = "privatelink.blob.core.windows.net"
   resource_group_name = var.resource_group_name
   ttl                 = 300
@@ -177,7 +177,7 @@ resource "azurerm_private_endpoint" "storage_file" {
 }
 
 resource "azurerm_private_dns_a_record" "storage_file" {
-  name                = "${module.naming.private_dns_a_record.name}-storage-file"
+  name                = azurerm_storage_account.this.name
   zone_name           = "privatelink.file.core.windows.net"
   resource_group_name = var.resource_group_name
   ttl                 = 300
@@ -187,7 +187,7 @@ resource "azurerm_private_dns_a_record" "storage_file" {
 
 #region network-interfaces
 resource "azurerm_network_interface" "vm_windows" {
-  name                = "${module.naming.network_interface.name}-vm-windows"
+  name                = "${module.naming.network_interface.name}-${var.vm_jumpbox_win_name}"
   location            = var.location
   resource_group_name = var.resource_group_name
 
