@@ -41,12 +41,6 @@ variable "enable_module_vm_mssql_win" {
   default     = true
 }
 
-variable "enable_module_vnet_app" {
-  type        = bool
-  description = "Set to true to enable the vnet_app module, false to skip it."
-  default     = true
-}
-
 variable "location" {
   type        = string
   description = "The name of the Azure Region where resources will be provisioned."

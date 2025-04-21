@@ -19,8 +19,8 @@ data "azurerm_key_vault_secret" "arm_client_secret" {
 
 #region modules
 module "naming" {
-  source                 = "Azure/naming/azurerm"
-  version                = "~> 0.4.2"
-  suffix                 = [var.tags["project"], var.tags["environment"]]
+  source  = "Azure/naming/azurerm"
+  version = "~> 0.4.2"
+  suffix  = [var.tags["project"], var.tags["environment"]]
 }
 #endregion

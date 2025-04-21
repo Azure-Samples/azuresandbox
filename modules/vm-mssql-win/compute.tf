@@ -31,12 +31,12 @@ resource "azurerm_windows_virtual_machine" "this" {
     interpreter = ["pwsh", "-Command"]
   }
 
-  lifecycle {
-    ignore_changes = [
-      admin_username,
-      admin_password
-    ]
-  }
+  # lifecycle {
+  #   ignore_changes = [
+  #     admin_username,
+  #     admin_password
+  #   ]
+  # }
 }
 
 resource "azurerm_managed_disk" "disks" {

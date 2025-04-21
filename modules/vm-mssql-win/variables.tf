@@ -116,7 +116,7 @@ variable "storage_blob_endpoint" {
   validation {
     condition     = can(regex("^https://[a-zA-Z0-9-]+\\.blob\\.core\\.windows\\.net/$", var.storage_blob_endpoint))
     error_message = "Must be a valid Azure Storage Blob endpoint. It should follow the format 'https://{storageAccountName}.blob.core.windows.net/'."
-  } 
+  }
 }
 
 variable "subnet_id" {

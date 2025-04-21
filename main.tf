@@ -102,8 +102,6 @@ module "vnet_shared" {
 module "vnet_app" {
   source = "./modules/vnet-app"
 
-  count = var.enable_module_vnet_app ? 1 : 0
-
   adds_domain_name            = module.vnet_shared.adds_domain_name
   admin_password_secret       = module.vnet_shared.admin_password_secret
   admin_username_secret       = module.vnet_shared.admin_username_secret
@@ -135,12 +133,12 @@ module "vm_jumpbox_linux" {
   key_vault_name        = azurerm_key_vault.this.name
   location              = azurerm_resource_group.this.location
   resource_group_name   = azurerm_resource_group.this.name
-  storage_account_name  = module.vnet_app[0].resource_names["storage_account"]
-  storage_share_name    = module.vnet_app[0].storage_share_name
-  subnet_id             = module.vnet_app[0].subnets["snet-app-01"].id
+  storage_account_name  = module.vnet_app.resource_names["storage_account"]
+  storage_share_name    = module.vnet_app.storage_share_name
+  subnet_id             = module.vnet_app.subnets["snet-app-01"].id
   tags                  = var.tags
 
-  depends_on = [module.vnet_app[0]]
+  depends_on = [module.vnet_shared, module.vnet_app]
 }
 
 module "vm_mssql_win" {
@@ -156,14 +154,14 @@ module "vm_mssql_win" {
   key_vault_name          = azurerm_key_vault.this.name
   location                = azurerm_resource_group.this.location
   resource_group_name     = azurerm_resource_group.this.name
-  storage_account_id      = module.vnet_app[0].resource_ids["storage_account"]
-  storage_account_name    = module.vnet_app[0].resource_names["storage_account"]
-  storage_blob_endpoint   = module.vnet_app[0].storage_endpoints["blob"]
-  storage_container_name  = module.vnet_app[0].storage_container_name
-  subnet_id               = module.vnet_app[0].subnets["snet-db-01"].id
+  storage_account_id      = module.vnet_app.resource_ids["storage_account"]
+  storage_account_name    = module.vnet_app.resource_names["storage_account"]
+  storage_blob_endpoint   = module.vnet_app.storage_endpoints["blob"]
+  storage_container_name  = module.vnet_app.storage_container_name
+  subnet_id               = module.vnet_app.subnets["snet-db-01"].id
   tags                    = var.tags
 
-  depends_on = [module.vnet_app[0]]
+  depends_on = [module.vnet_shared, module.vnet_app]
 }
 #endregion
 
