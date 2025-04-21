@@ -1,4 +1,5 @@
 #!/usr/bin/env pwsh
+#region params
 param (
     [Parameter(Mandatory = $true)]
     [String]$TenantId,
@@ -21,6 +22,7 @@ param (
     [Parameter(Mandatory = $true)]
     [string]$AppSecret
 )
+#endregion
 
 #region functions
 function Write-Log {
@@ -117,7 +119,7 @@ function Import-DscConfiguration {
         Exit-WithError $_
     }
 }
-function Start-DscCompliationJob {
+function Start-DscCompilationJob {
     param(
         [Parameter(Mandatory = $true)]
         [String]$ResourceGroupName,
@@ -228,14 +230,14 @@ Import-Module-Custom `
 Import-DscConfiguration `
     -ResourceGroupName $ResourceGroupName `
     -AutomationAccountName $automationAccount.AutomationAccountName `
-    -DscConfigurationName 'MssqlVmConfig' `
-    -DscConfigurationScript 'MssqlVmConfig.ps1'
+    -DscConfigurationName 'MssqlVmConfiguration' `
+    -DscConfigurationScript 'MssqlVmConfiguration.ps1'
 
 # Compile DSC Configurations
-Start-DscCompliationJob `
+Start-DscCompilationJob `
     -ResourceGroupName $ResourceGroupName `
     -AutomationAccountName $automationAccount.AutomationAccountName `
-    -DscConfigurationName 'MssqlVmConfig' `
+    -DscConfigurationName 'MssqlVmConfiguration' `
     -VirtualMachineName $VmMssqlWinName
 
 Exit 0

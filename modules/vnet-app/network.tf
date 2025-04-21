@@ -186,7 +186,7 @@ resource "azurerm_private_dns_a_record" "storage_file" {
 #endregion
 
 #region network-interfaces
-resource "azurerm_network_interface" "vm_windows" {
+resource "azurerm_network_interface" "this" {
   name                = "${module.naming.network_interface.name}-${var.vm_jumpbox_win_name}"
   location            = var.location
   resource_group_name = var.resource_group_name

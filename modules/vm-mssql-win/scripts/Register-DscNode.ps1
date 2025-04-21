@@ -1,3 +1,6 @@
+#!/usr/bin/env pwsh
+
+#region parameters
 param (
     [Parameter(Mandatory = $true)]
     [String]$TenantId,
@@ -26,6 +29,7 @@ param (
     [Parameter(Mandatory = $true)]
     [string]$DscConfigurationName
 )
+#endregion
 
 #region functions
 function Write-Log {
@@ -188,6 +192,17 @@ function Register-DscNode {
 
 #region main
 Write-Log "Running '$PSCommandPath'..."
+
+Write-Log "Running '$PSScriptRoot/Set-AutomationAccountConfiguration.ps1'..."
+
+.$PSScriptRoot/Set-AutomationAccountConfiguration.ps1 `
+    -TenantId $TenantId `
+    -SubscriptionId $SubscriptionId `
+    -ResourceGroupName $ResourceGroupName `
+    -AutomationAccountName $AutomationAccountName `
+    -VmMssqlWinName  $VirtualMachineName `
+    -AppId $AppId `
+    -AppSecret $AppSecret
 
 Write-Log "Logging into Azure using service principal id '$AppId'..."
 

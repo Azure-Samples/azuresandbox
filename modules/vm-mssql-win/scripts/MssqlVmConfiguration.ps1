@@ -1,4 +1,4 @@
-configuration MssqlVmConfig {
+configuration MssqlVmConfiguration {
     param (
         [Parameter(Mandatory = $true)]
         [String]$ComputerName

@@ -1,3 +1,4 @@
+#region parameters
 param (
     [Parameter(Mandatory = $true)]
     [String]$TenantId,
@@ -26,9 +27,10 @@ param (
     [Parameter(Mandatory = $true)]
     [int]$TempDiskSizeMb
 )
+#endregion
 
 #region constants
-$TaskName = 'configure-mssql'
+$TaskName = 'Set-MssqlConfiguration'
 $MaxTaskAttempts = 10
 $SCHED_S_TASK_RUNNING = 0x00041301
 #endregion

@@ -35,6 +35,12 @@ variable "enable_module_vm_jumpbox_linux" {
   default     = true
 }
 
+variable "enable_module_vm_mssql_win" {
+  type        = bool
+  description = "Set to true to enable the vm_mssql_win module, false to skip it."
+  default     = true
+}
+
 variable "enable_module_vnet_app" {
   type        = bool
   description = "Set to true to enable the vnet_app module, false to skip it."

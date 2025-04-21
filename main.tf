@@ -21,7 +21,7 @@ resource "azurerm_key_vault" "this" {
   public_network_access_enabled = true # Note:Required to demo sandbox using internet connection
 }
 
-resource "azurerm_role_assignment" "key_vault_roles" {
+resource "azurerm_role_assignment" "roles" {
   for_each = local.key_vault_roles
 
   principal_id         = each.value.principal_id
@@ -54,7 +54,7 @@ resource "azurerm_key_vault_secret" "log_primary_shared_key" {
   }
 }
 
-resource "azurerm_monitor_diagnostic_setting" "kv_diagnostic_setting" {
+resource "azurerm_monitor_diagnostic_setting" "this" {
   name                       = "Audit Logs"
   target_resource_id         = azurerm_key_vault.this.id
   log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
@@ -96,10 +96,7 @@ module "vnet_shared" {
   resource_group_name = azurerm_resource_group.this.name
   tags                = var.tags
 
-  depends_on = [
-    azurerm_key_vault_secret.spn_password,
-    azurerm_key_vault_secret.log_primary_shared_key
-  ]
+  depends_on = [azurerm_key_vault_secret.spn_password]
 }
 
 module "vnet_app" {
@@ -145,11 +142,34 @@ module "vm_jumpbox_linux" {
 
   depends_on = [module.vnet_app[0]]
 }
+
+module "vm_mssql_win" {
+  source = "./modules/vm-mssql-win"
+
+  count = var.enable_module_vm_mssql_win ? 1 : 0
+
+  adds_domain_name        = module.vnet_shared.adds_domain_name
+  admin_password_secret   = module.vnet_shared.admin_password_secret
+  admin_username_secret   = module.vnet_shared.admin_username_secret
+  automation_account_name = module.vnet_shared.resource_names["automation_account"]
+  key_vault_id            = azurerm_key_vault.this.id
+  key_vault_name          = azurerm_key_vault.this.name
+  location                = azurerm_resource_group.this.location
+  resource_group_name     = azurerm_resource_group.this.name
+  storage_account_id      = module.vnet_app[0].resource_ids["storage_account"]
+  storage_account_name    = module.vnet_app[0].resource_names["storage_account"]
+  storage_blob_endpoint   = module.vnet_app[0].storage_endpoints["blob"]
+  storage_container_name  = module.vnet_app[0].storage_container_name
+  subnet_id               = module.vnet_app[0].subnets["snet-db-01"].id
+  tags                    = var.tags
+
+  depends_on = [module.vnet_app[0]]
+}
 #endregion
 
 #region utility-resources
 resource "time_sleep" "wait_for_roles" {
   create_duration = "2m"
-  depends_on      = [azurerm_role_assignment.key_vault_roles]
+  depends_on      = [azurerm_role_assignment.roles]
 }
 #endregion

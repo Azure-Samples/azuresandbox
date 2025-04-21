@@ -374,7 +374,7 @@ foreach ($disk in $localRawDisks) {
         Exit-WithError $_
     }
 
-    $fileSystemLabel = $azureDataDisk.name.Split("-").Trim()[2]
+    $fileSystemLabel = $azureDataDisk.name.Split("-").Trim()[3]
     $driveLetter = $fileSystemLabel.Substring($fileSystemLabel.Length - 1, 1)
 
     Write-Log "Partitioning disk '$($disk.UniqueId)' using maximum volume size '$($azureDataDisk.diskSizeGb)' Gb and drive letter '$($driveLetter):'..."
@@ -624,7 +624,7 @@ if ($TempDiskSizeMb -ne 0) {
     }
 
     # Register scheduled task to recreate SQL Server tempdb folders on ephemeral drive
-    $taskName = "SQL-startup"
+    $taskName = "Set-MssqlStartupConfiguration"
     $sqlStartupScriptPath = "$((Get-Item $PSCommandPath).DirectoryName)\$taskName.ps1"
 
     if ( -not (Test-Path $sqlStartupScriptPath) ) {

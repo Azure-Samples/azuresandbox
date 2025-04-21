@@ -15,7 +15,7 @@ resource "azurerm_storage_account" "this" {
   lifecycle { ignore_changes = [azure_files_authentication] }
 }
 
-resource "azurerm_role_assignment" "storage_roles" {
+resource "azurerm_role_assignment" "assignments_storage" {
   for_each = local.storage_roles
 
   principal_id         = each.value.principal_id
@@ -80,6 +80,6 @@ resource "azapi_update_resource" "storage_account_disable_public_access" {
 
 resource "time_sleep" "wait_for_roles_and_public_access" {
   create_duration = "2m"
-  depends_on      = [azurerm_role_assignment.storage_roles, azapi_update_resource.storage_account_enable_public_access]
+  depends_on      = [azurerm_role_assignment.assignments_storage, azapi_update_resource.storage_account_enable_public_access]
 }
 #endregion

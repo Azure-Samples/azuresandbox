@@ -107,7 +107,7 @@ resource "azurerm_firewall_policy" "this" {
   threat_intelligence_mode = "Deny"
 }
 
-resource "azurerm_firewall_policy_rule_collection_group" "firewall" {
+resource "azurerm_firewall_policy_rule_collection_group" "this" {
   name               = module.naming.firewall_policy_rule_collection_group.name
   firewall_policy_id = azurerm_firewall_policy.this.id
   priority           = 500
