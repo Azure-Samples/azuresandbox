@@ -1,9 +1,13 @@
-output "vwan_01_id" {
-  value       = azurerm_virtual_wan.vwan_01.id
-  description = "The resource id of the virtual WAN."
+output "resource_ids" {
+  value = {
+    virtual_wan = azurerm_virtual_wan.this.id
+    virtual_wan_hub = azurerm_virtual_hub.this.id
+  }
 }
 
-output "vwan_01_hub_01_id" {
-  value       = azurerm_virtual_hub.vwan_01_hub_01.id
-  description = "The resource id of the virtual hub."
+output "resource_names" {
+  value = {
+    virtual_wan = azurerm_virtual_wan.this.name
+    virtual_wan_hub = azurerm_virtual_hub.this.name
+  }
 }

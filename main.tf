@@ -202,4 +202,19 @@ module "mysql" {
 
   depends_on = [module.vnet_app[0].resource_ids]
 }
+
+module "vwan" {
+  source = "./modules/vwan"
+
+  count = var.enable_module_vwan ? 1 : 0
+
+  dns_server          = module.vnet_shared.dns_server
+  location            = azurerm_resource_group.this.location
+  resource_group_name = azurerm_resource_group.this.name
+  tags                = var.tags
+  virtual_networks = {
+    virtual_network_shared = module.vnet_shared.resource_ids["virtual_network_shared"]
+    virtual_network_app    = module.vnet_app[0].resource_ids["virtual_network_app"]
+  }
+} 
 #endregion
