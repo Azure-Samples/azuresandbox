@@ -20,7 +20,14 @@ resource "azurerm_mssql_server" "this" {
   administrator_login_password  = data.azurerm_key_vault_secret.adminpassword.value
   minimum_tls_version           = "1.2"
   public_network_access_enabled = false
+
+  lifecycle { 
+    ignore_changes = [
+      express_vulnerability_assessment_enabled
+    ]
+  }
 }
+
 resource "azurerm_mssql_database" "this" {
   name         = var.mssql_database_name
   server_id    = azurerm_mssql_server.this.id
