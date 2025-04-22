@@ -48,7 +48,7 @@ resource "azurerm_vpn_server_configuration" "this" {
 
   client_root_certificate {
     name             = "Self signed certificate"
-    public_cert_data = file("${path.module}/scripts/public_cert_data.cer")
+    public_cert_data = join("\n", slice(split("\n", trimspace(file("${path.root}/MyP2SVPNRootCert_Base64_Encoded.cer"))), 1, length(split("\n", trimspace(file("${path.root}/MyP2SVPNRootCert_Base64_Encoded.cer")))) - 1)) 
   }
 }
 #endregion

@@ -212,9 +212,10 @@ module "vwan" {
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
   tags                = var.tags
+
   virtual_networks = {
     virtual_network_shared = module.vnet_shared.resource_ids["virtual_network_shared"]
     virtual_network_app    = module.vnet_app[0].resource_ids["virtual_network_app"]
   }
-} 
+}
 #endregion
