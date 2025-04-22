@@ -11,7 +11,7 @@ locals {
         "VirtualMachineName = '${var.vm_mssql_win_name}';",
         "AppId = '${data.azurerm_client_config.current.client_id}';",
         "AppSecret = '${data.azurerm_key_vault_secret.arm_client_secret.value}';",
-        "DscConfigurationName = 'MssqlVmConfiguration'",
+        "DscConfigurationName = 'MssqlVmConfiguration'"
       ]
     }
   }
@@ -28,7 +28,7 @@ locals {
         "Domain = '${var.adds_domain_name}';",
         "AdminUsernameSecret = '${var.admin_username_secret}';",
         "AdminPwdSecret = '${var.admin_password_secret}';",
-        "TempDiskSizeMb = '${var.temp_disk_size_mb}'",
+        "TempDiskSizeMb = '${var.temp_disk_size_mb}'"
       ]
     }
 

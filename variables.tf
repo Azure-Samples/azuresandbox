@@ -29,6 +29,20 @@ variable "arm_client_secret" {
   }
 }
 
+variable "enable_module_mssql" {
+  type        = bool
+  description = "Set to true to enable the Azure SQL Database (mssql) module, false to skip it."
+  default     = true
+  
+}
+
+variable "enable_module_mysql" {
+  type        = bool
+  description = "Set to true to enable the Azure Database for MySQL (mysql) module, false to skip it."
+  default     = true
+  
+}
+
 variable "enable_module_vm_jumpbox_linux" {
   type        = bool
   description = "Set to true to enable the vm_jumpbox_linux module, false to skip it."
@@ -38,6 +52,12 @@ variable "enable_module_vm_jumpbox_linux" {
 variable "enable_module_vm_mssql_win" {
   type        = bool
   description = "Set to true to enable the vm_mssql_win module, false to skip it."
+  default     = true
+}
+
+variable "enable_module_vnet_app" {
+  type        = bool
+  description = "Set to true to enable the vnet_app module, false to skip it."
   default     = true
 }
 

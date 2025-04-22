@@ -44,7 +44,7 @@ locals {
         "VirtualMachineName = '${var.vm_adds_name}';",
         "AppId = '${data.azurerm_client_config.current.client_id}';",
         "AppSecret = '${data.azurerm_key_vault_secret.arm_client_secret.value}';",
-        "DscConfigurationName = 'DomainControllerConfiguration'",
+        "DscConfigurationName = 'DomainControllerConfiguration'"
       ]
     }
   }

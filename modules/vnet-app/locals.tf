@@ -11,7 +11,7 @@ locals {
         "VirtualMachineName = '${var.vm_jumpbox_win_name}';",
         "AppId = '${data.azurerm_client_config.current.client_id}';",
         "AppSecret = '${data.azurerm_key_vault_secret.arm_client_secret.value}';",
-        "DscConfigurationName = 'JumpBoxConfiguration'",
+        "DscConfigurationName = 'JumpBoxConfiguration'"
       ]
     }
   }
@@ -28,7 +28,7 @@ locals {
         "StorageAccountName = '${azurerm_storage_account.this.name}';",
         "Domain = '${var.adds_domain_name}';",
         "AdminUsernameSecret = '${var.admin_username_secret}';",
-        "AdminPwdSecret = '${var.admin_password_secret}'",
+        "AdminPwdSecret = '${var.admin_password_secret}'"
       ]
     }
     worker = {
@@ -110,17 +110,17 @@ locals {
   }
 
   private_dns_zones = [
-    # "privatelink.api.azureml.ms",
-    # "privatelink.azurecr.io",
+    "privatelink.api.azureml.ms",
+    "privatelink.azurecr.io",
     "privatelink.blob.core.windows.net",
-    # "privatelink.cognitiveservices.azure.com",
-    # "privatelink.database.windows.net",
-    # "privatelink.documents.azure.com",
-    "privatelink.file.core.windows.net"
-    # "privatelink.mysql.database.azure.com",
-    # "privatelink.notebooks.azure.net",
-    # "privatelink.openai.azure.com",
-    # "privatelink.search.windows.net"
+    "privatelink.cognitiveservices.azure.com",
+    "privatelink.database.windows.net",
+    "privatelink.documents.azure.com",
+    "privatelink.file.core.windows.net",
+    "privatelink.mysql.database.azure.com",
+    "privatelink.notebooks.azure.net",
+    "privatelink.openai.azure.com",
+    "privatelink.search.windows.net"
   ]
 
   subnets = {

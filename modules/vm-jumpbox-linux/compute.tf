@@ -31,14 +31,6 @@ resource "azurerm_linux_virtual_machine" "this" {
   }
 
   custom_data = data.cloudinit_config.vm_jumpbox_linux.rendered
-
-  # lifecycle {
-  #   ignore_changes = [
-  #     admin_username,
-  #     admin_ssh_key,
-  #     custom_data
-  #   ]
-  # }
 }
 
 resource "azurerm_role_assignment" "kv_secrets_user_vm_linux" {

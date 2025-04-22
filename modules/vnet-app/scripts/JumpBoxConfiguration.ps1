@@ -54,24 +54,6 @@ configuration JumpBoxConfiguration {
             AutoUpgrade = $true
         }
 
-        cChocoPackageInstaller 'AzureStorageExplorer' {
-            Name = 'microsoftazurestorageexplorer'
-            DependsOn = '[cChocoInstaller]Chocolatey'
-            AutoUpgrade = $true
-        }
-
-        cChocoPackageInstaller 'AzCopy' {
-            Name = 'azcopy10'
-            DependsOn = '[cChocoInstaller]Chocolatey'
-            AutoUpgrade = $true
-        }
-
-        cChocoPackageInstaller 'AzureDataStudio' {
-            Name = 'azure-data-studio'
-            DependsOn = '[cChocoInstaller]Chocolatey'
-            AutoUpgrade = $true
-        }
-
         cChocoPackageInstaller 'MySQLWorkbench' {
             Name = 'mysql.workbench'
             DependsOn = '[cChocoInstaller]Chocolatey'

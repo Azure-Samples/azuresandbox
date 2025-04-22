@@ -30,13 +30,6 @@ resource "azurerm_windows_virtual_machine" "this" {
     command     = "$params = @{ ${join(" ", local.local_scripts["provisioner"].parameters)}}; ./${path.module}/scripts/${local.local_scripts["provisioner"].name} @params"
     interpreter = ["pwsh", "-Command"]
   }
-
-  # lifecycle {
-  #   ignore_changes = [
-  #     admin_username,
-  #     admin_password
-  #   ]
-  # }
 }
 
 resource "azurerm_managed_disk" "disks" {
