@@ -4,7 +4,7 @@ variable "aad_tenant_id" {
 
   validation {
     condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.aad_tenant_id))
-    error_message = "The 'aad_tenant_id' must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
+    error_message = "Must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
   }
 }
 
@@ -14,7 +14,7 @@ variable "arm_client_id" {
 
   validation {
     condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.arm_client_id))
-    error_message = "The 'arm_client_id' must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
+    error_message = "Must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
   }
 }
 
@@ -25,47 +25,47 @@ variable "arm_client_secret" {
 
   validation {
     condition     = length(var.arm_client_secret) >= 8
-    error_message = "The 'arm_client_secret' must be at least 8 characters long."
+    error_message = "Must be at least 8 characters long."
   }
 }
 
 variable "enable_module_mssql" {
   type        = bool
   description = "Set to true to enable the Azure SQL Database (mssql) module, false to skip it."
-  default     = true
-  
+  default     = false
+
 }
 
 variable "enable_module_mysql" {
   type        = bool
   description = "Set to true to enable the Azure Database for MySQL (mysql) module, false to skip it."
-  default     = true
-  
+  default     = false
+
 }
 
 variable "enable_module_vm_jumpbox_linux" {
   type        = bool
   description = "Set to true to enable the vm_jumpbox_linux module, false to skip it."
-  default     = true
+  default     = false
 }
 
 variable "enable_module_vm_mssql_win" {
   type        = bool
   description = "Set to true to enable the vm_mssql_win module, false to skip it."
-  default     = true
+  default     = false
 }
 
 variable "enable_module_vnet_app" {
   type        = bool
   description = "Set to true to enable the vnet_app module, false to skip it."
-  default     = true
+  default     = false
 }
 
 variable "enable_module_vwan" {
   type        = bool
   description = "Set to true to enable the vwan module, false to skip it."
-  default     = true
-  
+  default     = false
+
 }
 
 variable "location" {
@@ -74,7 +74,7 @@ variable "location" {
 
   validation {
     condition     = can(regex("^[a-z0-9-]+$", var.location))
-    error_message = "The 'location' must be a valid Azure region name. It should only contain lowercase letters, numbers, and dashes."
+    error_message = "Must be a valid Azure region name. It should only contain lowercase letters, numbers, and dashes."
   }
 }
 
@@ -85,7 +85,7 @@ variable "log_analytics_workspace_retention_days" {
 
   validation {
     condition     = can(regex("^(30|31|60|90|120|180|270|365|550|730)$", var.log_analytics_workspace_retention_days))
-    error_message = "The 'log_analytics_workspace_retention_days' must be one of the valid retention periods: 30, 31, 60, 90, 120, 180, 270, 365, 550, or 730 days."
+    error_message = "Must be one of the valid retention periods: 30, 31, 60, 90, 120, 180, 270, 365, 550, or 730 days."
   }
 }
 
@@ -95,7 +95,7 @@ variable "subscription_id" {
 
   validation {
     condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.subscription_id))
-    error_message = "The 'subscription_id' must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
+    error_message = "Must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
   }
 }
 
@@ -120,6 +120,6 @@ variable "user_object_id" {
 
   validation {
     condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.user_object_id))
-    error_message = "The 'user_object_id' must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
+    error_message = "Must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
   }
 }

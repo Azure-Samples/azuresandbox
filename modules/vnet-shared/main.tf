@@ -12,7 +12,7 @@ data "azurerm_key_vault_secret" "arm_client_secret" {
 }
 #endregion
 
-#region key-vault-secrets
+#region resources
 resource "random_string" "adminpassword_first_char" {
   length  = 1
   upper   = true
@@ -63,9 +63,7 @@ resource "azurerm_key_vault_secret" "adminusername" {
     ignore_changes = [expiration_date]
   }
 }
-#endregion
 
-#region automation-account
 resource "azurerm_automation_account" "this" {
   name                = module.naming.automation_account.name
   location            = var.location

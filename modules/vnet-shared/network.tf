@@ -1,4 +1,4 @@
-#region virtual-networks
+#region virtual-network
 resource "azurerm_virtual_network" "this" {
   name                = "${module.naming.virtual_network.name}-${var.vnet_name}"
   location            = var.location
@@ -60,7 +60,7 @@ resource "azurerm_network_security_rule" "rules" {
 }
 #endregion
 
-#region bastion-host
+#region bastion
 resource "azurerm_bastion_host" "this" {
   name                = module.naming.bastion_host.name
   location            = var.location

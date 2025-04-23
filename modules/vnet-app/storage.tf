@@ -14,7 +14,7 @@ resource "azurerm_storage_account" "this" {
 
   lifecycle { 
     ignore_changes = [
-      azure_files_authentication, # Configured separately by ./scripts/Set-AzureFilesConfiguration.ps1
+      azure_files_authentication,   # Configured separately by ./scripts/Set-AzureFilesConfiguration.ps1
       public_network_access_enabled # Avoid triggering recreation of resources in dependent modules if public access is temporarily enabled for terraform plan / apply operations
     ] 
   }

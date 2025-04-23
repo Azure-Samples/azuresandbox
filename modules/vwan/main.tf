@@ -1,62 +1,60 @@
 #region resources
-resource "azurerm_virtual_wan" "this" {
-  name                = module.naming.virtual_wan.name
-  resource_group_name = var.resource_group_name
-  location            = var.location
+
+# Generate a private key for the root certificate
+resource "tls_private_key" "root_cert_key" {
+  algorithm = "RSA"
+  rsa_bits  = 2048
 }
 
-resource "azurerm_virtual_hub" "this" {
-  name                = "${module.naming.virtual_wan.name}-hub"
-  resource_group_name = var.resource_group_name
-  location            = var.location
-  virtual_wan_id      = azurerm_virtual_wan.this.id
-  address_prefix      = var.vwan_hub_address_prefix
-}
-
-resource "azurerm_virtual_hub_connection" "connections" {
-  for_each = var.virtual_networks
-
-  name                      = each.key
-  virtual_hub_id            = azurerm_virtual_hub.this.id
-  remote_virtual_network_id = each.value
-}
-
-resource "azurerm_point_to_site_vpn_gateway" "this" {
-  name                        = module.naming.point_to_site_vpn_gateway.name
-  resource_group_name         = var.resource_group_name
-  location                    = var.location
-  virtual_hub_id              = azurerm_virtual_hub.this.id
-  vpn_server_configuration_id = azurerm_vpn_server_configuration.this.id
-  scale_unit                  = 1
-  dns_servers                 = [var.dns_server, "168.63.129.16"]
-
-  connection_configuration {
-    name = "Clients"
-
-    vpn_client_address_pool {
-      address_prefixes = [var.client_address_pool]
-    }
+# Generate a self-signed root certificate
+resource "tls_self_signed_cert" "root_cert" {
+  private_key_pem = tls_private_key.root_cert_key.private_key_pem
+  subject {
+    common_name  = "MyP2SVPNRootCert"
+    organization = "AzureSandbox"
   }
+  validity_period_hours = 8760 # 1 year
+  is_ca_certificate     = true
+  allowed_uses = [
+    "cert_signing",
+    "key_encipherment",
+    "digital_signature"
+  ]
 }
 
-resource "azurerm_vpn_server_configuration" "this" {
-  name                     = "${module.naming.point_to_site_vpn_gateway.name}-server-config"
-  resource_group_name      = var.resource_group_name
-  location                 = var.location
-  vpn_authentication_types = ["Certificate"]
-  tags                     = var.tags
+# Generate a private key for the child certificate
+resource "tls_private_key" "child_cert_key" {
+  algorithm = "RSA"
+  rsa_bits  = 2048
+}
 
-  client_root_certificate {
-    name             = "Self signed certificate"
-    public_cert_data = join("\n", slice(split("\n", trimspace(file("${path.root}/MyP2SVPNRootCert_Base64_Encoded.cer"))), 1, length(split("\n", trimspace(file("${path.root}/MyP2SVPNRootCert_Base64_Encoded.cer")))) - 1)) 
+# Generate a child certificate signed by the root certificate
+resource "tls_cert_request" "child_cert_request" {
+  private_key_pem = tls_private_key.child_cert_key.private_key_pem
+  subject {
+    common_name  = "MyP2SVPNChildCert"
+    organization = "AzureSandbox"
   }
+  dns_names = ["MyP2SVPNChildCert"]
+}
+
+resource "tls_locally_signed_cert" "child_cert" {
+  cert_request_pem      = tls_cert_request.child_cert_request.cert_request_pem
+  ca_private_key_pem    = tls_private_key.root_cert_key.private_key_pem
+  ca_cert_pem           = tls_self_signed_cert.root_cert.cert_pem
+  validity_period_hours = 8760 # 1 year
+  allowed_uses = [
+    "client_auth",
+    "digital_signature",
+    "key_encipherment"
+  ]
 }
 #endregion
 
 #region modules
 module "naming" {
-  source                 = "Azure/naming/azurerm"
-  version                = "~> 0.4.2"
-  suffix                 = [var.tags["project"], var.tags["environment"]]
+  source  = "Azure/naming/azurerm"
+  version = "~> 0.4.2"
+  suffix  = [var.tags["project"], var.tags["environment"]]
 }
 #endregion

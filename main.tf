@@ -16,7 +16,7 @@ resource "azurerm_key_vault" "this" {
   tenant_id                     = var.aad_tenant_id
   sku_name                      = "standard"
   enable_rbac_authorization     = true
-  public_network_access_enabled = true # Note:Required to demo sandbox using internet connection
+  public_network_access_enabled = true # Note: Public access is enabled for demos and testing from internet clients, and should be disabled in production.
 }
 
 resource "azurerm_role_assignment" "roles" {
@@ -80,7 +80,7 @@ resource "time_sleep" "wait_for_roles" {
 }
 #endregion
 
-#region modules-required
+#region required-modules
 module "naming" {
   source                 = "Azure/naming/azurerm"
   version                = "~> 0.4.2"
@@ -101,7 +101,7 @@ module "vnet_shared" {
 }
 #endregion
 
-#region modules-optional
+#region optional-modules
 module "vnet_app" {
   source = "./modules/vnet-app"
 
@@ -123,7 +123,7 @@ module "vnet_app" {
   virtual_network_shared_id   = module.vnet_shared.resource_ids["virtual_network_shared"]
   virtual_network_shared_name = module.vnet_shared.resource_names["virtual_network_shared"]
 
-  depends_on = [azurerm_key_vault_secret.spn_password, module.vnet_shared.resource_ids]
+  depends_on = [module.vnet_shared]
 }
 
 module "vm_jumpbox_linux" {
@@ -143,7 +143,7 @@ module "vm_jumpbox_linux" {
   subnet_id             = module.vnet_app[0].subnets["snet-app-01"].id
   tags                  = var.tags
 
-  depends_on = [module.vnet_app[0].azure_files_config_vm_extension_id]
+  depends_on = [module.vnet_app[0]]
 }
 
 module "vm_mssql_win" {
@@ -166,7 +166,7 @@ module "vm_mssql_win" {
   subnet_id               = module.vnet_app[0].subnets["snet-db-01"].id
   tags                    = var.tags
 
-  depends_on = [module.vnet_app[0].azure_files_config_vm_extension_id]
+  depends_on = [module.vnet_app[0]]
 }
 
 module "mssql" {
@@ -183,7 +183,7 @@ module "mssql" {
   tags                  = var.tags
   unique_seed           = module.naming.unique-seed
 
-  depends_on = [module.vnet_app[0].resource_ids]
+  depends_on = [module.vnet_app[0]]
 }
 
 module "mysql" {
@@ -200,7 +200,7 @@ module "mysql" {
   tags                  = var.tags
   unique_seed           = module.naming.unique-seed
 
-  depends_on = [module.vnet_app[0].resource_ids]
+  depends_on = [module.vnet_app[0]]
 }
 
 module "vwan" {
@@ -217,5 +217,7 @@ module "vwan" {
     virtual_network_shared = module.vnet_shared.resource_ids["virtual_network_shared"]
     virtual_network_app    = module.vnet_app[0].resource_ids["virtual_network_app"]
   }
+
+  depends_on = [module.vnet_app[0]]
 }
 #endregion
