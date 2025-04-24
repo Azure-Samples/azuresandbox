@@ -5,7 +5,6 @@
 * [Architecture](#architecture)
 * [Overview](#overview)
 * [Features](#features)
-* [Dependencies](#dependencies)
 * [Prerequisites](#prerequisites)
 * [Getting Started (Interactive Execution)](#getting-started-interactive-execution)
 * [Documentation](#documentation)
@@ -18,7 +17,7 @@
 
 Azure Sandbox is a Terraform-based project designed to simplify the deployment of sandbox environments in Microsoft Azure. It provides a modular and reusable framework for creating and managing Azure resources, enabling users to experiment, learn, and test in a controlled environment.
 
-The project is ideal for developers, IT professionals, and organizations looking to explore Azure services, prototype solutions, or conduct training sessions. With its modular design, AzureSandbox allows users to customize their deployments to suit specific use cases, such as virtual networks, virtual machines, AI services, and more.
+This project is ideal for developers, IT professionals, and organizations looking to explore Azure services, prototype solutions, or conduct training sessions. With its modular design, AzureSandbox allows users to customize their deployments to suit specific use cases, such as virtual networks, virtual machines, AI services, and more.
 
 Key highlights of Azure Sandbox include:
 
@@ -31,7 +30,15 @@ Azure Sandbox is not intended for production use but serves as a powerful tool f
 
 ## Features
 
-Azure Sandbox provides a comprehensive set of features to simplify the deployment and management of sandbox environments in Microsoft Azure. These features include:
+Azure Sandbox provides a comprehensive set of features to simplify the deployment and management of sandbox environments in Microsoft Azure.
+
+* [Modular and Extensible Architecture](#modular-and-extensible-architecture)
+* [Secure Networking and Connectivity](#secure-networking-and-connectivity)
+* [Pre-configured Virtual Machines](#pre-configured-virtual-machines)
+* [Pre-configured Storage Options](#pre-configured-storage-options)
+* [Pre-configured Database Options](#pre-configured-sql-database-options)
+* [Secure by Default, Secure by Design](#secure-by-default-secure-by-design)
+* [Documentation and Videos](#documentation-and-videos)
 
 ### Modular and Extensible Architecture
 
@@ -42,7 +49,7 @@ Reusable Terraform modules for common Azure resources, such as:
 * Storage services
 * Database services
 
-Enable only the modules you need for your specific environment. Disable the modules you don't need to reduce costs and complexity. Extend your sandbox environment with additional modules for specialized use cases, or create your own custom modules to meet specific requirements.
+Enable only the modules you need for your specific sandbox environment. Disable the modules you don't need to reduce costs and complexity. Extend your sandbox environment with additional modules for specialized use cases, or create your own custom modules to meet specific requirements.
 
 ### Secure Networking and Connectivity
 
@@ -50,32 +57,32 @@ Enable only the modules you need for your specific environment. Disable the modu
   * Shared virtual network (`vnet-shared`) for hosting common services.
   * Application-specific virtual network (`vnet-app`) with pre-configured subnets.
   * Virtual network peering for seamless connectivity between networks.
-  * Preconfigured network security groups (NSGs) for controlling inbound and outbound traffic.
-* **Private DNS Server**: Configures a private DNS server for name resolution within the sandbox environment, ensuring secure and isolated DNS queries.
-* **Private DNS Zones**: Supports private DNS zones for managing custom domain names for Azure resources, enabling seamless name resolution across virtual networks.
-* **Private Endpoints**: Provides network isolated endpoints for PaaS services.
-* **Azure Firewall**: Pre-configured firewall for secure outbound internet access and traffic filtering.
+  * Pre-configured network security groups (NSGs) for controlling inbound and outbound traffic.
+* **Private DNS Server**: Pre-configured  private DNS server for name resolution within the sandbox environment, ensuring secure and isolated DNS queries.
+* **Private DNS Zones**: Pre-configured private DNS zones for popular Azure services.
+* **Private Endpoints**: Pre-configured network isolated endpoints for PaaS services.
+* **Azure Firewall**: Pre-configured firewall for secure outbound internet access and threat intelligence.
 * **Azure Bastion**: Pre-configured Bastion for secure and seamless RDP/SSH access to virtual machines without exposing them to the public internet.
-* **Point-to-site VPN Gateway**: Configures an optional point-to-site VPN gateway for secure remote access to your sandbox environment.
+* **Point-to-site VPN Gateway**: Pre-configured point-to-site VPN gateway for secure remote access to your sandbox environment.
 
 ### Pre-configured Virtual Machines
 
-Pre-configured virtual machines:
+A variety of Windows and Linux virtual machines are include and are fully configured for use in the sandbox.
 
-* **Domain Controller**: Configures Active Directory Domain Services (AD DS) with a pre-configured local domain and integrated private DNS server.
+* **Domain Controller**: Active Directory Domain Services (AD DS) domain controller with a pre-configured local domain and integrated private DNS server.
 * **Windows Jumpbox**: Domain-joined Windows server for remote administration, management and development within the sandbox environment with a full suite of pre-configured tools.
 * **Linux Jumpbox**: Domain-joined Ubuntu server for secure SSH access to the sandbox environment with a full suite of pre-configured tools.
 
-### Storage Options
+### Pre-configured Storage Options
 
-Pre-configured storage services:
+Two storage options are included and are fully configured for use in the sandbox.
 
-* **Azure Blob Storage**: Preconfigured container for startup configuration scripts.
-* **Azure Files with AD DS Integration**: Preconfigured Azure Files share configured for integrated Active Directory Domain Services (AD DS) authentication for secure file sharing.
+* **Azure Blob Storage**: Container for startup configuration scripts with network isolated endpoints for secure access.
+* **Azure Files with AD DS Integration**:  Azure Files share configured for integrated Active Directory Domain Services (AD DS) authentication and network isolated endpoints for secure file sharing.
 
-### Database Options
+### Pre-configured SQL Database Options
 
-Multiple database deployment options to suit various use cases and requirements:
+Multiple SQL database options are provided to suit various use cases and requirements. The combination of these features helps ensure that your sandbox environment is secure by default and designed to meet the highest security standards. These options allow users to choose the database solution that best fits their needs, whether they require full control, a managed service, or compatibility with open-source technologies.
 
 * **SQL Server IaaS (SQL Virtual Machine)**:
   * Deploys a fully configured SQL Server instance on a domain-joined Windows virtual machine.
@@ -84,15 +91,15 @@ Multiple database deployment options to suit various use cases and requirements:
 
 * **SQL Server PaaS (Azure SQL Database)**:
   * Deploys a fully managed Azure SQL Database instance.
+  * Network isolated endpoints for secure access.
   * Simplifies database management by handling backups, scaling, and high availability.
   * Suitable for applications requiring a scalable and cost-effective relational database solution.
 
 * **MySQL PaaS (Azure Database for MySQL)**:
   * Deploys a fully managed MySQL database instance.
+  * Network isolated endpoints for secure access.
   * Provides high availability, automated backups, and scaling options.
   * Ideal for applications built on open-source technologies requiring MySQL as the backend database.
-
-These options allow users to choose the database solution that best fits their needs, whether they require full control, a managed service, or compatibility with open-source technologies.
 
 ### Secure by Default, Secure by Design
 
@@ -111,69 +118,33 @@ Azure Sandbox is built with security as a core principle, ensuring that all reso
   * Simplifies access management by leveraging Azure Active Directory (AAD) for identity and access control.
 
 * **Data Encryption**:
-  * Ensures all data at rest is encrypted using Azure-managed keys or customer-managed keys (CMKs) stored in Azure Key Vault.
-  * Supports end-to-end encryption for data in transit using HTTPS and TLS.
+  * Ensures all data at rest is encrypted using platform-managed keys.
+  * Supports end-to-end encryption for data in transit using HTTPS and TLS and host encryption for virtual machines.
 
 * **Compliance and Monitoring**:
   * Integrates with Azure Policy to enforce compliance with organizational or regulatory standards.
   * Configures diagnostic settings to log resource activity and monitor for potential security threats.
   * Supports integration with Microsoft Defender for Cloud to provide advanced threat protection and security recommendations.
 
-By combining these features, Azure Sandbox ensures that your sandbox environment is secure by default and designed to meet the highest security standards.
-
 ### Documentation and Videos
 
+This project includes valuable resources to help you get started quickly and easily. The content is designed to be user-friendly and accessible, making it easy for users of all skill levels to understand and utilize the features of Azure Sandbox.
+
 * Comprehensive documentation for each module and configuration.
-* Provides guided smoke testing procedures for validating deployments.
+* Prescriptive smoke testing procedures for validating deployments.
 * Step-by-step video tutorials for setup, testing, and customization.
-
-## Dependencies
-
-This section covers the dependencies used in the Azure Sandbox project, including Terraform providers, modules, scripting technologies, and configuration management technologies.
-
-### Terraform
-
-Azure Sandbox is built using Terraform, a cross platform, open-source Infrastructure as Code (IaC) tool that allows users to define and provision and version infrastructure using declarative configuration language.
-
-#### Providers
-
-The following Terraform providers are used in the project:
-
-* **azurerm**: The Azure provider, used to manage Azure resources.
-* **azapi**: The Azure API provider, used to manage Azure resources that are not yet supported by the azurerm provider and for direct access to Azure APIs.
-* **cloudinit**: The cloud-init utility provider is used to configure Linux virtual machines.
-* **random**: The Random utility provider is used to generate random values for resource attributes.
-* **time**: The time utility provider is used to implement wait cycles and other time based operations.
-* **tls**: The TLS provider is used to generate SSH certificates.
-
-#### Modules
-
-The following Terraform modules are used in this project:
-
-* **Azure/naming**: A module for generating consistent and compliant Azure resource names.
-
-### Scripting Technologies
-
-The following cross-platform scripting technologies are used in this project:
-
-* **PowerShell**:  Used for running scripts and automating tasks within the Azure Sandbox environment.
-* **Az PowerShell Module**: The Az module is used to manage Azure resources from PowerShell.
-* **Azure CLI**: The Azure Command-Line Interface (CLI) is used to manage Azure resources from the command line.
-* **Bash**: The Bash shell is used for running scripts and automating tasks within the Azure Sandbox environment.
-
-### Configuration Management Technologies
-
-The following configuration management technologies are used in this project to configure virtual machines:
-
-* **PowerShell DSC**: PowerShell Desired State Configuration (DSC) is used to configure Windows virtual machines.
-* **Azure Automation DSC**: Azure Automation Desired State Configuration is used to configure Windows virtual virtual machines using configurations written in PowerShell DSC.
-* **cloud-init**: Cloud-init is used to configure Linux virtual machines. It is a standard tool for cloud instance initialization and is widely used in cloud environments.
 
 ## Prerequisites
 
 This section describes the prerequisites required in order to provision an Azure Sandbox.
 
-### Entra ID Tenant and Azure Subscription
+* [Microsoft Entra ID Tenant and Azure Subscription](#microsoft-entra-id-tenant-and-azure-subscription)
+* [Azure RBAC Role Assignments](#azure-rbac-role-assignments)
+* [Service Principal](#service-principal)
+* [Azure Policies and Quotas](#azure-policies-and-quotas)
+* [Terraform Execution Environment](#terraform-execution-environment)
+
+### Microsoft Entra ID Tenant and Azure Subscription
 
 * Identify the [Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/fundamentals/whatis) tenant to be used for identity and access management, or create a new tenant using [Quickstart: Set up a tenant](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-create-new-tenant).
 * Identify a single Azure [subscription](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#subscription) or create a new Azure subscription. See [Azure Offer Details](https://azure.microsoft.com/support/legal/offer-details/) and [Associate or add an Azure subscription to your Microsoft Entra tenant](https://learn.microsoft.com/entra/fundamentals/how-subscriptions-associated-directory) for more information.
@@ -186,7 +157,7 @@ This section describes the prerequisites required in order to provision an Azure
 ### Service Principal
 
 * Verify the subscription owner has privileges to create a service principal on the Microsoft Entra tenant. See [Permissions required for registering an app](https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal#permissions-required-for-registering-an-app) for more information.
-* Ask the subscription owner to [Create an Azure service principal](https://learn.microsoft.com/en-us/cli/azure/azure-cli-sp-tutorial-1?tabs=bash) (SPN) for sandbox users using [Azure Cloud Shell](https://learn.microsoft.com/azure/cloud-shell/quickstart). The service principal can be created with the following command:
+* Ask the subscription owner to [Create an Azure service principal](https://learn.microsoft.com/en-us/cli/azure/azure-cli-sp-tutorial-1?tabs=bash) (SPN) for sandbox users with [Azure Cloud Shell](https://learn.microsoft.com/azure/cloud-shell/quickstart). The service principal can be created with the following command:
 
   ```bash
   az ad sp create-for-rbac -n AzureSandboxSPN --role Owner --scopes /subscriptions/YOUR-SUBSCRIPTION-ID-HERE
@@ -216,7 +187,7 @@ Save the service principal *appId* and *password* in a secure location such as a
 
 A variety of Terraform execution environments can be used to provision Azure Sandbox interactively, including:
 
-* **Windows-Only**: A Windows-only client can be used to run Terraform. The following software should be installed:
+* **Windows-Only Client**: A Windows-only client can be used to run Terraform. The following software should be installed:
   * git
   * Azure CLI
   * PowerShell 7.x
@@ -224,7 +195,7 @@ A variety of Terraform execution environments can be used to provision Azure San
   * Terraform
   * Visual Studio Code
 
-* **Windows Subsystem for Linux (WSL)**: WSL offers the best of Windows and Linux in the same client environment and was used to develop this project. The following software should be installed:
+* **Windows Subsystem for Linux (WSL) Client**: WSL offers the best of Windows and Linux in the same client environment and was used to develop this project. The following software should be installed:
   * Linux (WSL) software
     * Linux Distro: Ubuntu 24.04 LTS (Noble Numbat)
     * pip3 Python library package manager and the PyJWT Python library.
@@ -236,7 +207,7 @@ A variety of Terraform execution environments can be used to provision Azure San
   * Windows software
     * Visual Studio Code configured for [Remote development in WSL](https://code.visualstudio.com/docs/remote/wsl-tutorial)
 
-* **Linux / MacOs**: A Linux or MacOS client can be used to run Terraform. The following software should be installed:
+* **Linux / MacOs Client**: A Linux or MacOS client can be used to run Terraform. The following software should be installed:
   * git
   * Azure CLI
   * PowerShell 7.x
@@ -260,7 +231,7 @@ Azure DevOps, GitHub Actions, or other CI/CD tools can be used to automate the d
 
 ## Getting Started (Interactive Execution)
 
-This section covers the steps to get started with Azure Sandbox using an interactive execution environment. The steps include cloning the repository, initializing Terraform, configuring variables, validating and applying the configuration, and smoke testing.
+This section covers the steps to get started with Azure Sandbox using an interactive Terraform execution environment. The steps include cloning the repository, initializing Terraform, configuring variables, validating and applying the configuration, and smoke testing.
 
 * [Step 1: Clone the Repository](#step-1-clone-the-repository)
 * [Step 2: Initialize Terraform](#step-2-initialize-terraform)
@@ -272,7 +243,7 @@ This section covers the steps to get started with Azure Sandbox using an interac
 
 ### Step 1: Clone the Repository
 
-To get started, clone the Azure Sandbox repository to your local machine. You can do this using the following command:
+To get started, clone the Azure Sandbox repository to your local machine using the following command:
 
 ```bash
 git clone https://github.com/Azure-Samples/azuresandbox
@@ -479,32 +450,39 @@ Don't forget to delete your sandbox when you're done. You don't want to have to 
 
 This section provides documentation regarding the overall structure of the repository and the root module. See the README.md files in each module directory for more information about that module.
 
-### Repository Structure
+* [Project Structure](#project-structure)
+* [Root Module Resources](#root-module-resources)
+* [Child Modules](#child-modules)
+* [Additional Resources](#additional-resources)
 
-The Azure Sandbox repository is organized into the following structure:
+### Project Structure
 
-Path / File | Description
---- | ---
-`├── extras/`                     | Extend your sandbox with extra modules and configurations
-`│   ├── configurations/`         | Extra configurations
-`│   └── modules/`                | Extra modules
-`├── images/`                     | Diagrams and visual assets
-`│   └── azuresandbox.drawio.svg` | Architecture diagram for Azure Sandbox
-`├── modules/`                    | Reusable Terraform modules
-`│   ├── mssql/`                  | Azure SQL Database module
-`│   ├── mysql/`                  | Azure Database for MySQL module
-`│   ├── vm-jumpbox-linux/`       | Linux jumpbox virtual machine module
-`│   ├── vnet-shared/`            | Shared services virtual network module
-`│   ├── vnet-app/`               | Application virtual network module
-`│   └── vwan/`                   | Point-to-site VPN module
-`├── scripts/`                    | Helper scripts for setup and automation
-`│   ├── bootstrap.sh`            | Bash script for generating `terraform.tfvars`
-`│   └── bootstrap.ps1`           | PowerShell script for generating `terraform.tfvars`
-`├── locals.tf`                   | Local variables for the root module
-`├── main.tf`                     | Main Terraform configuration
-`├── outputs.tf`                  | Output variables for the root module
-`├── providers.tf`                | Provider configurations
-`└── variables.tf`                | Input variables for the root module
+The Azure Sandbox project is organized into the following structure:
+
+```plaintext
+├── extras/                     # Extend your sandbox with extra modules and configurations
+│   ├── configurations/         # 
+│   └── modules/                # 
+├── images/                     # 
+│   └── azuresandbox.drawio.svg # Architecture diagram
+├── modules/                    # 
+│   ├── mssql/                  # Azure SQL Database module
+│   ├── mysql/                  # Azure Database for MySQL module
+│   ├── vm-jumpbox-linux/       # Linux jumpbox virtual machine module
+│   ├── vm-msssql-win/          # Windows SQL Server virtual machine module
+│   ├── vnet-app/               # Application virtual network module
+│   ├── vnet-shared/            # Shared services virtual network module
+│   └── vwan/                   # Point-to-site VPN module
+├── scripts/                    # 
+│   ├── bootstrap.sh            # Bash script for generating terraform.tfvars
+│   └── bootstrap.ps1           # PowerShell script for generating terraform.tfvars
+├── locals.tf                   # Local variables 
+├── main.tf                     # Resource configurations
+├── outputs.tf                  # Output variables 
+├── providers.tf                # Provider configuration blocks
+├── terraform.tf                # Terraform configuration block
+└── variables.tf                # Variable definitions
+```
 
 ### Root Module Resources
 
@@ -535,8 +513,123 @@ Module | Required | Depends On | Notes
 [mysql](./modules/mysql) | No | `vnet-shared` module | Azure Database for MySQL module.
 [vwan](./modules/vwan) | No | `vnet-shared` module | Point-to-site VPN module.
 
+### Virtual Network Design
+
+The Azure Sandbox project uses a structured IPv4 address scheme to ensure proper segmentation and isolation of resources within the virtual networks and subnets. The following sections describe the IP address ranges and their usage in the shared and application-specific virtual networks. Minimum CIDR sizes are provided for each subnet to allow for customization. Network security groups (NSGs) are also configured for each subnet to control inbound and outbound traffic. This IP addressing scheme ensures proper segmentation, security, and scalability for the sandbox environment.
+
+* [Shared Services Virtual Network](#shared-services-virtual-network)
+* [Application Virtual Network](#application-virtual-network)
+* [Virtual Network Peering](#virtual-network-peering)
+* [Routing and Security](#routing-and-security)
+
+#### Shared Services Virtual Network
+
+The shared services virtual network (`vnet-shared`) is used to host common services that are shared across the sandbox environment, including ab AD DS domain controllers / DNS server, bastions hosts and firewalls.
+
+Setting | Value | Notes
+--- | --- | ---
+**Default CIDR** | `10.1.0.0/16` | Min CIDR is `/24`
+**Primary DNS Server** | `10.1.1.4` | Private IP of the AD DS domain controller
+**Secondary DNS Server** | `168.63.129.16` | Azure Recursive DNS Resolver
+
+The following subnets are configured in `vnet-shared`:
+
+Subnet Name | Default CIDR | Min CIDR | NSG | Purpose
+--- | --- | --- | --- | ---
+`AzureBastionSubnet` | `10.1.0.0/27` | `/27` | Yes | Reserved for Azure Bastion to provide secure RDP/SSH access to virtual machines.
+`snet-adds-01` | `10.1.1.0/24` | `/27` | Yes | Hosts the Active Directory Domain Services (AD DS) domain controller and DNS server.
+`snet-misc-01` | `10.1.2.0/24` | `/27` | Yes | Reserved for optional configurations requiring connectivity in the shared virtual network.
+`snet-misc-02` | `10.1.3.0/24` | `/27` | Yes | Reserved for optional configurations requiring connectivity in the shared virtual network.
+`AzureFirewallSubnet` | `10.1.4.0/26` | `/26` | No | Reserved for Azure Firewall to provide network security.
+
+#### Application Virtual Network
+
+The application virtual network (`vnet-app`) is used to host application-specific resources, such as virtual machines, databases, and private endpoints. The virtual network is configured as follows:
+
+Setting | Value | Notes
+--- | --- | ---
+**Default CIDR** | `10.2.0.0/16` | Min CIDR is `/24`
+**Primary DNS Server** | `10.1.1.4` | Private IP of the AD DS domain controller in `vnet-shared`
+**Secondary DNS Server** | `168.63.129.16` | Azure Recursive DNS Resolver
+
+The following subnets are configured in `vnet-app`:
+
+Subnet Name | Default CIDR | Min CIDR | NSG | Purpose
+--- | --- | --- | --- | ---
+`snet-app-01` | `10.2.0.0/24` | `/27` | Yes | Reserved for web, application, and jumpbox servers.
+`snet-db-01` | `10.2.1.0/24` | `/27` | Yes | Hosts database servers, such as SQL Server and MySQL.
+`snet-privatelink-01` | `10.2.2.0/24` | `/27` | Yes |Reserved for private endpoints using Azure Private Link.
+`snet-misc-03` | `10.2.3.0/24` | `/27` | Yes | Reserved for future use.
+`snet-appservice-01` | `10.2.4.0/24` | `/27` | Yes | Reserved for Azure App Service with delegation to `Microsoft.Web/serverFarms`.
+
+Private endpoints are configured in the `snet-privatelink-01` subnet to provide secure, network-isolated access to the following Azure PaaS services:
+
+* Azure Blob Storage
+* Azure Files
+* Azure SQL Database
+* Azure Database for MySQL
+
+#### Virtual Network Peering
+
+Bi-directional virtual virtual network peering is enabled between `vnet-shared` and `vnet-app` to allow network connectivity between resources in both virtual networks.
+
+#### Routing and Security
+
+* **Azure Firewall**: Configured in the `AzureFirewallSubnet` of `vnet-shared` to provide secure outbound internet access and threat intelligence.
+* **Network Security Groups (NSGs)**: Associated with each subnet to control inbound and outbound traffic based on security rules.
+* **Route Tables**: Custom route tables are used to direct traffic through the Azure Firewall for secure internet access.
+
+### Dependencies
+
+This section covers the dependencies used in the Azure Sandbox project, including Terraform providers, modules, scripting technologies, and configuration management technologies.
+
+* [Terraform](#terraform)
+* [Scripting Technologies](#scripting-technologies)
+* [Configuration Management Technologies](#configuration-management-technologies)
+* [Operating Systems](#operating-systems)
+
+#### Terraform
+
+Azure Sandbox is built using Terraform, a cross platform, open-source Infrastructure as Code (IaC) tool that allows users to define, provision and version cloud infrastructure using a declarative configuration language.
+
+* **Providers**: The following Terraform providers are used in the project:
+  * **azurerm**: Used to manage Azure resources.
+  * **azapi**: Used to manage Azure resources that are not yet supported by the azurerm provider and for direct access to Azure APIs.
+  * **cloudinit**: Used to configure Linux virtual machines.
+  * **random**: Used to generate random values for resource attributes.
+  * **time**: Used to implement wait cycles and other time based operations.
+  * **tls**: Used to generate certificates.
+* **Modules**: The following Terraform modules are used in this project:
+  * **Azure/naming**: A module for generating consistent and compliant Azure resource names.
+
+#### Scripting Technologies
+
+The following cross-platform scripting technologies are used in this project:
+
+* **PowerShell**:  Used for running scripts and automating tasks within the Azure Sandbox environment.
+* **Az PowerShell Module**: Used to manage Azure resources from PowerShell.
+* **Azure CLI**: Used to manage Azure resources from the command line.
+* **Bash**: Used for running scripts and automating tasks within the Azure Sandbox environment.
+
+#### Configuration Management Technologies
+
+The following configuration management technologies are used in this project to configure virtual machines:
+
+* **PowerShell DSC**: PowerShell Desired State Configuration is used to configure Windows virtual machines.
+* **Azure Automation DSC**: Used to configure Windows virtual virtual machines using configurations written in PowerShell DSC.
+* **cloud-init**: Used to configure Linux virtual machines. It is a standard tool for cloud instance initialization and is widely used in cloud environments.
+
+#### Operating Systems
+
+The following operating systems are used for the various virtual machines in the sandbox:
+
+Virtual Machine | Role | Module | Operating System
+--- | --- | --- | ---
+`adds1` | AD DS Domain Controller / DNS Server | `vnet-shared` | Windows Server 2025 Datacenter Azure Edition Core
+`jumpwin1` | Windows jumpbox VM | `vnet-app` | Windows Server 2025 Datacenter Azure Edition
+`mssqlwin1` | Windows SQL Server VM | `vm-mssql-win` | Windows Server 2022 / SQL Server 2022 Developer Edition
+`jumplinux1` | Linux jumpbox VM | `vm-jumpbox-linux` | Ubuntu Server LTS 24.04 (Nobel Numbat)
+
 ### Additional Resources
 
 See [extras](./extras/) for other modules and configurations that can be used to extend your sandbox. Links to videos and other learning resources are also included.
-
-## Disclaimer
