@@ -1,7 +1,10 @@
 #!/bin/bash
 
-# Bootstraps deployment with pre-requisites for applying Terraform configurations
-# Script is idempotent and can be run multiple times
+# This script generates a terraform.tfvars file for use with Azure Sandbox
+#
+# Package dependencies:
+#   - Azure CLI 
+#   - PyJWT python library to decode the JWT tokens
 
 #region functions
 
@@ -14,16 +17,33 @@ usage() {
 
 #region constants
 
-arm_client_id=''
-arm_client_secret=''
-default_costcenter="mycostcenter"
-default_environment="dev"
-default_location="centralus"
-default_project="sand"
+default_costcenter=mycostcenter
+default_environment=dev
+default_location=centralus
+default_project=sand
 
 #endregion
 
 #region main
+
+# Check if Azure CLI is installed
+if ! command -v az &> /dev/null
+then
+    printf "Azure CLI could not be found. Please install Azure CLI.\n"
+    usage
+fi
+# Check if Python 3 is installed
+if ! command -v python3 &> /dev/null
+then
+    printf "Python 3 could not be found. Please install Python 3.\n"
+    usage
+fi
+# Check if PyJWT is installed
+if ! python3 -c "import jwt" &> /dev/null
+then
+    printf "PyJWT could not be found. Please install PyJWT.\n"
+    usage
+fi
 
 # Get runtime defaults
 printf "Retrieving runtime defaults ...\n"
@@ -134,16 +154,21 @@ EOF
 # Generate terraform.tfvars file
 printf "\nGenerating terraform.tfvars file...\n\n"
 
-printf "aad_tenant_id   = \"$aad_tenant_id\"\n"   > ./terraform.tfvars
-printf "arm_client_id   = \"$arm_client_id\"\n"   >> ./terraform.tfvars
-printf "location        = \"$location\"\n"        >> ./terraform.tfvars
-printf "subscription_id = \"$subscription_id\"\n" >> ./terraform.tfvars
-printf "user_object_id  = \"$user_object_id\"\n"  >> ./terraform.tfvars
-printf "\ntags = $tags\n"                         >> ./terraform.tfvars
+printf "aad_tenant_id   = \"$aad_tenant_id\"\n"     > ./terraform.tfvars
+printf "arm_client_id   = \"$arm_client_id\"\n"     >> ./terraform.tfvars
+printf "location        = \"$location\"\n"          >> ./terraform.tfvars
+printf "subscription_id = \"$subscription_id\"\n"   >> ./terraform.tfvars
+printf "user_object_id  = \"$user_object_id\"\n"    >> ./terraform.tfvars
+printf "\ntags = $tags\n"                           >> ./terraform.tfvars
+printf "\n# Enable modules here\n\n"                >> ./terraform.tfvars
+printf "# enable_module_vnet_app         = true\n"  >> ./terraform.tfvars
+printf "# enable_module_vm_jumpbox_linux = true\n"  >> ./terraform.tfvars
+printf "# enable_module_vm_mssql_win     = true\n"  >> ./terraform.tfvars
+printf "# enable_module_mssql            = true\n"  >> ./terraform.tfvars
+printf "# enable_module_mysql            = true\n"  >> ./terraform.tfvars
+printf "# enable_module_vwan             = true\n"  >> ./terraform.tfvars
 
 cat ./terraform.tfvars
 
-printf "\nBootstrapping complete...\n"
 exit 0
-
 #endregion

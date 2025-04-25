@@ -54,8 +54,8 @@ Enable only the modules you need for your specific sandbox environment. Disable 
 ### Secure Networking and Connectivity
 
 * **Virtual Networks**: Configures virtual networks for secure and isolated communication between resources.
-  * Shared virtual network (`vnet-shared`) for hosting common services.
-  * Application-specific virtual network (`vnet-app`) with pre-configured subnets.
+  * Shared virtual network (vnet-shared) for hosting common services.
+  * Application-specific virtual network (vnet-app) with pre-configured subnets.
   * Virtual network peering for seamless connectivity between networks.
   * Pre-configured network security groups (NSGs) for controlling inbound and outbound traffic.
 * **Private DNS Server**: Pre-configured  private DNS server for name resolution within the sandbox environment, ensuring secure and isolated DNS queries.
@@ -141,7 +141,7 @@ This section describes the prerequisites required in order to provision an Azure
 * [Microsoft Entra ID Tenant and Azure Subscription](#microsoft-entra-id-tenant-and-azure-subscription)
 * [Azure RBAC Role Assignments](#azure-rbac-role-assignments)
 * [Service Principal](#service-principal)
-* [Azure Policies and Quotas](#azure-policies-and-quotas)
+* [Other Prerequisites](#other-prerequisites)
 * [Terraform Execution Environment](#terraform-execution-environment)
 
 ### Microsoft Entra ID Tenant and Azure Subscription
@@ -176,10 +176,12 @@ This section describes the prerequisites required in order to provision an Azure
 
 Save the service principal *appId* and *password* in a secure location such as a password vault.
 
-### Azure Policies and Quotas
+### Other Prerequisites
 
-* Some organizations may institute [Azure policy](https://learn.microsoft.com/azure/governance/policy/overview) which may cause some sandbox deployments to fail. This can be addressed by using custom settings which pass the policy checks, or by disabling the policies on the Azure subscription being used for the configurations.
 * Some Azure subscriptions may have low quota limits for specific Azure resources which may cause sandbox deployments to fail. See [Resolve errors for resource quotas](https://learn.microsoft.com/azure/azure-resource-manager/templates/error-resource-quota) for more information.
+* Some Azure subscriptions may not have the required resource providers registered. Terraform is configured to automatically register the required resource providers, but this may take some time on first use.
+* Some Azure subscriptions may not have the required features enabled, such has host encryption for virtual machines. Monitor your plan application for errors related to specific subscription features and enable them as needed.
+* Some organizations may institute [Azure policy](https://learn.microsoft.com/azure/governance/policy/overview) which may cause some sandbox deployments to fail. This can be addressed by using custom settings which pass the policy checks, or by disabling the policies on the Azure subscription being used for the configurations.
 
 ### Terraform Execution Environment
 
@@ -231,8 +233,9 @@ Azure DevOps, GitHub Actions, or other CI/CD tools can be used to automate the d
 
 ## Getting Started (Interactive Execution)
 
-This section covers the steps to get started with Azure Sandbox using an interactive Terraform execution environment. The steps include cloning the repository, initializing Terraform, configuring variables, validating and applying the configuration, and smoke testing.
+This section covers the steps to get started with Azure Sandbox using an interactive Terraform execution environment. The steps include logging into Azure, cloning the repository, initializing Terraform, configuring variables, validating and applying the configuration, and smoke testing.
 
+* [Step 0: Login](#step-0-login)
 * [Step 1: Clone the Repository](#step-1-clone-the-repository)
 * [Step 2: Initialize Terraform](#step-2-initialize-terraform)
 * [Step 3: Configure Variables](#step-3-configure-variables)
@@ -241,22 +244,60 @@ This section covers the steps to get started with Azure Sandbox using an interac
 * [Step 6: Use Your Sandbox](#step-6-use-your-sandbox)
 * [Step 7: Clean Up](#step-7-clean-up)
 
+### Step 0: Login
+
+Before you can provision an Azure Sandbox interactively, you need to log in to your Azure account. Use the following steps to log in
+
+* Open a terminal window and run one of the following commands to log in to Azure according to your preference:
+
+  ```bash
+  # Log in using Azure CLI
+  az login --use-device-code
+  ```
+
+  ```pwsh
+  # Log in using PowerShell
+  Connect-AzAccount -UseDeviceAuthentication
+  ```
+
+* Check the terminal for a message like this:
+
+  ```text
+  To sign in, use a web browser to open the page https://microsoft.com/devicelogin and enter the code XXXXXXXXX to authenticate.
+  ```
+
+* Open a browser and navigate to the URL provided in the terminal. Enter the code displayed in the terminal to authenticate your Azure account.
+* Select an account that has an Azure RBAC `Owner` role assignment on the subscription you will be using to provision the sandbox.
+* Depending upon how your Entra ID tenant is configured, you may be prompted to enter your password and/or approve a sign-in request on your mobile device.
+* Click **Continue** when asked if you are trying to sign in to Azure.
+* Check the terminal for a prompt like this:
+
+  ```text
+  Retrieving tenants and subscriptions for the selection...
+
+  [Tenant and subscription selection]
+
+  No     Subscription name               Subscription ID                       Tenant
+  -----  ------------------------------  ------------------------------------  ----------------
+  [1] *  SUBSCRIPTION1-NAME-HERE         SUBSCRIPTION1-ID-HERE                 TENANT-NAME-HERE
+  [2]    SUBSCRIPTION2-NAME-HERE         SUBSCRIPTION2-ID-HERE                 TENANT-NAME-HERE
+
+  The default is marked with an *; the default tenant is 'TENANT-NAME-HERE' and subscription is 'SUBSCRIPTION1-NAME-HERE' (SUBSCRIPTION1-ID-HERE).
+
+  Select a subscription and tenant (Type a number or Enter for no changes):
+  ```
+
+* Select the subscription you will be using to provision the sandbox by entering the number next to it. If you only have one subscription, just press Enter.
+
 ### Step 1: Clone the Repository
 
-To get started, clone the Azure Sandbox repository to your local machine using the following command:
+Clone the Azure Sandbox repository to your local machine using the following command:
 
 ```bash
 git clone https://github.com/Azure-Samples/azuresandbox
 ```
 
 ### Step 2: Initialize Terraform
-
-After cloning the repository, navigate to the `azuresandbox` directory and initialize Terraform. This step downloads the necessary provider plugins and modules.
-
-```bash
-cd azuresandbox
-terraform init
-```
 
 **WARNING:** By default this configuration assumes you will be using a local Terraform state file which includes sensitive information. If you wish to use a remote state file, simply add a `backend.tf` file to the root directory of the project and include the configuration for your remote backend. For example, if you are using Azure Storage as a remote backend, the `backend.tf` file might look like this:
 
@@ -273,57 +314,66 @@ terraform {
 }
 ```
 
+After cloning the repository, navigate to the `azuresandbox` directory and initialize Terraform. This step downloads the necessary provider plugins and modules.
+
+```bash
+cd azuresandbox
+terraform init
+```
+
 ### Step 3: Configure Variables
 
 There are hundreds (maybe thousands) of variables in this configuration. Defaults have been set for most of them so only a few need to be set in advance to provision a sandbox. There are a few different ways to set variables in Terraform.
 
-* Environment Variables: Set environment variables for sensitive information such as passwords and secrets used in the root module.
-* `terraform.tfvars` file: Create a `terraform.tfvars` file in the root directory of the project to set variables for the root module.
-* `main.tf` file: Override module default values in the `main.tf` file by customizing the module blocks.
+* **Environment Variables**: Set environment variables for sensitive information such as passwords and secrets used in the root module.
+* **terraform.tfvars file**: Create a `terraform.tfvars` file in the root directory of the project to set variables for the root module.
+* **main.tf file**: Override module default values in the `main.tf` file by customizing the module blocks.
 
-First, create an environment variable for the service principal password. For security reasons this secret should not be stored in the `terraform.tfvars` file.
+Follow these steps to configure the variables for your sandbox:
 
-```bash
-# Set environment variable in bash
-export TF_VAR_arm_client_secret=YOUR-SERVICE-PRINCIPAL-PASSWORD-HERE
-```
+* First, create an environment variable for the service principal password. For security reasons this secret should not be stored in the `terraform.tfvars` file.
 
-```pwsh
-# Set  environment variable in PowerShell
-$env:TF_VAR_arm_client_secret = "YOUR-SERVICE-PRINCIPAL-PASSWORD-HERE"
-```
+  ```bash
+  # Set environment variable in bash
+  export TF_VAR_arm_client_secret=YOUR-SERVICE-PRINCIPAL-PASSWORD-HERE
+  ```
 
-Next, create a `terraform.tfvars` file in the root directory of the project. This file should set the necessary variables for your deployment. Here is an example of what the `terraform.tfvars` file might look like:
+  ```pwsh
+  # Set environment variable in PowerShell
+  $env:TF_VAR_arm_client_secret = "YOUR-SERVICE-PRINCIPAL-PASSWORD-HERE"
+  ```
 
-```hcl
-aad_tenant_id   = "YOUR-ENTRA-TENANT-ID-HERE"
-arm_client_id   = "YOUR-SERVICE-PRINCIPAL-APP-ID-HERE"
-location        = "YOUR-AZURE-REGION-HERE"
-subscription_id = "YOUR-AZURE-SUBSCRIPTION-ID-HERE"
-user_object_id  = "YOUR-USER-OBJECT-ID-HERE"
+* Next, create a `terraform.tfvars` file in the root directory of the project. This file should set the necessary variables for your deployment. Here is an example of what the `terraform.tfvars` file might look like:
 
-tags = {
-  project     = "sand",
-  costcenter  = "mycostcenter",
-  environment = "dev"
-}
-```
+  ```hcl
+  aad_tenant_id   = "YOUR-ENTRA-TENANT-ID-HERE"
+  arm_client_id   = "YOUR-SERVICE-PRINCIPAL-APP-ID-HERE"
+  location        = "YOUR-AZURE-REGION-HERE"
+  subscription_id = "YOUR-AZURE-SUBSCRIPTION-ID-HERE"
+  user_object_id  = "YOUR-USER-OBJECT-ID-HERE"
 
-Helper scripts are provided to generate the `terraform.tfvars` file:
+  tags = {
+    project     = "sand",
+    costcenter  = "mycostcenter",
+    environment = "dev"
+  }
+  ```
 
-```bash
-# Bash bootstrap script
-./scripts/bootstrap.sh
-```
+  Helper scripts are provided to generate the `terraform.tfvars` file:
 
-```pwsh
-# PowerShell bootstrap script
-./scripts/bootstrap.ps1
-```
+  ```bash
+  # Bash bootstrap script, run from the root directory of the project
+  ./scripts/bootstrap.sh
+  ```
 
-#### Enabling Modules
+  ```pwsh
+  # PowerShell bootstrap script, run from the root directory of the project
+  ./scripts/bootstrap.ps1
+  ```
 
-By default only the shared virtual network module (`vnet-shared`) is enabled which isn't very useful on it's own. You can enable additional modules by setting the `enable_module_*` variables in the `terraform.tfvars` file. At a minimum you should enable the application virtual network module (`vnet-app`) by setting `enable_vnet_app = true` like this:
+#### **Enable Modules**
+
+By default only the shared virtual network module (vnet-shared) is enabled which isn't very useful on it's own. You can enable additional modules by setting the `enable_module_*` variables in the `terraform.tfvars` file. At a minimum you should enable the application virtual network module (vnet-app) like this:
 
 ```hcl
 aad_tenant_id   = "YOUR-ENTRA-TENANT-ID-HERE"
@@ -368,9 +418,9 @@ enable_module_vwan              = true
 
 You can examine the `depends_on` blocks in the `main.tf` file to see which modules depend on each other.
 
-#### Overriding Defaults
+#### **Overriding Defaults**
 
-The variable defaults set in each module can be overridden by customizing the appropriate module block in `main.tf`. For example, the default value for the `vm_adds_name` variable in the `vnet-shared` module is `adds1`. You can override this value by adding the following to the `vnet-shared` module block in `main.tf`:
+The variable defaults set in each module can be overridden by customizing the appropriate module block in `main.tf`. For example, the default value for the `vm_adds_name` variable in the vnet-shared module is `adds1`. You can override this value by adding the following to the vnet-shared module block in `main.tf`:
 
 ```hcl
 module "vnet_shared" {
@@ -391,40 +441,7 @@ module "vnet_shared" {
 
 ### Step 4: Validate and Apply Configuration
 
-First, validate that the configuration is syntactically correct:
-
-```bash
-terraform validate
-```
-
-Next, run a plan to see what resources will be created:
-
-```bash
-terraform plan
-```
-
-If you are provisioning a brand new sandbox, you will see a lot of `+` signs in the output. This indicates that new resources will be created if this plan is applied. If you are updating an existing sandbox, you may see `~` signs indicating that existing resources will be updated. If you see `-` signs, this indicates that existing resources will be deleted. Be careful with these operations as they may cause data loss.
-
-Public access is disabled by design for the Azure Storage account in the sandbox. This may cause errors during plan creation because your Terraform execution environment is blocked by the storage firewall. To work around this you can manually modify the storage firewall using a couple of different approaches:
-
-* Add the client ip for your Terraform execution environment to the storage firewall whitelist. This should work from most home networks, but will not work on a private network that implements source network address translation (SNAT).
-* Temporarily enable public network access on the storage account outside of Terraform.
-
-Be sure to check that storage firewall public access is disabled again after you are done with Terraform operations.
-
 Remember that Terraform will compare the state of existing resources in Azure with what it expects to be there when creating a plan. If the state of existing resources in Azure does not match what Terraform expects, the plan will modify existing resources to match the configuration. This can happen when resources are modified manually or via Policy outside of Terraform. This is known as "drift".
-
-Finally, apply the configuration to create the resources:
-
-```bash
-terraform apply
-```
-
-Monitor the progress of the apply operation in the console. If errors occur, that may not be reflected in the console immediately. Terraform will try to apply as much of the plan as possible first, then will show the errors when it is done. It can take up to 90 minutes to provision a sandbox depending upon which modules you choose to enable. If everything goes well you should see a message like this:
-
-```text
-Apply complete! Resources: XX added, XX changed, XX destroyed.
-```
 
 **WARNING:** This configuration uses Terraform provisioners and Azure custom script extensions which increase the chance of transient errors during plan application. Addressing errors may require any of the following actions:
 
@@ -433,6 +450,41 @@ Apply complete! Resources: XX added, XX changed, XX destroyed.
 * An existing Azure resource may need to be imported into Terraform state (see `terraform import` command).
 
 Once the error has been addressed, you can re-run the `terraform apply` command to continue provisioning the sandbox. Terraform will pick up where it left off.
+
+Follow these steps to validate and apply the configuration:
+
+* First, validate that the configuration is syntactically correct:
+
+  ```bash
+  terraform validate
+  ```
+
+* Next, create a plan to see what resources will be created:
+
+  ```bash
+  terraform plan
+  ```
+
+  * If you are provisioning a brand new sandbox, you will see a lot of `+` signs in the output. This indicates that new resources will be created if this plan is applied. If you are updating an existing sandbox, you may see `~` signs indicating that existing resources will be updated. If you see `-` signs, this indicates that existing resources will be deleted. Be careful with these operations as they may cause data loss.
+
+  * Public access is disabled by design for the Azure Storage account in the sandbox. This may cause errors during plan creation because your Terraform execution environment is blocked by the storage firewall. To work around this you can manually modify the storage firewall using a couple of different approaches:
+
+    * Add the client ip for your Terraform execution environment to the storage firewall whitelist. This should work from most home networks, but will not work on a private network that implements source network address translation (SNAT).
+    * Temporarily enable public network access on the storage account outside of Terraform.
+
+  * Be sure to check that storage firewall public access is disabled again after you are done with Terraform operations.
+
+* Finally, apply the configuration to create the resources:
+
+  ```bash
+  terraform apply
+  ```
+
+* Monitor the progress of the apply operation in the console. If errors occur, that may not be reflected in the console immediately. Terraform will try to apply as much of the plan as possible first, then will show the errors when it is done. It can take up to 90 minutes to provision a sandbox depending upon which modules you choose to enable. If everything goes well you should see a message like this:
+
+  ```text
+  Apply complete! Resources: XX added, XX changed, XX destroyed.
+  ```
 
 ### Step 5: Complete Smoke Testing
 
@@ -453,6 +505,8 @@ This section provides documentation regarding the overall structure of the repos
 * [Project Structure](#project-structure)
 * [Root Module Resources](#root-module-resources)
 * [Child Modules](#child-modules)
+* [Virtual Network Design](#virtual-network-design)
+* [Dependencies](#dependencies)
 * [Additional Resources](#additional-resources)
 
 ### Project Structure
@@ -484,100 +538,105 @@ The Azure Sandbox project is organized into the following structure:
 └── variables.tf                # Variable definitions
 ```
 
+---
+
 ### Root Module Resources
 
 The root module includes a resource group, key vault and log analytics workspace used by the child modules. It also implements Azure RBAC role assignments for both the service principal used by Terraform as well as the interactive user.
 
-Address | Sample Name | Notes
+Address | Name | Notes
 --- | --- | ---
-data.azurerm_client_config.current |  | Used to get the object id of the service principal
-azurerm_key_vault.this | `kv-sand-dev-xxxxxxxx` | Key vault for storing secrets
-azurerm_key_vault_secret.log_primary_shared_key |  | Shared key secret for log analytics workspace
-azurerm_key_vault_secret.spn_password | | Service principal password secret
-azurerm_log_analytics_workspace.this | `log-sand-dev-xxxxxxxx` | Log analytics workspace
-azurerm_monitor_diagnostic_setting.this | | Diagnostic settings for key vault
-azurerm_resource_group.this | `rg-sand-dev-xxxxxxxx` | Resource group for the sandbox
-azurerm_role_assignment.roles["kv_secrets_officer_spn"] | | Assigns the Key Vault Secrets Officer role to the service principal
-azurerm_role_assignment.roles["kv_secrets_officer_user"] | | Assigns the Key Vault Secrets Officer role to the interactive user
-time_sleep.wait_for_roles | | Waits for the role assignments to propagate
+azurerm_key_vault.this | kv&#8209;sand&#8209;dev&#8209;xxxxxxxx | Key vault for storing secrets. Public network access is enabled by default to facilitate testing. This should be disabled in production environments.
+azurerm_key_vault_secret.log_primary_shared_key |  | Shared key secret for log analytics workspace.
+azurerm_key_vault_secret.spn_password | | Service principal password secret.
+azurerm_log_analytics_workspace.this | log&#8209;sand&#8209;dev&#8209;xxxxxxxx | Log analytics workspace.
+azurerm_monitor_diagnostic_setting.this | | Diagnostic settings for key vault.
+azurerm_resource_group.this | rg&#8209;sand&#8209;dev&#8209;xxxxxxxx | Resource group for the sandbox.
+azurerm_role_assignment.roles[*] | | Assigns the `Key Vault Secrets Officer` role to the service principal and the interactive user.
+
+---
 
 ### Child Modules
 
 Module | Required | Depends On | Notes
 --- | --- | --- | ---
 [vnet-shared](./modules/vnet-shared) | Yes | Root module | Shared services virtual network module.
-[vnet-app](./modules/vnet-app) | No | `vnet-shared` module | Application virtual network module.
-[vm-jumpbox-linux](./modules/vm-jumpbox-linux) | No | `vnet-shared` module | Linux jumpbox virtual machine module.
-[vm-mssql-win](./modules/vm-mssql-win) | No | `vnet-shared` module | Windows SQL Server virtual machine module.
-[mssql](./modules/mssql) | No | `vnet-shared` module | Azure SQL Database module.
-[mysql](./modules/mysql) | No | `vnet-shared` module | Azure Database for MySQL module.
-[vwan](./modules/vwan) | No | `vnet-shared` module | Point-to-site VPN module.
+[vnet-app](./modules/vnet-app) | No | vnet-shared | Application virtual network module.
+[vm-jumpbox-linux](./modules/vm-jumpbox-linux) | No | vnet-app | Linux jumpbox virtual machine module.
+[vm-mssql-win](./modules/vm-mssql-win) | No | vnet-app | Windows SQL Server virtual machine module.
+[mssql](./modules/mssql) | No | vnet-app | Azure SQL Database module.
+[mysql](./modules/mysql) | No | vnet-app | Azure Database for MySQL module.
+[vwan](./modules/vwan) | No | vnet-app | Point-to-site VPN module.
+
+---
 
 ### Virtual Network Design
 
-The Azure Sandbox project uses a structured IPv4 address scheme to ensure proper segmentation and isolation of resources within the virtual networks and subnets. The following sections describe the IP address ranges and their usage in the shared and application-specific virtual networks. Minimum CIDR sizes are provided for each subnet to allow for customization. Network security groups (NSGs) are also configured for each subnet to control inbound and outbound traffic. This IP addressing scheme ensures proper segmentation, security, and scalability for the sandbox environment.
+The Azure Sandbox project uses a structured IPv4 address scheme to ensure proper segmentation and isolation of resources within the virtual networks and subnets. The following sections describe the IP address ranges and their usage in the `vent-shared` and vnet-app virtual networks. Minimum CIDR sizes are provided for each virtual network and subnet to allow for customization if you need to adapt the IP address scheme to your own requirements. Note the default CIDR ranges used are intentionally large for readability and can easily be condensed. Network security groups (NSGs) are also configured for each subnet to control inbound and outbound traffic. This IP addressing scheme ensures proper segmentation, security, and scalability for the sandbox environment.
 
 * [Shared Services Virtual Network](#shared-services-virtual-network)
 * [Application Virtual Network](#application-virtual-network)
 * [Virtual Network Peering](#virtual-network-peering)
 * [Routing and Security](#routing-and-security)
 
-#### Shared Services Virtual Network
+#### **Shared Services Virtual Network**
 
-The shared services virtual network (`vnet-shared`) is used to host common services that are shared across the sandbox environment, including ab AD DS domain controllers / DNS server, bastions hosts and firewalls.
-
-Setting | Value | Notes
---- | --- | ---
-**Default CIDR** | `10.1.0.0/16` | Min CIDR is `/24`
-**Primary DNS Server** | `10.1.1.4` | Private IP of the AD DS domain controller
-**Secondary DNS Server** | `168.63.129.16` | Azure Recursive DNS Resolver
-
-The following subnets are configured in `vnet-shared`:
-
-Subnet Name | Default CIDR | Min CIDR | NSG | Purpose
---- | --- | --- | --- | ---
-`AzureBastionSubnet` | `10.1.0.0/27` | `/27` | Yes | Reserved for Azure Bastion to provide secure RDP/SSH access to virtual machines.
-`snet-adds-01` | `10.1.1.0/24` | `/27` | Yes | Hosts the Active Directory Domain Services (AD DS) domain controller and DNS server.
-`snet-misc-01` | `10.1.2.0/24` | `/27` | Yes | Reserved for optional configurations requiring connectivity in the shared virtual network.
-`snet-misc-02` | `10.1.3.0/24` | `/27` | Yes | Reserved for optional configurations requiring connectivity in the shared virtual network.
-`AzureFirewallSubnet` | `10.1.4.0/26` | `/26` | No | Reserved for Azure Firewall to provide network security.
-
-#### Application Virtual Network
-
-The application virtual network (`vnet-app`) is used to host application-specific resources, such as virtual machines, databases, and private endpoints. The virtual network is configured as follows:
+The shared services virtual network (vnet-shared) is used to host common services that are shared across the sandbox environment, including ab AD DS domain controllers / DNS server, bastions hosts and firewalls.
 
 Setting | Value | Notes
 --- | --- | ---
-**Default CIDR** | `10.2.0.0/16` | Min CIDR is `/24`
-**Primary DNS Server** | `10.1.1.4` | Private IP of the AD DS domain controller in `vnet-shared`
-**Secondary DNS Server** | `168.63.129.16` | Azure Recursive DNS Resolver
+Default CIDR | `10.1.0.0/16` | Min CIDR is `/24`
+Primary DNS Server | `10.1.1.4` | Private IP of the AD DS domain controller
+Secondary DNS Server | `168.63.129.16` | Azure Recursive DNS Resolver
 
-The following subnets are configured in `vnet-app`:
+The following subnets are configured in vnet-shared:
 
 Subnet Name | Default CIDR | Min CIDR | NSG | Purpose
 --- | --- | --- | --- | ---
-`snet-app-01` | `10.2.0.0/24` | `/27` | Yes | Reserved for web, application, and jumpbox servers.
-`snet-db-01` | `10.2.1.0/24` | `/27` | Yes | Hosts database servers, such as SQL Server and MySQL.
-`snet-privatelink-01` | `10.2.2.0/24` | `/27` | Yes |Reserved for private endpoints using Azure Private Link.
-`snet-misc-03` | `10.2.3.0/24` | `/27` | Yes | Reserved for future use.
-`snet-appservice-01` | `10.2.4.0/24` | `/27` | Yes | Reserved for Azure App Service with delegation to `Microsoft.Web/serverFarms`.
+AzureBastionSubnet | `10.1.0.0/27` | `/27` | Yes | Reserved for Azure Bastion to provide secure RDP/SSH access to virtual machines.
+snet-adds-01 | `10.1.1.0/24` | `/27` | Yes | Hosts the Active Directory Domain Services (AD DS) domain controller and DNS server.
+snet-misc-01 | `10.1.2.0/24` | `/27` | Yes | Reserved for optional configurations requiring connectivity in the shared virtual network.
+snet-misc-02 | `10.1.3.0/24` | `/27` | Yes | Reserved for optional configurations requiring connectivity in the shared virtual network.
+AzureFirewallSubnet | `10.1.4.0/26` | `/26` | No | Reserved for Azure Firewall to provide network security.
 
-Private endpoints are configured in the `snet-privatelink-01` subnet to provide secure, network-isolated access to the following Azure PaaS services:
+#### **Application Virtual Network**
+
+The application virtual network (vnet-app) is used to host application-specific resources, such as virtual machines, databases, and private endpoints. The virtual network is configured as follows:
+
+Setting | Value | Notes
+--- | --- | ---
+Default CIDR | `10.2.0.0/16` | Min CIDR is `/24`
+Primary DNS Server | `10.1.1.4` | Private IP of the AD DS domain controller in vnet-shared
+Secondary DNS Server | `168.63.129.16` | Azure Recursive DNS Resolver
+
+The following subnets are configured in vnet-app:
+
+Subnet Name | Default CIDR | Min CIDR | NSG | Purpose
+--- | --- | --- | --- | ---
+snet-app-01 | `10.2.0.0/24` | `/27` | Yes | Reserved for web, application, and jumpbox servers.
+snet-db-01 | `10.2.1.0/24` | `/27` | Yes | Hosts database servers, such as SQL Server and MySQL.
+snet-privatelink-01 | `10.2.2.0/24` | `/27` | Yes |Reserved for private endpoints using Azure Private Link.
+snet-misc-03 | `10.2.3.0/24` | `/27` | Yes | Reserved for future use.
+snet-appservice-01 | `10.2.4.0/24` | `/27` | Yes | Reserved for Azure App Service with delegation to `Microsoft.Web/serverFarms`.
+
+Private endpoints are configured in the snet-privatelink-01 subnet to provide secure, network-isolated access to the following Azure PaaS services:
 
 * Azure Blob Storage
 * Azure Files
 * Azure SQL Database
 * Azure Database for MySQL
 
-#### Virtual Network Peering
+#### **Virtual Network Peering**
 
-Bi-directional virtual virtual network peering is enabled between `vnet-shared` and `vnet-app` to allow network connectivity between resources in both virtual networks.
+Bi-directional virtual network peering is enabled between vnet-shared and vnet-app to allow network connectivity between resources in both virtual networks.
 
-#### Routing and Security
+#### **Routing and Security**
 
-* **Azure Firewall**: Configured in the `AzureFirewallSubnet` of `vnet-shared` to provide secure outbound internet access and threat intelligence.
+* **Azure Firewall**: Configured in the dedicated AzureFirewallSubnet of vnet-shared to provide secure outbound internet access and threat intelligence.
 * **Network Security Groups (NSGs)**: Associated with each subnet to control inbound and outbound traffic based on security rules.
 * **Route Tables**: Custom route tables are used to direct traffic through the Azure Firewall for secure internet access.
+
+---
 
 ### Dependencies
 
@@ -588,21 +647,21 @@ This section covers the dependencies used in the Azure Sandbox project, includin
 * [Configuration Management Technologies](#configuration-management-technologies)
 * [Operating Systems](#operating-systems)
 
-#### Terraform
+#### **Terraform**
 
 Azure Sandbox is built using Terraform, a cross platform, open-source Infrastructure as Code (IaC) tool that allows users to define, provision and version cloud infrastructure using a declarative configuration language.
 
 * **Providers**: The following Terraform providers are used in the project:
-  * **azurerm**: Used to manage Azure resources.
-  * **azapi**: Used to manage Azure resources that are not yet supported by the azurerm provider and for direct access to Azure APIs.
-  * **cloudinit**: Used to configure Linux virtual machines.
-  * **random**: Used to generate random values for resource attributes.
-  * **time**: Used to implement wait cycles and other time based operations.
-  * **tls**: Used to generate certificates.
+  * `azurerm`: Used to manage Azure resources.
+  * `azapi`: Used to manage Azure resources that are not yet supported by the azurerm provider and for direct access to Azure APIs.
+  * `cloudinit`: Used to configure Linux virtual machines.
+  * `random`: Used to generate random values for resource attributes.
+  * `time`: Used to implement wait cycles and other time based operations.
+  * `tls`: Used to generate certificates.
 * **Modules**: The following Terraform modules are used in this project:
-  * **Azure/naming**: A module for generating consistent and compliant Azure resource names.
+  * `Azure/naming`: A module for generating consistent and compliant Azure resource names.
 
-#### Scripting Technologies
+#### **Scripting Technologies**
 
 The following cross-platform scripting technologies are used in this project:
 
@@ -611,24 +670,26 @@ The following cross-platform scripting technologies are used in this project:
 * **Azure CLI**: Used to manage Azure resources from the command line.
 * **Bash**: Used for running scripts and automating tasks within the Azure Sandbox environment.
 
-#### Configuration Management Technologies
+#### **Configuration Management Technologies**
 
 The following configuration management technologies are used in this project to configure virtual machines:
 
 * **PowerShell DSC**: PowerShell Desired State Configuration is used to configure Windows virtual machines.
 * **Azure Automation DSC**: Used to configure Windows virtual virtual machines using configurations written in PowerShell DSC.
-* **cloud-init**: Used to configure Linux virtual machines. It is a standard tool for cloud instance initialization and is widely used in cloud environments.
+* **cloudinit**: Used to configure Linux virtual machines. It is a standard tool for cloud instance initialization and is widely used in cloud environments.
 
-#### Operating Systems
+#### **Operating Systems**
 
 The following operating systems are used for the various virtual machines in the sandbox:
 
 Virtual Machine | Role | Module | Operating System
 --- | --- | --- | ---
-`adds1` | AD DS Domain Controller / DNS Server | `vnet-shared` | Windows Server 2025 Datacenter Azure Edition Core
-`jumpwin1` | Windows jumpbox VM | `vnet-app` | Windows Server 2025 Datacenter Azure Edition
-`mssqlwin1` | Windows SQL Server VM | `vm-mssql-win` | Windows Server 2022 / SQL Server 2022 Developer Edition
-`jumplinux1` | Linux jumpbox VM | `vm-jumpbox-linux` | Ubuntu Server LTS 24.04 (Nobel Numbat)
+adds1 | AD DS Domain Controller / DNS Server | vnet-shared | Windows Server 2025 Datacenter Azure Edition Core
+jumpwin1 | Windows jumpbox VM | vnet-app | Windows Server 2025 Datacenter Azure Edition
+mssqlwin1 | Windows SQL Server VM | vm-mssql-win | Windows Server 2022 / SQL Server 2022 Developer Edition
+jumplinux1 | Linux jumpbox VM | vm-jumpbox-linux | Ubuntu Server LTS 24.04 (Nobel Numbat)
+
+---
 
 ### Additional Resources
 
