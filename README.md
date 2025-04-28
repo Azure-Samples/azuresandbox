@@ -15,16 +15,9 @@
 
 ## Overview
 
-Azure Sandbox is a Terraform-based project designed to simplify the deployment of sandbox environments in Microsoft Azure. It provides a modular and reusable framework for creating and managing Azure resources, enabling users to experiment, learn, and test in a controlled environment.
+Azure Sandbox is a Terraform-based project designed to simplify the deployment of sandbox environments in Microsoft Azure. It provides a modular and reusable framework for implementing foundational infrastructure which can accelerate the development of innovative new solutions in Azure.
 
-This project is ideal for developers, IT professionals, and organizations looking to explore Azure services, prototype solutions, or conduct training sessions. With its modular design, AzureSandbox allows users to customize their deployments to suit specific use cases, such as virtual networks, virtual machines, AI services, and more.
-
-Key highlights of Azure Sandbox include:
-
-* **Modular Architecture**: Reusable modules for common Azure resources like virtual networks, virtual machines, databases and storage solutions.
-* **Secure Secrets Management**: Integration with Azure Key Vault for securely storing sensitive information.
-* **Diagnostics and Monitoring**: Configurations for Log Analytics and diagnostic settings to monitor resource usage and performance.
-* **Extensibility**: Additional configurations for specialized use cases, such as AI services, DevOps environments, and on-premises connectivity simulations.
+This project is ideal for developers, IT professionals, and organizations looking to explore Azure services, prototype solutions, or conduct training sessions. With its modular design, AzureS Sandbox allows users to customize their deployments to suit specific use cases, such as virtual networks, virtual machines, AI services, and more.
 
 Azure Sandbox is not intended for production use but serves as a powerful tool for learning and experimentation in Azure.
 
@@ -48,6 +41,7 @@ Reusable Terraform modules for common Azure resources, such as:
 * Virtual machines
 * Storage services
 * Database services
+* AI services
 
 Enable only the modules you need for your specific sandbox environment. Disable the modules you don't need to reduce costs and complexity. Extend your sandbox environment with additional modules for specialized use cases, or create your own custom modules to meet specific requirements.
 
@@ -191,7 +185,6 @@ A variety of Terraform execution environments can be used to provision Azure San
 
 * **Windows-Only Client**: A Windows-only client can be used to run Terraform. The following software should be installed:
   * git
-  * Azure CLI
   * PowerShell 7.x
   * Az PowerShell Module
   * Terraform
@@ -223,10 +216,9 @@ A variety of Terraform execution environments can be used to provision Azure San
 
 #### Automated Execution
 
-Azure DevOps, GitHub Actions, or other CI/CD tools can be used to automate the deployment of Azure Sandbox. The following software should be installed:
+Azure DevOps, GitHub Actions, or other CI/CD tools can be used to automate the deployment of Azure Sandbox. The following software should be installed in your Terraform execution environment:
 
 * git
-* Azure CLI
 * PowerShell 7.x
 * Az PowerShell Module
 * Terraform

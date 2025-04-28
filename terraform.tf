@@ -9,17 +9,17 @@ terraform {
 
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 4.26.0"
+      version = "~> 4.27.0"
     }
 
     cloudinit = {
       source  = "hashicorp/cloudinit"
-      version = "~>2.3.6"
+      version = "~> 2.3.7"
     }
 
     random = {
       source  = "hashicorp/random"
-      version = "~> 3.7.1"
+      version = "~> 3.7.2"
     }
 
     time = {
@@ -29,7 +29,7 @@ terraform {
 
     tls = {
       source  = "hashicorp/tls"
-      version = "~> 4.0.6"
+      version = "~> 4.1.0"
     }
   }
 }
