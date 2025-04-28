@@ -17,7 +17,7 @@ resource "azurerm_mysql_flexible_server" "this" {
   location               = var.location
   administrator_login    = data.azurerm_key_vault_secret.adminuser.value
   administrator_password = data.azurerm_key_vault_secret.adminpassword.value
-  sku_name               = "B_Standard_B1s"
+  sku_name               = "B_Standard_B1ms"
 }
 
 resource "azurerm_mysql_flexible_database" "this" {
