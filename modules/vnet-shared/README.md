@@ -6,7 +6,6 @@
 * [Overview](#overview)
 * [Smoke testing](#smoke-testing)
 * [Documentation](#documentation)
-* [Videos](#videos)
 
 ## Architecture
 
@@ -14,7 +13,7 @@
 
 ## Overview
 
-This module implements a virtual network with shared services used by all the configurations including ([Step-By-Step Video](https://youtu.be/tYSnlPy-oJc)):
+This module implements a virtual network with shared services used by all the configurations including:
 
 * An [automation account](https://learn.microsoft.com/azure/automation/automation-intro) for configuration management.
 * A [virtual network](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vnet) for hosting [virtual machines](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm).
@@ -24,7 +23,7 @@ This module implements a virtual network with shared services used by all the co
 
 ## Smoke testing
 
-* Explore your newly provisioned resources in the Azure portal ([Step-By-Step Video](https://youtu.be/gxO9oKoitQ0)).
+* Explore your newly provisioned resources in the Azure portal:
   * Key vault
     * Navigate to *portal.azure.com* > *Key vaults* > *kv-sand-dev-xxxxxxxx* > *Objects* > *Secrets* > *adminpassword* > *CURRENT VERSION* > *00000000-0000-0000-0000-000000000000* > *Show Secret Value*
     * Make a note of the *Secret value*. This is a strong password associated with the *adminuser* key vault secret. Together these credentials are used to set up initial administrative access to resources in Azure Sandbox.
@@ -40,9 +39,17 @@ This module implements a virtual network with shared services used by all the co
 
 This section provides additional information on various aspects of this module.
 
+* [Dependencies](#dependencies)
 * [Module Structure](#module-structure)
-* [Variable Defaults](#variable-defaults)
+* [Input Variable Defaults](#input-variable-defaults)
 * [Module Resources](#module-resources)
+* [Output Variables](#output-variables)
+
+### Dependencies
+
+This module depends upon resources provisioned in the following modules:
+
+* Root module
 
 ### Module Structure
 
@@ -65,7 +72,7 @@ vnet-shared/
 └── variables.tf                                # Input variables
 ```
 
-### Variable Defaults
+### Input Variable Defaults
 
 This section documents default values for module variables as defined in `variables.tf`.
 
@@ -117,9 +124,16 @@ module.vnet_shared.azurerm_subnet_route_table_association.associations[*] | | Th
 module.vnet_shared.azurerm_virtual_network.this | vnet&#8209;sand&#8209;dev&#8209;shared   | The shared services virtual network.
 module.vnet_shared.azurerm_windows_virtual_machine.this | adds1 | The AD DS Domain Controller / DNS Server VM. Registered with Azure Automation DSC by `./scripts/Register-DscNode.ps1` using DSC configuration `./scripts/DomainControllerConfiguration.ps1`.
 
-## Videos
+### Output Variables
 
-Video | Section
---- |---
-[Shared services virtual network (Part 1)](https://youtu.be/tYSnlPy-oJc) | [Overview](#overview)
-[Shared services virtual network (Part 4)](https://youtu.be/gxO9oKoitQ0) | [Smoke testing](#smoke-testing)
+This section lists the output variables returned by the module.
+
+Output Variable | Default | Description
+--- | --- | ---
+adds_domain_name | mysandbox.local | The Active Directory Domain Services (AD DS) domain name.
+admin_password_secret | adminpassword | The name of the key vault secret containing the admin password.
+admin_username_secret | adminuser | The name of the key vault secret containing the admin username.
+dns_server | 10.1.1.4 | The primary DNS server IP address for the virtual network.
+resource_ids | | A map of resource IDs for key resources in the module.
+resource_names | | A map of resource names for key resources in the module.
+subnets | | A list of subnets provisioned in the shared virtual network.
