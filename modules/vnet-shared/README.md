@@ -41,7 +41,7 @@ This section provides additional information on various aspects of this module.
 
 * [Dependencies](#dependencies)
 * [Module Structure](#module-structure)
-* [Input Variable Defaults](#input-variable-defaults)
+* [Input Variables](#input-variables)
 * [Module Resources](#module-resources)
 * [Output Variables](#output-variables)
 
@@ -72,9 +72,9 @@ vnet-shared/
 └── variables.tf                                # Input variables
 ```
 
-### Input Variable Defaults
+### Input Variables
 
-This section documents default values for module variables as defined in `variables.tf`.
+This section documents default values for module variables as defined in `variables.tf`. Defaults can be overridden by passing values to the module when it is called.
 
 Variable | Default | Description
 --- | --- | ---
@@ -82,11 +82,15 @@ adds_domain_name | mysandbox.local | The AD DS domain name.
 admin_password_secret | adminpassword | The name of the key vault secret containing the admin password.
 admin_username | bootstrapadmin | The name of the key vault secret containing the admin username.
 admin_username_secret | adminuser | The name of the key vault secret containing the admin username.
+key_vault_id | | The resource ID of the key vault in the root module.
+location | | The location defined in the root module.
+resource_group_name | | The resource group defined in the root module.
 subnet_adds_address_prefix | `10.1.1.0/24` | The address prefix for the AD Domain Services subnet.
 subnet_AzureBastionSubnet_address_prefix | `10.1.0.0/27` | The address prefix for the AzureBastionSubnet subnet.
 subnet_AzureFirewallSubnet_address_prefix | `10.1.4.0/26` | The address prefix for the AzureFirewallSubnet subnet.
 subnet_misc_address_prefix | `10.1.2.0/24` | The address prefix for the miscellaneous subnet.
 subnet_misc_02_address_prefix | `10.1.3.0/24` | The address prefix for the miscellaneous 2 subnet.
+tags | | The tags defined in the root module.
 vm_adds_image_offer | `WindowsServer` | The offer type of the virtual machine image used to create the VM.
 vm_adds_image_publisher | `MicrosoftWindowsServer` | The publisher for the virtual machine image used to create the VM.
 vm_adds_image_sku | `2025-datacenter-azure-edition-core` | The SKU of the virtual machine image used to create the VM.

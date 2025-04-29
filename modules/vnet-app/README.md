@@ -102,10 +102,10 @@ The steps in this section verify that the Windows jumpbox VM (jumpwin1) is confi
 This section provides additional information on various aspects of this module.
 
 * [Dependencies](#dependencies)
-* [Module structure](#module-structure)
-* [Input variable defaults](#input-variable-defaults)
-* [Module resources](#module-resources)
-* [Output variables](#output-variables)
+* [Module Structure](#module-structure)
+* [Input Variables](#input-variables)
+* [Module Resources](#module-resources)
+* [Output Variables](#output-variables)
 
 ### Dependencies
 
@@ -137,12 +137,22 @@ The vnet-app module is organized as follows:
 └── variables.tf                                # Input variables
 ```
 
-### Input Variable Defaults
+### Input Variables
 
-This section lists the default values for the input variables used in this module.
+This section lists the default values for the input variables used in this module. Defaults can be overridden by specifying a different value in the root module.
 
 Variable | Default | Description
 --- | --- | ---
+adds_domain_name | | The domain name defined in the vnet-shared module.
+admin_password_secret | | The name of the key vault secret that contains the password for the admin account. Defined in the vnet-shared module.
+admin username_secret | | The name of the key vault secret that contains the user name for the admin account. Defined in the vnet-shared module.
+automation_account_name | | The name of the Azure Automation account used for DSC. Defined in the vnet-shared module.
+dns_server | | The IP address of the DNS server used for the virtual network. Defined in the vnet-shared module.
+firewall_route_table_id | | The ID of the route table used for the firewall. Defined in the vnet-shared module.
+key_vault_id | | The ID of the key vault defined in the root module.
+key_vault_name | | The name of the key vault defined in the root module.
+location | | The location defined in the root module.
+resource_group_name | | The name of the resource group defined in the root module.
 storage_container_name | scripts | The name of the storage container used to store scripts.
 storage_share_name | myfileshare | The name of the Azure Files share.
 storage_share_quota_gb | 1024 | The quota for the Azure Files share in GB.
@@ -151,6 +161,11 @@ subnet_appservice_address_prefix | `10.2.4.0/24` | The address prefix for the ap
 subnet_database_address_prefix | `10.2.1.0/24` | The address prefix for the database subnet.
 subnet_misc_address_prefix | `10.2.3.0/24` | The address prefix for the miscellaneous subnet.
 subnet_privatelink_address_prefix | `10.2.2.0/24` | The address prefix for the private link subnet.
+tags | | The tags defined in the root module..
+unique_seed | | The unique seed used to generate unique names for resources. Defined in the root module.
+user_object_id | | The object ID of the interactive user. Defined in the root module.
+virtual_network_shared_id | | The resource ID of the shared services virtual network (vnet-shared). Defined in the root module.
+virtual_network_shared_name | | The name of the shared services virtual network (vnet-shared). Defined in the root module.
 vm_jumpbox_win_image_offer | `WindowsServer` | The offer type of the virtual machine image used to create the Windows Jumpbox VM.
 vm_jumpbox_win_image_publisher | `MicrosoftWindowsServer` | The publisher for the virtual machine image used to create the Windows Jumpbox VM.
 vm_jumpbox_win_image_sku | `2025-datacenter-azure-edition` | The SKU for the virtual machine image used to create the Windows Jumpbox VM.
@@ -212,11 +227,11 @@ This section includes a list of output variables returned by the module.
 
 Name | Default | Comments
 --- | --- | ---
-azure_files_config_vm_extension_id | N/A | Dependent modules can reference this output to determine if Azure Files configuration is complete.
-private_dns_zones | N/A | A map of private DNS zones provisioned in the module.
-resource_ids | N/A | A map of resource IDs for key resources in the module.
-resource_names | N/A | A map of resource names for key resources in the module.
+azure_files_config_vm_extension_id | | Dependent modules can reference this output to determine if Azure Files configuration is complete.
+private_dns_zones | | A map of private DNS zones provisioned in the module.
+resource_ids | | A map of resource IDs for key resources in the module.
+resource_names | | A map of resource names for key resources in the module.
 storage_container_name | scripts | The name of the storage container used to store scripts.
-storage_endpoints | N/A | A map of storage endpoints for blob and file storage.
+storage_endpoints | | A map of storage endpoints for blob and file storage.
 storage_share_name | myfileshare | The name of the Azure Files share.
-subnets | N/A | A list of subnets provisioned in the application virtual network.
+subnets | | A list of subnets provisioned in the application virtual network.
