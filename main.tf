@@ -97,7 +97,7 @@ module "vnet_shared" {
   resource_group_name = azurerm_resource_group.this.name
   tags                = var.tags
 
-  depends_on = [azurerm_key_vault_secret.spn_password]
+  depends_on = [azurerm_key_vault_secret.spn_password] # Ensure the SPN password key vault secret is provisioned
 }
 #endregion
 
@@ -123,7 +123,7 @@ module "vnet_app" {
   virtual_network_shared_id   = module.vnet_shared.resource_ids["virtual_network_shared"]
   virtual_network_shared_name = module.vnet_shared.resource_names["virtual_network_shared"]
 
-  depends_on = [module.vnet_shared]
+  depends_on = [module.vnet_shared.resource_ids] # Ensure the domain controller VM is provisioned
 }
 
 module "vm_jumpbox_linux" {
@@ -143,7 +143,7 @@ module "vm_jumpbox_linux" {
   subnet_id             = module.vnet_app[0].subnets["snet-app-01"].id
   tags                  = var.tags
 
-  depends_on = [module.vnet_app[0]]
+  depends_on = [module.vnet_app[0].azure_files_config_vm_extension_id] # Ensure that Azure Files is configured
 }
 
 module "vm_mssql_win" {
@@ -166,7 +166,7 @@ module "vm_mssql_win" {
   subnet_id               = module.vnet_app[0].subnets["snet-db-01"].id
   tags                    = var.tags
 
-  depends_on = [module.vnet_app[0]]
+  depends_on = [module.vnet_app[0].resource_ids] # Ensure the Windows jumpbox VM is provisioned
 }
 
 module "mssql" {
@@ -183,7 +183,7 @@ module "mssql" {
   tags                  = var.tags
   unique_seed           = module.naming.unique-seed
 
-  depends_on = [module.vnet_app[0]]
+  depends_on = [module.vnet_app[0].resource_ids] # Ensure the Windows jumpbox VM is provisioned
 }
 
 module "mysql" {
@@ -200,7 +200,7 @@ module "mysql" {
   tags                  = var.tags
   unique_seed           = module.naming.unique-seed
 
-  depends_on = [module.vnet_app[0]]
+  depends_on = [module.vnet_app[0].resource_ids] # Ensure the Windows jumpbox VM is provisioned
 }
 
 module "vwan" {
@@ -218,6 +218,6 @@ module "vwan" {
     virtual_network_app    = module.vnet_app[0].resource_ids["virtual_network_app"]
   }
 
-  depends_on = [module.vnet_app[0]]
+  depends_on = [module.vnet_app[0].resource_ids] # Ensure the Windows jumpbox VM is provisioned
 }
 #endregion

@@ -13,20 +13,23 @@
 
 ## Overview
 
-This configuration implements a virtual network for applications including ([Step-By-Step Video](https://youtu.be/J7jK-dxiFrA)):
+This configuration implements a virtual network for applications including:
 
-* A [virtual network](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vnet) for hosting for hosting [virtual machines](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) and private endpoints implemented using [PrivateLink](https://learn.microsoft.com/azure/azure-sql/database/private-endpoint-overview). [Virtual network peering](https://learn.microsoft.com/azure/virtual-network/virtual-network-peering-overview) with `vnet-shared` virtual network is automatically configured.
-* A Windows Server [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) for use as a jumpbox.
-* A [PaaS](https://azure.microsoft.com/overview/what-is-paas/) SMB file share hosted in [Azure Files](https://learn.microsoft.com/azure/storage/files/storage-files-introduction) with a private endpoint implemented using [PrivateLink](https://learn.microsoft.com/azure/azure-sql/database/private-endpoint-overview).
+* A virtual network with pre-configured subnets for hosting various application workloads, including virtual machines and private endpoints implemented using PrivateLink.
+  * Pre-configured virtual network peering with the `vnet-shared` virtual network.
+* A network isolated Azure Files share to enable secure SMB file sharing between resources in the sandbox environment.
+* A Windows Server virtual machine for use as a jumpbox with the following capabilities:
+  * Secure RDP access via Bastion using a password stored in Azure Key Vault.
+  * Domain joined to the `mysandbox.local` Active Directory domain.
+  * Secure AD integrated access to network isolated Azure Files share.
+  * Pre-installed software packages and features, including:
+    * Remote Server Administration Tools (RSAT)
+    * Chocolatey
+    * Visual Studio Code
+    * SQL Server Management Studio (SSMS)
+    * MySQL Workbench
 
 ## Smoke testing
-
-The following sections provide guided smoke testing of the following resources:
-
-* [Jumpbox smoke testing](#jumpbox-smoke-testing)
-* [Azure Files smoke testing](#azure-files-smoke-testing)
-
-### Jumpbox smoke testing
 
 The steps in this section verify that the Windows jumpbox VM (jumpwin1) is configured correctly.
 
@@ -61,21 +64,19 @@ The steps in this section verify that the Windows jumpbox VM (jumpwin1) is confi
   * Close Server Manager
 
 * From *jumpwin1*, inspect the *mysandbox.local* Active Directory domain
-  * Navigate to *Start* > *Windows Administrative Tools* > *Active Directory Users and Computers*.
+  * Navigate to *Start* > *Windows Tools* > *Active Directory Users and Computers*.
   * Navigate to *mysandbox.local* and verify that a computer account exists in the root for the storage account, e.g. *stsanddevxxxxxxxx*.
   * Navigate to *mysandbox.local* > *Computers* and verify that *jumpwin1* is listed.
   * Navigate to *mysandbox.local* > *Domain Controllers* and verify that *adds1* is listed.
 
 * From *jumpwin1*, inspect the *mysandbox.local* DNS zone
-  * Navigate to *Start* > *Windows Administrative Tools* > *DNS*
+  * Navigate to *Start* > *Windows Tools* > *DNS*
   * Connect to the DNS Server on *adds1*.
   * Click on *adds1* in the left pane
     * Double-click on *Forwarders* in the right pane.
     * Verify that [168.63.129.16](https://learn.microsoft.com/azure/virtual-network/what-is-ip-address-168-63-129-16) is listed. This ensures that the DNS server will forward any DNS queries it cannot resolve to the Azure Recursive DNS resolver.
     * Click *Cancel*.
     * Navigate to *adds1* > *Forward Lookup Zones* > *mysandbox.local* and verify that there are *Host (A)* records for *adds1* and *jumpwin1*.
-
-### Azure Files smoke testing
 
 * Test DNS queries for Azure Files private endpoint
   * From the execution environment, navigate to *portal.azure.com* > *Storage accounts* > *stsanddevxxxxxxxx* > *File shares* > *myfileshare* and copy the the FQDN portion of the `Share URL`, e.g. *stsanddevxxxxxxxx.file.core.windows.net*.
@@ -116,7 +117,7 @@ This module depends upon resources provisioned in the following modules:
 
 ### Module Structure
 
-The vnet-app module is organized as follows:
+This module is organized as follows:
 
 ```plaintext
 ├── images/
@@ -182,6 +183,7 @@ This section lists the resources included in this configuration.
 
 Address | Name | Notes
 --- | --- | ---
+module.vnet_app[0].azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;jumpwin1 | Network interface for the Windows jumpbox VM.
 module.vnet_app[0].azurerm_network_security_group.groups[*] | | NSGs for each subnet.
 module.vnet_app[0].azurerm_network_security_rule.rules[*] | | NSG rules for each NSG. See locals.tf for rule definitions.
 module.vnet_app[0].azurerm_private_dns_a_record.storage_blob | | A record for the blob storage private endpoint.
