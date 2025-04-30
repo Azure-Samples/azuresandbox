@@ -550,15 +550,7 @@ azurerm_role_assignment.roles[*] | | Assigns the `Key Vault Secrets Officer` rol
 
 ### Child Modules
 
-Module | Required | Depends On | Notes
---- | --- | --- | ---
-[vnet-shared](./modules/vnet-shared) | Yes | Root module | Shared services virtual network module.
-[vnet-app](./modules/vnet-app) | No | vnet-shared | Application virtual network module.
-[vm-jumpbox-linux](./modules/vm-jumpbox-linux) | No | vnet-app | Linux jumpbox virtual machine module.
-[vm-mssql-win](./modules/vm-mssql-win) | No | vnet-app | Windows SQL Server virtual machine module.
-[mssql](./modules/mssql) | No | vnet-app | Azure SQL Database module.
-[mysql](./modules/mysql) | No | vnet-app | Azure Database for MySQL module.
-[vwan](./modules/vwan) | No | vnet-app | Point-to-site VPN module.
+Several child [modules](./modules/) are included in the Azure Sandbox project. Each module is designed to be reusable and configurable, allowing you to customize your sandbox environment according to your needs.
 
 ---
 
