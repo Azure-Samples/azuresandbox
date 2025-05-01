@@ -119,6 +119,7 @@ function Import-DscConfiguration {
         Exit-WithError $_
     }
 }
+
 function Start-DscCompilationJob {
     param(
         [Parameter(Mandatory = $true)]
@@ -134,13 +135,13 @@ function Start-DscCompilationJob {
         [String]$VirtualMachineName
     )
 
-    Write-Log "Compliling DSC Configuration '$DscConfigurationName'..."
+    Write-Log "Compiling DSC Configuration '$DscConfigurationName'..."
 
     $params = @{
         ComputerName = $VirtualMachineName
     }
 
-    $configuationData = @{
+    $configurationData = @{
         AllNodes = @(
             @{
                 NodeName = "$VirtualMachineName"
@@ -154,7 +155,7 @@ function Start-DscCompilationJob {
             -ResourceGroupName $ResourceGroupName `
             -AutomationAccountName $AutomationAccountName `
             -ConfigurationName $DscConfigurationName `
-            -ConfigurationData $configuationData `
+            -ConfigurationData $configurationData `
             -Parameters $params `
             -ErrorAction Stop
     }
@@ -164,17 +165,31 @@ function Start-DscCompilationJob {
     
     $jobId = $dscCompilationJob.Id
     
-    while ($null -eq $dscCompilationJob.EndTime -and $null -eq $dscCompilationJob.Exception) {
+    while (-not $dscCompilationJob.Exception) {
         $dscCompilationJob = $dscCompilationJob | Get-AzAutomationDscCompilationJob
         Write-Log "DSC compilation job ID '$jobId' status is '$($dscCompilationJob.Status)'..."
-        Start-Sleep -Seconds 10
+
+        if ($dscCompilationJob.Status -in @("Queued", "Starting", "Resuming", "Running", "Stopping", "Suspending", "Activating", "New")) {
+            Start-Sleep -Seconds 10
+            continue
+        }
+
+        # Stop looping if status is Completed, Failed, Stopped, Suspended
+        if ($dscCompilationJob.Status -in @("Completed", "Failed", "Stopped", "Suspended")) {
+            break
+        }
+
+        # Anything else is an unexpected status
+        Exit-WithError "DSC compilation job ID '$jobId' returned unexpected status '$($dscCompilationJob.Status)'..."
     }
     
     if ($dscCompilationJob.Exception) {
-        Exit-WithError "DSC compilation job ID '$jobId' failed..."
+        Exit-WithError "DSC compilation job ID '$jobId' failed with an exception..."
     }
-    
-    Write-Log "DSC compilation job ID '$jobId' status is '$($dscCompilationJob.Status)'..."    
+
+    if ($dscCompilationJob.Status -in @("Failed", "Stopped", "Suspended")) {
+        Exit-WithError "DSC compilation job ID '$jobId' failed with status '$($dscCompilationJob.Status)'..."
+    }
 }
 #endregion
 

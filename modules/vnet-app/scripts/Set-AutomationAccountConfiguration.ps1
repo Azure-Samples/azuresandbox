@@ -165,14 +165,30 @@ function Start-DscCompilationJob {
     
     $jobId = $dscCompilationJob.Id
     
-    while ($dscCompilationJob.Status -ne "Completed" -and -not $dscCompilationJob.Exception) {
+    while (-not $dscCompilationJob.Exception) {
         $dscCompilationJob = $dscCompilationJob | Get-AzAutomationDscCompilationJob
         Write-Log "DSC compilation job ID '$jobId' status is '$($dscCompilationJob.Status)'..."
-        Start-Sleep -Seconds 10
+
+        if ($dscCompilationJob.Status -in @("Queued", "Starting", "Resuming", "Running", "Stopping", "Suspending", "Activating", "New")) {
+            Start-Sleep -Seconds 10
+            continue
+        }
+
+        # Stop looping if status is Completed, Failed, Stopped, Suspended
+        if ($dscCompilationJob.Status -in @("Completed", "Failed", "Stopped", "Suspended")) {
+            break
+        }
+
+        # Anything else is an unexpected status
+        Exit-WithError "DSC compilation job ID '$jobId' returned unexpected status '$($dscCompilationJob.Status)'..."
     }
     
     if ($dscCompilationJob.Exception) {
-        Exit-WithError "DSC compilation job ID '$jobId' failed..."
+        Exit-WithError "DSC compilation job ID '$jobId' failed with an exception..."
+    }
+
+    if ($dscCompilationJob.Status -in @("Failed", "Stopped", "Suspended")) {
+        Exit-WithError "DSC compilation job ID '$jobId' failed with status '$($dscCompilationJob.Status)'..."
     }
 }
 #endregion
