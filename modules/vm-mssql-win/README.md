@@ -1,15 +1,11 @@
-# \#AzureSandbox - terraform-azurerm-vm-mssql
+# SQL Server Virtual Machine Module (vm-mssql-win)
 
 ## Contents
 
 * [Architecture](#architecture)
 * [Overview](#overview)
-* [Before you start](#before-you-start)
-* [Getting started](#getting-started)
-* [Smoke testing](#smoke-testing)
+* [Smoke Testing](#smoke-testing)
 * [Documentation](#documentation)
-* [Next steps](#next-steps)
-* [Videos](#videos)
 
 ## Architecture
 
@@ -17,74 +13,19 @@
 
 ## Overview
 
-This configuration implements an [IaaS](https://azure.microsoft.com/overview/what-is-iaas/) database server [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) based on the [SQL Server virtual machines in Azure](https://learn.microsoft.com/azure/azure-sql/virtual-machines/windows/sql-server-on-azure-vm-iaas-what-is-overview#payasyougo) offering ([Step-By-Step Video](https://youtu.be/2wkGPxqNm-M)).
+This configuration implements a SQL Server virtual machine for use as a database server. The VM is configured using Azure Automation DSC and offers the following capabilities:
 
-Activity | Estimated time required
---- | ---
-Pre-configuration | ~10 minutes
-Provisioning | ~15 minutes
-Smoke testing | ~10 minutes
-
-## Before you start
-
-[terraform-azurerm-vnet-app](../terraform-azurerm-vnet-app) must be provisioned first before starting. This configuration is optional and can be skipped to reduce costs. Proceed with [terraform-azurerm-mssql](../terraform-azurerm-mssql) if you wish to skip this configuration.
-
-## Getting started
-
-This section describes how to provision this configuration using default settings ([Step-By-Step Video](https://youtu.be/Qk8OIW-VgHs)).
-
-* Change the working directory.
-
-  ```bash
-  cd ~/azuresandbox/terraform-azurerm-vm-mssql
-  ```
-
-* Add an environment variable containing the password for the service principal.
-
-  ```bash
-  export TF_VAR_arm_client_secret=YOUR-SERVICE-PRINCIPAL-PASSWORD
-  ```
-
-* Run [bootstrap.sh](./scripts/bootstrap.sh) using the default settings or custom settings.
-
-  ```bash
-  ./scripts/bootstrap.sh
-  ```
-
-* Apply the Terraform configuration.
-
-  ```bash
-  # Initialize terraform providers
-  terraform init
-
-  # Validate configuration files
-  terraform validate
-
-  # Review plan output
-  terraform plan
-
-  # Apply configuration
-  terraform apply
-  ```
-
-* Monitor output. Upon completion, you should see a message similar to the following:
-
-  `Apply complete! Resources: 10 added, 0 changed, 0 destroyed.`
-
-* Inspect `terraform.tfstate`.
-
-  ```bash
-  # List resources managed by terraform
-  terraform state list 
-  ```
+* Domain joined to the *mysandbox.local* Active Directory domain.
+* Pre-configured SQL Server data and log disks.
+* Pre-configured SQL Server instance.
 
 ## Smoke testing
 
-Perform the following tests to validate the configuration is provisioned correctly ([Step-By-Step Video](https://youtu.be/uedt5wKIrcY))
+This section describes how to test the module after deployment.
 
+* Wait for 15 minutes to proceed to allow time for DSC configurations to complete.
 * Verify *mssqlwin1* node configuration is compliant.
-  * Wait for 15 minutes to proceed to allow time for DSC configurations to complete.
-  * From the client environment, navigate to *portal.azure.com* > *Automation Accounts* > *auto-xxxxxxxxxxxxxxxx-01* > *Configuration Management* > *State configuration (DSC)*.
+  * From the client environment, navigate to *portal.azure.com* > *Automation Accounts* > *aa-sand-dev* > *Configuration Management* > *State configuration (DSC)*.
   * Refresh the data on the *Nodes* tab and verify that all nodes are compliant.
   * Review the data in the *Configurations* and *Compiled configurations* tabs as well.
 * From *jumpwin1*, test DNS queries for SQL Server (IaaS)
@@ -94,7 +35,7 @@ Perform the following tests to validate the configuration is provisioned correct
     Resolve-DnsName mssqlwin1
     ```
 
-  * Verify the IPAddress returned is within the subnet IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-db-01"]*, e.g. `10.2.1.*`.
+  * Verify the IPAddress returned is within the subnet IP address prefix for *vnet_app[0].subnets["snet-db-01"]*, e.g. `10.2.1.*`.
 * From *jumpwin1*, test SQL Server Connectivity with SQL Server Management Studio (SSMS)
   * Navigate to *Start* > *Microsoft SQL Server Tools 20* > *Microsoft SQL Server Management Studio 20*
   * Connect to the default instance of SQL Server installed on the database server virtual machine using the following settings:
@@ -112,99 +53,95 @@ Perform the following tests to validate the configuration is provisioned correct
 
 This section provides additional information on various aspects of this configuration.
 
-### Bootstrap script
+* [Dependencies](#dependencies)
+* [Module Structure](#module-structure)
+* [Input Variables](#input-variables)
+* [Module Resources](#module-resources)
+* [Output Variables](#output-variables)
 
-This configuration uses the script [bootstrap.sh](./scripts/bootstrap.sh) to create a *terraform.tfvars* file for generating and applying Terraform plans ([Step-By-Step Video](https://youtu.be/Jzi58S7lBJ8)). For simplified deployment, several runtime defaults are initialized using output variables stored in the *terraform.tfstate* file associated with the [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared;) and [terraform-azurerm-vnet-app](../terraform-azurerm-vnet-app/) configurations, including:
+### Dependencies
 
-Output variable | Sample value
---- | ---
-aad_tenant_id | "00000000-0000-0000-0000-000000000000"
-adds_domain_name | "mysandbox.local"
-admin_password_secret | "adminpassword"
-admin_username_secret | "adminuser"
-arm_client_id | "00000000-0000-0000-0000-000000000000"
-automation_account_name | "auto-9a633c2bba9351cc-01"
-key_vault_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.KeyVault/vaults/kv-XXXXXXXXXXXXXXX"
-key_vault_name | "kv-XXXXXXXXXXXXXXX"
-location | "centralus"
-resource_group_name | "rg-sandbox-01"
-storage_account_name | "stXXXXXXXXXXXXXXX"
-storage_container_name | "scripts"
-subscription_id | "00000000-0000-0000-0000-000000000000"
-tags | tomap( { "costcenter" = "10177772" "environment" = "dev" "project" = "#AzureSandbox" } )
-vnet_app_01_subnets | Contains all the subnet definitions including *snet-app-01*, *snet-db-01*, *snet-mysql-01* and *snet-privatelink-01*.
+This module depends upon resources provisioned in the following modules:
 
-The configured virtual machine size is checked to determine if it includes a temporary disk and that the size is available in the configured location.
+* Root module
+* vnet-shared module
+* vnet-app module
 
-Public internet access to the shared storage account is temporarily enabled so the following PowerShell scripts can be uploaded to the *scripts* container in the storage account. These scripts are referenced by virtual machine extensions:
+### Module Structure
 
-* [configure-vm-mssql.ps1](./scripts/configure-vm-mssql.ps1)
-* [configure-mssql.ps1](./scripts/configure-mssql.ps1)
-* [sql-startup.ps1](./scripts/sql-startup.ps1)
+The module is organized as follows:
 
-Public internet access to the shared storage account is disabled again.
+```plaintext
+├── images/
+|   └── vm-mssql-diagram.drawio.svg             # Architecture diagram
+├── scripts/
+|   ├── Invoke-MssqlConfiguration.ps1           # Starts SQL Server configuration task
+|   ├── MssqlVmConfiguration.ps1                # DSC configuration for SQL Server VM
+|   ├── Register-DscNode.ps1                    # Registers a VM with Azure Automation DSC
+|   ├── Set-AutomationAccountConfiguration.ps1  # Configures Azure Automation settings
+|   ├── Set-MssqlConfiguration.ps1              # Prepares data and log disks and configures SQL Server instance
+|   └── Set-MssqlStartupConfiguration.ps1       # Re-configures SQL Server tempdb folder for VM sizes with temporary disks 
+├── compute.tf                                  # Compute resource configurations
+├── locals.tf                                   # Local variables
+├── main.tf                                     # Resource configurations
+├── network.tf                                  # Network resource configurations
+├── outputs.tf                                  # Output variables
+├── storage.tf                                  # Storage resource configurations
+├── terraform.tf                                # Terraform configuration block
+└── variables.tf                                # Input variables
+```
 
-Configuration of [Azure Automation State Configuration (DSC)](https://learn.microsoft.com/azure/automation/automation-dsc-overview) is performed by [configure-automation.ps1](./scripts/configure-automation.ps1) including the following:
+### Input Variables
 
-* Configures [Azure Automation shared resources](https://learn.microsoft.com/azure/automation/automation-intro#shared-resources) including:
-  * [Modules](https://learn.microsoft.com/azure/automation/shared-resources/modules)
-    * Imports new modules including the following:
-      * [NetworkingDsc](https://github.com/dsccommunity/NetworkingDsc)
-      * [SqlServerDsc](https://github.com/dsccommunity/SqlServerDsc)
-  * Imports [DSC Configuration](https://learn.microsoft.com/azure/automation/automation-dsc-getting-started#create-a-dsc-configuration) [MssqlVmConfig.ps1](./scripts/MssqlVmConfig.ps1).
-  * [Compiles DSC Configuration](https://learn.microsoft.com/azure/automation/automation-dsc-compile) so it can be used later to [Register a VM to be managed by State Configuration](https://learn.microsoft.com/azure/automation/tutorial-configure-servers-desired-state#register-a-vm-to-be-managed-by-state-configuration).
+This section lists the default values for the input variables used in this module. Defaults can be overridden by specifying a different value in the root module.
 
-### Terraform Resources
+Variable | Default | Description
+--- | --- | ---
+adds_domain_name | mysandbox.local | The domain name defined in the vnet-shared module.
+admin_password_secret | adminpassword | The name of the key vault secret that contains the password for the admin account. Defined in the vnet-shared module.
+admin_username_secret | adminuser | The name of the key vault secret that contains the user name for the admin account. Defined in the vnet-shared module.
+automation_account_name | aa-sand-dev | The name of the Azure Automation Account used for state configuration (DSC). Defined in the vnet-shared module.
+key_vault_id | | The ID of the key vault defined in the root module.
+key_vault_name | | The name of the key vault defined in the root module.
+location | | The name of the Azure Region where resources will be provisioned.
+resource_group_name | | The name of the resource group defined in the root module.
+storage_account_id | | The ID of the storage account defined in the vnet-app module.
+storage_account_name | | The name of the storage account defined in the vnet-app module.
+storage_container_name | scripts | The name of the storage container defined in the vnet-app module.
+storage_blob_endpoint | | The blob endpoint for the storage account defined in the vnet-app module.
+subnet_id | | The subnet ID defined in the vnet-app module.
+tags | | The tags from the root module.
+temp_disk_size_mb | 0 | The size of the temporary disk for the VM size selected. Should be > 0 for "diskfull" sizes.
+vm_mssql_win_image_offer | `sql2022-ws2022` | The offer type of the virtual machine image used to create the database server VM.
+vm_mssql_win_image_publisher | `MicrosoftSQLServer` | The publisher for the virtual machine image used to create the database server VM.
+vm_mssql_win_image_sku | `sqldev-gen2` | The SKU of the virtual machine image used to create the database server VM.
+vm_mssql_win_image_version | `Latest` | The version of the virtual machine image used to create the database server VM.
+vm_mssql_win_name | mssqlwin1 | The name of the database server VM.
+vm_mssql_win_size | `Standard_B4s_v2` | The size of the virtual machine.
+vm_mssql_win_storage_account_type | `StandardSSD_LRS` | The storage type to be used for the VM's OS and data disks.
+
+### Module Resources
 
 This section lists the resources included in this configuration.
 
-#### Database server virtual machine
+Address | Name | Notes
+--- | --- | ---
+module.vm_mssql_win[0].azurerm_managed_disk.disks["sqldata"] | disk&#8209;sand&#8209;dev&#8209;vol_sqldata_M | The managed disk for SQL Server data.
+module.vm_mssql_win[0].azurerm_managed_disk.disks["sqllog"] | disk&#8209;sand&#8209;dev&#8209;vol_sqllog_L | The managed disk for SQL Server logs.
+module.vm_mssql_win[0].azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;mssqlwin1 | The network interface associated with the VM.
+module.vm_mssql_win[0].azurerm_role_assignment.assignments[*] | | Key vault and storage role assignments for the VM. See `locals.tf` for definitions.
+module.vm_mssql_win[0].azurerm_storage_blob.remote_scripts["orchestrator"] | Invoke-MssqlConfiguration.ps1 | The script that starts the SQL Server configuration task.
+module.vm_mssql_win[0].azurerm_storage_blob.remote_scripts["startup"] | Set-MssqlStartupConfiguration.ps1 | The script that re-configures SQL Server tempdb folder for VM sizes with temporary disks.
+module.vm_mssql_win[0].azurerm_storage_blob.remote_scripts["worker"] | Set-MssqlConfiguration.ps1 | The script that prepares data and log disks and configures SQL Server instance.
+module.vm_mssql_win[0].azurerm_virtual_machine_data_disk_attachment.attachments[*] | | The data and log disk attachments for the VM.
+module.vm_mssql_win[0].azurerm_virtual_machine_extension.this | | The custom script extension used to configure the SQL Server instance.
+module.vm_mssql_win[0].azurerm_windows_virtual_machine.this | mssqlwin1 | The Windows virtual machine resource.
 
-The configuration for these resources can be found in [compute.tf](./compute.tf) ([Step-By-Step Video](https://youtu.be/RXkPVOZZBwU)).
+### Output Variables
 
-Resource name (ARM) | Notes
---- | ---
-azurerm_windows_virtual_machine . vm_mssql_win (mssqlwin1) | By default, provisions a [Standard_B4s_v2](https://learn.microsoft.com/azure/virtual-machines/bsv2-series) virtual machine for use as a database server. See below for more information.
-azurerm_network_interface . vm_mssql_win_nic_01 (nic&#x2011;mssqlwin1&#x2011;1) | The configured subnet is *azurerm_subnet.vnet_app_01_subnets["snet-db-01"]*.
-azurerm_managed_disk . vm_mssql_win_data_disks ["sqldata"] (disk&#x2011;mssqlwin1&#x2011;vol_sqldata_M) | By default, provisions an E10 [Standard SSD](https://learn.microsoft.com/azure/virtual-machines/disks-types#standard-ssd) [managed disk](https://learn.microsoft.com/azure/virtual-machines/managed-disks-overview) for storing SQL Server data files. Caching is set to *ReadOnly* by default.
-azurerm_managed_disk . vm_mssql_win_data_disks ["sqllog"] (disk&#x2011;mssqlwin1&#x2011;vol_sqllog_L) | By default, provisions an E4 [Standard SSD](https://learn.microsoft.com/azure/virtual-machines/disks-types#standard-ssd) [managed disk](https://learn.microsoft.com/azure/virtual-machines/managed-disks-overview) for storing SQL Server log files. Caching is set to *None* by default.
-azurerm_virtual_machine_data_disk_attachment . vm_mssql_win_data_disk_attachments ["sqldata"] | Attaches *azurerm_managed_disk.vm_mssql_win_data_disks["sqldata"]* to *azurerm_windows_virtual_machine.vm_mssql_win*.
-azurerm_virtual_machine_data_disk_attachment . vm_mssql_win_data_disk_attachments ["sqllog"] | Attaches *azurerm_managed_disk.vm_mssql_win_data_disks["sqllog"]* to *azurerm_windows_virtual_machine.vm_mssql_win*
-azurerm_virtual_machine_extension . vm_mssql_win_postdeploy_script (vmext&#x2011;mssqlwin1&#x2011;postdeploy&#x2011;script) | Downloads [configure&#x2011;vm&#x2011;mssql.ps1](./scripts/configure-mssql.ps1) and [sql&#x2011;startup.ps1](./scripts/sql-startup.ps1) to *azurerm_windows_virtual_machine.vm_mssql_win* and executes [configure&#x2011;vm&#x2011;mssql.ps1](./scripts/configure-mssql.ps1) using the [Custom Script Extension for Windows](https://learn.microsoft.com/azure/virtual-machines/extensions/custom-script-windows).
-azurerm_role_assignment . vm_mssql_win_storage_account_role_assignment | Grants `Storage Blob Data Reader` role to the managed identity for *azurerm_windows_virtual_machine.vm_mssql_win* on the shared storage account.
-azurerm_role_assignment . vm_mssql_win_key_vault_role_assignment | Grants `Key Vault Secrets User` role to the managed identity for *azurerm_windows_virtual_machine.vm_mssql_win* on the shared key vault.
+This section includes a list of output variables returned by the module.
 
-* Guest OS: Windows Server 2022 Datacenter.
-* Database: Microsoft SQL Server 2022 Developer Edition
-* By default the [patch assessment mode](https://learn.microsoft.com/en-us/azure/update-manager/assessment-options) is set to `AutomaticByPlatform` and `provision_vm_agent` is set to `true` to enable use of [Azure Update Manager Update or Patch Orchestration](https://learn.microsoft.com/en-us/azure/update-manager/updates-maintenance-schedules#update-or-patch-orchestration).
-* *admin_username* and *admin_password* are configured using key vault secrets *adminuser* and *adminpassword*.
-* This resource is configured using a [provisioner](https://www.terraform.io/docs/language/resources/provisioners/syntax.html) that runs [aadsc-register-node.ps1](./scripts/aadsc-register-node.ps1) which registers the node with *azurerm_automation_account.automation_account_01* and applies the configuration [MssqlVmConfig.ps1](./scripts/MssqlVmConfig.ps1). Retry logic is implemented to wait until the node registration is compliant as multiple attempts to apply the configuration are sometimes required.
-  * The virtual machine is domain joined.
-  * The [Windows Firewall](https://learn.microsoft.com/windows/security/threat-protection/windows-firewall/windows-firewall-with-advanced-security#overview-of-windows-defender-firewall-with-advanced-security) is [Configured to Allow SQL Server Access](https://learn.microsoft.com/sql/sql-server/install/configure-the-windows-firewall-to-allow-sql-server-access). A new firewall rule is created that allows inbound traffic over port 1433.
-  * A SQL Server Windows login is added for the domain administrator and added to the SQL Server builtin `sysadmin` role.
-* Post-deployment configuration is then implemented using a custom script extension that runs [configure-vm-mssql.ps1](./scripts/configure-vm-mssql.ps1) which registers [configure-mssql.ps1](./scripts/configure-mssql.ps1) as a scheduled task and executes it using domain administrator credentials.
-* [configure-mssql.ps1](./scripts/configure-mssql.ps1) configures SQL Server following guidelines established in [Checklist: Best practices for SQL Server on Azure VMs](https://learn.microsoft.com/azure/azure-sql/virtual-machines/windows/performance-guidelines-best-practices-checklist).
-  * Data disk metadata is retrieved dynamically using the [Azure Instance Metadata Service (Windows)](https://learn.microsoft.com/azure/virtual-machines/windows/instance-metadata-service?tabs=windows) including:
-    * Volume label and drive letter, e.g. *vol_sqldata_M*
-    * Size
-    * Lun
-  * The metadata is then used to partition and format the raw data disks using the SQL Server recommended allocation unit size of 64K.
-  * The *tempdb* database is moved from the OS disk to either the the Azure local temporary disk (D:) or to the data (M:) and log disks (L:) depending upon whether the VM size selected includes an Azure local temporary disk.  
-    * If *tempdb* as moved to the Azure local temporary disk (D:) special logic is implemented to avoid errors if the Azure virtual machine is stopped, deallocated and restarted on a different host. If this occurs the `D:\SQLTEMP` folder must be recreated with appropriate permissions in order to start the SQL Server. The SQL Server is configured for manual startup, and the scheduled task [sql-startup.ps1](./scripts/sql-startup.ps1) is created to recreate the `D:\SQLTEMP` folder then start SQL Server. The scheduled task is set to run automatically at startup using domain administrator credentials.
-  * The data and log files for the *master*, *model* and *msdb* system databases are moved to the data and log disks respectively.
-  * The SQL Server errorlog is moved to the data disk.
-  * Windows Update is configured to enable first-party updates for SQL Server patching.
-
-## Next steps
-
-Move on to the next configuration [terraform-azurerm-mssql](../terraform-azurerm-mssql).
-
-## Videos
-
-Video | Section
---- | ---
-[SQL Server VM (Part 1)](https://youtu.be/2wkGPxqNm-M) | [terraform-azurerm-vm-mssql \| Overview](#overview)
-[SQL Server VM (Part 2)](https://youtu.be/Qk8OIW-VgHs) | [terraform-azurerm-vm-mssql \| Getting started](#getting-started)
-[SQL Server VM (Part 3)](https://youtu.be/uedt5wKIrcY) | [terraform-azurerm-vm-mssql \| Smoke testing](#smoke-testing)
-[SQL Server VM (Part 4)](https://youtu.be/Jzi58S7lBJ8) | [terraform-azurerm-vm-mssql \| Documentation \| Bootstrap script](#bootstrap-script)
-[SQL Server VM (Part 5)](https://youtu.be/RXkPVOZZBwU) | [terraform-azurerm-vm-mssql \| Documentation \| Terraform resources](#terraform-resources)
+Name | Default | Comments
+--- | --- | ---
+resource_ids | | A map of resource IDs for key resources in the module.
+resource_names | | A map of resource names for key resources in the module.

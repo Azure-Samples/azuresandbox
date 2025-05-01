@@ -181,12 +181,12 @@ This section lists the default values for the input variables used in this modul
 
 Variable | Default | Description
 --- | --- | ---
-adds_domain_name | N/A | The domain name defined in the vnet-shared module.
-admin_username_secret | N/A | The name of the key vault secret that contains the user name for the admin account. Defined in the vnet-shared module.
+adds_domain_name | mysandbox.local | The domain name defined in the vnet-shared module.
+admin_username_secret | adminuser | The name of the key vault secret that contains the user name for the admin account. Defined in the vnet-shared module.
 dns_server | N/A | The IP address of the DNS server used for the virtual network. Defined in the vnet-shared module.
 key_vault_id | N/A | The ID of the key vault defined in the root module.
 key_vault_name | N/A | The name of the key vault defined in the root module.
-location | N/A | The location defined in the root module.
+location | N/A | The Azure region defined in the root module.
 resource_group_name | N/A | The name of the resource group defined in the root module.
 storage_account_name | N/A | The storage account name from the vnet-app module.
 storage_share_name | N/A | The Azure Files share name from the vnet-app module.
