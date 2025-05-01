@@ -1,15 +1,11 @@
-# \#AzureSandbox - terraform-azurerm-mssql
+# Azure SQL Database Module (mssql)
 
 ## Contents
 
 * [Architecture](#architecture)
 * [Overview](#overview)
-* [Before you start](#before-you-start)
-* [Getting started](#getting-started)
-* [Smoke testing](#smoke-testing)
+* [Smoke Testing](#smoke-testing)
 * [Documentation](#documentation)
-* [Next steps](#next-steps)
-* [Videos](#videos)
 
 ## Architecture
 
@@ -17,70 +13,11 @@
 
 ## Overview
 
-This configuration implements a [PaaS](https://azure.microsoft.com/overview/what-is-paas/) database hosted in [Azure SQL Database](https://learn.microsoft.com/azure/azure-sql/database/sql-database-paas-overview) with a private endpoint implemented using [PrivateLink](https://learn.microsoft.com/azure/azure-sql/database/private-endpoint-overview) ([Step-By-Step Video](https://youtu.be/bkgyYhHfoKg)).
+This configuration implements a network isolated Azure SQL Database using private endpoints.
 
-Activity | Estimated time required
---- | ---
-Pre-configuration | ~5 minutes
-Provisioning | ~5 minutes
-Smoke testing | ~20 minutes
+## Smoke Testing
 
-## Before you start
-
-[terraform-azurerm-vnet-app](../terraform-azurerm-vnet-app) must be provisioned first before starting. This configuration is optional and can be skipped to reduce costs. Proceed with [terraform-azurerm-mysql](../terraform-azurerm-mysql) if you wish to skip it.
-
-## Getting started
-
-This section describes how to provision this configuration using default settings ([Step-By-Step Video](https://youtu.be/atq1GXv_Jlg)).
-
-* Change the working directory.
-
-  ```bash
-  cd ~/azuresandbox/terraform-azurerm-mssql
-  ```
-
-* Add an environment variable containing the password for the service principal.
-
-  ```bash
-  export TF_VAR_arm_client_secret=YOUR-SERVICE-PRINCIPAL-PASSWORD
-  ```
-
-* Run [bootstrap.sh](./scripts/bootstrap.sh) using the default settings or custom settings.
-
-  ```bash
-  ./scripts/bootstrap.sh
-  ```
-
-* Apply the Terraform configuration.
-
-  ```bash
-  # Initialize terraform providers
-  terraform init
-
-  # Validate configuration files
-  terraform validate
-
-  # Review plan output
-  terraform plan
-
-  # Apply configuration
-  terraform apply
-  ```
-
-* Monitor output. Upon completion, you should see a message similar to the following:
-
-  `Apply complete! Resources: 4 added, 0 changed, 0 destroyed.`
-
-* Inspect `terraform.tfstate`.
-
-  ```bash
-  # List resources managed by terraform
-  terraform state list 
-  ```
-
-## Smoke testing
-
-Use the steps in this section to smoke test the configuration ([Step-By-Step Video](https://youtu.be/pLYKU50Z014))
+This section describes how to test the module after deployment.
 
 * Test DNS queries for Azure SQL database private endpoint
   * From the client environment, navigate to *portal.azure.com* > *SQL Servers* > *mssql-xxxxxxxxxxxxxxxx* > *Overview* > *Server name* and and copy the the FQDN, e.g. *mssql&#x2011;xxxxxxxxxxxxxxxx.database.windows.net*.
@@ -90,7 +27,7 @@ Use the steps in this section to smoke test the configuration ([Step-By-Step Vid
     Resolve-DnsName mssql-xxxxxxxxxxxxxxxx.database.windows.net
     ```
 
-  * Verify the *IP4Address* returned is within the subnet IP address prefix for *azurerm_subnet.vnet_app_01_subnets["snet-privatelink-01"]*, e.g. `10.2.2.*`.
+  * Verify the *IP4Address* returned is within the subnet IP address prefix for *vnet_app.subnets["snet-privatelink-01"]*, e.g. `10.2.2.*`.
 * From *jumpwin1*, test SQL Server Connectivity with SQL Server Management Studio (SSMS)
   * Navigate to *Start* > *Microsoft SQL Server Tools 19* > *Microsoft SQL Server Management Studio 19*
   * Connect to the Azure SQL Database server using PrivateLink
@@ -159,54 +96,69 @@ Use the steps in this section to smoke test the configuration ([Step-By-Step Vid
 
 ## Documentation
 
-This section provides additional information on various aspects of this configuration.
+This section provides additional information on various aspects of this module.
 
-### Bootstrap script
+* [Dependencies](#dependencies)
+* [Module Structure](#module-structure)
+* [Input Variables](#input-variables)
+* [Module Resources](#module-resources)
+* [Output Variables](#output-variables)
 
-This configuration uses the script [bootstrap.sh](./scripts/bootstrap.sh) to create a *terraform.tfvars* file for generating and applying Terraform plans ([Step-By-Step Video](https://youtu.be/sD6ySES0fJQ)). For simplified deployment, several runtime defaults are initialized using output variables stored in the *terraform.tfstate* file associated with the [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared;) and [terraform-azurerm-vnet-app](../terraform-azurerm-vnet-app/) configurations, including:
+### Dependencies
 
-Output variable | Sample value
---- | ---
-aad_tenant_id | "00000000-0000-0000-0000-000000000000"
-adds_domain_name | "mysandbox.local"
-admin_password_secret | "adminpassword"
-admin_username_secret | "adminuser"
-arm_client_id | "00000000-0000-0000-0000-000000000000"
-automation_account_name | "auto-9a633c2bba9351cc-01"
-key_vault_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.KeyVault/vaults/kv-XXXXXXXXXXXXXXX"
-key_vault_name | "kv-XXXXXXXXXXXXXXX"
-location | "centralus"
-random_id | "xxxxxxxxxxxxxxx"
-resource_group_name | "rg-sandbox-01"
-subscription_id | "00000000-0000-0000-0000-000000000000"
-tags | tomap( { "costcenter" = "10177772" "environment" = "dev" "project" = "#AzureSandbox" } )
-vnet_app_01_subnets | Contains all the subnet definitions including *snet-app-01*, *snet-db-01*, *snet-mysql-01* and *snet-privatelink-01*.
+This module depends upon resources provisioned in the following modules:
 
-### Terraform Resources
+* Root module
+* vnet-shared module
+* vnet-app module
 
-This section lists the resources included in this configuration ([Step-By-Step Video](https://youtu.be/-nuc-Q6N430)).
+### Module Structure
 
-#### Azure SQL Database
+The module is organized as follows:
 
-The configuration for these resources can be found in [main.tf](./main.tf).
+```plaintext
+├── images/
+|   └── mssql-diagram.drawio.svg  # Architecture diagram
+├── main.tf                       # Resource configurations
+├── network.tf                    # Network resource configurations
+├── outputs.tf                    # Output variables
+├── storage.tf                    # Storage resource configurations
+├── terraform.tf                  # Terraform configuration block
+└── variables.tf                  # Input variables
+```
 
-Resource name (ARM) | Notes
---- | ---
-azurerm_mssql_server.mssql_server_01 (mssql-xxxxxxxxxxxxxxxx) | An [Azure SQL Database logical server](https://learn.microsoft.com/azure/azure-sql/database/logical-servers) for hosting databases.
-azurerm_mssql_database.mssql_database_01 | A [single database](https://learn.microsoft.com/azure/azure-sql/database/single-database-overview) named *testdb* for testing connectivity.
-azurerm_private_endpoint.mssql_server_01 | A private endpoint for connecting to [Azure SQL Database using PrivateLink](https://learn.microsoft.com/azure/azure-sql/database/private-endpoint-overview)
-azurerm_private_dns_a_record.sql_server_01 | A DNS A record for resolving DNS queries to *azurerm_mssql_server.mssql_server_01* using PrivateLink. This resource has a dependency on the *azurerm_private_dns_zone.database_windows_net* resource.
+### Input Variables
 
-## Next steps
+This section lists input variables used in this module. Defaults can be overridden by specifying a different value in the root module.
 
-Move on to the next configuration [terraform-azurerm-mysql](../terraform-azurerm-mysql).
+Variable | Default | Description
+--- | --- | ---
+admin_password_secret | adminpassword | The name of the key vault secret that contains the password for the admin account. Defined in the vnet-shared module.
+admin_username_secret | adminuser | The name of the key vault secret that contains the user name for the admin account. Defined in the vnet-shared module.
+key_vault_id | N/A | The ID of the key vault defined in the root module.
+location | N/A | The name of the Azure Region where resources will be provisioned.
+mssql_database_name | testdb | The name of the Azure SQL Database to be provisioned.
+resource_group_name | | The name of the resource group defined in the root module.
+subnet_id | | The subnet ID defined in the vnet-app module.
+tags | |  The tags from the root module.
+unique_seed | | The unique seed used to generate unique names for resources. Defined in the root module.
 
-## Videos
+### Module Resources
 
-Video | Section
---- | ---
-[Azure SQL Database (Part 1)](https://youtu.be/bkgyYhHfoKg) | [terraform-azurerm-mssql \| Overview](#overview)
-[Azure SQL Database (Part 2)](https://youtu.be/atq1GXv_Jlg) | [terraform-azurerm-mssql \| Getting started](#getting-started)
-[Azure SQL Database (Part 3)](https://youtu.be/pLYKU50Z014) | [terraform-azurerm-mssql \| Smoke testing](#smoke-testing)
-[Azure SQL Database (Part 4)](https://youtu.be/sD6ySES0fJQ) | [terraform-azurerm-mssql \| Documentation \| Bootstrap script](#bootstrap-script)
-[Azure SQL Database (Part 5)](https://youtu.be/-nuc-Q6N430) | [terraform-azurerm-mssql \| Documentation \| Terraform resources](#terraform-resources)
+This section lists the resources included in this module.
+
+Address | Name | Notes
+--- | --- | ---
+module.mssql[0].azurerm_mssql_database.this | testdb | The Azure SQL Database.
+module.mssql[0].azurerm_mssql_server.this | sql&#8209;sand&#8209;dev&#8209;xxxxxxxx | The Azure SQL logical server.
+module.mssql[0].azurerm_private_dns_a_record.this | | The A record for the Azure SQL logical server.
+module.mssql[0].azurerm_private_endpoint.this | pe&#8209;sand&#8209;dev&#8209;mssql&#8209;server | The private endpoint for the Azure SQL logical server.
+
+### Output Variables
+
+This section includes a list of output variables returned by the module.
+
+Name | Default | Comments
+--- | --- | ---
+resource_ids | | A map of resource IDs for key resources in the module.
+resource_names | | A map of resource names for key resources in the module.

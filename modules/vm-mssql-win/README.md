@@ -51,7 +51,7 @@ This section describes how to test the module after deployment.
 
 ## Documentation
 
-This section provides additional information on various aspects of this configuration.
+This section provides additional information on various aspects of this module.
 
 * [Dependencies](#dependencies)
 * [Module Structure](#module-structure)
@@ -93,7 +93,7 @@ The module is organized as follows:
 
 ### Input Variables
 
-This section lists the default values for the input variables used in this module. Defaults can be overridden by specifying a different value in the root module.
+This section lists input variables used in this module. Defaults can be overridden by specifying a different value in the root module.
 
 Variable | Default | Description
 --- | --- | ---
@@ -122,7 +122,7 @@ vm_mssql_win_storage_account_type | `StandardSSD_LRS` | The storage type to be u
 
 ### Module Resources
 
-This section lists the resources included in this configuration.
+This section lists the resources included in this module.
 
 Address | Name | Notes
 --- | --- | ---
