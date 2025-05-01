@@ -13,7 +13,7 @@
 
 ## Overview
 
-This configuration implements a SQL Server virtual machine for use as a database server. The VM is configured using Azure Automation DSC and offers the following capabilities:
+This configuration implements a SQL Server virtual machine. The VM is configured using Azure Automation DSC and offers the following capabilities:
 
 * Domain joined to the *mysandbox.local* Active Directory domain.
 * Pre-configured SQL Server data and log disks.
@@ -38,7 +38,7 @@ This section describes how to test the module after deployment.
   * Verify the IPAddress returned is within the subnet IP address prefix for *vnet_app[0].subnets["snet-db-01"]*, e.g. `10.2.1.*`.
 * From *jumpwin1*, test SQL Server Connectivity with SQL Server Management Studio (SSMS)
   * Navigate to *Start* > *Microsoft SQL Server Tools 20* > *Microsoft SQL Server Management Studio 20*
-  * Connect to the default instance of SQL Server installed on the database server virtual machine using the following settings:
+  * Connect to the default instance of SQL Server installed on the SQL Server virtual machine using the following settings:
     * Server
       * Server type: `Database Engine`
       * Server name: `mssqlwin1`
@@ -112,11 +112,11 @@ storage_blob_endpoint | | The blob endpoint for the storage account defined in t
 subnet_id | | The subnet ID defined in the vnet-app module.
 tags | | The tags from the root module.
 temp_disk_size_mb | 0 | The size of the temporary disk for the VM size selected. Should be > 0 for "diskfull" sizes.
-vm_mssql_win_image_offer | `sql2022-ws2022` | The offer type of the virtual machine image used to create the database server VM.
-vm_mssql_win_image_publisher | `MicrosoftSQLServer` | The publisher for the virtual machine image used to create the database server VM.
-vm_mssql_win_image_sku | `sqldev-gen2` | The SKU of the virtual machine image used to create the database server VM.
-vm_mssql_win_image_version | `Latest` | The version of the virtual machine image used to create the database server VM.
-vm_mssql_win_name | mssqlwin1 | The name of the database server VM.
+vm_mssql_win_image_offer | `sql2022-ws2022` | The offer type of the virtual machine image used to create the SQL Server VM.
+vm_mssql_win_image_publisher | `MicrosoftSQLServer` | The publisher for the virtual machine image used to create the SQL Server VM.
+vm_mssql_win_image_sku | `sqldev-gen2` | The SKU of the virtual machine image used to create the SQL Server VM.
+vm_mssql_win_image_version | `Latest` | The version of the virtual machine image used to create the SQL Server VM.
+vm_mssql_win_name | mssqlwin1 | The name of the SQL Server VM.
 vm_mssql_win_size | `Standard_B4s_v2` | The size of the virtual machine.
 vm_mssql_win_storage_account_type | `StandardSSD_LRS` | The storage type to be used for the VM's OS and data disks.
 
