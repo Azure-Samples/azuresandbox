@@ -9,16 +9,16 @@
 
 ## Architecture
 
-![vnet-app-diagram](./images/vm-jumpbox-linux-diagram.svg)
+![vnet-app-diagram](./images/vm-jumpbox-linux-diagram.drawio.svg)
 
 ## Overview
 
-This configuration implements a Linux virtual machine for use as a jumpbox. The VM is configured using cloudinit and offers the following capabilities:
+This configuration implements a Linux virtual machine for use as a jumpbox. The VM is configured using cloud-init and offers the following capabilities:
 
 * Secure SSH access via Bastion using a private SSH key stored in Azure Key Vault.
 * Domain joined to the *mysandbox.local* Active Directory domain using winbind.
-* Remote-ssh development capabilities using Visual Studio Code on jumpwin1.
-* Secure AD integrated access to sandbox Azure Files share automatically mounted by the VM using SMB/cifs.
+* Remote-ssh development capabilities using Visual Studio Code on *jumpwin1*.
+* Secure AD integrated access to Azure Files SMB/cifs share automatically mounted by the VM.
 * Pre-installed software packages, including:
   * autofs
   * azure-cli
@@ -46,11 +46,16 @@ This section describes how to test the module after deployment.
   * From the client environment, navigate to *portal.azure.com* > *Virtual machines* > *jumplinux1*
   * Click *Connect*, then click *Connect via Bastion*
   * For *Authentication Type* choose `SSH Private Key from Azure Key Vault`
-  * For *Username* enter `bootstrapadminlocal`
+  * For *Username* enter the following:
+
+    ```plaintext
+    bootstrapadminlocal
+    ```
+
   * For *Azure Key Vault Secret* specify the following values:
     * For *Subscription* choose the same Azure subscription used to provision the #AzureSandbox.
-    * For *Azure Key Vault* choose the key vault provisioned by [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared/#bootstrap-script), e.g. `kv-xxxxxxxxxxxxxxx`
-    * For *Azure Key Vault Secret* choose `bootstrapadmin-ssh-key-private`
+    * For *Azure Key Vault* choose the key vault associated with the sandbox environment, e.g. *kv-sand-dev-xxxxxxxx*.`
+    * For *Azure Key Vault Secret* choose *jumplinux1-ssh-key-private*
   * Click *Connect*
   * Execute the following command:
 
@@ -95,7 +100,7 @@ This section describes how to test the module after deployment.
   * Click on *adds1* in the left pane
     * Navigate to *adds1* > *Forward Lookup Zones* > *mysandbox.local* and verify that there is a *Host (A)* record for *jumplinux1*.
 
-* From *jumpwin1*, configure [Visual Studio Code](https://aka.ms/vscode) to do remote development on *jumplinux1*
+* From *jumpwin1*, configure Visual Studio Code to do remote SSH development on *jumplinux1*
   * Navigate to *Start* > *Visual Studio Code* > *Visual Studio Code*.
   * Click on the blue *Open a Remote Window* icon in the lower left corner
   * For *Select an option to open a Remote Window* choose `SSH`

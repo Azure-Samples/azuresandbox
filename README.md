@@ -480,7 +480,7 @@ Follow these steps to validate and apply the configuration:
 
 ### Step 5: Complete Smoke Testing
 
-After the sandbox has been provisioned, complete the smoke testing procedures specific to each module. This will ensure that the resources are functioning as expected and that the configuration is correct.
+After the sandbox has been provisioned, complete the smoke testing procedures specific to each module. This will ensure that the resources are functioning as expected and that the configuration is correct. You can find smoke testing guidance in the `README.md` files in each module directory. The smoke testing procedures are designed to be simple and quick, allowing you to verify the functionality of the deployed resources without extensive testing. Start with the `vnet-shared` module and work your way through the other modules as needed. See [Child Modules](#child-modules) for a list of modules included in the configuration.
 
 ### Step 6: Use Your Sandbox
 
@@ -516,13 +516,13 @@ The Azure Sandbox project is organized into the following structure:
 │   ├── mssql/                  # Azure SQL Database module
 │   ├── mysql/                  # Azure Database for MySQL module
 │   ├── vm-jumpbox-linux/       # Linux jumpbox virtual machine module
-│   ├── vm-msssql-win/          # Windows SQL Server virtual machine module
+│   ├── vm-msssql-win/          # SQL Server virtual machine module
 │   ├── vnet-app/               # Application virtual network module
 │   ├── vnet-shared/            # Shared services virtual network module
 │   └── vwan/                   # Point-to-site VPN module
 ├── scripts/                    # 
-│   ├── bootstrap.sh            # Bash script for generating terraform.tfvars
-│   └── bootstrap.ps1           # PowerShell script for generating terraform.tfvars
+│   ├── bootstrap.sh            # Bash helper script for generating terraform.tfvars
+│   └── bootstrap.ps1           # PowerShell helper script for generating terraform.tfvars
 ├── locals.tf                   # Local variables 
 ├── main.tf                     # Resource configurations
 ├── outputs.tf                  # Output variables 
@@ -563,8 +563,8 @@ The root module includes a resource group, key vault and log analytics workspace
 Address | Name | Notes
 --- | --- | ---
 azurerm_key_vault.this | kv&#8209;sand&#8209;dev&#8209;xxxxxxxx | Key vault for storing secrets. Public network access is enabled by default to facilitate testing. This should be disabled in production environments.
-azurerm_key_vault_secret.log_primary_shared_key | | Shared key secret for log analytics workspace.
-azurerm_key_vault_secret.spn_password | | Service principal password secret.
+azurerm_key_vault_secret.log_primary_shared_key | | Shared key secret for log analytics workspace. The name of the secret is the same as the log analytics workspace id.
+azurerm_key_vault_secret.spn_password | | Service principal password secret. The name of the secret is the same as the service principal AppId.
 azurerm_log_analytics_workspace.this | log&#8209;sand&#8209;dev&#8209;xxxxxxxx | Log analytics workspace.
 azurerm_monitor_diagnostic_setting.this | | Diagnostic settings for key vault.
 azurerm_resource_group.this | rg&#8209;sand&#8209;dev&#8209;xxxxxxxx | Resource group for the sandbox.
@@ -601,7 +601,7 @@ Name | Required | Description
 
 ### Virtual Network Design
 
-The Azure Sandbox project uses a structured IPv4 address scheme to ensure proper segmentation and isolation of resources within the virtual networks and subnets. The following sections describe the IP address ranges and their usage in the `vent-shared` and vnet-app virtual networks. Minimum CIDR sizes are provided for each virtual network and subnet to allow for customization if you need to adapt the IP address scheme to your own requirements. Note the default CIDR ranges used are intentionally large for readability and can easily be condensed. Network security groups (NSGs) are also configured for each subnet to control inbound and outbound traffic. This IP addressing scheme ensures proper segmentation, security, and scalability for the sandbox environment.
+The Azure Sandbox project uses a structured IPv4 address scheme to ensure proper segmentation and isolation of resources within the virtual networks and subnets. The following sections describe the IP address ranges and their usage in the *vnet-shared* and *vnet-app* virtual networks. Minimum prefix lengths are provided for each virtual network and subnet to allow for customization if you need to adapt the IP address scheme to your own requirements. Note the default CIDR ranges used are intentionally large for readability and can easily be condensed. Network security groups (NSGs) are also configured for each subnet to control inbound and outbound traffic. This IP addressing scheme ensures proper segmentation, security, and scalability for the sandbox environment.
 
 * [Shared Services Virtual Network](#shared-services-virtual-network)
 * [Application Virtual Network](#application-virtual-network)
@@ -615,13 +615,13 @@ The shared services virtual network (vnet-shared) is used to host common service
 
 Setting | Value | Notes
 --- | --- | ---
-Default CIDR | `10.1.0.0/16` | Min CIDR is `/24`
+Default CIDR | `10.1.0.0/16` | Min prefix length is `/24`
 Primary DNS Server | `10.1.1.4` | Private IP of the AD DS domain controller
 Secondary DNS Server | `168.63.129.16` | Azure Recursive DNS Resolver
 
-The following subnets are configured in vnet-shared:
+The following subnets are configured in *vnet-shared*:
 
-Subnet Name | Default CIDR | Min CIDR | NSG | Purpose
+Subnet Name | Default CIDR | Min prefix length | NSG | Purpose
 --- | --- | --- | --- | ---
 AzureBastionSubnet | `10.1.0.0/27` | `/27` | Yes | Reserved for Azure Bastion to provide secure RDP/SSH access to virtual machines.
 snet-adds-01 | `10.1.1.0/24` | `/27` | Yes | Hosts the Active Directory Domain Services (AD DS) domain controller and DNS server.
@@ -635,13 +635,13 @@ The application virtual network (vnet-app) is used to host application-specific 
 
 Setting | Value | Notes
 --- | --- | ---
-Default CIDR | `10.2.0.0/16` | Min CIDR is `/24`
+Default CIDR | `10.2.0.0/16` | Min prefix length is `/24`
 Primary DNS Server | `10.1.1.4` | Private IP of the AD DS domain controller in vnet-shared
 Secondary DNS Server | `168.63.129.16` | Azure Recursive DNS Resolver
 
-The following subnets are configured in vnet-app:
+The following subnets are configured in *vnet-app*:
 
-Subnet Name | Default CIDR | Min CIDR | NSG | Purpose
+Subnet Name | Default CIDR | Min prefix length | NSG | Purpose
 --- | --- | --- | --- | ---
 snet-app-01 | `10.2.0.0/24` | `/27` | Yes | Reserved for web, application, and jumpbox servers.
 snet-db-01 | `10.2.1.0/24` | `/27` | Yes | Hosts database servers, such as SQL Server and MySQL.
@@ -649,48 +649,55 @@ snet-privatelink-01 | `10.2.2.0/24` | `/27` | Yes |Reserved for private endpoint
 snet-misc-03 | `10.2.3.0/24` | `/27` | Yes | Reserved for future use.
 snet-appservice-01 | `10.2.4.0/24` | `/27` | Yes | Reserved for Azure App Service with delegation to `Microsoft.Web/serverFarms`.
 
-Private endpoints are configured in the snet-privatelink-01 subnet to provide secure, network-isolated access to the following Azure PaaS services:
+The following private endpoints are configured in the *snet-privatelink-01* subnet to provide secure, network-isolated access to the following Azure PaaS services:
 
-* Azure Blob Storage
-* Azure Files
-* Azure SQL Database
-* Azure Database for MySQL
+Service | Module
+--- | ---
+Azure Blob Storage | vnet-app
+Azure Files | vnet-app
+Azure SQL Database | mssql
+Azure Database for MySQL | mysql
 
 #### **Virtual Network Peering**
 
-Bi-directional virtual network peering is enabled between vnet-shared and vnet-app to allow network connectivity between resources in both virtual networks.
+Bi-directional virtual network peering is enabled between the virtual networks in *vnet-shared* and *vnet-app* to allow network connectivity between resources in both virtual networks.
 
 #### **Routing and Security**
 
-* **Azure Firewall**: Configured in the dedicated AzureFirewallSubnet of vnet-shared to provide secure outbound internet access and threat intelligence.
+* **Azure Firewall**: Configured in the dedicated *AzureFirewallSubnet* of *vnet-shared* to provide secure outbound internet access and threat intelligence.
+* **Route Tables**: A custom route table is used to direct traffic through the Azure Firewall for secure internet access. The route table sets the next hop for the default route to go to Azure Firewall for all sandbox subnets except those used for the Firewall itself and for Azure Bastion.
 * **Network Security Groups (NSGs)**: Associated with each subnet to control inbound and outbound traffic based on security rules.
-* **Route Tables**: Custom route tables are used to direct traffic through the Azure Firewall for secure internet access.
 
 #### **Secure VPN Access**
 
-The vwan module implements an Azure Virtual WAN point-to-site VPN gateway for secure remote connectivity to your sandbox environment from your local computer. A self-signed certificate is used for authentication.
+The optional *vwan* module implements an Azure Virtual WAN point-to-site VPN gateway for secure remote connectivity to your sandbox environment from a local computer. This is ideal for scenarios where access via Bastion is not sufficient, for example if you need to transfer data into your sandbox environment or use tools that are only available on a local computer. A self-signed certificate is used for authentication. The virtual WAN hub is connected to both of the virtual networks in *vnet-shared* and *vnet-app*, allowing secure VPN access to resources in both virtual networks.
 
 The following address ranges are used for the point-to-site VPN gateway:
 
-Name | Default CIDR | Min CIDR | Purpose
+Name | Default CIDR | Min prefix length | Purpose
 --- | --- | --- | ---
-vwan_hub_address_prefix | `10.3.0.0/16` | `/24` | Address range for the virtual hub in the Azure Virtual WAN (vWAN) architecture.
+vwan_hub_address_prefix | `10.3.0.0/16` | `/24` | Address range for the Azure Virtual WAN Hub.
 client_address_pool | `10.4.0.0/16` | `/27` | Address range for VPN clients connecting to the point-to-site VPN gateway.
 
 ---
 
 ### Dependencies
 
-This section covers the dependencies used in the Azure Sandbox project, including Terraform providers, modules, scripting technologies, and configuration management technologies.
+This section covers the dependencies in this configuration.
 
+* [Source Control](#source-control)
 * [Terraform](#terraform)
 * [Scripting Technologies](#scripting-technologies)
 * [Configuration Management Technologies](#configuration-management-technologies)
 * [Operating Systems](#operating-systems)
 
+#### **Source Control**
+
+The configuration is hosted on GitHub and uses Git for version control. The repository includes a `.gitignore` file to exclude sensitive information and temporary files from being tracked by Git. The repository is organized into modules and configurations, making it easy to navigate and understand the structure of the project.
+
 #### **Terraform**
 
-Azure Sandbox is built using Terraform, a cross platform, open-source Infrastructure as Code (IaC) tool that allows users to define, provision and version cloud infrastructure using a declarative configuration language.
+Sandbox environments are built using Terraform, a cross platform, open-source Infrastructure as Code (IaC) tool that allows users to define, provision and version cloud infrastructure using a declarative configuration language called HCL (HashiCorp Configuration Language).
 
 * **Providers**: The following Terraform providers are used in the project:
   * `azurerm`: Used to manage Azure resources.
@@ -706,18 +713,18 @@ Azure Sandbox is built using Terraform, a cross platform, open-source Infrastruc
 
 The following cross-platform scripting technologies are used in this project:
 
-* **PowerShell**:  Used for running scripts and automating tasks within the Azure Sandbox environment.
-* **Az PowerShell Module**: Used to manage Azure resources from PowerShell.
-* **Azure CLI**: Used to manage Azure resources from the command line.
+* **PowerShell**:  Used for general purpose scripting and to to implement Terraform provisioners and Azure custom script extensions.
+* **Az PowerShell Module**: Used for connecting to and configuring Azure Resources from provisioners and Azure custom script extensions.
 * **Bash**: Used for running scripts and automating tasks within the Azure Sandbox environment.
+* **Azure CLI**: Used for general purpose scripting.
 
 #### **Configuration Management Technologies**
 
 The following configuration management technologies are used in this project to configure virtual machines:
 
 * **PowerShell DSC**: PowerShell Desired State Configuration is used to configure Windows virtual machines.
-* **Azure Automation DSC**: Used to configure Windows virtual virtual machines using configurations written in PowerShell DSC.
-* **cloudinit**: Used to configure Linux virtual machines. It is a standard tool for cloud instance initialization and is widely used in cloud environments.
+* **Azure Automation DSC**: Used to configure Windows virtual machines using configurations written in PowerShell DSC.
+* **cloud-init**: Used to configure Linux virtual machines. It is a standard open source tool for cloud instance initialization and is widely used in cloud environments.
 
 #### **Operating Systems**
 
@@ -726,9 +733,9 @@ The following operating systems are used for the various virtual machines in the
 Virtual Machine | Role | Module | Operating System
 --- | --- | --- | ---
 adds1 | AD DS Domain Controller / DNS Server | vnet-shared | Windows Server 2025 Datacenter Azure Edition Core
-jumpwin1 | Windows jumpbox VM | vnet-app | Windows Server 2025 Datacenter Azure Edition
+jumpwin1 | Windows Jumpbox VM | vnet-app | Windows Server 2025 Datacenter Azure Edition
 mssqlwin1 | Windows SQL Server VM | vm-mssql-win | Windows Server 2022 / SQL Server 2022 Developer Edition
-jumplinux1 | Linux jumpbox VM | vm-jumpbox-linux | Ubuntu Server LTS 24.04 (Nobel Numbat)
+jumplinux1 | Linux Jumpbox VM | vm-jumpbox-linux | Ubuntu Server LTS 24.04 (Nobel Numbat)
 
 ---
 
