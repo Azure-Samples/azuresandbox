@@ -50,21 +50,5 @@ configuration MssqlVmConfiguration {
             DependsOn = '[SqlLogin]DomainAdmin'
             PSDscRunAsCredential = $localAdminCredential
         }
-
-        WindowsFeature 'RSAT-AD-PowerShell' {
-            Name = 'RSAT-AD-PowerShell'
-            Ensure = 'Present'
-            DependsOn = '[xDSCDomainjoin]JoinDomain'            
-        }
-
-        ADGroup 'DatabaseServers' {
-            GroupName = 'DatabaseServers'
-            GroupScope = 'Global'
-            Category = 'Security'
-            MembersToInclude = "$ComputerName$"
-            Credential = $domainAdminCredential
-            Ensure = 'Present'
-            DependsOn = '[WindowsFeature]RSAT-AD-PowerShell'            
-        }
     }
 }

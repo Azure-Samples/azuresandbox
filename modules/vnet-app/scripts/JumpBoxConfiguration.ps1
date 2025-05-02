@@ -13,33 +13,38 @@ configuration JumpBoxConfiguration {
     $domainAdminCredential = Get-AutomationPSCredential 'domainadmin'
 
     node $ComputerName {
-        WindowsFeature 'RSAT-AD-PowerShell' {
-            Name = 'RSAT-AD-PowerShell'
-            Ensure = 'Present'
+        xDSCDomainjoin 'JoinDomain' {
+            Domain = $domain
+            Credential = $domainAdminCredential
         }
 
         WindowsFeature 'RSAT-ADDS' {
             Name = 'RSAT-ADDS'
             Ensure = 'Present'
+            DependsOn = '[xDSCDomainjoin]JoinDomain'
         }
 
         WindowsFeature 'RSAT-DNS-Server' {
             Name = 'RSAT-DNS-Server'
             Ensure = 'Present'
+            DependsOn = '[xDSCDomainjoin]JoinDomain'
         }
 
         WindowsFeature 'RSAT-Clustering-Mgmt' {
             Name = 'RSAT-Clustering-Mgmt'
             Ensure = 'Present'
+            DependsOn = '[xDSCDomainjoin]JoinDomain'
         }
 
         WindowsFeature 'RSAT-Clustering-PowerShell' {
             Name = 'RSAT-Clustering-PowerShell'
             Ensure = 'Present'
+            DependsOn = '[xDSCDomainjoin]JoinDomain'
         }
 
         cChocoInstaller 'Chocolatey' {
             InstallDir = 'c:\choco'
+            DependsOn = '[xDSCDomainjoin]JoinDomain'
         }
 
         cChocoPackageInstaller 'VSCode' {
@@ -58,22 +63,6 @@ configuration JumpBoxConfiguration {
             Name = 'mysql.workbench'
             DependsOn = '[cChocoInstaller]Chocolatey'
             AutoUpgrade = $true
-        }
-
-        xDSCDomainjoin 'JoinDomain' {
-            Domain = $domain
-            Credential = $domainAdminCredential
-            DependsOn = '[WindowsFeature]RSAT-AD-PowerShell' 
-        }
-
-        ADGroup 'JumpBoxes' {
-            GroupName = 'JumpBoxes'
-            GroupScope = 'Global'
-            Category = 'Security'
-            MembersToInclude = "$ComputerName$"
-            Credential = $domainAdminCredential
-            Ensure = 'Present'
-            DependsOn = '[xDSCDomainjoin]JoinDomain'            
         }
     }
 }
