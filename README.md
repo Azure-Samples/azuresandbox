@@ -494,14 +494,15 @@ Don't forget to delete your sandbox when you're done. You don't want to have to 
 
 This section provides documentation regarding the overall structure of the repository and the root module. See the README.md files in each module directory for more information about that module.
 
-* [Project Structure](#project-structure)
+* [Root Module Structure](#root-module-structure)
 * [Root Module Resources](#root-module-resources)
+* [Root Module Input Variables](#root-module-input-variables)
 * [Child Modules](#child-modules)
 * [Virtual Network Design](#virtual-network-design)
 * [Dependencies](#dependencies)
 * [Additional Resources](#additional-resources)
 
-### Project Structure
+### Root Module Structure
 
 The Azure Sandbox project is organized into the following structure:
 
@@ -532,6 +533,29 @@ The Azure Sandbox project is organized into the following structure:
 
 ---
 
+### Root Module Input Variables
+
+This section lists input variables used in the root module. Defaults can be overridden by specifying a different value in terraform.tfvars.
+
+Variable | Default | Description
+--- | --- | ---
+aad_tenant_id | | The Microsoft Entra tenant id.
+arm_client_id | | The AppId of the service principal used for authenticating with Azure. Must have an `Owner` role assignment scoped to the subscription.
+arm_client_secret | | The password for the service principal used for authenticating with Azure. Set interactively or using an environment variable 'TF_VAR_arm_client_secret'.
+enable_module_mssql | false | Set to true to enable the Azure SQL Database (mssql) module, false to skip it.
+enable_module_mysql | false | Set to true to enable the Azure Database for MySQL (mysql) module, false to skip it.
+enable_module_vm_jumpbox_linux | false | Set to true to enable the vm_jumpbox_linux module, false to skip it.
+enable_module_vm_mssql_win | false | Set to true to enable the vm_mssql_win module, false to skip it.
+enable_module_vnet_app | false | Set to true to enable the vnet_app module, false to skip it.
+enable_module_vwan | false | Set to true to enable the vwan module, false to skip it.
+location | | The name of the Azure Region where resources will be provisioned.
+log_analytics_workspace_retention_days | 30 | The retention period for the log analytics workspace.
+subscription_id | | The Azure subscription id used to provision resources.
+tags | { costcenter = "mycostcenter", environment = "dev", project = "sand" } | Tags in map format to be applied to the sandbox resource group and used for resource naming.
+user_object_id | N/A | The object id of the interactive user (e.g. Azure CLI or Az PowerShell signed in user).
+
+---
+
 ### Root Module Resources
 
 The root module includes a resource group, key vault and log analytics workspace used by the child modules. It also implements Azure RBAC role assignments for both the service principal used by Terraform as well as the interactive user.
@@ -539,7 +563,7 @@ The root module includes a resource group, key vault and log analytics workspace
 Address | Name | Notes
 --- | --- | ---
 azurerm_key_vault.this | kv&#8209;sand&#8209;dev&#8209;xxxxxxxx | Key vault for storing secrets. Public network access is enabled by default to facilitate testing. This should be disabled in production environments.
-azurerm_key_vault_secret.log_primary_shared_key |  | Shared key secret for log analytics workspace.
+azurerm_key_vault_secret.log_primary_shared_key | | Shared key secret for log analytics workspace.
 azurerm_key_vault_secret.spn_password | | Service principal password secret.
 azurerm_log_analytics_workspace.this | log&#8209;sand&#8209;dev&#8209;xxxxxxxx | Log analytics workspace.
 azurerm_monitor_diagnostic_setting.this | | Diagnostic settings for key vault.
@@ -548,9 +572,30 @@ azurerm_role_assignment.roles[*] | | Assigns the `Key Vault Secrets Officer` rol
 
 ---
 
+### Root Module Output Variables
+
+This section includes a list of output variables returned by the root module.
+
+Name | Default | Comments
+--- | --- | ---
+resource_ids | | A map of resource IDs for key resources in the configuration.
+resource_names | | A map of resource names for key resources in the configuration.
+
+---
+
 ### Child Modules
 
-Several child [modules](./modules/) are included in the Azure Sandbox project. Each module is designed to be reusable and configurable, allowing you to customize your sandbox environment according to your needs.
+The following [modules](./modules/) are included in this configuration:
+
+Name | Required | Description
+--- | --- | ---
+[vnet-shared](./modules/vnet-shared/) | Yes | Includes a shared services virtual network including a Bastion Host, Azure Firewall and an AD domain controller/DNS server VM.
+[vnet-app](./modules/vnet-app/) | No | Includes an application virtual network, a network isolated Azure Files share and a preconfigured Windows jumpbox VM.
+[vm-jumpbox-linux](./modules/vm-jumpbox-linux/) | No | Includes a preconfigured Linux jumpbox VM in the application virtual network.
+[vm-mssql-win](./modules/vm-mssql-win/) | No | Includes a preconfigured Windows VM with SQL Server in the application virtual network.
+[mssql](./modules/mssql/) | No | Includes a network isolated Azure SQL Database in the application virtual network.
+[mysql](./modules/mysql/) | No | Creates a network isolated Azure MySQL Database in the application virtual network.
+[vwan](./modules/vwan/) | No | Creates a Point-to-Site VPN gateway to securely connect to your sandbox environment from your local machine.
 
 ---
 
@@ -562,6 +607,7 @@ The Azure Sandbox project uses a structured IPv4 address scheme to ensure proper
 * [Application Virtual Network](#application-virtual-network)
 * [Virtual Network Peering](#virtual-network-peering)
 * [Routing and Security](#routing-and-security)
+* [Secure VPN Acceess](#secure-vpn-access)
 
 #### **Shared Services Virtual Network**
 
@@ -619,6 +665,17 @@ Bi-directional virtual network peering is enabled between vnet-shared and vnet-a
 * **Azure Firewall**: Configured in the dedicated AzureFirewallSubnet of vnet-shared to provide secure outbound internet access and threat intelligence.
 * **Network Security Groups (NSGs)**: Associated with each subnet to control inbound and outbound traffic based on security rules.
 * **Route Tables**: Custom route tables are used to direct traffic through the Azure Firewall for secure internet access.
+
+#### **Secure VPN Access**
+
+The vwan module implements an Azure Virtual WAN point-to-site VPN gateway for secure remote connectivity to your sandbox environment from your local computer. A self-signed certificate is used for authentication.
+
+The following address ranges are used for the point-to-site VPN gateway:
+
+Name | Default CIDR | Min CIDR | Purpose
+--- | --- | --- | ---
+vwan_hub_address_prefix | `10.3.0.0/16` | `/24` | Address range for the virtual hub in the Azure Virtual WAN (vWAN) architecture.
+client_address_pool | `10.4.0.0/16` | `/27` | Address range for VPN clients connecting to the point-to-site VPN gateway.
 
 ---
 

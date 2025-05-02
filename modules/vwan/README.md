@@ -1,15 +1,11 @@
-# \#AzureSandbox - terraform-azurerm-vwan
+# Point-to-site VPN Gateway Module (vwan)
 
 ## Contents
 
 * [Architecture](#architecture)
 * [Overview](#overview)
-* [Before you start](#before-you-start)
-* [Getting started](#getting-started)
-* [Smoke testing](#smoke-testing)
+* [Smoke Testing](#smoke-testing)
 * [Documentation](#documentation)
-* [Next steps](#next-steps)
-* [Videos](#videos)
 
 ## Architecture
 
@@ -17,115 +13,73 @@
 
 ## Overview
 
-This configuration implements an [Azure Virtual WAN](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about) to connect /#AzureSandbox to remote users using [User VPN (point-to-site) connections](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#uservpn), including ([Step-By-Step Video](https://youtu.be/68E-HiDaXng)):
-
-* A [virtual wan](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#resources).
-* A [virtual wan hub](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#resources) with pre-configured [hub virtual network connections](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#resources) with [terraform-azurerm-vnet-shared](./terraform-azurerm-vnet-shared/) and [terraform-azurerm-vnet-app](./terraform-azurerm-vnet-app/). The hub is also pre-configured for [User VPN (point-to-site) connections](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#uservpn).
-
-Activity | Estimated time required
---- | ---
-Pre-configuration | ~5 minutes
-Provisioning | ~60 minutes
-Smoke testing | ~45 minutes
-
-## Before you start
-
-This configuration only supports the [Windows Subsystem for Linux](../README.md#windows-subsystem-for-linux) client environment. [Cloud shell](../README.md#azure-cloud-shell) and [Linux / macOS](../README.md#linux--macos) client environments are not supported. The following configurations must be deployed first before starting:
-
-* [terraform-azurerm-vnet-app](../terraform-azurerm-vnet-app)
-
-## Getting started
-
-This section describes how to provision this configuration using default settings ([Step-By-Step Video](https://youtu.be/jFkW6GDdg1I)).
-
-* From the client environment, generate self-signed certificates to use for P2S VPN certificate authentication.
-  * Download [genp2svpncerts.ps1](./scripts/genp2svpncerts.ps1) into a folder named `C:\scripts`.
-  * Open a Windows PowerShell command prompt using `Run as administrator`.
-  * Execute the following commands to to generate the self-signed certificates required for setting up a P2S VPN:
-  
-    ```powershell
-    # Change execution policy, enter 'Y' when prompted for confirmation
-    Set-ExecutionPolicy -ExecutionPolicy Unrestricted
-    cd C:\scripts
-
-    # Generate self-signed certificates, enter 'R' when prompted for confirmation
-    .\genp2svpncerts.ps1
-    ```
-  
-    * Note: This script creates a root certificate in the registry, then uses that root certificate to create a self-signed client certificate in the registry. Both certificates are then exported to files, including:
-      * `MyP2SVPNRootCert_DER_Encoded.cer`: This is a temporary file used to create a Base64 encoded version of the root certificate.
-      * `MyP2SVPNRootCert_Base64_Encoded.cer`: This is the root certificate used to create a User VPN Configuration in Virtual WAN.
-      * `MyP2SVPNChildCert.pfx`: This is an export of the client certificate protected with a password. You only need this if you want to configure the Azure VPN client on a different computer than the one used to generate the certificates.
-  * Copy `MyP2SVPNRootCert_Base64_Encoded.cer` from Windows to WSL in the directory `~/azuresandbox/terraform-azurerm-vwan`.
-
-* From a Bash terminal, change the working directory.
-
-  ```bash
-  cd ~/azuresandbox/terraform-azurerm-vwan
-  ```
-
-* Add an environment variable containing the password for the service principal.
-
-  ```bash
-  export TF_VAR_arm_client_secret=YOUR-SERVICE-PRINCIPAL-PASSWORD
-  ```
-
-* Run [bootstrap.sh](./scripts/bootstrap.sh) using the default settings or custom settings.
-
-  ```bash
-  ./scripts/bootstrap.sh
-  ```
-
-* Apply the Terraform configuration.
-
-  ```bash
-  # Initialize terraform providers
-  terraform init
-
-  # Validate configuration files
-  terraform validate
-
-  # Review plan output
-  terraform plan
-
-  # Apply configuration
-  terraform apply
-  ```
-
-* Monitor output. Upon completion, you should see a message similar to the following:
-
-  `Apply complete! Resources: 6 added, 0 changed, 0 destroyed.`
-
-* Inspect `terraform.tfstate`.
-
-  ```bash
-  terraform state list 
-  ```
+This module implements a point-to-site VPN gateway for secure remote connectivity to your sandbox environment from your local computer.
 
 ## Smoke testing
 
 This smoke testing is designed to be performed from a [Windows Subsystem for Linux](../README.md#windows-subsystem-for-linux) client environment using a user (point-to-site) VPN connection to the Azure Virtual WAN Hub. Upon completion you will have tested connectivity using a variety of ports and protocols to Azure resources using private endpoints ([Step-By-Step Video](https://youtu.be/pUUUiUnchCw)).
 
+* [Configure Certificates on Remote Client](#configure-certificates-on-remote-client)
 * [Install and configure VPN client](#install-and-configure-vpn-client)
 * [Test user (point-to-site) VPN connectivity](#test-user-point-to-site-vpn-connectivity)
 
+### Configure Certificates on Remote Client
+
+The point-to-site VPN gateway uses a self-signed root certificate to authenticate the remote client. This root certificate and a related client certificate must be installed on the remote client machine to authenticate the VPN connection.
+
+* Perform the following steps from the Terraform execution environment:
+  * Export the root certificate and client certificate.
+
+    ```bash
+    # Export certificates using bash helper script
+    ./modules/vwan/scripts/export-certificates.sh
+    ```
+
+    ```pwsh
+    # Export certificates using PowerShell helper script
+    ./modules/vwan/scripts/Export-Certificates.ps1
+    ```
+
+  * Verify `root_cert.pem` and `client_cert.pfx` files were created in the root module directory.
+  * Copy these files to the remote client machine.
+
+* Perform the following steps from the remote client machine:
+  * Import self-signed root certificate to Trusted Root Certification Authorities
+    * Launch Microsoft Management Console by navigating to *Start* > *Run* and entering `certmgr.msc`.
+    * Expand the *Certificates- Current User* node and navigate to *Trusted Root Certification Authorities* > *Certificates*.
+    * Right-click on the *Certificates* node and select *All Tasks* > *Import...*
+    * Click *Next>* and select the `root_cert.pem` file created in the previous step.
+    * Click *Next>* and select the *Place all certificates in the following store* option.
+    * Click *Finish* to complete the import.
+    * Click *OK* to close the *The import was successful* dialog.
+  * Import client certificate to Personal Certificates
+    * Navigate to *Personal* > *Certificates*.
+    * Right-click on the *Certificates* node and select *All Tasks* > *Import...*
+    * Click *Next>* and select the `client_cert.pfx` file created in the previous step.
+    * Click *Next>* and enter the password using the value of the `adminpassword` key vault secret.
+    * Click *Next>* and select the *Place all certificates in the following store* option.
+    * Select the option to place the certificate in the Personal store.
+    * Click *Finish* to complete the import.
+    * Click *OK* to close the *The import was successful* dialog.
+
 ### Install and configure VPN client
 
+The Azure VPN Client is used to establish a point-to-site VPN connection to the VPN gateway. Perform these steps from the remote client machine.
+
 * Download virtual hub user VPN profile
-  * Navigate to *portal.azure.com* > *Virtual WANs* > *vwan-XXXX-01* > *Hubs* > *vhub-XXXX-01* > *User VPN (Point to site)*
+  * Navigate to *portal.azure.com* > *Virtual WANs* > *vwan-sand-dev* > *Hubs* > *vwan-sand-dev-hub* > *User VPN (Point to site)*
   * Click *Download virtual hub user VPN profile*
     * Authentication type: *EAPTLS*
     * Click *Generate and download profile*
     * Extract the files from the archive and examine `AzureVPN\azurevpnconfig.xml`.
 * Configure Azure VPN Client
   * Navigate to *Start* > *Azure VPN Client*
-  * Navigate to *+ Add or Import a new VPN connection*
+  * Navigate to *+* > *Import* and select `AzureVPN\azurevpnconfig.xml`.
   * Click *Import*
   * Navigate to the `AzureVPN` folder from the previous step, and open `azurevpnconfig.xml`.
     * Client authentication
       * Authentication Type: *Certificate*
-      * Certificate Information: `MyP2SVPNChildCert`
-        * Note: If you do not see this certificate you need to import the .pfx created in [Getting started](#getting-started).
+      * Certificate Information: `MyP2SVPNClientCert`
   * Click *Save*, then click *Connect*.
   * Inspect *Connection Properties* > *VPN routes* which should show the following routes:
     * `10.1.0.0/16`: Shared services virtual network
@@ -281,63 +235,80 @@ Use the following sections to test user VPN (point-to-site) connectivity to priv
 
 ## Documentation
 
-This section provides additional information on various aspects of this configuration ([Step-By-Step Video](https://youtu.be/jHm_36a8ms4)).
+This section provides additional information on various aspects of this module.
 
-### Bootstrap script
+* [Dependencies](#dependencies)
+* [Module Structure](#module-structure)
+* [Input Variables](#input-variables)
+* [Module Resources](#module-resources)
+* [Output Variables](#output-variables)
 
-This configuration uses the script [bootstrap.sh](./scripts/bootstrap.sh) to create a *terraform.tfvars* file for generating and applying Terraform plans. For simplified deployment, several runtime defaults are initialized using output variables stored in the *terraform.tfstate* files associated with the [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared) and [terraform-azurerm-vnet-app](../terraform-azurerm-vnet-app) configurations, including:
+### Dependencies
 
-Output variable | Sample value
---- | ---
-aad_tenant_id | "00000000-0000-0000-0000-000000000000"
-arm_client_id | "00000000-0000-0000-0000-000000000000"
-location | "centralus"
-random_id | "xxxxxxxxxxxxxxxx"
-resource_group_name | "rg-sandbox-01"
-subscription_id | "00000000-0000-0000-0000-000000000000"
-tags | tomap( { "costcenter" = "10177772" "environment" = "dev" "project" = "#AzureSandbox" } )
-vnet_shared_01_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualNetworks/vnet-shared-01"
-vnet_shared_01_name | "vnet-shared-01"
-vnet_app_01_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualNetworks/vnet-app-01"
-vnet_app_01_name | "vnet-app-01"
+This module depends upon resources provisioned in the following modules:
 
-### Terraform resources
+* Root module
+* vnet-shared module
+* vnet-app module
+
+### Module Structure
+
+The module is organized as follows:
+
+```plaintext
+├── images/
+|   └── vwan-diagram.drawio.svg # Architecture diagram
+├── scripts/
+|   |── Export-Certificates.ps1 # Helper script to export the root and client certificates for P2S VPN client
+|   └── export-certificates.sh  # Helper script to export the root and client certificates for P2S VPN client
+├── locals.tf                   # Local variables
+├── main.tf                     # Resource configurations
+├── network.tf                  # Network resource configurations
+├── outputs.tf                  # Output variables
+├── terraform.tf                # Terraform configuration block
+└── variables.tf                # Input variables
+```
+
+### Input Variables
+
+This section lists input variables used in this module. Defaults can be overridden by specifying a different value in the root module.
+
+Variable | Default | Description
+--- | --- | ---
+client_address_pool | `10.4.0.0/16` | The address range used for point-to-site VPN clients.
+dns_server | `10.1.1.4` | The IP address of the DNS server used for the virtual network. Defined in the vnet-shared module.
+key_vault_id | | The ID of the key vault defined in the root module.
+location | | The Azure region defined in the root module.
+resource_group_name | | The name of the resource group defined in the root module.
+tags | | The tags defined in the root module..
+virtual_networks | | The resource ids for the virtual networks to be connected to the vwan hub. Defined in the vnet-shared and vnet-app modules.
+vwan_hub_address_prefix | `10.3.0.0/16` | The address prefix in CIDR notation for the new spoke virtual wan hub.
+
+### Module Resources
 
 This section lists the resources included in this configuration.
 
-#### Network resources
+Address | Name | Notes
+--- | --- | ---
+module.vwan[0].azurerm_key_vault_secret.this | p2svpn&#8209;client&#8209;private&#8209;key&#8209;pem | Key vault secret used to secure the client certificate private key.
+module.vwan[0].azurerm_point_to_site_vpn_gateway.this | vpngw&#8209;sand&#8209;dev | The Azure Virtual WAN point-to-site VPN gateway.
+module.vwan[0].azurerm_virtual_hub.this | vwan&#8209;sand&#8209;dev&#8209;hub | The Azure Virtual WAN hub.
+module.vwan[0].azurerm_virtual_hub_connection.connections[*] | | The Azure Virtual WAN hub connections to the virtual networks.
+module.vwan[0].azurerm_virtual_wan.this | vwan&#8209;sand&#8209;dev | The Azure Virtual WAN.
+module.vwan[0].azurerm_vpn_server_configuration.this | | The Azure Virtual WAN VPN server configuration.
+module.vwan[0].tls_cert_request.client_cert_request | | The certificate request for the client certificate.
+module.vwan[0].tls_locally_signed_cert.client_cert | | The locally signed client certificate. This is used to create the client certificate pfx file.
+module.vwan[0].tls_private_key.client_cert_key | | The private key for the client certificate. This is used to create the client certificate pfx file.
+module.vwan[0].tls_private_key.root_cert_key | | The private key for the root certificate.
+module.vwan[0].tls_self_signed_cert.root_cert | | The self-signed root certificate used in the VPN server configuration for authentication. This needs to be installed on the client machine.
 
-The configuration for these resources can be found in [network.tf](./network.tf).
+### Output Variables
 
-Resource name (ARM) | Notes
---- | ---
-azurerm_virtual_wan.vwan_01 (vwan-xxxxxxxxxxxxxxxx-01)| [Virtual wan](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about) to connect the shared services and application virtual networks to remote users.
-azurerm_virtual_hub.vwan_01_hub_01 (vhub-xxxxxxxxxxxxxxxx-01) | [Virtual WAN hub](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#resources) associated with the virtual wan.
-azurerm_virtual_hub_connection.vwan_01_hub_01_connections["vnet-shared-01"] | [Hub virtual network connection](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#resources) to *azurerm_virtual_network.vnet_shared_01*.
-azurerm_virtual_hub_connection.vwan_01_hub_01_connections["vnet-app-01"] | [Hub virtual network connection](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#resources) to *azurerm_virtual_network.vnet_app_01*.
-azurerm_point_to_site_vpn_gateway.point_to_site_vpn_gateway_01 | Enables [User VPN (point-to-site) connections](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#uservpn). See below for more details.
-azurerm_vpn_server_configuration.vpn_server_configuration_01 | Defines the parameters for remote clients to connect to *azurerm_point_to_site_vpn_gateway.point_to_site_vpn_gateway_01*. See below for more details.
+This section includes a list of output variables returned by the module.
 
-[User VPN (point-to-site) connections](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#uservpn) are enabled by generating a self-signed certificate in the client environment and using it to authenticate with a point-to-site VPN gateway provisioned in a [Virtual WAN hub](https://learn.microsoft.com/azure/virtual-wan/virtual-wan-about#resources) that is connected to both the shared services and application virtual networks used in \#AzureSandbox.
-
-### Terraform output variables
-
-This section lists the output variables defined in the Terraform configurations in this sample. Some of these may be used for automation in other configurations.
-
-Output variable | Sample value
---- | ---
-vwan_01_hub_01_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualHubs/vhub-xxxxxxxxxxxxxxxx"
-vwan_01_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.Network/virtualWans/vwan-xxxxxxxxxxxxxxxx"
-
-## Next steps
-
-You have provisioned all of the configurations included in \#AzureSandbox. Now it's time to use your sandbox environment to experiment with additional Azure services and capabilities.
-
-## Videos
-
-Video | Section
---- | ---
-[Azure Virtual WAN (Part 1)](https://youtu.be/68E-HiDaXng) | [terraform-azurerm-vwan \| Overview](#overview)
-[Azure Virtual WAN (Part 2)](https://youtu.be/jFkW6GDdg1I) | [terraform-azurerm-vwan \| Getting started](#getting-started)
-[Azure Virtual WAN (Part 3)](https://youtu.be/pUUUiUnchCw) | [terraform-azurerm-vwan \| Smoke testing](#smoke-testing)
-[Azure Virtual WAN (Part 4)](https://youtu.be/jHm_36a8ms4) | [terraform-azurerm-vwan \| Documentation](#documentation)
+Name | Default | Comments
+--- | --- | ---
+client_cert_pem | | The client certificate in PEM format. This can be combined with tls_private_key.client_cert_key.private_key_pem to create a pfx file using OpenSSL.
+resource_ids | | A map of resource IDs for key resources in the module.
+resource_names | | A map of resource names for key resources in the module.
+root_cert_pem | | The root certificate in PEM format. This needs to be installed on the client machine.

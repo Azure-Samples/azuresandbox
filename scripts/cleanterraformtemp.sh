@@ -40,9 +40,14 @@ printf "Removing all files matching 'sshkeytemp*'...\n"
 find ../. -type f -name 'sshkeytemp*' 
 find ../. -type f -name 'sshkeytemp*' | xargs -r rm
 
-printf "Removing all files matching '*.cer'...\n"
+printf "Removing all files matching '*.pem'...\n"
 
-find ../. -type f -name '*.cer' 
-find ../. -type f -name '*.cer' | xargs -r rm
+find ../. -type f -name '*.pem' 
+find ../. -type f -name '*.pem' | xargs -r rm
+
+printf "Removing all files matching '*.pfx'...\n"
+
+find ../. -type f -name '*.pfx' 
+find ../. -type f -name '*.pfx' | xargs -r rm
 
 exit 0

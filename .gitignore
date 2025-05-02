@@ -81,4 +81,5 @@ sshkeytemp
 sshkeytemp.pub
 
 # Ignore certificate files
-*.cer
+*.pem
+*.pfx

@@ -122,7 +122,6 @@ The module is organized as follows:
 ├── main.tf                       # Resource configurations
 ├── network.tf                    # Network resource configurations
 ├── outputs.tf                    # Output variables
-├── storage.tf                    # Storage resource configurations
 ├── terraform.tf                  # Terraform configuration block
 └── variables.tf                  # Input variables
 ```
@@ -135,8 +134,8 @@ Variable | Default | Description
 --- | --- | ---
 admin_password_secret | adminpassword | The name of the key vault secret that contains the password for the admin account. Defined in the vnet-shared module.
 admin_username_secret | adminuser | The name of the key vault secret that contains the user name for the admin account. Defined in the vnet-shared module.
-key_vault_id | N/A | The ID of the key vault defined in the root module.
-location | N/A | The name of the Azure Region where resources will be provisioned.
+key_vault_id | | The ID of the key vault defined in the root module.
+location | | The name of the Azure Region where resources will be provisioned.
 mssql_database_name | testdb | The name of the Azure SQL Database to be provisioned.
 resource_group_name | | The name of the resource group defined in the root module.
 subnet_id | | The subnet ID defined in the vnet-app module.

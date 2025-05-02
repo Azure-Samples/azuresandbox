@@ -144,15 +144,15 @@ This section lists the default values for the input variables used in this modul
 
 Variable | Default | Description
 --- | --- | ---
-adds_domain_name | | The domain name defined in the vnet-shared module.
-admin_password_secret | | The name of the key vault secret that contains the password for the admin account. Defined in the vnet-shared module.
-admin username_secret | | The name of the key vault secret that contains the user name for the admin account. Defined in the vnet-shared module.
-automation_account_name | | The name of the Azure Automation account used for DSC. Defined in the vnet-shared module.
-dns_server | | The IP address of the DNS server used for the virtual network. Defined in the vnet-shared module.
+adds_domain_name | mysandbox.local | The domain name defined in the vnet-shared module.
+admin_password_secret | adminpassword | The name of the key vault secret that contains the password for the admin account. Defined in the vnet-shared module.
+admin username_secret | adminuser | The name of the key vault secret that contains the user name for the admin account. Defined in the vnet-shared module.
+automation_account_name | aa-sand-dev | The name of the Azure Automation account used for DSC. Defined in the vnet-shared module.
+dns_server | `10.1.1.4` | The IP address of the DNS server used for the virtual network. Defined in the vnet-shared module.
 firewall_route_table_id | | The ID of the route table used for the firewall. Defined in the vnet-shared module.
 key_vault_id | | The ID of the key vault defined in the root module.
 key_vault_name | | The name of the key vault defined in the root module.
-location | | The location defined in the root module.
+location | | The Azure region defined in the root module.
 resource_group_name | | The name of the resource group defined in the root module.
 storage_container_name | scripts | The name of the storage container used to store scripts.
 storage_share_name | myfileshare | The name of the Azure Files share.
@@ -162,7 +162,7 @@ subnet_appservice_address_prefix | `10.2.4.0/24` | The address prefix for the ap
 subnet_database_address_prefix | `10.2.1.0/24` | The address prefix for the database subnet.
 subnet_misc_address_prefix | `10.2.3.0/24` | The address prefix for the miscellaneous subnet.
 subnet_privatelink_address_prefix | `10.2.2.0/24` | The address prefix for the private link subnet.
-tags | | The tags defined in the root module..
+tags | | The tags defined in the root module.
 unique_seed | | The unique seed used to generate unique names for resources. Defined in the root module.
 user_object_id | | The object ID of the interactive user. Defined in the root module.
 virtual_network_shared_id | | The resource ID of the shared services virtual network (vnet-shared). Defined in the root module.

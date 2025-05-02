@@ -166,7 +166,7 @@ module "vm_mssql_win" {
   subnet_id               = module.vnet_app[0].subnets["snet-db-01"].id
   tags                    = var.tags
 
-  depends_on = [module.vnet_app[0].resource_ids] # Ensure the Windows jumpbox VM is provisioned
+  depends_on = [module.vnet_app[0].resource_ids] # Ensure vnet-app module resources are provisioned
 }
 
 module "mssql" {
@@ -183,7 +183,7 @@ module "mssql" {
   tags                  = var.tags
   unique_seed           = module.naming.unique-seed
 
-  depends_on = [module.vnet_app[0].resource_ids] # Ensure the Windows jumpbox VM is provisioned
+  depends_on = [module.vnet_app[0].resource_ids] # Ensure vnet-app module resources are provisioned
 }
 
 module "mysql" {
@@ -200,7 +200,7 @@ module "mysql" {
   tags                  = var.tags
   unique_seed           = module.naming.unique-seed
 
-  depends_on = [module.vnet_app[0].resource_ids] # Ensure the Windows jumpbox VM is provisioned
+  depends_on = [module.vnet_app[0].resource_ids] # Ensure vnet-app module resources are provisioned
 }
 
 module "vwan" {
@@ -209,6 +209,7 @@ module "vwan" {
   count = var.enable_module_vwan ? 1 : 0
 
   dns_server          = module.vnet_shared.dns_server
+  key_vault_id        = azurerm_key_vault.this.id
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
   tags                = var.tags
@@ -218,6 +219,6 @@ module "vwan" {
     virtual_network_app    = module.vnet_app[0].resource_ids["virtual_network_app"]
   }
 
-  depends_on = [module.vnet_app[0].resource_ids] # Ensure the Windows jumpbox VM is provisioned
+  depends_on = [module.vnet_app[0].resource_ids] # Ensure vnet-app module resources are provisioned
 }
 #endregion

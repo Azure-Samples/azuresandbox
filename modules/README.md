@@ -1,6 +1,6 @@
 # Azure Sandbox Modules
 
-The following modules are included in this project:
+The following modules are included in this configuration:
 
 Name | Required | Description
 --- | --- | ---

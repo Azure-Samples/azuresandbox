@@ -110,8 +110,8 @@ module.vnet_shared.azurerm_bastion_host.this | snap&#8209;sand&#8209;dev | The B
 module.vnet_shared.azurerm_firewall.this | fw&#8209;sand&#8209;dev | The Azure Firewall used for secure internet egress.
 module.vnet_shared.azurerm_firewall_policy.this | awfp&#8209;sand&#8209;dev | Threat intelligence mode is set to `Deny`.
 module.vnet_shared.azurerm_firewall_policy_rule_collection_group.this | | Allows all outbound traffic for ports `80`, `443` and `1688` (Windows Activation).
-module.vnet_shared.azurerm_key_vault_secret.adminpassword | | Randomly generated admin password used for sandbox VMs and services.
-module.vnet_shared.azurerm_key_vault_secret.adminusername | | Admin username used for sandbox VMs and services, default is `bootstrapadmin`.
+module.vnet_shared.azurerm_key_vault_secret.adminpassword | adminpassword | Randomly generated admin password used for sandbox VMs and services.
+module.vnet_shared.azurerm_key_vault_secret.adminusername | adminuser | Admin username used for sandbox VMs and services, default is `bootstrapadmin`.
 module.vnet_shared.azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;adds1 | Nic for `adds1` VM.
 module.vnet_shared.azurerm_network_security_group.groups[*] | | NSGs for each subnet except `AzureFirewallSubnet`.
 module.vnet_shared.azurerm_network_security_rule.rules[*] | | NSG rules for each NSG. See `locals.tf` for rule definitions.

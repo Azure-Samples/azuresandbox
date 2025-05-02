@@ -1,6 +1,5 @@
-output "child_cert_pfx" {
-  description = "Convert to pfx: openssl pkcs12 -export -out child_cert.pfx -inkey child_cert_key.pem -in child_cert.pem -certfile root_cert.pem"
-  value       = base64encode(tls_locally_signed_cert.child_cert.cert_pem)
+output "client_cert_pem" {
+  value = tls_locally_signed_cert.client_cert.cert_pem
 }
 
 output "resource_ids" {
@@ -18,9 +17,6 @@ output "resource_names" {
 }
 
 output "root_cert_pem" {
+  description = "Self signed root certificate in PEM format for use with point-to-site VPN clients."
   value = tls_self_signed_cert.root_cert.cert_pem
-}
-
-output "debug" {
-  value = local.public_cert_data
 }

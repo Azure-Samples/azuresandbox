@@ -206,7 +206,7 @@ This section lists the resources included in this configuration.
 
 Address | Name | Notes
 --- | --- | ---
-module.vm_jumpbox_linux[0].azurerm_key_vault_secret.ssh_private_key | | The private SSH key stored in Azure Key Vault.
+module.vm_jumpbox_linux[0].azurerm_key_vault_secret.ssh_private_key | jumplinux1&#8209;ssh&#8209;private&#8209;key | The private SSH key stored in Azure Key Vault.
 module.vm_jumpbox_linux[0].azurerm_linux_virtual_machine.this | jumplinux1 | The Linux virtual machine resource.
 module.vm_jumpbox_linux[0].azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;jumplinux1 | The network interface associated with the Linux virtual machine.
 module.vm_jumpbox_linux[0].azurerm_role_assignment.kv_secrets_user_vm_linux | | Role assignment for accessing Key Vault secrets from the Linux virtual machine.

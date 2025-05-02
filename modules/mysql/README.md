@@ -1,15 +1,11 @@
-# \#AzureSandbox - terraform-azurerm-mysql
+# Azure MySQL Database Module (mysql)
 
 ## Contents
 
 * [Architecture](#architecture)
 * [Overview](#overview)
-* [Before you start](#before-you-start)
-* [Getting started](#getting-started)
-* [Smoke testing](#smoke-testing)
+* [Smoke Testing](#smoke-testing)
 * [Documentation](#documentation)
-* [Next steps](#next-steps)
-* [Videos](#videos)
 
 ## Architecture
 
@@ -17,70 +13,11 @@
 
 ## Overview
 
-This configuration implements a [PaaS](https://azure.microsoft.com/overview/what-is-paas/) database hosted in [Azure Database for MySQL - Flexible Server](https://learn.microsoft.com/azure/mysql/flexible-server/overview) with a private endpoint implemented using [PrivateLink](https://learn.microsoft.com/en-us/azure/mysql/flexible-server/concepts-networking-private-link) ([Step-by-Step Video](https://youtu.be/MPYO-7HaFAQ)).
+This configuration implements a network isolated Azure SQL Database using private endpoints.
 
-Activity | Estimated time required
---- | ---
-Pre-configuration | ~5 minutes
-Provisioning | ~10 minutes
-Smoke testing | ~10 minutes
+## Smoke Testing
 
-## Before you start
-
-[terraform-azurerm-vnet-app](../terraform-azurerm-vnet-app) must be provisioned first before starting. This configuration is optional and can be skipped to reduce costs. Proceed with [terraform-azurerm-vwan](../terraform-azurerm-vwan) if you wish to skip it.
-
-## Getting started
-
-This section describes how to provision this configuration using default settings ([Step-by-Step Video](https://youtu.be/yCzbmekoQLI)).
-
-* Change the working directory.
-
-  ```bash
-  cd ~/azuresandbox/terraform-azurerm-mysql
-  ```
-
-* Add an environment variable containing the password for the service principal.
-
-  ```bash
-  export TF_VAR_arm_client_secret=YOUR-SERVICE-PRINCIPAL-PASSWORD
-  ```
-
-* Run [bootstrap.sh](./scripts/bootstrap.sh) using the default settings or custom settings.
-
-  ```bash
-  ./scripts/bootstrap.sh
-  ```
-
-* Apply the Terraform configuration.
-
-  ```bash
-  # Initialize terraform providers
-  terraform init
-
-  # Validate configuration files
-  terraform validate
-
-  # Review plan output
-  terraform plan
-
-  # Apply configuration
-  terraform apply
-  ```
-
-* Monitor output. Upon completion, you should see a message similar to the following:
-
-  `Apply complete! Resources: 4 added, 0 changed, 0 destroyed.`
-
-* Inspect `terraform.tfstate`.
-
-  ```bash
-  # List resources managed by terraform
-  terraform state list 
-  ```
-
-## Smoke testing
-
-Use the steps in this section to verify the configuration is working as expected ([Step-by-Step Video](https://youtu.be/AAOBooTgcus)).
+This section describes how to test the module after deployment.
 
 * Test DNS queries for Azure Database for MySQL private endpoint (PaaS)
   * From the client environment, navigate to *portal.azure.com* > *Azure Database for MySQL flexible servers* > *mysql-xxxxxxxxxxxxxxxx* > *Overview* > *Server name* and and copy the the FQDN, e.g. *mysql&#x2011;xxxxxxxxxxxxxxxx.mysql.database.azure.com*.
@@ -157,52 +94,68 @@ Use the steps in this section to verify the configuration is working as expected
 
 ## Documentation
 
-This section provides additional information on various aspects of this configuration ([Step-by-Step Video](https://youtu.be/4oTJuFeBrdg)).
+This section provides additional information on various aspects of this module.
 
-### Bootstrap script
+* [Dependencies](#dependencies)
+* [Module Structure](#module-structure)
+* [Input Variables](#input-variables)
+* [Module Resources](#module-resources)
+* [Output Variables](#output-variables)
 
-This configuration uses the script [bootstrap.sh](./scripts/bootstrap.sh) to create a *terraform.tfvars* file for generating and applying Terraform plans. For simplified deployment, several runtime defaults are initialized using output variables stored in the *terraform.tfstate* file associated with the [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared) and [terraform-azurerm-vnet-app](../terraform-azurerm-vnet-app) configurations, including:
+### Dependencies
 
-Output variable | Sample value
---- | ---
-aad_tenant_id | "00000000-0000-0000-0000-000000000000"
-admin_password_secret | "adminpassword"
-admin_username_secret | "adminuser"
-arm_client_id | "00000000-0000-0000-0000-000000000000"
-key_vault_id | "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-sandbox-01/providers/Microsoft.KeyVault/vaults/kv-XXXXXXXXXXXXXXX"
-key_vault_name | "kv-XXXXXXXXXXXXXXX"
-location | "centralus"
-random_id | "xxxxxxxxxxxxxxxx"
-resource_group_name | "rg-sandbox-01"
-subscription_id | "00000000-0000-0000-0000-000000000000"
-tags | tomap( { "costcenter" = "10177772" "environment" = "dev" "project" = "#AzureSandbox" } )
-private_dns_zones | Contains all the subnet definitions from this configuration including *snet-app-01*, *snet-db-01*, *snet-mysql-01* and *snet-privatelink-01*.
-vnet_app_01_subnets | Contains all the subnet definitions including *snet-app-01*, *snet-db-01*, *snet-privatelink-01* and *snet-misc-03*.
+This module depends upon resources provisioned in the following modules:
 
-### Terraform Resources
+* Root module
+* vnet-shared module
+* vnet-app module
 
-This section lists the resources included in this configuration.
+### Module Structure
 
-#### Azure Database for MySQL Flexible Server
+The module is organized as follows:
 
-The configuration for these resources can be found in [main.tf](./main.tf).
+```plaintext
+├── images/
+|   └── mysql-diagram.drawio.svg  # Architecture diagram
+├── main.tf                       # Resource configurations
+├── network.tf                    # Network resource configurations
+├── outputs.tf                    # Output variables
+├── terraform.tf                  # Terraform configuration block
+└── variables.tf                  # Input variables
+```
 
-Resource name (ARM) | Notes
---- | ---
-azurerm_mysql_flexible_server.mysql_server_01 (mysql-xxxxxxxxxxxxxxxx) | An [Azure Database for MySQL - Flexible Server](https://learn.microsoft.com/azure/mysql/flexible-server/overview) for hosting databases.
-azurerm_mysql_flexible_database.mysql_database_01 | A MySQL Database named *testdb* for testing connectivity.
-azurerm_private_endpoint.mysql_server_01 (pend-mysql-xxxxxxxxxxxxxxxx) | A private endpoint for the MySQL server.
-azurerm_private_dns_a_record.mysql_server_01 | A private DNS A record for the MySQL server private endpoint.
+### Input Variables
 
-## Next steps
+This section lists input variables used in this module. Defaults can be overridden by specifying a different value in the root module.
 
-Move on to the next configuration [terraform-azurerm-vwan](../terraform-azurerm-vwan).
+Variable | Default | Description
+--- | --- | ---
+admin_password_secret | adminpassword | The name of the key vault secret that contains the password for the admin account. Defined in the vnet-shared module.
+admin_username_secret | adminuser | The name of the key vault secret that contains the user name for the admin account. Defined in the vnet-shared module.
+key_vault_id | | The ID of the key vault defined in the root module.
+location | | The name of the Azure Region where resources will be provisioned.
+mysql_database_name | testdb | The name of the Azure MySQL Database to be provisioned.
+resource_group_name | | The name of the resource group defined in the root module.
+subnet_id | | The subnet ID defined in the vnet-app module.
+tags | | The tags from the root module.
+unique_seed | | The unique seed used to generate unique names for resources. Defined in the root module.
 
-## Videos
+### Module Resources
 
-Video | Section
---- | ---
-[Azure MySQL Flexible Server (Part 1)](https://youtu.be/MPYO-7HaFAQ) | [terraform-azurerm-mysql \| Overview](#overview)
-[Azure MySQL Flexible Server (Part 2)](https://youtu.be/yCzbmekoQLI) | [terraform-azurerm-mysql \| Getting started](#getting-started)
-[Azure MySQL Flexible Server (Part 3)](https://youtu.be/AAOBooTgcus) | [terraform-azurerm-mysql \| Smoke testing](#smoke-testing)
-[Azure MySQL Flexible Server (Part 4)](https://youtu.be/4oTJuFeBrdg) | [terraform-azurerm-mysql \| Documentation](#documentation)
+This section lists the resources included in this module.
+
+Address | Name | Notes
+--- | --- | ---
+module.mysql[0].azurerm_mysql_flexible_database.this | testdb | The Azure MySQL Database.
+module.mysql[0].azurerm_mysql_flexible_server.this | mysql&#8209;sand&#8209;dev&#8209;xxxxxxxx | The Azure MySQL flexible server.
+module.mysql[0].azurerm_private_dns_a_record.this | | The A record for the Azure MySQL flexible server.
+module.mysql[0].azurerm_private_endpoint.this | pe&#8209;sand&#8209;dev&#8209;mysql&#8209;server | The private endpoint for the Azure MySQL flexible server.
+
+### Output Variables
+
+This section includes a list of output variables returned by the module.
+
+Name | Default | Comments
+--- | --- | ---
+resource_ids | | A map of resource IDs for key resources in the module.
+resource_names | | A map of resource names for key resources in the module.

@@ -1,5 +1,11 @@
+output "client_cert_pem" {
+  description = "Client certificate in PEM format for use with point-to-site VPN clients."
+  value       = length(module.vwan) == 1 ? module.vwan[0].client_cert_pem : null
+}
+
+
 output "resource_ids" {
-  value = merge(
+  value = jsonencode(merge(
     {
       key_vault               = azurerm_key_vault.this.id
       log_analytics_workspace = azurerm_log_analytics_workspace.this.id
@@ -12,11 +18,11 @@ output "resource_ids" {
     length(module.mssql) > 0 ? module.mssql[0].resource_ids : {},
     length(module.mysql) > 0 ? module.mysql[0].resource_ids : {},
     length(module.vwan) > 0 ? module.vwan[0].resource_ids : {}
-  )
+  ))
 }
 
 output "resource_names" {
-  value = merge(
+  value = jsonencode(merge(
     {
       key_vault               = azurerm_key_vault.this.name
       log_analytics_workspace = azurerm_log_analytics_workspace.this.name
@@ -29,5 +35,10 @@ output "resource_names" {
     length(module.mssql) > 0 ? module.mssql[0].resource_names : {},
     length(module.mysql) > 0 ? module.mysql[0].resource_names : {},
     length(module.vwan) > 0 ? module.vwan[0].resource_names : {}
-  )
+  ))
+}
+
+output "root_cert_pem" {
+  description = "Self signed root certificate in PEM format for use with point-to-site VPN clients."
+  value       = length(module.vwan) == 1 ? module.vwan[0].root_cert_pem : null
 }
