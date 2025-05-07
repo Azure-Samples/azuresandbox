@@ -51,7 +51,7 @@ The steps in this section verify that the Windows jumpbox VM (jumpwin1) is confi
 
 * From the client environment, navigate to *portal.azure.com* > *Virtual machines* > *jumpwin1*
   * Click *Connect*, then click *Connect via Bastion*
-  * For *Authentication Type* choose `Password from Azure Key Vault`
+  * For *Authentication Type* choose *Password from Azure Key Vault*
   * For *username* enter the UPN of the domain admin, which by default is:
   
     ```plaintext

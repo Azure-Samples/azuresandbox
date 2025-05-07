@@ -82,12 +82,17 @@ This section describes how to test the module after deployment.
 
 * From the client environment, navigate to *portal.azure.com* > *Virtual machines* > *jumpwin1*
   * Click *Connect*, then click *Connect via Bastion*
-  * For *Authentication Type* choose `Password from Azure Key Vault`
-  * For *username* enter the UPN of the domain admin, which by default is `bootstrapadmin@mysandbox.local`
+  * For *Authentication Type* choose *Password from Azure Key Vault*
+  * For *username* enter the UPN of the domain admin, which by default is:
+  
+    ```plaintext
+    bootstrapadmin@mysandbox.local
+    ```
+
   * For *Azure Key Vault Secret* specify the following values:
-    * For *Subscription* choose the same Azure subscription used to provision the #AzureSandbox.
-    * For *Azure Key Vault* choose the key vault provisioned by [terraform-azurerm-vnet-shared](../terraform-azurerm-vnet-shared/#bootstrap-script), e.g. `kv-xxxxxxxxxxxxxxx`
-    * For *Azure Key Vault Secret* choose `adminpassword`
+    * For *Subscription* choose the same Azure subscription used to provision the sandbox environment.
+    * For *Azure Key Vault* choose the key vault associated with the sandbox environment, e.g. *kv-sand-dev-xxxxxxxx*.
+    * For *Azure Key Vault Secret* choose adminpassword
   * Click *Connect*
 
 * From *jumpwin1*, inspect the *mysandbox.local* Active Directory domain
@@ -103,18 +108,23 @@ This section describes how to test the module after deployment.
 * From *jumpwin1*, configure Visual Studio Code to do remote SSH development on *jumplinux1*
   * Navigate to *Start* > *Visual Studio Code* > *Visual Studio Code*.
   * Click on the blue *Open a Remote Window* icon in the lower left corner
-  * For *Select an option to open a Remote Window* choose `SSH`
-  * For *Select configured SSH host or enter user@host* choose `+ Add New SSH Host...`
-  * For *Enter SSH Connection Command* enter `ssh bootstrapadmin@mysandbox.local@jumplinux1`
-  * For *Select SSH configuration file to update choose `C:\Users\bootstrapadmin\.ssh\config`
+  * For *Select an option to open a Remote Window* choose *SSH*
+  * For *Select configured SSH host or enter user@host* choose *+ Add New SSH Host...*
+  * For *Enter SSH Connection Command* enter the following:
+  
+    ```plaintext  
+    ssh bootstrapadmin@mysandbox.local@jumplinux1
+    ```
+
+  * For *Select SSH configuration file to update* choose *C:\Users\bootstrapadmin\.ssh\config*
 
 * From *jumpwin1*, open a remote window to *jumplinux1*
   * From Visual Studio Code, click on the blue *Open a Remote Window* icon in the lower left corner
-  * For *Select an option to open a Remote Window* choose `Connect to Host...`
-  * For *Select configured SSH host or enter user@host* choose `jumplinux1`
+  * For *Select an option to open a Remote Window* choose *Connect to Host...*
+  * For *Select configured SSH host or enter user@host* choose *jumplinux1*
   * A new Visual Studio Code window will open.
-  * For *Select the platform of the remote host "jumplinux1"* choose `Linux`
-  * For *"jumplinux1" has fingerprint...* choose `Continue`
+  * For *Select the platform of the remote host "jumplinux1"* choose *Linux*
+  * For *"jumplinux1" has fingerprint...* choose *Continue*
   * For *Enter password...* enter the value of the *adminpassword* secret in key vault.
   * Verify that *SSH:jumplinux1* is displayed in the blue status section in the lower left corner.
   * Navigate to *View* > *Explorer*
@@ -138,7 +148,7 @@ This section describes how to test the module after deployment.
     terraform --version
     ```
 
-  * Execute the following commands Bash to verify access to the test files and folders you created from *jumpwin1*:
+  * Run the following Bash command to verify access to the test files and folders you created from *jumpwin1*:
 
     ```bash
     ll /fileshares/myfileshare/
@@ -168,16 +178,16 @@ This module is organized as follows:
 
 ```plaintext
 ├── images/
-|   └── vm-jumpbox-linux-diagram.svg    # Architecture diagram
+|   └── vm-jumpbox-linux-diagram.drawio.svg # Architecture diagram
 ├── scripts/
-|   ├── configure-vm-jumpbox-linux.sh   # cloudinit shell script to configure the VM
-|   └── configure-vm-jumpbox-linux.yaml # cloudinit cloud-config file to configure the VM
-├── compute.tf                          # Compute resource configurations
-├── main.tf                             # Resource configurations
-├── network.tf                          # Network resource configurations
-├── outputs.tf                          # Output variables
-├── terraform.tf                        # Terraform configuration block
-└── variables.tf                        # Input variables
+|   ├── configure-vm-jumpbox-linux.sh       # cloud-init shell script to configure the VM
+|   └── configure-vm-jumpbox-linux.yaml     # cloud-init cloud-config file to configure the VM
+├── compute.tf                              # Compute resource configurations
+├── main.tf                                 # Resource configurations
+├── network.tf                              # Network resource configurations
+├── outputs.tf                              # Output variables
+├── terraform.tf                            # Terraform configuration block
+└── variables.tf                            # Input variables
 ```
 
 ### Input Variables
@@ -188,15 +198,15 @@ Variable | Default | Description
 --- | --- | ---
 adds_domain_name | mysandbox.local | The domain name defined in the vnet-shared module.
 admin_username_secret | adminuser | The name of the key vault secret that contains the user name for the admin account. Defined in the vnet-shared module.
-dns_server | N/A | The IP address of the DNS server used for the virtual network. Defined in the vnet-shared module.
-key_vault_id | N/A | The ID of the key vault defined in the root module.
-key_vault_name | N/A | The name of the key vault defined in the root module.
-location | N/A | The Azure region defined in the root module.
-resource_group_name | N/A | The name of the resource group defined in the root module.
-storage_account_name | N/A | The storage account name from the vnet-app module.
-storage_share_name | N/A | The Azure Files share name from the vnet-app module.
-subnet_id | N/A | The subnet ID from the vnet-app module.
-tags | N/A | The tags from the root module.
+dns_server | `10.1.1.4` | The IP address of the DNS server used for the virtual network. Defined in the vnet-shared module.
+key_vault_id | | The ID of the key vault defined in the root module.
+key_vault_name | | The name of the key vault defined in the root module.
+location | | The Azure region defined in the root module.
+resource_group_name | | The name of the resource group defined in the root module.
+storage_account_name | | The storage account name from the vnet-app module.
+storage_share_name | | The Azure Files share name from the vnet-app module.
+subnet_id | | The subnet ID from the vnet-app module.
+tags | | The tags from the root module.
 vm_jumpbox_linux_image_offer | `ubuntu-24_04-lts` | The offer type of the virtual machine image used to create the VM.
 vm_jumpbox_linux_image_publisher | `Canonical` | The publisher for the virtual machine image used to create the VM.
 vm_jumpbox_linux_image_sku | `server` | The SKU of the virtual machine image used to create the VM.
