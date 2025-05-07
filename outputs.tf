@@ -5,7 +5,7 @@ output "client_cert_pem" {
 
 
 output "resource_ids" {
-  value = jsonencode(merge(
+  value = merge(
     {
       key_vault               = azurerm_key_vault.this.id
       log_analytics_workspace = azurerm_log_analytics_workspace.this.id
@@ -18,11 +18,11 @@ output "resource_ids" {
     length(module.mssql) > 0 ? module.mssql[0].resource_ids : {},
     length(module.mysql) > 0 ? module.mysql[0].resource_ids : {},
     length(module.vwan) > 0 ? module.vwan[0].resource_ids : {}
-  ))
+  )
 }
 
 output "resource_names" {
-  value = jsonencode(merge(
+  value = merge(
     {
       key_vault               = azurerm_key_vault.this.name
       log_analytics_workspace = azurerm_log_analytics_workspace.this.name
@@ -35,7 +35,7 @@ output "resource_names" {
     length(module.mssql) > 0 ? module.mssql[0].resource_names : {},
     length(module.mysql) > 0 ? module.mysql[0].resource_names : {},
     length(module.vwan) > 0 ? module.vwan[0].resource_names : {}
-  ))
+  )
 }
 
 output "root_cert_pem" {
