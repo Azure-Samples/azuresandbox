@@ -5,64 +5,65 @@ configuration JumpBoxConfiguration {
     )
 
     Import-DscResource -ModuleName 'PSDscResources'
-    Import-DscResource -ModuleName 'xDSCDomainjoin'
-    Import-DscResource -ModuleName 'ActiveDirectoryDsc'
+    Import-DscResource -ModuleName 'ComputerManagementDsc'
     Import-DscResource -ModuleName 'cChoco'
-    
+
+
     $domain = Get-AutomationVariable -Name 'adds_domain_name'
     $domainAdminCredential = Get-AutomationPSCredential 'domainadmin'
 
     node $ComputerName {
-        xDSCDomainjoin 'JoinDomain' {
-            Domain = $domain
-            Credential = $domainAdminCredential
-        }
-
-        WindowsFeature 'RSAT-ADDS' {
+        WindowsFeature RsatAdds {
             Name = 'RSAT-ADDS'
             Ensure = 'Present'
-            DependsOn = '[xDSCDomainjoin]JoinDomain'
         }
 
-        WindowsFeature 'RSAT-DNS-Server' {
+        WindowsFeature RsatDns {
             Name = 'RSAT-DNS-Server'
             Ensure = 'Present'
-            DependsOn = '[xDSCDomainjoin]JoinDomain'
         }
 
-        WindowsFeature 'RSAT-Clustering-Mgmt' {
-            Name = 'RSAT-Clustering-Mgmt'
-            Ensure = 'Present'
-            DependsOn = '[xDSCDomainjoin]JoinDomain'
-        }
-
-        WindowsFeature 'RSAT-Clustering-PowerShell' {
-            Name = 'RSAT-Clustering-PowerShell'
-            Ensure = 'Present'
-            DependsOn = '[xDSCDomainjoin]JoinDomain'
-        }
-
-        cChocoInstaller 'Chocolatey' {
+        cChocoInstaller InstallChoco {
             InstallDir = 'c:\choco'
-            DependsOn = '[xDSCDomainjoin]JoinDomain'
         }
 
-        cChocoPackageInstaller 'VSCode' {
-            Name = 'vscode'
-            DependsOn = '[cChocoInstaller]Chocolatey'
-            AutoUpgrade = $true
+        cChocoPackageInstallerSet JumpboxSoftware {
+            Ensure = 'Present'
+            Name = @(
+                "az.powershell"
+                "mysql.workbench"
+                "sql-server-management-studio"
+                "vscode"
+            )
         }
 
-        cChocoPackageInstaller 'SSMS' {
-            Name = 'sql-server-management-studio'
-            DependsOn = '[cChocoInstaller]Chocolatey'
-            AutoUpgrade = $true
+        # Custom Script to Wait for Software Installation
+        Script WaitForSoftware {
+            GetScript = {
+                @{
+                    Result = (Get-Module -Name Az -ListAvailable | Where-Object { $_.Name -eq 'Az' })
+                }
+            }
+            TestScript = {
+                (Get-Module -Name Az -ListAvailable | Where-Object { $_.Name -eq 'Az' }) -ne $null
+            }
+            SetScript = {
+                Write-Verbose "Waiting for the Az PowerShell module to be installed on Windows PowerShell..."
+            }
+            DependsOn = "[cChocoPackageInstallerSet]JumpboxSoftware"
         }
 
-        cChocoPackageInstaller 'MySQLWorkbench' {
-            Name = 'mysql.workbench'
-            DependsOn = '[cChocoInstaller]Chocolatey'
-            AutoUpgrade = $true
+        Computer JoinDomain {
+            Name = $ComputerName
+            DomainName = $domain
+            Credential = $domainAdminCredential
+            DependsOn = '[Script]WaitForSoftware'
+        }
+
+        # Force a reboot if required
+        PendingReboot RebootAfterDomainJoin {
+            Name = 'DomainJoin'
+            DependsOn = '[Computer]JoinDomain'
         }
     }
 }

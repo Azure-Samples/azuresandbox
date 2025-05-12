@@ -33,6 +33,7 @@ param (
 $TaskName = 'Set-AzureFilesConfiguration'
 $MaxTaskAttempts = 10
 $SCHED_S_TASK_RUNNING = 0x00041301
+$ERROR_SHUTDOWN_IN_PROGRESS = 0x8007045B
 #endregion
 
 #region functions
@@ -53,24 +54,27 @@ function Exit-WithError {
 $logpath = $PSCommandPath + '.log'
 Write-Log "Running '$PSCommandPath'..."
 
-# Install Powershell Az module
-Write-Log "Installing NuGet package provider..."
-Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force 
-
-Write-Log "installing PowerShellGet..."
-Install-Module -Name PowerShellGet -MinimumVersion 2.2.4.1 -Scope AllUsers -Force
-
-Write-Log "Installing PowerShell Az module..."
-Install-Module -Name Az -Repository PSGallery -Scope AllUsers -Force
-
-# Log into Azure
+# Log into Azure with retry logic
 Write-Log "Logging into Azure using managed identity..."
 
-try {
-    Connect-AzAccount -Identity
-}
-catch {
-    Exit-WithError $_
+$maxRetries = 40
+$retryCount = 0
+$success = $false
+
+while (-not $success -and $retryCount -lt $maxRetries) {
+    try {
+        Connect-AzAccount -Identity -ErrorAction Stop
+        $success = $true
+        Write-Log "Successfully logged into Azure."
+    }
+    catch {
+        $retryCount++
+        Write-Log "Failed to log into Azure. Attempt $retryCount of $maxRetries. Retrying in 1 minute..."
+        if ($retryCount -ge $maxRetries) {
+            Exit-WithError "Failed to log into Azure after $maxRetries attempts."
+        }
+        Start-Sleep -Seconds 60
+    }
 }
 
 # Get Secrets from key vault
@@ -119,13 +123,13 @@ Write-Log "Registering scheduled task '$TaskName' to run '$scriptPath' as '$doma
 
 $commandParamParts = @(
     '$params = @{',
-      "TenantId = '$TenantId'; ", 
-      "SubscriptionId = '$SubscriptionId'; ", 
-      "AppId = '$AppId'; ",
-      "ResourceGroupName = '$ResourceGroupName'; ",
-      "KeyVaultName = '$KeyVaultName'; ",
-      "StorageAccountName = '$StorageAccountName'; ",
-      "Domain = '$Domain'",
+    "TenantId = '$TenantId'; ", 
+    "SubscriptionId = '$SubscriptionId'; ", 
+    "AppId = '$AppId'; ",
+    "ResourceGroupName = '$ResourceGroupName'; ",
+    "KeyVaultName = '$KeyVaultName'; ",
+    "StorageAccountName = '$StorageAccountName'; ",
+    "Domain = '$Domain'",
     '}'
 )
 
@@ -182,6 +186,10 @@ do {
     if ($lastTaskResult -eq $SCHED_S_TASK_RUNNING) {
         Start-Sleep 10
         continue
+    }
+
+    if ($lastTaskResult -eq $ERROR_SHUTDOWN_IN_PROGRESS) {
+        Exit-WithError "Task '$taskName' cannot be started because the system is shutting down..."
     }
 
     if ($i -eq $MaxTaskAttempts) {

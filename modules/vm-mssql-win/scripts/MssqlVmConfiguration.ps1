@@ -5,10 +5,9 @@ configuration MssqlVmConfiguration {
     )
 
     Import-DscResource -ModuleName 'PSDscResources'
-    Import-DscResource -ModuleName 'xDSCDomainjoin'
+    Import-DscResource -ModuleName 'ComputerManagementDsc'
     Import-DscResource -ModuleName 'NetworkingDsc'
     Import-DscResource -ModuleName 'SqlServerDsc'
-    Import-DscResource -ModuleName 'ActiveDirectoryDsc'
     
     $domain = Get-AutomationVariable -Name 'adds_domain_name'
     $localAdminCredential = Get-AutomationPSCredential 'bootstrapadmin'
@@ -16,12 +15,13 @@ configuration MssqlVmConfiguration {
     $domainAdminShortCredential = Get-AutomationPSCredential 'domainadminshort'
 
     node $ComputerName {
-        xDSCDomainjoin 'JoinDomain' {
-            Domain = $domain
+        Computer JoinDomain {
+            Name = $ComputerName
+            DomainName = $domain
             Credential = $domainAdminCredential
         }
 
-        Firewall 'MssqlFirewallRule' {
+        Firewall MssqlFirewallRule {
             Name = 'MssqlFirewallRule'
             DisplayName = 'Microsoft SQL Server database engine.'
             Ensure = 'Present'
@@ -30,19 +30,19 @@ configuration MssqlVmConfiguration {
             Direction = 'InBound'
             LocalPort = ('1433')
             Protocol = 'TCP'
-            DependsOn = '[xDSCDomainjoin]JoinDomain'
+            DependsOn = '[Computer]JoinDomain'
         }
 
-        SqlLogin 'DomainAdmin' {
+        SqlLogin DomainAdmin {
             Name = $domainAdminShortCredential.UserName
             LoginType = 'WindowsUser'
             InstanceName = 'MSSQLSERVER'
             Ensure = 'Present'
-            DependsOn = '[xDSCDomainjoin]JoinDomain'
+            DependsOn = '[Computer]JoinDomain'
             PSDscRunAsCredential = $localAdminCredential
         }
 
-        SqlRole 'sysadmin' {
+        SqlRole SysAdminRole {
             ServerRoleName = 'sysadmin'
             MembersToInclude = $domainAdminShortCredential.UserName
             InstanceName = 'MSSQLSERVER'

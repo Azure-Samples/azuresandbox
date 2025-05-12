@@ -607,7 +607,7 @@ The Azure Sandbox project uses a structured IPv4 address scheme to ensure proper
 * [Application Virtual Network](#application-virtual-network)
 * [Virtual Network Peering](#virtual-network-peering)
 * [Routing and Security](#routing-and-security)
-* [Secure VPN Acceess](#secure-vpn-access)
+* [Secure VPN Access](#secure-vpn-access)
 
 #### **Shared Services Virtual Network**
 

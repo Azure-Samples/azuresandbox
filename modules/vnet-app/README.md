@@ -46,8 +46,9 @@ The steps in this section verify that the Windows jumpbox VM (jumpwin1) is confi
       WindowsFeature | Compliant
       cChocoInstaller | Compliant
       cChocoPackageInstaller | Compliant
-      xDSCDomainjoin | Compliant
-      ADGroup | Compliant
+      Script | Compliant
+      Computer | Compliant
+      PendingReboot | Compliant
 
 * From the client environment, navigate to *portal.azure.com* > *Virtual machines* > *jumpwin1*
   * Click *Connect*, then click *Connect via Bastion*
