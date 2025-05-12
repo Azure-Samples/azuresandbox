@@ -20,79 +20,24 @@ This configuration implements a network isolated Azure SQL Database using privat
 This section describes how to test the module after deployment.
 
 * Test DNS queries for Azure SQL database private endpoint
-  * From the client environment, navigate to *portal.azure.com* > *SQL Servers* > *mssql-xxxxxxxxxxxxxxxx* > *Overview* > *Server name* and and copy the the FQDN, e.g. *mssql&#x2011;xxxxxxxxxxxxxxxx.database.windows.net*.
   * From *jumpwin1*, run the Windows PowerShell command:
   
     ```powershell
-    Resolve-DnsName mssql-xxxxxxxxxxxxxxxx.database.windows.net
+    Resolve-DnsName YOUR-AZURE-SQL-SERVER-NAME-HERE.database.windows.net
     ```
 
-  * Verify the *IP4Address* returned is within the subnet IP address prefix for *vnet_app.subnets["snet-privatelink-01"]*, e.g. `10.2.2.*`.
+  * Verify the *IP4Address* returned is within the subnet IP address prefix for *vnet_app[0].subnets["snet-privatelink-01"]*, e.g. `10.2.2.*`.
 * From *jumpwin1*, test SQL Server Connectivity with SQL Server Management Studio (SSMS)
-  * Navigate to *Start* > *Microsoft SQL Server Tools 19* > *Microsoft SQL Server Management Studio 19*
-  * Connect to the Azure SQL Database server using PrivateLink
-    * Server name: *mssql&#x2011;xxxxxxxxxxxxxxxx.database.windows.net*
-    * Authentication: *SQL Server Authentication*
-    * Login: *bootstrapadmin*
-    * Password: Use the value stored in the *adminpassword* key vault secret
+  * Navigate to *Start* > *Microsoft SQL Server Tools 20* > *Microsoft SQL Server Management Studio 20*
+  * Connect to the network isolated Azure SQL Database server
+    * Server properties:
+      * Server name: *YOUR-AZURE-SQL-SERVER-NAME-HERE.database.windows.net*
+      * Authentication: *SQL Server Authentication*
+      * Login: *bootstrapadmin*
+      * Password: Use the value stored in the *adminpassword* key vault secret
+    * Connection security properties:
+      * Encryption: *Strict (SQL Server 2022 and Azure SQL)*
   * Expand the *Databases* tab and verify you can see *testdb*
-* Optional: Enable internet access to Azure SQL Database
-  * From the client environment (not *jumpwin1*), verify that PrivateLink is not already configured on the network
-    * Open a command prompt and run the following command:
-
-      ```text
-      ipconfig /all
-      ```
-
-    * Scan the results for *privatelink.database.windows.net* in *Connection-specific DNS Suffix Search List*.
-      * If found, PrivateLink is already configured on the network.
-        * If you are directly connected to a private network, skip this portion of the smoke testing.
-        * If you are connected to a private network using a VPN, disconnect from it and try again.
-          * If the *privatelink.database.windows.net* DNS Suffix is no longer listed, you can continue.
-  * Execute the following PowerShell command:
-
-    ```powershell
-    Resolve-DnsName mssql-xxxxxxxxxxxxxxxx.database.windows.net
-    ```
-
-  * Make a note of the *IP4Address* returned. It is different from the private IP address returned previously in the smoke testing.
-  * Navigate to [lookip.net](https://www.lookip.net/ip) and lookup the *IP4Address* from the previous step. Examine the *Technical details* and verify that the ISP for the IP Address is `Microsoft Corporation` and the Company is `Microsoft Azure`.
-  * Manually enable public access to Azure SQL Database
-    * Navigate to *portal.azure.com* > *Home* > *SQL Servers* > *mssql&#x2011;xxxxxxxxxxxxxxxx* > *Security* > *Networking*
-    * On the *Public access* tab, click *Selected networks*
-    * In the *Firewall rules* section, click *Add your client IPv4 address*
-    * Click *Save*
-  * Test Internet connectivity to Azure SQL Database
-    * Launch *Microsoft SQL Server Management Studio* (SSMS)
-    * Connect to the Azure SQL Database server using public endpoint
-      * Server name: *mssql&#x2011;xxxxxxxxxxxxxxxx.database.windows.net*
-      * Authentication: *SQL Server Authentication*
-      * Login: *bootstrapadmin*
-      * Password: Use the value stored in the *adminpassword* key vault secret
-    * Expand the *Databases* tab and verify you can see *testdb*
-    * Disconnect from Azure SQL Database
-  * Disable public network access
-    * From the client environment, execute the following Bash commands:
-
-      ```bash
-      # Change the working directory
-      cd ~/azuresandbox/terraform-azurerm-mssql
-      
-      # Verify plan will change one property on one resource only
-      terraform plan
-
-      # Apply the change
-      terraform apply
-      ```
-
-  * Verify public network access is disabled
-    * Launch *Microsoft SQL Server Management Studio* (SSMS)
-    * Connect to the Azure SQL Database server using public endpoint
-      * Server name: *mssql&#x2011;xxxxxxxxxxxxxxxx.database.windows.net*
-      * Authentication: *SQL Server Authentication*
-      * Login: *bootstrapadmin*
-      * Password: Use the value stored in the *adminpassword* key vault secret
-    * Verify the connection was denied and examine the error message
 
 ## Documentation
 
