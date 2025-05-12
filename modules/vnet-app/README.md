@@ -66,10 +66,6 @@ The steps in this section verify that the Windows jumpbox VM (jumpwin1) is confi
   * Click *Connect*
   * If you see a prompt for allowing access to the clipboard, click *Allow*.
   
-* From *jumpwin1*, disable Server Manager
-  * Navigate to *Server Manager* > *Manage* > *Server Manager Properties* and enable *Do not start Server Manager automatically at logon*
-  * Close Server Manager
-
 * From *jumpwin1*, inspect the *mysandbox.local* Active Directory domain
   * Navigate to *Start* > *Windows Tools* > *Active Directory Users and Computers*.
   * Navigate to *mysandbox.local* and verify that a computer account exists in the root for the storage account, e.g. *stsanddevxxxxxxxx*.
@@ -86,16 +82,15 @@ The steps in this section verify that the Windows jumpbox VM (jumpwin1) is confi
     * Navigate to *adds1* > *Forward Lookup Zones* > *mysandbox.local* and verify that there are *Host (A)* records for *adds1* and *jumpwin1*.
 
 * Test DNS queries for Azure Files private endpoint
-  * From the client environment, navigate to *portal.azure.com* > *Storage accounts* > *stsanddevxxxxxxxx* > *File shares* > *myfileshare* and copy the the FQDN portion of the `Share URL`, e.g. *stsanddevxxxxxxxx.file.core.windows.net*.
   * From *jumpwin1*, execute the following command from PowerShell:
   
     ```pwsh
-    Resolve-DnsName "YOUR-STORAGE-ACCOUNT-NAME-HERE.file.core.windows.net"
+    Resolve-DnsName "YOUR-SANDBOX-STORAGE-ACCOUNT-NAME-HERE.file.core.windows.net"
     ```
 
-  * Verify the *IP4Address* returned is within the subnet IP address prefix for *azurerm_subnet.subnets["snet-privatelink-01"]*, e.g. `10.2.2.*`.
+  * Verify the *IP4Address* returned is within the subnet IP address prefix for the subnet *snet-privatelink-01*, e.g. `10.2.2.*`.
 
-* From *jumpwin1*, test SMB connectivity with integrated Windows Authentication to Azure Files private endpoint (PaaS)
+* From *jumpwin1*, test SMB connectivity with integrated Windows Authentication to Azure Files private endpoint
   * Execute the following command from PowerShell:
   
     ```pwsh

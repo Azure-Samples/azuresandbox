@@ -45,7 +45,7 @@ This section describes how to test the module after deployment.
 * Verify *jumplinux1* cloud-init configuration is complete.
   * From the client environment, navigate to *portal.azure.com* > *Virtual machines* > *jumplinux1*
   * Click *Connect*, then click *Connect via Bastion*
-  * For *Authentication Type* choose `SSH Private Key from Azure Key Vault`
+  * For *Authentication Type* choose *SSH Private Key from Azure Key Vault*
   * For *Username* enter the following:
 
     ```plaintext
@@ -53,7 +53,7 @@ This section describes how to test the module after deployment.
     ```
 
   * For *Azure Key Vault Secret* specify the following values:
-    * For *Subscription* choose the same Azure subscription used to provision the #AzureSandbox.
+    * For *Subscription* choose the same Azure subscription used to provision the sandbox environment.
     * For *Azure Key Vault* choose the key vault associated with the sandbox environment, e.g. *kv-sand-dev-xxxxxxxx*.`
     * For *Azure Key Vault Secret* choose *jumplinux1-ssh-key-private*
   * Click *Connect*
@@ -63,7 +63,7 @@ This section describes how to test the module after deployment.
     cloud-init status
     ```
 
-  * Verify that cloud-init status is `done`.
+  * Verify that cloud-init status is *done*.
   * Execute the following command:
 
     ```bash
@@ -80,21 +80,6 @@ This section describes how to test the module after deployment.
     exit
     ```
 
-* From the client environment, navigate to *portal.azure.com* > *Virtual machines* > *jumpwin1*
-  * Click *Connect*, then click *Connect via Bastion*
-  * For *Authentication Type* choose *Password from Azure Key Vault*
-  * For *username* enter the UPN of the domain admin, which by default is:
-  
-    ```plaintext
-    bootstrapadmin@mysandbox.local
-    ```
-
-  * For *Azure Key Vault Secret* specify the following values:
-    * For *Subscription* choose the same Azure subscription used to provision the sandbox environment.
-    * For *Azure Key Vault* choose the key vault associated with the sandbox environment, e.g. *kv-sand-dev-xxxxxxxx*.
-    * For *Azure Key Vault Secret* choose adminpassword
-  * Click *Connect*
-
 * From *jumpwin1*, inspect the *mysandbox.local* Active Directory domain
   * Navigate to *Start* > *Windows Tools* > *Active Directory Users and Computers*.
   * Navigate to *mysandbox.local* > *Computers* and verify that *jumplinux1* is listed.
@@ -109,6 +94,8 @@ This section describes how to test the module after deployment.
   * Navigate to *Start* > *Visual Studio Code* > *Visual Studio Code*.
   * Click on the blue *Open a Remote Window* icon in the lower left corner
   * For *Select an option to open a Remote Window* choose *SSH*
+  * Click on the blue *Open a Remote Window* icon in the lower left corner
+  * For *Select an option to open a Remote Window* choose *Connect to Host...*
   * For *Select configured SSH host or enter user@host* choose *+ Add New SSH Host...*
   * For *Enter SSH Connection Command* enter the following:
   
@@ -125,14 +112,16 @@ This section describes how to test the module after deployment.
   * A new Visual Studio Code window will open.
   * For *Select the platform of the remote host "jumplinux1"* choose *Linux*
   * For *"jumplinux1" has fingerprint...* choose *Continue*
-  * For *Enter password...* enter the value of the *adminpassword* secret in key vault.
+  * For *Enter password...* enter the value of the *adminpassword* secret in the sandbox environment key vault.
   * Verify that *SSH:jumplinux1* is displayed in the blue status section in the lower left corner.
   * Navigate to *View* > *Explorer*
   * Click *Open Folder*
   * For *Open Folder* select the default folder (home directory) and click *OK*.
-  * For *Enter password...* enter the value of the *adminpassword* secret in key vault.
-  * If a Bash terminal is not visible, navigate to *View* > *Terminal*.
-  * Inspect the configuration of *jumplinux1* by executing the following commands from Bash:
+  * For *Enter password...* enter the value of the *adminpassword* secret in the sandbox environment key vault.
+  * Select *Trust the authors of all files in the present folder 'home'*
+  * Click *Yes, I trust the authors*
+  * Navigate to *View* > *Terminal*.
+  * Inspect the configuration of *jumplinux1* by executing the following Bash commands:
 
     ```bash
     # Verify Linux distribution
@@ -148,11 +137,13 @@ This section describes how to test the module after deployment.
     terraform --version
     ```
 
-  * Run the following Bash command to verify access to the test files and folders you created from *jumpwin1*:
+  * Run the following Bash command to test SMB/cifs connectivity with Kerberos authentication to the Azure Files private endpoint:
 
     ```bash
     ll /fileshares/myfileshare/
     ```
+  
+  * Create some test folders and files on /fileshares/myfileshare.
 
 ## Documentation
 
