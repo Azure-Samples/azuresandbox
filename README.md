@@ -17,7 +17,7 @@
 
 Azure Sandbox is a Terraform-based project designed to simplify the deployment of sandbox environments in Microsoft Azure. It provides a modular and reusable framework for implementing foundational infrastructure which can accelerate the development of innovative new solutions in Azure.
 
-This project is ideal for developers, IT professionals, and organizations looking to explore Azure services, prototype solutions, or conduct training sessions. With its modular design, AzureS Sandbox allows users to customize their deployments to suit specific use cases, such as virtual networks, virtual machines, AI services, and more.
+This project is ideal for developers, IT professionals, and organizations looking to explore Azure services, prototype solutions, or conduct training sessions. With its modular design, Azure Sandbox allows users to customize their deployments to suit specific use cases, such as virtual networks, virtual machines, AI services, and more.
 
 Azure Sandbox is not intended for production use but serves as a powerful tool for learning and experimentation in Azure.
 
