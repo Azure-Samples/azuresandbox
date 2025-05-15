@@ -21,7 +21,7 @@ resource "azurerm_mssql_server" "this" {
   minimum_tls_version           = "1.2"
   public_network_access_enabled = false
 
-  lifecycle { 
+  lifecycle {
     ignore_changes = [
       express_vulnerability_assessment_enabled
     ]

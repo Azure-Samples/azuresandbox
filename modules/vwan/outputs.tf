@@ -18,5 +18,5 @@ output "resource_names" {
 
 output "root_cert_pem" {
   description = "Self signed root certificate in PEM format for use with point-to-site VPN clients."
-  value = tls_self_signed_cert.root_cert.cert_pem
+  value       = tls_self_signed_cert.root_cert.cert_pem
 }
