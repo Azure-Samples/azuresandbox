@@ -78,7 +78,7 @@ if (-not (Get-Module -ListAvailable -Name Az)) {
 # Connect to Azure if not already connected
 if (-not (Get-AzContext)) {
     Write-Host "You are not logged into Azure. Please log in." -ForegroundColor Yellow
-    Connect-AzAccount
+    Connect-AzAccount -UseDeviceAuthentication
 }
 
 # Retrieve runtime defaults

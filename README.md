@@ -63,7 +63,7 @@ Enable only the modules you need for your specific sandbox environment. Disable 
 
 A variety of Windows and Linux virtual machines are include and are fully configured for use in the sandbox.
 
-* **Domain Controller**: Active Directory Domain Services (AD DS) domain controller with a pre-configured local domain and integrated private DNS server.
+* **Domain Controller / DNS Server**: Active Directory Domain Services (AD DS) domain controller with a pre-configured local domain and integrated private DNS server.
 * **Windows Jumpbox**: Domain-joined Windows server for remote administration, management and development within the sandbox environment with a full suite of pre-configured tools.
 * **Linux Jumpbox**: Domain-joined Ubuntu server for secure SSH access to the sandbox environment with a full suite of pre-configured tools.
 
@@ -72,24 +72,24 @@ A variety of Windows and Linux virtual machines are include and are fully config
 Two storage options are included and are fully configured for use in the sandbox.
 
 * **Azure Blob Storage**: Container for startup configuration scripts with network isolated endpoints for secure access.
-* **Azure Files with AD DS Integration**:  Azure Files share configured for integrated Active Directory Domain Services (AD DS) authentication and network isolated endpoints for secure file sharing.
+* **Azure Files**:  Azure Files share configured for integrated Active Directory Domain Services (AD DS) authentication and network isolated endpoints for secure file sharing.
 
 ### Pre-configured SQL Database Options
 
 Multiple SQL database options are provided to suit various use cases and requirements. The combination of these features helps ensure that your sandbox environment is secure by default and designed to meet the highest security standards. These options allow users to choose the database solution that best fits their needs, whether they require full control, a managed service, or compatibility with open-source technologies.
 
-* **SQL Server IaaS (SQL Virtual Machine)**:
+* **SQL Server Virtual Machine (IaaS)**:
   * Deploys a fully configured SQL Server instance on a domain-joined Windows virtual machine.
   * Ideal for scenarios requiring full control over the operating system and database configuration.
   * Supports custom configurations, such as SQL Server Agent jobs, linked servers, and advanced database settings.
 
-* **SQL Server PaaS (Azure SQL Database)**:
+* **Azure SQL Database (PaaS)**:
   * Deploys a fully managed Azure SQL Database instance.
   * Network isolated endpoints for secure access.
   * Simplifies database management by handling backups, scaling, and high availability.
   * Suitable for applications requiring a scalable and cost-effective relational database solution.
 
-* **MySQL PaaS (Azure Database for MySQL)**:
+* **Azure Database for MySQL (PaaS)**:
   * Deploys a fully managed MySQL database instance.
   * Network isolated endpoints for secure access.
   * Provides high availability, automated backups, and scaling options.
@@ -111,14 +111,19 @@ Azure Sandbox is built with security as a core principle, ensuring that all reso
   * Ensures that only authorized entities can access or manage Azure resources.
   * Simplifies access management by leveraging Azure Active Directory (AAD) for identity and access control.
 
+  **IMPORTANT**: Both the interactive user and the service principal used to provision the sandbox environment must have an `Owner` role assignment scoped to the sandbox subscription. This is required for the service principal to be able to create and manage resources in the subscription including role assignments. All other role assignments follow the principle of least privilege and leverage managed identities where applicable.
+
 * **Data Encryption**:
-  * Ensures all data at rest is encrypted using platform-managed keys.
-  * Supports end-to-end encryption for data in transit using HTTPS and TLS and host encryption for virtual machines.
+  * All data stored in the sandbox environment is encrypted at rest using platform-managed keys.
+  * Supports end-to-end encryption for data in transit using TLS and host encryption for virtual machines.
 
 * **Compliance and Monitoring**:
   * Integrates with Azure Policy to enforce compliance with organizational or regulatory standards.
   * Configures diagnostic settings to log resource activity and monitor for potential security threats.
   * Supports integration with Microsoft Defender for Cloud to provide advanced threat protection and security recommendations.
+
+* **Network Isolation**:
+  * All sandbox resources are deployed within a secure virtual network, ensuring that they are isolated from the public internet and other Azure resources.
 
 ### Documentation and Videos
 
@@ -141,7 +146,7 @@ This section describes the prerequisites required in order to provision an Azure
 ### Microsoft Entra ID Tenant and Azure Subscription
 
 * Identify the [Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/fundamentals/whatis) tenant to be used for identity and access management, or create a new tenant using [Quickstart: Set up a tenant](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-create-new-tenant).
-* Identify a single Azure [subscription](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#subscription) or create a new Azure subscription. See [Azure Offer Details](https://azure.microsoft.com/support/legal/offer-details/) and [Associate or add an Azure subscription to your Microsoft Entra tenant](https://learn.microsoft.com/entra/fundamentals/how-subscriptions-associated-directory) for more information.
+* Identify a single Azure [subscription](https://learn.microsoft.com/azure/cloud-adoption-framework/ready/considerations/fundamental-concepts#azure-terminology) or create a new Azure subscription. See [Azure Offer Details](https://azure.microsoft.com/support/legal/offer-details/) and [Associate or add an Azure subscription to your Microsoft Entra tenant](https://learn.microsoft.com/entra/fundamentals/how-subscriptions-associated-directory) for more information.
 * Identify the owner of the Azure subscription to be used to provision Azure Sandbox. This user should have an [Owner](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#owner) Azure RBAC role assignment on the subscription. See [Steps to assign an Azure role](https://learn.microsoft.com/azure/role-based-access-control/role-assignments-steps) for more information.
 
 ### Azure RBAC Role Assignments
@@ -259,7 +264,7 @@ Before you can provision an Azure Sandbox interactively, you need to log in to y
   ```
 
 * Open a browser and navigate to the URL provided in the terminal. Enter the code displayed in the terminal to authenticate your Azure account.
-* Select an account that has an Azure RBAC `Owner` role assignment on the subscription you will be using to provision the sandbox.
+* Sign in with an account that has an Azure RBAC `Owner` role assignment on the subscription you will be using to provision the sandbox.
 * Depending upon how your Entra ID tenant is configured, you may be prompted to enter your password and/or approve a sign-in request on your mobile device.
 * Click **Continue** when asked if you are trying to sign in to Azure.
 * Check the terminal for a prompt like this:
@@ -315,7 +320,7 @@ terraform init
 
 ### Step 3: Configure Variables
 
-There are hundreds (maybe thousands) of variables in this configuration. Defaults have been set for most of them so only a few need to be set in advance to provision a sandbox. There are a few different ways to set variables in Terraform.
+There are hundreds of variables in this configuration. Defaults have been set for most of them so only a few need to be set in advance to provision a sandbox. There are a few different ways to set variables in Terraform.
 
 * **Environment Variables**: Set environment variables for sensitive information such as passwords and secrets used in the root module.
 * **terraform.tfvars file**: Create a `terraform.tfvars` file in the root directory of the project to set variables for the root module.
@@ -480,7 +485,7 @@ Follow these steps to validate and apply the configuration:
 
 ### Step 5: Complete Smoke Testing
 
-After the sandbox has been provisioned, complete the smoke testing procedures specific to each module. This will ensure that the resources are functioning as expected and that the configuration is correct. You can find smoke testing guidance in the `README.md` files in each module directory. The smoke testing procedures are designed to be simple and quick, allowing you to verify the functionality of the deployed resources without extensive testing. Start with the `vnet-shared` module and work your way through the other modules as needed. See [Child Modules](#child-modules) for a list of modules included in the configuration.
+After the sandbox has been provisioned, complete the smoke testing procedures specific to each module. This will ensure that the resources are functioning as expected and that the configuration is correct. You can find smoke testing guidance in the *README.md* files in each module directory. The smoke testing procedures are designed to be simple and quick, allowing you to verify the functionality of the deployed resources without extensive testing. Start with the *vnet-shared* module and work your way through the other modules as needed. See [Child Modules](#child-modules) for a list of modules included in the configuration.
 
 ### Step 6: Use Your Sandbox
 
@@ -550,9 +555,9 @@ enable_module_vnet_app | false | Set to true to enable the vnet_app module, fals
 enable_module_vwan | false | Set to true to enable the vwan module, false to skip it.
 location | | The name of the Azure Region where resources will be provisioned.
 log_analytics_workspace_retention_days | 30 | The retention period for the log analytics workspace.
-subscription_id | | The Azure subscription id used to provision resources.
+subscription_id | | The Azure subscription id used to provision sandbox resources.
 tags | { costcenter = "mycostcenter", environment = "dev", project = "sand" } | Tags in map format to be applied to the sandbox resource group and used for resource naming.
-user_object_id | N/A | The object id of the interactive user (e.g. Azure CLI or Az PowerShell signed in user).
+user_object_id | | The object id of the interactive user (e.g. Azure CLI or Az PowerShell signed in user).
 
 ---
 
@@ -576,10 +581,12 @@ azurerm_role_assignment.roles[*] | | Assigns the `Key Vault Secrets Officer` rol
 
 This section includes a list of output variables returned by the root module.
 
-Name | Default | Comments
---- | --- | ---
-resource_ids | | A map of resource IDs for key resources in the configuration.
-resource_names | | A map of resource names for key resources in the configuration.
+Name | Comments
+--- | ---
+client_cert_pem | The client certificate in PEM format for use with point-to-site VPN clients.
+resource_ids | A map of resource IDs for key resources in the configuration.
+resource_names | A map of resource names for key resources in the configuration.
+root_cert_pem | The root certificate in PEM format for use with point-to-site VPN clients.
 
 ---
 
@@ -587,21 +594,21 @@ resource_names | | A map of resource names for key resources in the configuratio
 
 The following [modules](./modules/) are included in this configuration:
 
-Name | Required | Description
---- | --- | ---
-[vnet-shared](./modules/vnet-shared/) | Yes | Includes a shared services virtual network including a Bastion Host, Azure Firewall and an AD domain controller/DNS server VM.
-[vnet-app](./modules/vnet-app/) | No | Includes an application virtual network, a network isolated Azure Files share and a preconfigured Windows jumpbox VM.
-[vm-jumpbox-linux](./modules/vm-jumpbox-linux/) | No | Includes a preconfigured Linux jumpbox VM in the application virtual network.
-[vm-mssql-win](./modules/vm-mssql-win/) | No | Includes a preconfigured Windows VM with SQL Server in the application virtual network.
-[mssql](./modules/mssql/) | No | Includes a network isolated Azure SQL Database in the application virtual network.
-[mysql](./modules/mysql/) | No | Creates a network isolated Azure MySQL Database in the application virtual network.
-[vwan](./modules/vwan/) | No | Creates a Point-to-Site VPN gateway to securely connect to your sandbox environment from your local machine.
+Name | Required | Depends On | Description
+--- | --- | --- | ---
+[vnet-shared](./modules/vnet-shared/) | Yes | Root module | Includes a shared services virtual network including a Bastion Host, Azure Firewall and an AD domain controller/DNS server VM.
+[vnet-app](./modules/vnet-app/) | No | vnet-shared module | Includes an application virtual network, a network isolated Azure Files share and a preconfigured Windows jumpbox VM.
+[vm-jumpbox-linux](./modules/vm-jumpbox-linux/) | No | vnet-app module | Creates a preconfigured Linux jumpbox VM in the application virtual network.
+[vm-mssql-win](./modules/vm-mssql-win/) | No | vnet-app module | Creates a preconfigured SQL Server VM in the application virtual network.
+[mssql](./modules/mssql/) | No | vnet-app module | Creates a network isolated Azure SQL Database in the application virtual network.
+[mysql](./modules/mysql/) | No | vnet-app module | Creates a network isolated Azure MySQL Database in the application virtual network.
+[vwan](./modules/vwan/) | No | vnet-app module | Creates a Point-to-Site VPN gateway to securely connect to your sandbox environment from your local machine.
 
 ---
 
 ### Virtual Network Design
 
-The Azure Sandbox project uses a structured IPv4 address scheme to ensure proper segmentation and isolation of resources within the virtual networks and subnets. The following sections describe the IP address ranges and their usage in the *vnet-shared* and *vnet-app* virtual networks. Minimum prefix lengths are provided for each virtual network and subnet to allow for customization if you need to adapt the IP address scheme to your own requirements. Note the default CIDR ranges used are intentionally large for readability and can easily be condensed. Network security groups (NSGs) are also configured for each subnet to control inbound and outbound traffic. This IP addressing scheme ensures proper segmentation, security, and scalability for the sandbox environment.
+The Azure Sandbox project uses a structured IPv4 address scheme to ensure proper segmentation and isolation of resources within the virtual networks and subnets. The following sections describe the IP address ranges and their usage in the *vnet-shared* and *vnet-app* virtual networks. Minimum prefix lengths are provided for each virtual network and subnet to allow for customization if you need to adapt the IP address scheme to your own requirements. Note the default CIDR ranges used are intentionally large for readability and can easily be condensed. Network security groups (NSGs) are also configured for each subnet to control inbound and outbound traffic.
 
 * [Shared Services Virtual Network](#shared-services-virtual-network)
 * [Application Virtual Network](#application-virtual-network)
@@ -611,12 +618,12 @@ The Azure Sandbox project uses a structured IPv4 address scheme to ensure proper
 
 #### **Shared Services Virtual Network**
 
-The shared services virtual network (vnet-shared) is used to host common services that are shared across the sandbox environment, including ab AD DS domain controllers / DNS server, bastions hosts and firewalls.
+The shared services virtual network (vnet-shared) is used to host common services that are shared across the sandbox environment, including a domain controllers / DNS server VM, bastions host and firewall.
 
 Setting | Value | Notes
 --- | --- | ---
 Default CIDR | `10.1.0.0/16` | Min prefix length is `/24`
-Primary DNS Server | `10.1.1.4` | Private IP of the AD DS domain controller
+Primary DNS Server | `10.1.1.4` | Private IP domain controller VM
 Secondary DNS Server | `168.63.129.16` | Azure Recursive DNS Resolver
 
 The following subnets are configured in *vnet-shared*:
@@ -636,15 +643,15 @@ The application virtual network (vnet-app) is used to host application-specific 
 Setting | Value | Notes
 --- | --- | ---
 Default CIDR | `10.2.0.0/16` | Min prefix length is `/24`
-Primary DNS Server | `10.1.1.4` | Private IP of the AD DS domain controller in vnet-shared
+Primary DNS Server | `10.1.1.4` | Private IP domain controller VM in vnet-shared
 Secondary DNS Server | `168.63.129.16` | Azure Recursive DNS Resolver
 
 The following subnets are configured in *vnet-app*:
 
 Subnet Name | Default CIDR | Min prefix length | NSG | Purpose
 --- | --- | --- | --- | ---
-snet-app-01 | `10.2.0.0/24` | `/27` | Yes | Reserved for web, application, and jumpbox servers.
-snet-db-01 | `10.2.1.0/24` | `/27` | Yes | Hosts database servers, such as SQL Server and MySQL.
+snet-app-01 | `10.2.0.0/24` | `/27` | Yes | Reserved for web server, application server, and jumpbox VMs.
+snet-db-01 | `10.2.1.0/24` | `/27` | Yes | Reserved for Database Server VMs.
 snet-privatelink-01 | `10.2.2.0/24` | `/27` | Yes |Reserved for private endpoints using Azure Private Link.
 snet-misc-03 | `10.2.3.0/24` | `/27` | Yes | Reserved for future use.
 snet-appservice-01 | `10.2.4.0/24` | `/27` | Yes | Reserved for Azure App Service with delegation to `Microsoft.Web/serverFarms`.
@@ -670,7 +677,7 @@ Bi-directional virtual network peering is enabled between the virtual networks i
 
 #### **Secure VPN Access**
 
-The optional *vwan* module implements an Azure Virtual WAN point-to-site VPN gateway for secure remote connectivity to your sandbox environment from a local computer. This is ideal for scenarios where access via Bastion is not sufficient, for example if you need to transfer data into your sandbox environment or use tools that are only available on a local computer. A self-signed certificate is used for authentication. The virtual WAN hub is connected to both of the virtual networks in *vnet-shared* and *vnet-app*, allowing secure VPN access to resources in both virtual networks.
+The optional *vwan* module implements an Azure Virtual WAN point-to-site VPN gateway for secure remote connectivity to your sandbox environment from a remote computer. This is ideal for scenarios where access via Bastion is not sufficient, for example if you need to transfer data into your sandbox environment or use tools that are only available on a remote computer. A self-signed certificate is used for authentication. The virtual WAN hub is connected to both the *vnet-shared* and *vnet-app* virtual networks, allowing secure VPN access to resources in your sandbox environment.
 
 The following address ranges are used for the point-to-site VPN gateway:
 
@@ -693,30 +700,30 @@ This section covers the dependencies in this configuration.
 
 #### **Source Control**
 
-The configuration is hosted on GitHub and uses Git for version control. The repository includes a `.gitignore` file to exclude sensitive information and temporary files from being tracked by Git. The repository is organized into modules and configurations, making it easy to navigate and understand the structure of the project.
+The configuration is hosted on GitHub and uses Git for source control. The repository includes a *.gitignore* file to exclude sensitive information and temporary files from being tracked by Git. The repository is organized into modules and configurations, making it easy to navigate and understand the structure of the project.
 
 #### **Terraform**
 
 Sandbox environments are built using Terraform, a cross platform, open-source Infrastructure as Code (IaC) tool that allows users to define, provision and version cloud infrastructure using a declarative configuration language called HCL (HashiCorp Configuration Language).
 
 * **Providers**: The following Terraform providers are used in the project:
-  * `azurerm`: Used to manage Azure resources.
-  * `azapi`: Used to manage Azure resources that are not yet supported by the azurerm provider and for direct access to Azure APIs.
-  * `cloudinit`: Used to configure Linux virtual machines.
-  * `random`: Used to generate random values for resource attributes.
-  * `time`: Used to implement wait cycles and other time based operations.
-  * `tls`: Used to generate certificates.
+  * **azapi**: Used to manage Azure resources that are not yet supported by the azurerm provider and for direct access to Azure APIs.
+  * **azurerm**: Used to manage Azure resources.
+  * **cloudinit**: Used to configure Linux virtual machines.
+  * **random**: Used to generate random values for resource attributes.
+  * **time**: Used to implement wait cycles and other time based operations.
+  * **tls**: Used to generate certificates.
 * **Modules**: The following Terraform modules are used in this project:
-  * `Azure/naming`: A module for generating consistent and compliant Azure resource names.
+  * **Azure/naming**: A module for generating consistent and compliant Azure resource names.
 
 #### **Scripting Technologies**
 
 The following cross-platform scripting technologies are used in this project:
 
-* **PowerShell**:  Used for general purpose scripting and to to implement Terraform provisioners and Azure custom script extensions.
-* **Az PowerShell Module**: Used for connecting to and configuring Azure Resources from provisioners and Azure custom script extensions.
-* **Bash**: Used for running scripts and automating tasks within the Azure Sandbox environment.
-* **Azure CLI**: Used for general purpose scripting.
+* **PowerShell**:  Used for general purpose scripting and to implement Terraform provisioners and Azure custom script extensions.
+* **Az PowerShell Module**: Used to connect to and configure Azure resources from PowerShell scripts.
+* **Bash**: Used for general purpose scripting.
+* **Azure CLI**: Used for connecting to Azure resources from Bash scripts.
 
 #### **Configuration Management Technologies**
 
@@ -724,7 +731,7 @@ The following configuration management technologies are used in this project to 
 
 * **PowerShell DSC**: PowerShell Desired State Configuration is used to configure Windows virtual machines.
 * **Azure Automation DSC**: Used to configure Windows virtual machines using configurations written in PowerShell DSC.
-* **cloud-init**: Used to configure Linux virtual machines. It is a standard open source tool for cloud instance initialization and is widely used in cloud environments.
+* **cloud-init**: Used to configure Linux virtual machines.
 
 #### **Operating Systems**
 
