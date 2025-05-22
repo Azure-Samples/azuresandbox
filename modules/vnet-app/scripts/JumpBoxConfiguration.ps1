@@ -35,6 +35,7 @@ configuration JumpBoxConfiguration {
                 "sql-server-management-studio"
                 "vscode"
             )
+            DependsOn = '[cChocoInstaller]InstallChoco'
         }
 
         # Custom Script to Wait for Software Installation
