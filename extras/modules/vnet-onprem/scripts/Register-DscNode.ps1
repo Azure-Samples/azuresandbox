@@ -1,3 +1,6 @@
+#!/usr/bin/env pwsh
+
+#region params
 param (
     [Parameter(Mandatory = $true)]
     [String]$TenantId,
@@ -15,7 +18,16 @@ param (
     [String]$AutomationAccountName,
 
     [Parameter(Mandatory = $true)]
-    [String]$VirtualMachineName,
+    [String]$VmAddsName,
+
+    [Parameter(Mandatory = $true)]
+    [String]$VmJumpboxWinName,
+
+    [Parameter(Mandatory = $true)]
+    [String]$AdminUsername,
+
+    [Parameter(Mandatory = $true)]
+    [String]$AdminPwd,
 
     [Parameter(Mandatory = $true)]
     [String]$AppId,
@@ -24,8 +36,17 @@ param (
     [string]$AppSecret,
 
     [Parameter(Mandatory = $true)]
-    [string]$DscConfigurationName
-)
+    [string]$DscConfigurationName,
+
+    [Parameter(Mandatory = $false)]
+    [string]$Domain,
+
+    [Parameter(Mandatory = $true)]
+    [String]$DnsResolverCloud,
+
+    [Parameter(Mandatory = $true)]
+    [bool]$SkipAzureAutomationConfiguration = $false)
+#endregion
 
 #region functions
 function Write-Log {
@@ -108,7 +129,7 @@ function Register-DscNode {
     $rollupStatus = $nodeConfig.RollupStatus
     Write-Log "DSC node configuration '$nodeConfigName' RollupStatus is '$($rollupStatus)'..."
 
-    if ($rollupStatus -ne 'Good'){
+    if ($rollupStatus -ne 'Good') {
         Exit-WithError "Invalid DSC node configuration RollupStatus..."
     }
 
@@ -128,10 +149,10 @@ function Register-DscNode {
         -RebootNodeIfNeeded $true `
         -ActionAfterReboot 'ContinueConfiguration' `
         -ErrorAction SilentlyContinue
-
+    
     Write-Log "Sleeping for 60 seconds before checking node status..."    
     Start-Sleep -Seconds 60
-    
+
     try {
         $dscNodes = Get-AzAutomationDscNode `
             -ResourceGroupName $ResourceGroupName `
@@ -164,7 +185,7 @@ function Register-DscNode {
                 -ResourceGroupName $ResourceGroupName `
                 -AutomationAccountName $AutomationAccountName `
                 -ErrorAction Stop
-            }
+        }
         catch {
             Exit-WithError $_
         }
@@ -182,12 +203,32 @@ function Register-DscNode {
 
     if ($dscNodeStatus -ne $statusCompliant) {
         Exit-WithError "DSC node status did not reach '$statusCompliant' after $maxRetries attempts."
-    }    
+    }        
 }
 #endregion
 
 #region main
 Write-Log "Running '$PSCommandPath'..."
+
+# Azure Automation only needs to be configured on the first run of the script when the domain controller is being registered.
+if (-not $SkipAzureAutomationConfiguration) {
+    .$PSScriptRoot/Set-AutomationAccountConfiguration.ps1 `
+        -TenantId $TenantId `
+        -SubscriptionId $SubscriptionId `
+        -ResourceGroupName $ResourceGroupName `
+        -AutomationAccountName $AutomationAccountName `
+        -Domain $Domain `
+        -VmAddsName $VmAddsName `
+        -VmJumpboxWinName $VmJumpboxWinName `
+        -AdminUsername $AdminUsername `
+        -AdminPwd $AdminPwd `
+        -AppId $AppId `
+        -AppSecret $AppSecret `
+        -DnsResolverCloud $DnsResolverCloud
+}
+else {
+    Write-Log "Skipping '$PSScriptRoot/Set-AutomationAccountConfiguration.ps1'..."
+}
 
 Write-Log "Logging into Azure using service principal id '$AppId'..."
 
@@ -220,13 +261,23 @@ if ($null -eq $automationAccount) {
 
 Write-Log "Located automation account '$AutomationAccountName' in resource group '$ResourceGroupName'"
 
-# Register DSC Node
-Register-DscNode `
-    -ResourceGroupName $ResourceGroupName `
-    -AutomationAccountName $AutomationAccountName `
-    -VirtualMachineName $VirtualMachineName `
-    -Location $Location `
-    -DscConfigurationName $DscConfigurationName
+# If Azure Automation configuration is skipped, we are registering the jumpbox VM. If not we are registering the adds VM.
+if ($SkipAzureAutomationConfiguration) {
+    Register-DscNode `
+        -ResourceGroupName $ResourceGroupName `
+        -AutomationAccountName $AutomationAccountName `
+        -VirtualMachineName $VmJumpboxWinName `
+        -Location $Location `
+        -DscConfigurationName $DscConfigurationName
+}
+else {
+    Register-DscNode `
+        -ResourceGroupName $ResourceGroupName `
+        -AutomationAccountName $AutomationAccountName `
+        -VirtualMachineName $VmAddsName `
+        -Location $Location `
+        -DscConfigurationName $DscConfigurationName
+}
 
 Exit
 #endregion

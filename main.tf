@@ -221,4 +221,38 @@ module "vwan" {
 
   depends_on = [module.vnet_app[0].resource_ids] # Ensure vnet-app module resources are provisioned
 }
+
+module "vnet_onprem" {
+  source = "./extras/modules/vnet-onprem"
+
+  count = var.enable_module_vnet_onprem ? 1 : 0
+
+  adds_domain_name_cloud  = module.vnet_shared.adds_domain_name
+  admin_password_secret   = module.vnet_shared.admin_password_secret
+  admin_username_secret   = module.vnet_shared.admin_username_secret
+  automation_account_name = module.vnet_shared.resource_names["automation_account"]
+  dns_server_cloud        = module.vnet_shared.dns_server
+  key_vault_id            = azurerm_key_vault.this.id
+  key_vault_name          = azurerm_key_vault.this.name
+  location                = azurerm_resource_group.this.location
+  resource_group_name     = azurerm_resource_group.this.name
+  subnets_cloud           = module.vnet_shared.subnets
+  tags                    = var.tags
+
+  virtual_networks_cloud = {
+    virtual_network_shared = {
+      id   = module.vnet_shared.resource_ids["virtual_network_shared"]
+      name = module.vnet_shared.resource_names["virtual_network_shared"]
+    }
+    virtual_network_app = {
+      id   = module.vnet_app[0].resource_ids["virtual_network_app"]
+      name = module.vnet_app[0].resource_names["virtual_network_app"]
+    }
+  }
+
+  vwan_hub_id = module.vwan[0].resource_ids["virtual_wan_hub"]
+  vwan_id     = module.vwan[0].resource_ids["virtual_wan"]
+
+  depends_on = [ module.vwan[0].resource_ids ] # Ensure vwan module resources are provisioned
+}
 #endregion

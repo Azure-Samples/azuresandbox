@@ -1,4 +1,4 @@
-configuration OnPremDomainConfig {
+configuration DomainControllerConfiguration2 {
     param (
         [Parameter(Mandatory = $true)]
         [String]$ComputerName
@@ -18,7 +18,7 @@ configuration OnPremDomainConfig {
             Ensure = 'Present'
         }
 
-        ADDomain 'OnPremDomain' {
+        ADDomain 'Domain' {
             DomainName = $domain
             Credential = $adminCredential
             SafemodeAdministratorPassword = $adminCredential
@@ -30,31 +30,31 @@ configuration OnPremDomainConfig {
             IsSingleInstance = 'Yes'
             IPAddresses = @('168.63.129.16')
             UseRootHint = $false
-            DependsOn = '[ADDomain]OnPremDomain'
+            DependsOn = '[ADDomain]Domain'
         }
 
         DnsServerConditionalForwarder 'SandboxDomainForwarder' {
             Name = 'mysandbox.local'
             MasterServers = @("$dnsResolverCloud")
-            DependsOn = '[ADDomain]OnPremDomain'
+            DependsOn = '[ADDomain]Domain'
         }
 
         DnsServerConditionalForwarder 'AzureFiles' {
             Name = 'file.core.windows.net'
             MasterServers = @("$dnsResolverCloud")
-            DependsOn = '[ADDomain]OnPremDomain'
+            DependsOn = '[ADDomain]Domain'
         }
 
         DnsServerConditionalForwarder 'AzureSqlDb' {
             Name = 'database.windows.net'
             MasterServers = @("$dnsResolverCloud")
-            DependsOn = '[ADDomain]OnPremDomain'
+            DependsOn = '[ADDomain]Domain'
         }
 
         DnsServerConditionalForwarder 'AzureMySQLFlexServer' {
             Name = 'mysql.database.azure.com'
             MasterServers = @("$dnsResolverCloud")
-            DependsOn = '[ADDomain]OnPremDomain'
+            DependsOn = '[ADDomain]Domain'
         }
     }
 }
