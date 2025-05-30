@@ -8,11 +8,11 @@ resource "azurerm_virtual_network" "this" {
 }
 
 resource "azurerm_subnet" "subnets" {
-  for_each                                  = local.subnets
-  name                                      = each.key
-  resource_group_name                       = var.resource_group_name
-  virtual_network_name                      = azurerm_virtual_network.this.name
-  address_prefixes                          = [each.value.address_prefix]
+  for_each             = local.subnets
+  name                 = each.key
+  resource_group_name  = var.resource_group_name
+  virtual_network_name = azurerm_virtual_network.this.name
+  address_prefixes     = [each.value.address_prefix]
 }
 #endregion
 
@@ -185,7 +185,7 @@ resource "azurerm_private_dns_resolver_virtual_network_link" "vnet_app" {
 
 #region nics
 resource "azurerm_network_interface" "vm_adds" {
-  name                =  "${module.naming.network_interface.name}-${var.vm_adds_name}"
+  name                = "${module.naming.network_interface.name}-${var.vm_adds_name}"
   location            = var.location
   resource_group_name = var.resource_group_name
 

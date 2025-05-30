@@ -233,7 +233,6 @@ module "vnet_onprem" {
   automation_account_name = module.vnet_shared.resource_names["automation_account"]
   dns_server_cloud        = module.vnet_shared.dns_server
   key_vault_id            = azurerm_key_vault.this.id
-  key_vault_name          = azurerm_key_vault.this.name
   location                = azurerm_resource_group.this.location
   resource_group_name     = azurerm_resource_group.this.name
   subnets_cloud           = module.vnet_shared.subnets
@@ -253,6 +252,6 @@ module "vnet_onprem" {
   vwan_hub_id = module.vwan[0].resource_ids["virtual_wan_hub"]
   vwan_id     = module.vwan[0].resource_ids["virtual_wan"]
 
-  depends_on = [ module.vwan[0].resource_ids ] # Ensure vwan module resources are provisioned
+  depends_on = [module.vwan[0].resource_ids] # Ensure vwan module resources are provisioned
 }
 #endregion

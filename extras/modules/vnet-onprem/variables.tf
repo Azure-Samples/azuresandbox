@@ -69,16 +69,6 @@ variable "key_vault_id" {
   }
 }
 
-variable "key_vault_name" {
-  type        = string
-  description = "The existing key vault where secrets are stored"
-
-  validation {
-    condition     = can(regex("^[a-zA-Z0-9-]{3,24}$", var.key_vault_name))
-    error_message = "Must conform to Azure Key Vault naming requirements: it can only contain alphanumeric characters and hyphens, must start with a letter, and must be between 3 and 24 characters long."
-  }
-}
-
 variable "location" {
   type        = string
   description = "The name of the Azure Region where resources will be provisioned."
