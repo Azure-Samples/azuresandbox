@@ -17,7 +17,8 @@ output "resource_ids" {
     length(module.vm_mssql_win) > 0 ? module.vm_mssql_win[0].resource_ids : {},
     length(module.mssql) > 0 ? module.mssql[0].resource_ids : {},
     length(module.mysql) > 0 ? module.mysql[0].resource_ids : {},
-    length(module.vwan) > 0 ? module.vwan[0].resource_ids : {}
+    length(module.vwan) > 0 ? module.vwan[0].resource_ids : {},
+    length(module.vnet_onprem) > 0 ? module.vnet_onprem[0].resource_ids : {}
   )
 }
 
@@ -34,7 +35,8 @@ output "resource_names" {
     length(module.vm_mssql_win) > 0 ? module.vm_mssql_win[0].resource_names : {},
     length(module.mssql) > 0 ? module.mssql[0].resource_names : {},
     length(module.mysql) > 0 ? module.mysql[0].resource_names : {},
-    length(module.vwan) > 0 ? module.vwan[0].resource_names : {}
+    length(module.vwan) > 0 ? module.vwan[0].resource_names : {},
+    length(module.vnet_onprem) > 0 ? module.vnet_onprem[0].resource_names : {}
   )
 }
 

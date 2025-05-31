@@ -61,6 +61,12 @@ variable "enable_module_vnet_app" {
   default     = false
 }
 
+variable "enable_module_vnet_onprem" {
+  type        = bool
+  description = "Set to true to enable the vnet_onprem module, false to skip it."
+  default     = false
+}
+
 variable "enable_module_vwan" {
   type        = bool
   description = "Set to true to enable the vwan module, false to skip it."

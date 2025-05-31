@@ -15,6 +15,10 @@ resource "azurerm_subnet" "subnets" {
   address_prefixes                  = [each.value.address_prefix]
   private_endpoint_network_policies = each.value.private_endpoint_network_policies
   default_outbound_access_enabled   = false
+
+  lifecycle {
+    ignore_changes = [delegation]
+  }
 }
 
 resource "azurerm_network_security_group" "groups" {

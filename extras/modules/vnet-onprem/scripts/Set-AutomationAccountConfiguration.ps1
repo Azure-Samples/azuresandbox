@@ -1,5 +1,6 @@
 #!/usr/bin/env pwsh
 
+#region params
 param (
     [Parameter(Mandatory = $true)]
     [String]$TenantId,
@@ -37,6 +38,7 @@ param (
     [Parameter(Mandatory = $true)]
     [String]$DnsResolverCloud
 )
+#endregion
 
 #region functions
 function Write-Log {
@@ -84,7 +86,7 @@ function Import-DscConfiguration {
     }
 }
 
-function Start-DscCompliationJob {
+function Start-DscCompilationJob {
     param(
         [Parameter(Mandatory = $true)]
         [String]$ResourceGroupName,
@@ -244,26 +246,26 @@ Set-Variable `
 Import-DscConfiguration `
     -ResourceGroupName $ResourceGroupName `
     -AutomationAccountName $automationAccount.AutomationAccountName `
-    -DscConfigurationName 'OnPremDomainConfig' `
-    -DscConfigurationScript 'OnPremDomainConfig.ps1'
+    -DscConfigurationName 'DomainControllerConfiguration2' `
+    -DscConfigurationScript 'DomainControllerConfiguration2.ps1'
 
 Import-DscConfiguration `
     -ResourceGroupName $ResourceGroupName `
     -AutomationAccountName $automationAccount.AutomationAccountName `
-    -DscConfigurationName 'JumpBoxConfig2' `
-    -DscConfigurationScript 'JumpBoxConfig2.ps1'
+    -DscConfigurationName 'JumpBoxConfiguration2' `
+    -DscConfigurationScript 'JumpBoxConfiguration2.ps1'
 
 # Compile DSC Configurations
-Start-DscCompliationJob `
+Start-DscCompilationJob `
     -ResourceGroupName $ResourceGroupName `
     -AutomationAccountName $automationAccount.AutomationAccountName `
-    -DscConfigurationName 'OnPremDomainConfig' `
+    -DscConfigurationName 'DomainControllerConfiguration2' `
     -VirtualMachineName $VmAddsName
 
-Start-DscCompliationJob `
+Start-DscCompilationJob `
     -ResourceGroupName $ResourceGroupName `
     -AutomationAccountName $automationAccount.AutomationAccountName `
-    -DscConfigurationName 'JumpBoxConfig2' `
+    -DscConfigurationName 'JumpBoxConfiguration2' `
     -VirtualMachineName $VmJumpboxWinName
 
 Exit 0

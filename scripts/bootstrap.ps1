@@ -105,7 +105,7 @@ if (-not $aadTenantId) {
     $aadTenantId = $defaultAadTenantId
 }
 
-$userObjectId = Read-Host "Object id for Azure CLI signed in user (user_object_id) default '$defaultUserObjectId'"
+$userObjectId = Read-Host "Object id for Azure PowerShell signed in user (user_object_id) default '$defaultUserObjectId'"
 
 if (-not $userObjectId) {
     $userObjectId = $defaultUserObjectId
@@ -205,6 +205,7 @@ tags = {
 # enable_module_mssql            = true
 # enable_module_mysql            = true
 # enable_module_vwan             = true
+# enable_module_vnet_onprem      = true
 "@ | Out-File -FilePath ./terraform.tfvars -Encoding utf8
 
 Get-Content ./terraform.tfvars

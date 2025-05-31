@@ -109,7 +109,7 @@ Azure Sandbox is built with security as a core principle, ensuring that all reso
 * **Role-Based Access Control (RBAC)**:
   * Enforces least-privilege access by assigning roles to users, groups, and services based on their specific needs.
   * Ensures that only authorized entities can access or manage Azure resources.
-  * Simplifies access management by leveraging Azure Active Directory (AAD) for identity and access control.
+  * Simplifies access management by leveraging Microsoft Entra ID for identity and access control.
 
   **IMPORTANT**: Both the interactive user and the service principal used to provision the sandbox environment must have an `Owner` role assignment scoped to the sandbox subscription. This is required for the service principal to be able to create and manage resources in the subscription including role assignments. All other role assignments follow the principle of least privilege and leverage managed identities where applicable.
 
@@ -123,7 +123,7 @@ Azure Sandbox is built with security as a core principle, ensuring that all reso
   * Supports integration with Microsoft Defender for Cloud to provide advanced threat protection and security recommendations.
 
 * **Network Isolation**:
-  * All sandbox resources are deployed within a secure virtual network, ensuring that they are isolated from the public internet and other Azure resources.
+  * All sandbox resources are deployed within separate virtual networks, ensuring that they are isolated from the public internet and other Azure resources.
 
 ### Documentation and Videos
 
