@@ -1,4 +1,4 @@
-#region onprem virtual network and subnets
+#region onprem vnets and subnets
 resource "azurerm_virtual_network" "this" {
   name                = "${module.naming.virtual_network.name}-${var.vnet_name}"
   location            = var.location
@@ -8,15 +8,16 @@ resource "azurerm_virtual_network" "this" {
 }
 
 resource "azurerm_subnet" "subnets" {
-  for_each             = local.subnets
-  name                 = each.key
-  resource_group_name  = var.resource_group_name
-  virtual_network_name = azurerm_virtual_network.this.name
-  address_prefixes     = [each.value.address_prefix]
+  for_each                        = local.subnets
+  name                            = each.key
+  resource_group_name             = var.resource_group_name
+  virtual_network_name            = azurerm_virtual_network.this.name
+  address_prefixes                = [each.value.address_prefix]
+  default_outbound_access_enabled = false
 }
 #endregion
 
-#region onprem network site-to-site VPN Gateway
+#region onprem VPN Gateway
 resource "azurerm_virtual_network_gateway" "this" {
   name                       = module.naming.virtual_network_gateway.name
   location                   = var.location
@@ -28,18 +29,26 @@ resource "azurerm_virtual_network_gateway" "this" {
   sku                        = "VpnGw1"
   generation                 = "Generation1"
   private_ip_address_enabled = false
-  depends_on                 = [azurerm_subnet.subnets]
 
   ip_configuration {
     name                          = "Primary"
     subnet_id                     = azurerm_subnet.subnets["GatewaySubnet"].id
-    public_ip_address_id          = azurerm_public_ip.this.id
+    public_ip_address_id          = azurerm_public_ip.vpn.id
     private_ip_address_allocation = "Dynamic"
   }
 
   bgp_settings {
     asn = var.vnet_asn
   }
+}
+
+resource "azurerm_public_ip" "vpn" {
+  name                = "${module.naming.public_ip.name}-vpn"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  allocation_method   = "Static"
+  sku                 = "Standard"
+  tags                = var.tags
 }
 
 resource "azurerm_local_network_gateway" "this" {
@@ -65,18 +74,72 @@ resource "azurerm_virtual_network_gateway_connection" "this" {
   enable_bgp                 = true
   shared_key                 = data.azurerm_key_vault_secret.adminpassword.value
 }
+#endregion
 
-resource "azurerm_public_ip" "this" {
-  name                = "${module.naming.public_ip.name}-vpn"
+#region onprem NAT gateway
+resource "azurerm_nat_gateway" "this" {
+  name                = module.naming.nat_gateway.name
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  sku_name            = "Standard"
+}
+
+resource "azurerm_public_ip" "nat" {
+  name                = "${module.naming.public_ip.name}-nat"
   location            = var.location
   resource_group_name = var.resource_group_name
   allocation_method   = "Static"
   sku                 = "Standard"
-  tags                = var.tags
+}
+
+resource "azurerm_nat_gateway_public_ip_association" "this" {
+  nat_gateway_id       = azurerm_nat_gateway.this.id
+  public_ip_address_id = azurerm_public_ip.nat.id
+}
+
+resource "azurerm_subnet_nat_gateway_association" "associations" {
+  for_each = {
+    for k, v in local.subnets : k => azurerm_subnet.subnets[k]
+    if v.associate_nat_gateway
+  }
+  subnet_id      = each.value.id
+  nat_gateway_id = azurerm_nat_gateway.this.id
+
+  depends_on = [azurerm_local_network_gateway.this]
 }
 #endregion
 
-#region cloud network site-to-site VPN Gateway
+#region onprem nics
+resource "azurerm_network_interface" "vm_adds" {
+  name                = "${module.naming.network_interface.name}-${var.vm_adds_name}"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+
+  ip_configuration {
+    name                          = "Primary"
+    subnet_id                     = azurerm_subnet.subnets["snet-adds-02"].id
+    private_ip_address_allocation = "Dynamic"
+  }
+
+  depends_on = [azurerm_subnet_nat_gateway_association.associations]
+}
+
+resource "azurerm_network_interface" "vm_jumpbox_win" {
+  name                = "${module.naming.network_interface.name}-${var.vm_jumpbox_win_name}"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+
+  ip_configuration {
+    name                          = "Primary"
+    subnet_id                     = azurerm_subnet.subnets["snet-misc-04"].id
+    private_ip_address_allocation = "Dynamic"
+  }
+
+  depends_on = [azurerm_subnet_nat_gateway_association.associations]
+}
+#endregion
+
+#region cloud VPN Gateway
 resource "azurerm_vpn_gateway" "this" {
   name                = "${module.naming.virtual_wan.name}-vpn"
   resource_group_name = var.resource_group_name
@@ -115,7 +178,7 @@ resource "azurerm_vpn_gateway_connection" "this" {
 }
 #endregion
 
-#region cloud network private dns resolver
+#region cloud dns private resolver
 resource "azurerm_private_dns_resolver" "this" {
   name                = "pdnsr-${var.tags["project"]}-${var.tags["environment"]}"
   resource_group_name = var.resource_group_name
@@ -180,31 +243,5 @@ resource "azurerm_private_dns_resolver_virtual_network_link" "vnet_app" {
   name                      = "link-${var.virtual_networks_cloud["virtual_network_app"].name}"
   dns_forwarding_ruleset_id = azurerm_private_dns_resolver_dns_forwarding_ruleset.this.id
   virtual_network_id        = var.virtual_networks_cloud["virtual_network_app"].id
-}
-#endregion
-
-#region nics
-resource "azurerm_network_interface" "vm_adds" {
-  name                = "${module.naming.network_interface.name}-${var.vm_adds_name}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-
-  ip_configuration {
-    name                          = "Primary"
-    subnet_id                     = azurerm_subnet.subnets["snet-adds-02"].id
-    private_ip_address_allocation = "Dynamic"
-  }
-}
-
-resource "azurerm_network_interface" "vm_jumpbox_win" {
-  name                = "${module.naming.network_interface.name}-${var.vm_jumpbox_win_name}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-
-  ip_configuration {
-    name                          = "Primary"
-    subnet_id                     = azurerm_subnet.subnets["snet-misc-04"].id
-    private_ip_address_allocation = "Dynamic"
-  }
 }
 #endregion

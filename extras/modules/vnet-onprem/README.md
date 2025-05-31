@@ -15,12 +15,13 @@
 
 This configuration simulates connectivity between the sandbox environment and an on-premises network including:
 
-* A new virtual network used to simulate an on-premises network and for hosting virtual machines.
-  * Includes a VPN gateway connection to the sandbox environment.
+* A separate virtual network used to simulate an on-premises network, including:
+  * A NAT gateway for outbound internet connectivity.
+  * A VPN gateway connection to the sandbox environment.
   * A Windows Server virtual machine (adds2) for use as a domain controller and DNS server for a separate *myonprem.local* domain.
   * A Windows Server virtual machine (jumpwin2) for use as a jumpbox.
 * Updates to the existing sandbox environment including:
-  * A site-to-site VPN gateway connection to the new on-premises network.
+  * A site-to-site VPN gateway connection to the simulated on-premises network.
   * A DNS private resolver for the following use cases:
     * Resolve DNS queries from *mysandbox.local* to *myonprem.local* and vice versa.
     * Resolve DNS queries from *myonprem.local* to private DNS zones in the sandbox environment.
@@ -354,29 +355,34 @@ This section lists the resources included in this configuration.
 
 Address | Name | Notes
 --- | --- | ---
-module.vnet_onprem[0].azurerm_local_network_gateway.this | lgw-sand-dev | Local network gateway for the on-premises network.
+module.vnet_onprem[0].azurerm_local_network_gateway.this | lgw-sand-dev | Local network gateway for the simulated on-premises network.
+module.vnet_onprem[0].azurerm_nat_gateway.this | nat-sand-dev-onprem | NAT gateway for the simulated on-premises network.
+module.vnet_onprem[0].azurerm_nat_gateway_public_ip_association.this | | Public IP address association for the NAT gateway in the simulated on-premises network.
 module.vnet_onprem[0].azurerm_network_interface.vm_adds | nic-sand-dev-adds2 | Network interface for the adds2 VM.
 module.vnet_onprem[0].azurerm_network_interface.vm_jumpbox_win | nic-sand-dev-jumpwin2 | Network interface for the jumpwin2 VM.
 module.vnet_onprem[0].azurerm_private_dns_resolver.this | pdnsr-sand-dev | Private DNS resolver for the cloud sandbox environment.
 module.vnet_onprem[0].azurerm_private_dns_resolver_dns_forwarding_ruleset.this | rset-sand-dev | DNS forwarding ruleset for the private DNS resolver.
-module.vnet_onprem[0].azurerm_private_dns_resolver_forwarding_rule.rule_cloud | | Forwarding rule for DNS queries from the on-premises network to the cloud sandbox environment.
-module.vnet_onprem[0].azurerm_private_dns_resolver_forwarding_rule.rule_onprem | | Forwarding rule for DNS queries from the cloud sandbox environment to the on-premises network.
+module.vnet_onprem[0].azurerm_private_dns_resolver_forwarding_rule.rule_cloud | | Forwarding rule for DNS queries from the simulated on-premises network to the cloud sandbox environment.
+module.vnet_onprem[0].azurerm_private_dns_resolver_forwarding_rule.rule_onprem | | Forwarding rule for DNS queries from the cloud sandbox environment to the simulated on-premises network.
 module.vnet_onprem[0].azurerm_private_dns_resolver_inbound_endpoint.this | | Inbound endpoint for the private DNS resolver.
 module.vnet_onprem[0].azurerm_private_dns_resolver_outbound_endpoint.this | | Outbound endpoint for the private DNS resolver.
 module.vnet_onprem[0].azurerm_private_dns_resolver_virtual_network_link.vnet_app | | Virtual network link for the app virtual network in the cloud sandbox environment.
 module.vnet_onprem[0].azurerm_private_dns_resolver_virtual_network_link.vnet_shared | | Virtual network link for the shared services virtual network in the cloud sandbox environment.
-module.vnet_onprem[0].azurerm_public_ip.this | pip-sand-dev-vpn | Public IP address for the VPN gateway in the on-premises network.
-module.vnet_onprem[0].azurerm_subnet.subnets["GatewaySubnet"] | | Gateway subnet for the VPN gateway in the on-premises network.
-module.vnet_onprem[0].azurerm_subnet.subnets["snet-adds-02"] | | Subnet for the adds2 VM in the on-premises network.
-module.vnet_onprem[0].azurerm_subnet.subnets["snet-misc-04"] | | Miscellaneous subnet for the jumpbox VM in the on-premises network.
-module.vnet_onprem[0].azurerm_virtual_network.this | vnet-sand-dev-onprem | Virtual network for the simulted on-premises network.
-module.vnet_onprem[0].azurerm_virtual_network_gateway.this | | VPN gateway for the on-premises network.
+module.vnet_onprem[0].azurerm_public_ip.nat | pip-sand-dev-nat | Public IP address for the NAT gateway in the simulated on-premises network.
+module.vnet_onprem[0].azurerm_public_ip.vpn | pip-sand-dev-vpn | Public IP address for the VPN gateway in the simulated on-premises network.
+module.vnet_onprem[0].azurerm_subnet.subnets["GatewaySubnet"] | | Gateway subnet for the VPN gateway in the simulated on-premises network.
+module.vnet_onprem[0].azurerm_subnet.subnets["snet-adds-02"] | | Subnet for the adds2 VM in the simulated on-premises network.
+module.vnet_onprem[0].azurerm_subnet.subnets["snet-misc-04"] | | Miscellaneous subnet for the jumpbox VM in the simulated on-premises network.
+module.vnet_onprem[0].azurerm_subnet_nat_gateway_association.associations["snet-adds-02"] | | NAT gateway association for the adds2 subnet.
+module.vnet_onprem[0].azurerm_subnet_nat_gateway_association.associations["snet-misc-04"] | | NAT gateway association for the miscellaneous subnet.
+module.vnet_onprem[0].azurerm_virtual_network.this | vnet-sand-dev-onprem | Virtual network for the simulated simulated on-premises network.
+module.vnet_onprem[0].azurerm_virtual_network_gateway.this | | VPN gateway for the simulated on-premises network.
 module.vnet_onprem[0].azurerm_virtual_network_gateway_connection.this | | VPN gateway connection to the cloud sandbox environment.
 module.vnet_onprem[0].azurerm_vpn_gateway.this | | Site-to-site VPN gateway for the cloud sandbox environment.
-module.vnet_onprem[0].azurerm_vpn_gateway_connection.this | | Site-to-site VPN gateway connection to the on-premises network.
-module.vnet_onprem[0].azurerm_vpn_site.this | | VPN site for the on-premises network.
-module.vnet_onprem[0].azurerm_windows_virtual_machine.vm_adds | adds2 | Windows domain controller / DNS server VM in the on-premises network.
-module.vnet_onprem[0].azurerm_windows_virtual_machine.vm_jumpbox_win | jumpwin2 | Windows jumpbox VM in the on-premises network.
+module.vnet_onprem[0].azurerm_vpn_gateway_connection.this | | Site-to-site VPN gateway connection to the simulated on-premises network.
+module.vnet_onprem[0].azurerm_vpn_site.this | | VPN site for the simulated on-premises network.
+module.vnet_onprem[0].azurerm_windows_virtual_machine.vm_adds | adds2 | Windows domain controller / DNS server VM in the simulated on-premises network.
+module.vnet_onprem[0].azurerm_windows_virtual_machine.vm_jumpbox_win | jumpwin2 | Windows jumpbox VM in the simulated on-premises network.
 
 ### Output Variables
 
