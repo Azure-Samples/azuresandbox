@@ -3,7 +3,7 @@ resource "azurerm_storage_share_directory" "this" {
   name             = "documents"
   storage_share_id = "${var.storage_file_endpoint}${var.storage_share_name}"
 
-  depends_on = [time_sleep.wait_for_public_access]  
+  depends_on = [time_sleep.wait_for_public_access]
 }
 
 resource "azurerm_storage_share_file" "documents" {

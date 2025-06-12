@@ -1,7 +1,3 @@
-#region data
-data "azurerm_client_config" "current" {}
-#endregion
-
 #region ai foundry
 resource "azurerm_ai_foundry" "this" {
   name                    = "foundry-${var.tags["project"]}-${var.tags["environment"]}"
