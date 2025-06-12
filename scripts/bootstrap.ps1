@@ -206,6 +206,7 @@ tags = {
 # enable_module_mysql            = true
 # enable_module_vwan             = true
 # enable_module_vnet_onprem      = true
+# enable_module_ai_foundry       = true
 "@ | Out-File -FilePath ./terraform.tfvars -Encoding utf8
 
 Get-Content ./terraform.tfvars

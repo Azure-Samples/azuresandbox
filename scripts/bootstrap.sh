@@ -168,7 +168,7 @@ printf "# enable_module_mssql            = true\n"  >> ./terraform.tfvars
 printf "# enable_module_mysql            = true\n"  >> ./terraform.tfvars
 printf "# enable_module_vwan             = true\n"  >> ./terraform.tfvars
 printf "# enable_module_vnet_onprem      = true\n"  >> ./terraform.tfvars
-
+printf "# enable_module_ai_foundry       = true\n"  >> ./terraform.tfvars
 cat ./terraform.tfvars
 
 exit 0

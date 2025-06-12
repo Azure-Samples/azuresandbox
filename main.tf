@@ -139,7 +139,7 @@ module "vm_jumpbox_linux" {
   location              = azurerm_resource_group.this.location
   resource_group_name   = azurerm_resource_group.this.name
   storage_account_name  = module.vnet_app[0].resource_names["storage_account"]
-  storage_share_name    = module.vnet_app[0].storage_share_name
+  storage_share_name    = module.vnet_app[0].resource_names["storage_share"]
   subnet_id             = module.vnet_app[0].subnets["snet-app-01"].id
   tags                  = var.tags
 
@@ -254,4 +254,26 @@ module "vnet_onprem" {
 
   depends_on = [module.vwan[0].resource_ids] # Ensure vwan module resources are provisioned
 }
-#endregion
+
+module "ai_foundry" {
+  source = "./extras/modules/ai-foundry"
+
+  count = var.enable_module_ai_foundry ? 1 : 0
+
+  key_vault_id          = azurerm_key_vault.this.id
+  location              = azurerm_resource_group.this.location
+  private_dns_zones     = module.vnet_app[0].private_dns_zones
+  resource_group_id     = azurerm_resource_group.this.id
+  resource_group_name   = azurerm_resource_group.this.name
+  storage_account_id    = module.vnet_app[0].resource_ids["storage_account"]
+  storage_account_name  = module.vnet_app[0].resource_names["storage_account"]
+  storage_file_endpoint = module.vnet_app[0].storage_endpoints["file"]
+  storage_share_name    = module.vnet_app[0].resource_names["storage_share"]
+  subnets               = module.vnet_app[0].subnets
+  tags                  = var.tags
+  unique_seed           = module.naming.unique-seed
+  user_object_id        = var.user_object_id
+
+  depends_on = [module.vnet_app[0].resource_ids] # Ensure vnet-app module resources are provisioned
+}
+# #endregion

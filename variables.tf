@@ -29,6 +29,12 @@ variable "arm_client_secret" {
   }
 }
 
+variable "enable_module_ai_foundry" {
+  type        = bool
+  description = "Set to true to enable the AI Foundry module, false to skip it."
+  default     = false
+}
+
 variable "enable_module_mssql" {
   type        = bool
   description = "Set to true to enable the Azure SQL Database (mssql) module, false to skip it."

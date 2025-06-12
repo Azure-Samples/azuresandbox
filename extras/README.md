@@ -30,7 +30,7 @@ This section describes additional Terraform configurations that can be added to 
 
 This section describes additional Terraform modules that can be added to Azure Sandbox. These modules are not required to use Azure Sandbox, but may be useful for learning or testing purposes.
 
-* [aistudio](./modules/aistudio/) enables the use of [Azure AI Studio](https://learn.microsoft.com/en-us/azure/ai-studio/what-is-ai-studio) in Azure Sandbox, including:
+* [ai_foundry](./modules/ai_foundry/) enables the use of [Azure AI Studio](https://learn.microsoft.com/en-us/azure/ai-studio/what-is-ai-studio) in Azure Sandbox, including:
   * An [Azure AI Studio hub](https://learn.microsoft.com/en-us/azure/ai-studio/concepts/ai-resources) configured for [network isolation](https://learn.microsoft.com/azure/ai-studio/how-to/configure-managed-network). The hub is connected to the shared services storage account and key vault.
     * An [Application Insights](https://learn.microsoft.com/azure/azure-monitor/app/app-insights-overview) workspace connected to the hub.
     * An [Azure Container Registry](https://learn.microsoft.com/azure/container-registry/container-registry-intro) connected to the hub.
