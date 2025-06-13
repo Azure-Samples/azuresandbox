@@ -1,6 +1,6 @@
 #region ai foundry
 resource "azurerm_ai_foundry" "this" {
-  name                    = "foundry-${var.tags["project"]}-${var.tags["environment"]}"
+  name                    = "foundry-${var.tags["project"]}-${var.tags["environment"]}-${local.name_unique}"
   location                = var.location
   resource_group_name     = var.resource_group_name
   application_insights_id = azurerm_application_insights.this.id
@@ -25,7 +25,7 @@ resource "azurerm_ai_foundry" "this" {
 }
 
 resource "azurerm_application_insights" "this" {
-  name                = module.naming.application_insights.name
+  name                = module.naming.application_insights.name_unique
   location            = var.location
   resource_group_name = var.resource_group_name
   application_type    = "web"
@@ -87,11 +87,11 @@ resource "azapi_resource" "search_service_connection" {
 
 #region ai services
 resource "azurerm_ai_services" "this" {
-  name                  = "ais-${var.tags["project"]}-${var.tags["environment"]}"
+  name                  = "ais-${var.tags["project"]}-${var.tags["environment"]}-${local.name_unique}"
   location              = var.location
   resource_group_name   = var.resource_group_name
   sku_name              = var.ai_services_sku
-  custom_subdomain_name = "ais-${var.tags["project"]}-${var.tags["environment"]}"
+  custom_subdomain_name = "ais-${var.tags["project"]}-${var.tags["environment"]}-${local.name_unique}"
   public_network_access = "Disabled"
 
   identity {
@@ -110,7 +110,7 @@ resource "azurerm_role_assignment" "ai_services" {
 
 #region ai search
 resource "azurerm_search_service" "this" {
-  name                          = module.naming.search_service.name
+  name                          = module.naming.search_service.name_unique
   resource_group_name           = var.resource_group_name
   location                      = var.location
   sku                           = var.ai_search_sku
