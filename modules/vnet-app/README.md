@@ -236,5 +236,4 @@ resource_ids | | A map of resource IDs for key resources in the module.
 resource_names | | A map of resource names for key resources in the module.
 storage_container_name | scripts | The name of the storage container used to store scripts.
 storage_endpoints | | A map of storage endpoints for blob and file storage.
-storage_share_name | myfileshare | The name of the Azure Files share.
 subnets | | A list of subnets provisioned in the application virtual network.
