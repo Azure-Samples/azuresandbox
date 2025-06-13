@@ -34,6 +34,8 @@ locals {
     "OmniServe_CSAT_Guidelines.pdf"
   ]
 
+  name_unique = regex("^.*-(.+)$", var.resource_group_name)[0]
+  
   search_service_roles = {
     storage_blob_data_contributor = {
       scope                = var.storage_account_id
