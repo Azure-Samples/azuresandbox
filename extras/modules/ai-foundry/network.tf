@@ -67,7 +67,7 @@ resource "azurerm_private_endpoint" "container_registry" {
 }
 
 resource "azurerm_private_endpoint" "ai_foundry" {
-  name                = "${module.naming.private_endpoint.name}-foundry"
+  name                = "${module.naming.private_endpoint.name}-aif"
   resource_group_name = var.resource_group_name
   location            = var.location
   subnet_id           = var.subnets["snet-privatelink-01"].id

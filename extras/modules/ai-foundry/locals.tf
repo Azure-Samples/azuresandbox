@@ -1,4 +1,12 @@
 locals {
+  ai_project_roles = {
+    ai_developer = {
+      scope                = azurerm_ai_services.this.id
+      role_definition_name = "Azure AI Developer"
+      principal_id         = azurerm_ai_foundry_project.this.identity[0].principal_id
+    }
+  }
+
   ai_services_roles = {
     storage_blob_data_contributor = {
       scope                = var.storage_account_id
@@ -35,7 +43,7 @@ locals {
   ]
 
   name_unique = regex("^.*-(.+)$", var.resource_group_name)[0]
-  
+
   search_service_roles = {
     storage_blob_data_contributor = {
       scope                = var.storage_account_id
