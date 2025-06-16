@@ -272,6 +272,6 @@ module "ai_foundry" {
   unique_seed           = module.naming.unique-seed
   user_object_id        = var.user_object_id
 
-  depends_on = [module.vnet_app[0].resource_ids] # Ensure vnet-app module resources are provisioned
+  depends_on = [module.vnet_app[0].azure_files_config_vm_extension_id] # Ensure that Azure Files is configured
 }
 # #endregion
