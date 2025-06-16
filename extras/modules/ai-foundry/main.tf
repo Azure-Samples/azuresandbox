@@ -1,6 +1,6 @@
 #region ai foundry
 resource "azurerm_ai_foundry" "this" {
-  name                    = "foundry-${var.tags["project"]}-${var.tags["environment"]}-${local.name_unique}"
+  name                    = "aif-${var.tags["project"]}-${var.tags["environment"]}-${local.name_unique}"
   location                = var.location
   resource_group_name     = var.resource_group_name
   application_insights_id = azurerm_application_insights.this.id
@@ -22,6 +22,35 @@ resource "azurerm_ai_foundry" "this" {
   managed_network {
     isolation_mode = "AllowInternetOutbound"
   }
+
+  lifecycle {
+    ignore_changes = [
+      tags
+    ]
+  }
+}
+
+resource "azurerm_ai_foundry_project" "this" {
+  name               = "aip-${var.tags["project"]}-${var.tags["environment"]}-${local.name_unique}"
+  location           = var.location
+  ai_services_hub_id = azurerm_ai_foundry.this.id
+
+  depends_on = [
+    azapi_resource.ai_services_connection,
+    azapi_resource.search_service_connection
+  ]
+
+  identity {
+    type = "SystemAssigned"
+  }
+}
+
+resource "azurerm_role_assignment" "ai_project" {
+  for_each = local.ai_project_roles
+
+  scope                = each.value.scope
+  role_definition_name = each.value.role_definition_name
+  principal_id         = each.value.principal_id
 }
 
 resource "azurerm_application_insights" "this" {
@@ -60,6 +89,10 @@ resource "azapi_resource" "ai_services_connection" {
       target = "${azurerm_ai_services.this.name}.cognitiveservices.azure.com"
     }
   }
+
+  lifecycle {
+    ignore_changes = all
+  }
 }
 
 resource "azapi_resource" "search_service_connection" {
@@ -81,6 +114,10 @@ resource "azapi_resource" "search_service_connection" {
       }
       target = "${azurerm_search_service.this.name}.search.windows.net"
     }
+  }
+
+  lifecycle {
+    ignore_changes = all
   }
 }
 #endregion

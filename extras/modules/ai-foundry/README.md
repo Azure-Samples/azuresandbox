@@ -225,9 +225,9 @@ Address | Name | Notes
 --- | --- | ---
 module.ai_foundry[0].azapi_resource.ai_services_connection | | Connects the AI Services resource to the AI Foundry hub.
 module.ai_foundry[0].azapi_resource.search_service_connection | | Connects the AI Search resource to the AI Foundry hub.
-module.ai_foundry[0].azurerm_ai_foundry.this | foundry-sand-dev | The AI Foundry hub resource.
-module.ai_foundry[0].azurerm_ai_services.this | ais-sand-dev | The Azure AI Services resource.
-module.ai_foundry[0].azurerm_application_insights.this | appi-sand-dev | The Application Insights workspace connected to the AI Foundry hub.
+module.ai_foundry[0].azurerm_ai_foundry.this | aif-sand-dev-xxx | The AI Foundry hub resource.
+module.ai_foundry[0].azurerm_ai_services.this | ais-sand-dev-xxx | The Azure AI Services resource.
+module.ai_foundry[0].azurerm_application_insights.this | appi-sand-dev-xxx | The Application Insights workspace connected to the AI Foundry hub.
 module.ai_foundry[0].azurerm_container_registry.this | acrsanddevxxx | The Azure Container Registry connected to the AI Foundry hub.
 module.ai_foundry[0].azurerm_private_endpoint.ai_foundry | pe-sand-dev-foundry | The private endpoint for the AI Foundry hub.
 module.ai_foundry[0].azurerm_private_endpoint.ai_services | pe-sand-dev-ais | The private endpoint for the Azure AI Services resource.
@@ -235,7 +235,7 @@ module.ai_foundry[0].azurerm_private_endpoint.container_registry | pe-sand-dev-a
 module.ai_foundry[0].azurerm_private_endpoint.search_service | pe-sand-dev-srch | The private endpoint for the Azure AI Search resource.
 module.ai_foundry[0].azurerm_role_assignment.ai_services[*] | | Role assignments for the Azure AI Services resource as defined in the *locals.tf* file.
 module.ai_foundry[0].azurerm_role_assignment.search_service[*] | | Role assignments for the Azure AI Search resource as defined in the *locals.tf* file.
-module.ai_foundry[0].azurerm_search_service.this | srch-sand-dev | The Azure AI Search resource connected to the AI Foundry hub.
+module.ai_foundry[0].azurerm_search_service.this | srch-sand-dev-xxx | The Azure AI Search resource connected to the AI Foundry hub.
 module.ai_foundry[0].azurerm_storage_share_directory.this | documents | The Azure Files share directory for storing documents.
 module.ai_foundry[0].azurerm_storage_share_file.documents[*] | | Various documents for smoke testing and demonstration purposes.
 
