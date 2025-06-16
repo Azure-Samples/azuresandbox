@@ -22,6 +22,12 @@ resource "azurerm_ai_foundry" "this" {
   managed_network {
     isolation_mode = "AllowInternetOutbound"
   }
+
+  lifecycle {
+    ignore_changes = [
+      tags
+    ]
+  }
 }
 
 resource "azurerm_ai_foundry_project" "this" {
@@ -83,6 +89,10 @@ resource "azapi_resource" "ai_services_connection" {
       target = "${azurerm_ai_services.this.name}.cognitiveservices.azure.com"
     }
   }
+
+  lifecycle {
+    ignore_changes = all
+  }
 }
 
 resource "azapi_resource" "search_service_connection" {
@@ -104,6 +114,10 @@ resource "azapi_resource" "search_service_connection" {
       }
       target = "${azurerm_search_service.this.name}.search.windows.net"
     }
+  }
+
+  lifecycle {
+    ignore_changes = all
   }
 }
 #endregion
