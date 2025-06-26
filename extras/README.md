@@ -19,11 +19,7 @@ Code and content in this section may be incomplete, outdated or not fully functi
 
 This section describes additional Terraform configurations that can be added to Azure Sandbox. These configurations are not required to use Azure Sandbox, but may be useful for learning or testing purposes.
 
-* [rg-devops](./configurations/rg-devops/) includes the following:
-  * A [resource group](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#resource-group) which contains DevOps environment resources.
-  * A [key vault](https://learn.microsoft.com/azure/key-vault/general/overview) for managing secrets.
-  * A [storage account](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#storage-account) for use as a [Terraform azurerm backend](https://developer.hashicorp.com/terraform/language/settings/backends/azurerm).
-  * A Linux [virtual machine](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) for use as a DevOps agent.
+* [rg-devops-iac](./configurations/rg-devops-iac/) This configuration provides a minimal set of resources to function as a Terraform execution environment which is often a critical part of a DevOps pipeline. It is a useful starting point for DevOps / Infrastructure-As-Code (IaC) projects that require a secure and isolated environment for deploying and managing infrastructure using Terraform.
 * [vm-devops](./configurations/vm-devops/) implements a collection of identical [IaaS](https://azure.microsoft.com/overview/what-is-iaas/) [virtual machines](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) designed to be used as Windows Developer Workstations.
 
 ## Modules
