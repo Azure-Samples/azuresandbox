@@ -500,8 +500,9 @@ Don't forget to delete your sandbox when you're done. You don't want to have to 
 This section provides documentation regarding the overall structure of the repository and the root module. See the README.md files in each module directory for more information about that module.
 
 * [Root Module Structure](#root-module-structure)
-* [Root Module Resources](#root-module-resources)
 * [Root Module Input Variables](#root-module-input-variables)
+* [Root Module Resources](#root-module-resources)
+* [Root Module Output Variables](#root-module-output-variables)
 * [Child Modules](#child-modules)
 * [Virtual Network Design](#virtual-network-design)
 * [Dependencies](#dependencies)
