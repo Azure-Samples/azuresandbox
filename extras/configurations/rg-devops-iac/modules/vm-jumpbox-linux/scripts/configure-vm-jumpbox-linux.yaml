@@ -141,5 +141,5 @@ write_files:
   - path: /etc/environment
     content: |
       ARM_USE_MSI=true
-      ARM_TENANT_ID=00000000-0000-0000-0000-000000000000
+      ARM_TENANT_ID=${aad_tenant_id}
     append: true
