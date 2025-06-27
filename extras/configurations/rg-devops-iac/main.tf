@@ -19,7 +19,7 @@ resource "azurerm_key_vault" "this" {
   public_network_access_enabled = true # Note: Public access is enabled for demos and testing from internet clients, and should be disabled in production.
 }
 
-resource "azurerm_role_assignment" "roles" {
+resource "azurerm_role_assignment" "keyvault_roles" {
   for_each = local.key_vault_roles
 
   principal_id         = each.value.principal_id
@@ -30,7 +30,7 @@ resource "azurerm_role_assignment" "roles" {
 
 resource "time_sleep" "wait_for_roles" {
   create_duration = "2m"
-  depends_on      = [azurerm_role_assignment.roles]
+  depends_on      = [azurerm_role_assignment.keyvault_roles]
 }
 #endregion
 
