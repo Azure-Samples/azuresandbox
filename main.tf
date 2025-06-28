@@ -221,7 +221,9 @@ module "vwan" {
 
   depends_on = [module.vnet_app[0].resource_ids] # Ensure vnet-app module resources are provisioned
 }
+#endregion
 
+#region extra-modules
 module "vnet_onprem" {
   source = "./extras/modules/vnet-onprem"
 
@@ -274,4 +276,26 @@ module "ai_foundry" {
 
   depends_on = [module.vnet_app[0].azure_files_config_vm_extension_id] # Ensure that Azure Files is configured
 }
-# #endregion
+
+module "vm_devops_win" {
+  source = "./extras/modules/vm-devops-win"
+
+  count = var.enable_module_vm_devops_win ? 1 : 0
+
+  admin_password_secret   = module.vnet_shared.admin_password_secret
+  admin_username_secret   = module.vnet_shared.admin_username_secret
+  automation_account_name = module.vnet_shared.resource_names["automation_account"]
+  key_vault_id            = azurerm_key_vault.this.id
+  location                = azurerm_resource_group.this.location
+  resource_group_name     = azurerm_resource_group.this.name
+  storage_account_id      = module.vnet_app[0].resource_ids["storage_account"]
+  storage_account_name    = module.vnet_app[0].resource_names["storage_account"]
+  storage_blob_endpoint   = module.vnet_app[0].storage_endpoints["blob"]
+  storage_container_name  = module.vnet_app[0].storage_container_name
+  vm_devops_win_instances = 1
+  subnet_id               = module.vnet_app[0].subnets["snet-app-01"].id
+  tags                    = var.tags
+
+  depends_on = [module.vnet_app[0].azure_files_config_vm_extension_id] # Ensure that Azure Files is configured
+}
+#endregion

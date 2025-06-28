@@ -12,16 +12,11 @@ terraform {
       version = "~> 4.34.0"
     }
 
-    cloudinit = {
-      source  = "hashicorp/cloudinit"
-      version = "~> 2.3.7"
-    }
-
     null = {
       source  = "hashicorp/null"
       version = "~> 3.2.4"
     }
-    
+
     random = {
       source  = "hashicorp/random"
       version = "~> 3.7.2"
@@ -30,11 +25,6 @@ terraform {
     time = {
       source  = "hashicorp/time"
       version = "~> 0.13.1"
-    }
-
-    tls = {
-      source  = "hashicorp/tls"
-      version = "~> 4.1.0"
     }
   }
 }

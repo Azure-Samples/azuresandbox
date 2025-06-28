@@ -71,7 +71,7 @@ else {
     }
 }
 
-$driveLetterAscii = 69 # Ascii code for 'E'
+$driveLetterAscii = 69 # Ascii code for 'F'
 foreach ( $disk in $localRawDisks ) {
     Write-Log "$('=' * 80)"
     Write-Log "Local data disk DiskNumber -----: $($disk.DiskNumber)"

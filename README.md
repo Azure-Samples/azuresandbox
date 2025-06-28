@@ -718,6 +718,7 @@ Sandbox environments are built using Terraform, a cross platform, open-source In
   * **azapi**: Used to manage Azure resources that are not yet supported by the azurerm provider and for direct access to Azure APIs.
   * **azurerm**: Used to manage Azure resources.
   * **cloudinit**: Used to configure Linux virtual machines.
+  * **null**: Used to implement provisioners and other operations that do not require a specific resource.
   * **random**: Used to generate random values for resource attributes.
   * **time**: Used to implement wait cycles and other time based operations.
   * **tls**: Used to generate certificates.
