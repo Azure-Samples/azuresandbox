@@ -1,3 +1,6 @@
+#!/usr/bin/env pwsh
+
+#region parameters
 param (
     [Parameter(Mandatory = $true)]
     [String]$TenantId,
@@ -12,7 +15,7 @@ param (
     [String]$Location,
 
     [Parameter(Mandatory = $true)]
-    [String]$AutomationAccountId,
+    [String]$AutomationAccountName,
 
     [Parameter(Mandatory = $true)]
     [String]$VirtualMachineName,
@@ -26,6 +29,7 @@ param (
     [Parameter(Mandatory = $true)]
     [string]$DscConfigurationName
 )
+#endregion
 
 #region functions
 function Write-Log {
@@ -47,9 +51,6 @@ function Register-DscNode {
 
         [Parameter(Mandatory = $true)]
         [string] $AutomationAccountName,
-
-        [Parameter(Mandatory = $true)]
-        [string] $VmResourceGroupName,
 
         [Parameter(Mandatory = $true)]
         [string] $VirtualMachineName,
@@ -98,13 +99,21 @@ function Register-DscNode {
     Write-Log "Checking for node configuration '$nodeConfigName'..."
 
     try {
-        Get-AzAutomationDscNodeConfiguration `
+        $nodeConfig = Get-AzAutomationDscNodeConfiguration `
             -ResourceGroupName $ResourceGroupName `
             -AutomationAccountName $AutomationAccountName `
-            -Name $nodeConfigName | Out-Null
+            -Name $nodeConfigName `
+            -ErrorAction Stop
     }
     catch {
         Exit-WithError $_
+    }
+
+    $rollupStatus = $nodeConfig.RollupStatus
+    Write-Log "DSC node configuration '$nodeConfigName' RollupStatus is '$($rollupStatus)'..."
+
+    if ($rollupStatus -ne 'Good'){
+        Exit-WithError "Invalid DSC node configuration RollupStatus..."
     }
 
     Write-Log "Registering DSC node '$VirtualMachineName' with node configuration '$nodeConfigName'..."
@@ -114,7 +123,7 @@ function Register-DscNode {
         -ResourceGroupName $ResourceGroupName `
         -AutomationAccountName $AutomationAccountName `
         -AzureVMName $VirtualMachineName `
-        -AzureVMResourceGroup $VmResourceGroupName `
+        -AzureVMResourceGroup $ResourceGroupName `
         -AzureVMLocation $Location `
         -NodeConfigurationName $nodeConfigName `
         -ConfigurationModeFrequencyMins 15 `
@@ -123,6 +132,61 @@ function Register-DscNode {
         -RebootNodeIfNeeded $true `
         -ActionAfterReboot 'ContinueConfiguration' `
         -ErrorAction SilentlyContinue
+
+    Write-Log "Sleeping for 60 seconds before checking node status..."    
+    Start-Sleep -Seconds 60
+    
+    try {
+        $dscNodes = Get-AzAutomationDscNode `
+            -ResourceGroupName $ResourceGroupName `
+            -AutomationAccountName $AutomationAccountName `
+            -Name $VirtualMachineName `
+            -ErrorAction Stop
+    }
+    catch {
+        Exit-WithError $_
+    }
+
+    if ($null -eq $dscNodes) {
+        Exit-WithError "No existing DSC node registrations for '$VirtualMachineName' with node configuration '$nodeConfigName' found..."
+    }
+
+    $dscNode = $dscNodes[0]
+    $dscNodeId = $dscNode.Id
+    $dscNodeStatus = $dscNode.Status
+    Write-Log "DSC node registration id '$dscNodeId' found with status '$dscNodeStatus'..."    
+    
+    $maxRetries = 30
+    $retryCount = 0
+    $statusCompliant = "Compliant"
+
+    while ($retryCount -lt $maxRetries -and $dscNodeStatus -ne $statusCompliant) {
+        $retryCount++
+        try {
+            $dscNodes = Get-AzAutomationDscNode `
+                -Id $dscNodeId `
+                -ResourceGroupName $ResourceGroupName `
+                -AutomationAccountName $AutomationAccountName `
+                -ErrorAction Stop
+            }
+        catch {
+            Exit-WithError $_
+        }
+
+        $dscNode = $dscNodes[0]
+        $dscNodeId = $dscNode.Id
+        $dscNodeStatus = $dscNode.Status
+        Write-Log "Retry '$retryCount': DSC node registration id '$dscNodeId' status is '$dscNodeStatus'..."
+
+        if ($dscNodeStatus -ne $statusCompliant) {
+            Write-Log "DSC node status is not '$statusCompliant'. Retrying in 30 seconds..."
+            Start-Sleep -Seconds 30
+        }
+    }
+
+    if ($dscNodeStatus -ne $statusCompliant) {
+        Exit-WithError "DSC node status did not reach '$statusCompliant' after $maxRetries attempts."
+    }    
 }
 #endregion
 
@@ -152,24 +216,18 @@ catch {
 }
 
 # Get automation account
-$automationAccountParts = $AutomationAccountId.Split("/")
-$automationAccountResourceGroupName = $automationAccountParts[4]
-$automationAccountName = $automationAccountParts[8]
-
-
-$automationAccount = Get-AzAutomationAccount -ResourceGroupName $automationAccountResourceGroupName -Name $automationAccountName
+$automationAccount = Get-AzAutomationAccount -ResourceGroupName $ResourceGroupName -Name $AutomationAccountName
 
 if ($null -eq $automationAccount) {
-    Exit-WithError "Automation account '$automationAccountName' was not found in resource group '$automationAccountResourceGroupName'..."
+    Exit-WithError "Automation account '$AutomationAccountName' was not found..."
 }
 
-Write-Log "Located automation account '$AutomationAccountName' in resource group '$automationAccountResourceGroupName'"
+Write-Log "Located automation account '$AutomationAccountName' in resource group '$ResourceGroupName'"
 
 # Register DSC Node
 Register-DscNode `
-    -ResourceGroupName $automationAccountResourceGroupName `
+    -ResourceGroupName $ResourceGroupName `
     -AutomationAccountName $AutomationAccountName `
-    -VmResourceGroupName $ResourceGroupName `
     -VirtualMachineName $VirtualMachineName `
     -Location $Location `
     -DscConfigurationName $DscConfigurationName

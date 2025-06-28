@@ -49,6 +49,13 @@ variable "enable_module_mysql" {
 
 }
 
+variable "enable_module_vm_devops_win" {
+  type        = bool
+  description = "Set to true to enable the vm_devops_win module, false to skip it."
+  default     = false
+  
+}
+
 variable "enable_module_vm_jumpbox_linux" {
   type        = bool
   description = "Set to true to enable the vm_jumpbox_linux module, false to skip it."

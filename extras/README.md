@@ -20,7 +20,6 @@ Code and content in this section may be incomplete, outdated or not fully functi
 This section describes additional Terraform configurations that can be added to Azure Sandbox. These configurations are not required to use Azure Sandbox, but may be useful for learning or testing purposes.
 
 * [rg-devops-iac](./configurations/rg-devops-iac/) This configuration provides a minimal set of resources to function as a Terraform execution environment which is often a critical part of a DevOps pipeline. It is a useful starting point for DevOps / Infrastructure-As-Code (IaC) projects that require a secure and isolated environment for deploying and managing infrastructure using Terraform.
-* [vm-devops](./configurations/vm-devops/) implements a collection of identical [IaaS](https://azure.microsoft.com/overview/what-is-iaas/) [virtual machines](https://learn.microsoft.com/azure/azure-glossary-cloud-terminology#vm) designed to be used as Windows Developer Workstations.
 
 ## Modules
 
@@ -29,6 +28,7 @@ This section describes additional Terraform modules that can be added to Azure S
 This module adds an implementation of [Azure AI Foundry](https://learn.microsoft.com/en-us/azure/ai-foundry/) to Azure Sandbox, including:
 
 * [ai-foundry](./modules/ai-foundry/) enables the use of an [Azure AI Foundry hub](https://learn.microsoft.com/en-us/azure/ai-foundry/concepts/ai-resources) in a sandbox environment.
+* [vm-devops-win](./modules/vm-devops-win/) implements a collection of identical Windows developer VMs.
 * [vnet-onprem](./modules/vnet-onprem/) simulates connectivity to an on-premises network using a site-to-site VPN connection and Azure DNS private resolver.
 
 ## Demo videos

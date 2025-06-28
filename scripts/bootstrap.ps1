@@ -57,7 +57,7 @@ function Show-JWTtoken {
 # Initialize constants
 $defaultCostCenter = "mycostcenter"
 $defaultEnvironment = "dev"
-$defaultLocation = "centralus"
+$defaultLocation = "eastus2"
 $defaultProject = "sand"
 #endregion
 
@@ -205,8 +205,12 @@ tags = {
 # enable_module_mssql            = true
 # enable_module_mysql            = true
 # enable_module_vwan             = true
+
+# Enable extra modules here
+
 # enable_module_vnet_onprem      = true
 # enable_module_ai_foundry       = true
+# enable_module_vm_devops_win    = true
 "@ | Out-File -FilePath ./terraform.tfvars -Encoding utf8
 
 Get-Content ./terraform.tfvars

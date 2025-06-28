@@ -19,7 +19,7 @@ usage() {
 
 default_costcenter=mycostcenter
 default_environment=dev
-default_location=centralus
+default_location=eastus2
 default_project=sand
 
 #endregion
@@ -167,8 +167,10 @@ printf "# enable_module_vm_mssql_win     = true\n"  >> ./terraform.tfvars
 printf "# enable_module_mssql            = true\n"  >> ./terraform.tfvars
 printf "# enable_module_mysql            = true\n"  >> ./terraform.tfvars
 printf "# enable_module_vwan             = true\n"  >> ./terraform.tfvars
+printf "\n# Enable extra modules here\n\n"          >> ./terraform.tfvars
 printf "# enable_module_vnet_onprem      = true\n"  >> ./terraform.tfvars
 printf "# enable_module_ai_foundry       = true\n"  >> ./terraform.tfvars
+printf "# enable_module_vm_devops_win    = true\n"  >> ./terraform.tfvars
 cat ./terraform.tfvars
 
 exit 0

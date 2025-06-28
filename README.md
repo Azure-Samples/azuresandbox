@@ -215,6 +215,13 @@ A variety of Terraform execution environments can be used to provision Azure San
   * Terraform
   * Visual Studio Code
 
+* **Azure Virtual Machine**: An Azure virtual machine (Windows or Linux) can be used to run Terraform. This may be your only option if your client device is managed by strict corporate security policies that restrict developer use cases. See [rg-devops-iac](./extras/configurations/rg-devops-iac/) in extras for a complete configuration that can be used as a Terraform execution environment, either interactive or automated as part of a DevOps pipeline. This configuration has been tested as a Linux Terraform execution environment for Azure Sandbox. If you build your own Azure Virtual Machine to use as a Terraform execution environment, the following software should be installed:
+  * git
+  * Azure CLI
+  * PowerShell 7.x
+  * Az PowerShell Module
+  * Terraform
+  
 * **Azure Cloud Shell**: Azure Cloud Shell is not recommended but can be used. Most of the software dependencies are pre-installed.
 
 * **GitHub Codespaces**: GitHub Codespaces has not been tested but should be okay. Most of the software dependencies should be pre-installed.
@@ -711,6 +718,7 @@ Sandbox environments are built using Terraform, a cross platform, open-source In
   * **azapi**: Used to manage Azure resources that are not yet supported by the azurerm provider and for direct access to Azure APIs.
   * **azurerm**: Used to manage Azure resources.
   * **cloudinit**: Used to configure Linux virtual machines.
+  * **null**: Used to implement provisioners and other operations that do not require a specific resource.
   * **random**: Used to generate random values for resource attributes.
   * **time**: Used to implement wait cycles and other time based operations.
   * **tls**: Used to generate certificates.

@@ -15,7 +15,7 @@
 
 ## Overview
 
-This configuration provides a minimal set of resources to function as an execution environment for Terraform which is often a critical part of a DevOps pipeline. It is a useful starting point for DevOps / Infrastructure-As-Code (IaC) projects that require a secure and isolated environment for deploying and managing infrastructure using Terraform.
+This configuration provides a minimal set of resources to function as an execution environment for Terraform which is often a critical part of a DevOps pipeline. It is a useful starting point for DevOps / Infrastructure-As-Code (IaC) projects that require a secure and isolated environment for deploying and managing infrastructure using Terraform. The root module creates network, storage and security prerequisites. The virtual machine used as a Terraform execution environment is implemented in a child module which can be repurposed in other environments (such as a platform landing zone) where the resources defined in the root module already exist.
 
 ## Features
 
@@ -374,7 +374,8 @@ azurerm_nat_gateway_public_ip_association.this | | Associates the NAT gateway wi
 azurerm_network_security_group.this | | NSG used to open inbound connectivity for port 22 (SSH) to the Linux virtual machine.
 azurerm_public_ip.this | pip-devops-dev-nat | Public IP address for the NAT gateway.
 azurerm_resource_group.this | rg-devops-dev-xxx | Resource group for all resources in this configuration.
-azurerm_role_assignment.roles[*] | | Assigns `Key Vault Secrets Officer` to both the service principal and the interactive user.
+azurerm_role_assignment.keyvault_roles[*] | | Assigns `Key Vault Secrets Officer` to both the service principal and the interactive user.
+azurerm_role_assignment.storage_roles[*] | | Assigns `Storage Blob Data Contributor` to both the service principal and the interactive user.
 azurerm_storage_account.this | stdevopsdevxxx | Storage account for storing Terraform state files.
 azurerm_storage_container.this | tfstate | Storage container for storing Terraform state files.
 azurerm_subnet.this | snet-devops-01 | Subnet for the Linux virtual machine.
