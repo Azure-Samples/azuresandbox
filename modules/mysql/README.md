@@ -81,6 +81,7 @@ admin_username_secret | adminuser | The name of the key vault secret that contai
 key_vault_id | | The ID of the key vault defined in the root module.
 location | | The name of the Azure Region where resources will be provisioned. Defined in the root module.
 mysql_database_name | testdb | The name of the Azure MySQL Database to be provisioned.
+mysql_sku_name | B_Gen5_1 | The SKU name for the Azure MySQL Flexible Server.
 resource_group_name | | The name of the resource group defined in the root module.
 subnet_id | | The subnet ID defined in the vnet-app module.
 tags | | The tags from the root module.
