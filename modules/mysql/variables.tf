@@ -49,6 +49,17 @@ variable "mysql_database_name" {
   }
 }
 
+variable "mysql_sku_name" {
+  type        = string
+  description = "The SKU name for the Azure MySQL Flexible Server."
+  default     = "B_Standard_B1ms"
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9_\\-]{1,64}$", var.mysql_sku_name))
+    error_message = "The SKU name must be 1-64 characters long and can only contain alphanumeric characters, underscores (_), and hyphens (-)."
+  }
+}
+
 variable "resource_group_name" {
   type        = string
   description = "The name of the existing resource group for provisioning resources."

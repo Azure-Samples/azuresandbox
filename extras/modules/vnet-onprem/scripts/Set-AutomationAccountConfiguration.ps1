@@ -52,6 +52,58 @@ function Exit-WithError {
     Exit 2
 }
 
+function Import-Module {
+    param(
+        [Parameter(Mandatory = $true)]
+        [String]$ResourceGroupName,
+
+        [Parameter(Mandatory = $true)]
+        [String]$AutomationAccountName,
+
+        [Parameter(Mandatory = $true)]
+        [String]$ModuleName,
+
+        [Parameter(Mandatory = $true)]
+        [String]$ModuleUri
+    )
+
+    Write-Log "Importing module '$ModuleName'..."
+    $automationModule = Get-AzAutomationModule -ResourceGroupName $ResourceGroupName -AutomationAccountName $AutomationAccountName | Where-Object { $_.Name -eq $ModuleName }
+
+    if ($null -eq $automationModule) {
+        try {
+            $automationModule = New-AzAutomationModule `
+                -Name $ModuleName `
+                -ContentLinkUri $ModuleUri `
+                -ResourceGroupName $ResourceGroupName `
+                -AutomationAccountName $AutomationAccountName `
+                -ErrorAction Stop            
+        }
+        catch {
+            Exit-WithError $_
+        }
+    }
+
+    if ($automationModule.ProvisioningState -ne 'Created') {
+        while ($true) {
+            $automationModule = Get-AzAutomationModule -Name $ModuleName -ResourceGroupName $ResourceGroupName -AutomationAccountName $AutomationAccountName
+        
+            if (($automationModule.ProvisioningState -eq 'Succeeded') -or ($automationModule.ProvisioningState -eq 'Failed') -or ($automationModule.ProvisioningState -eq 'Created')) {
+                break
+            }
+
+            Write-Log "Module '$($automationModule.Name)' provisioning state is '$($automationModule.ProvisioningState)'..."
+            Start-Sleep -Seconds 10
+        }
+    }
+
+    if ($automationModule.ProvisioningState -eq "Failed") {
+        Exit-WithError "Module '$($automationModule.Name)' import failed..."
+    }
+
+    Write-Log "Module '$($automationModule.Name)' provisioning state is '$($automationModule.ProvisioningState)'..."
+}
+
 function Import-DscConfiguration {
     param(
         [Parameter(Mandatory = $true)]
@@ -101,13 +153,13 @@ function Start-DscCompilationJob {
         [String]$VirtualMachineName
     )
 
-    Write-Log "Compliling DSC Configuration '$DscConfigurationName'..."
+    Write-Log "Compiling DSC Configuration '$DscConfigurationName'..."
 
     $params = @{
         ComputerName = $VirtualMachineName
     }
 
-    $configuationData = @{
+    $configurationData = @{
         AllNodes = @(
             @{
                 NodeName = "$VirtualMachineName"
@@ -121,7 +173,7 @@ function Start-DscCompilationJob {
             -ResourceGroupName $ResourceGroupName `
             -AutomationAccountName $AutomationAccountName `
             -ConfigurationName $DscConfigurationName `
-            -ConfigurationData $configuationData `
+            -ConfigurationData $configurationData `
             -Parameters $params `
             -ErrorAction Stop
     }
@@ -131,17 +183,31 @@ function Start-DscCompilationJob {
     
     $jobId = $dscCompilationJob.Id
     
-    while ($null -eq $dscCompilationJob.EndTime -and $null -eq $dscCompilationJob.Exception) {
+    while (-not $dscCompilationJob.Exception) {
         $dscCompilationJob = $dscCompilationJob | Get-AzAutomationDscCompilationJob
         Write-Log "DSC compilation job ID '$jobId' status is '$($dscCompilationJob.Status)'..."
-        Start-Sleep -Seconds 10
+
+        if ($dscCompilationJob.Status -in @("Queued", "Starting", "Resuming", "Running", "Stopping", "Suspending", "Activating", "New")) {
+            Start-Sleep -Seconds 10
+            continue
+        }
+
+        # Stop looping if status is Completed, Failed, Stopped, Suspended
+        if ($dscCompilationJob.Status -in @("Completed", "Failed", "Stopped", "Suspended")) {
+            break
+        }
+
+        # Anything else is an unexpected status
+        Exit-WithError "DSC compilation job ID '$jobId' returned unexpected status '$($dscCompilationJob.Status)'..."
     }
     
     if ($dscCompilationJob.Exception) {
-        Exit-WithError "DSC compilation job ID '$jobId' failed..."
+        Exit-WithError "DSC compilation job ID '$jobId' failed with an exception..."
     }
-    
-    Write-Log "DSC compilation job ID '$jobId' status is '$($dscCompilationJob.Status)'..."    
+
+    if ($dscCompilationJob.Status -in @("Failed", "Stopped", "Suspended")) {
+        Exit-WithError "DSC compilation job ID '$jobId' failed with status '$($dscCompilationJob.Status)'..."
+    }
 }
 
 function Set-Variable {
@@ -166,7 +232,7 @@ function Set-Variable {
         try {
             $automationVariable = New-AzAutomationVariable `
                 -Name $VariableName `
-                -Encrypted $false `
+                -Encrypted $true `
                 -Description $VariableName `
                 -Value $VariableValue `
                 -ResourceGroupName $ResourceGroupName `
@@ -181,7 +247,7 @@ function Set-Variable {
         try {
             $automationVariable = Set-AzAutomationVariable `
                 -Name $VariableName `
-                -Encrypted $false `
+                -Encrypted $true `
                 -Value $VariableValue `
                 -ResourceGroupName $ResourceGroupName `
                 -AutomationAccountName $AutomationAccountName `
@@ -191,6 +257,73 @@ function Set-Variable {
             Exit-WithError $_
         }
     }
+}
+
+function Set-Credential {
+    param (
+        [Parameter(Mandatory = $true)]
+        [String]$ResourceGroupName,
+
+        [Parameter(Mandatory = $true)]
+        [String]$AutomationAccountName,
+
+        [Parameter(Mandatory = $true)]
+        [String]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [String]$Description,
+
+        [Parameter(Mandatory = $true)]
+        [String]$UserName,
+
+        [Parameter(Mandatory = $true)]
+        [String]$UserSecret        
+    )
+
+    Write-Log "Setting automation credential '$Name'..."
+
+    try {
+        $automationCredential = Get-AzAutomationCredential `
+            -ResourceGroupName $ResourceGroupName `
+            -AutomationAccountName $AutomationAccountName `
+            -ErrorAction Stop `
+        | Where-Object { $_.Name -eq $Name }
+    }
+    catch {
+        Exit-WithError $_
+    }
+    
+    $userSecretSecure = ConvertTo-SecureString $UserSecret -AsPlainText -Force
+    $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $UserName, $userSecretSecure
+    
+    if ($null -eq $automationCredential) {
+        try {
+            $automationCredential = New-AzAutomationCredential `
+                -Name $Name `
+                -Description $Description `
+                -Value $credential `
+                -ResourceGroupName $ResourceGroupName `
+                -AutomationAccountName $AutomationAccountName `
+                -ErrorAction Stop
+        }
+        catch {
+            Exit-WithError $_
+        }
+    }
+    else {
+        try {
+            $automationCredential = Set-AzAutomationCredential `
+                -Name $Name `
+                -Description $Description `
+                -Value $credential `
+                -ResourceGroupName $ResourceGroupName `
+                -AutomationAccountName $AutomationAccountName `
+                -ErrorAction Stop
+    }
+        catch {
+            Exit-WithError $_
+        }
+    }    
 }
 #endregion
 
@@ -241,6 +374,15 @@ Set-Variable `
     -AutomationAccountName $automationAccount.AutomationAccountName `
     -VariableName 'dns_resolver_cloud' `
     -VariableValue $DnsResolverCloud
+
+# Bootstrap automation credentials
+Set-Credential `
+    -ResourceGroupName $ResourceGroupName `
+    -AutomationAccountName $automationAccount.AutomationAccountName `
+    -Name 'domainadmin2' `
+    -Description 'Domain admin account credential for myonprem.local' `
+    -UserName $($Domain + '\' + $AdminUsername) `
+    -UserSecret $AdminPwd 
 
 # Import DSC Configurations
 Import-DscConfiguration `
