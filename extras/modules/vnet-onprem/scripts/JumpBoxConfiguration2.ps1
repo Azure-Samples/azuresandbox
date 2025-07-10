@@ -9,7 +9,7 @@ configuration JumpBoxConfiguration2 {
     Import-DscResource -ModuleName 'cChoco'
     
     $domain = Get-AutomationVariable -Name 'adds2_domain_name'
-    $domainAdminCredential = Get-AutomationPSCredential 'domainadmin'
+    $domainAdminCredential = Get-AutomationPSCredential 'domainadmin2'
 
     node $ComputerName {
         WindowsFeature RsatAdds {
