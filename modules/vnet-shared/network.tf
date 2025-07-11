@@ -163,6 +163,42 @@ resource "azurerm_public_ip" "firewall" {
 }
 #endregion
 
+#region private-endpoints
+resource "azurerm_private_dns_zone" "this" {
+  name                = "privatelink.vaultcore.azure.net"
+  resource_group_name = var.resource_group_name
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "this" {
+  name                  = "link-${azurerm_private_dns_zone.this.name}-${azurerm_virtual_network.this.name}"
+  resource_group_name   = var.resource_group_name
+  private_dns_zone_name = azurerm_private_dns_zone.this.name
+  virtual_network_id    = azurerm_virtual_network.this.id
+}
+
+resource "azurerm_private_endpoint" "this" {
+  name                = "${module.naming.private_endpoint.name}-key-vault"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  subnet_id           = azurerm_subnet.subnets["snet-privatelink-02"].id
+
+  private_service_connection {
+    name                           = "key_vault"
+    private_connection_resource_id = azurerm_key_vault.this.id
+    is_manual_connection           = false
+    subresource_names              = ["vault"]
+  }
+}
+
+resource "azurerm_private_dns_a_record" "this" {
+  name                = azurerm_key_vault.this.name
+  zone_name           = azurerm_private_dns_zone.this.name
+  resource_group_name = var.resource_group_name
+  ttl                 = 300
+  records             = [azurerm_private_endpoint.this.private_service_connection[0].private_ip_address]
+}
+#endregion
+
 #region network-interfaces
 resource "azurerm_network_interface" "this" {
   name                = "${module.naming.network_interface.name}-${var.vm_adds_name}"

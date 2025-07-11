@@ -14,6 +14,10 @@ output "dns_server" {
   value = azurerm_virtual_network.this.dns_servers[0]
 }
 
+output "private_dns_zones" {
+  value = {"${azurerm_private_dns_zone.this.name}" = azurerm_private_dns_zone.this}
+}
+
 output "resource_ids" {
   value = {
     automation_account      = azurerm_automation_account.this.id

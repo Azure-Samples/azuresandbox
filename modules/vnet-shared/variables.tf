@@ -139,6 +139,17 @@ variable "subnet_misc_02_address_prefix" {
   }
 }
 
+variable "subnet_privatelink_address_prefix" {
+  type        = string
+  description = "The address prefix for the PrivateLink subnet."
+  default     = "10.1.5.0/24"
+
+  validation {
+    condition     = can(cidrhost(var.subnet_privatelink_address_prefix, 0))
+    error_message = "Must be valid IPv4 CIDR."
+  }
+}
+
 variable "tags" {
   type        = map(any)
   description = "The tags in map format to be used when creating new resources."
