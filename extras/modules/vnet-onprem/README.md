@@ -73,7 +73,7 @@ This smoke testing is divided into two sections:
   * For *User name*, enter the following value:
   
     ```plaintext
-    bootstrapadmin@myonprem.local
+    onprembootstrapadmin@myonprem.local
     ```
 
   * Click *Connect*
@@ -118,7 +118,7 @@ This smoke testing uses the RDP connection to *jumpwin2* established previously 
 * From a Windows PowerShell command prompt run the following command:
 
   ```powershell
-  Resolve-DnsName YOUR-SANDBOX-STORAGE-ACCOUNT-NAME-HERE.file.core.windows.net
+  Resolve-DnsName <your-storage-account-name>.file.core.windows.net
   ```
 
 * Verify the *IP4Address* returned is in the *snet-privatelink-01* subnet, e.g. `10.2.2.5`.
@@ -127,7 +127,7 @@ This smoke testing uses the RDP connection to *jumpwin2* established previously 
 
   ```powershell
   # Replace FQDN with the value copied previously.
-  net use z: \\stxxxxxxxxxxx.file.core.windows.net\myfileshare /USER:bootstrapadmin@mysandbox.local
+  net use z: \\<your-storage-account-name>.file.core.windows.net\myfileshare /USER:bootstrapadmin@mysandbox.local
   ```
 
 * For *Password*, enter the value of the *adminpassword* secret in key vault.
@@ -202,7 +202,7 @@ In order to complete this smoke test, SQL Server Management Studio must be insta
 * From a Windows PowerShell command prompt run the following command:
 
   ```powershell
-  Resolve-DnsName YOUR-MSSQL-SERVER-NAME-HERE.database.windows.net
+  Resolve-DnsName <your-mssql-server-name-here>.database.windows.net
   ```
 
 * Verify the *IP4Address* returned is in the *snet-privatelink-01* subnet.
@@ -211,7 +211,7 @@ In order to complete this smoke test, SQL Server Management Studio must be insta
   * Server name:
   
     ```plaintext
-    YOUR-MSSQL-SERVER-NAME-HERE.database.windows.net
+    <your-mssql-server-name-here>.database.windows.net
     ```
 
   * Authentication: *SQL Server Authentication*
@@ -234,7 +234,7 @@ In order to complete this smoke test, MySQL Workbench must be installed on *jump
 * Using Windows PowerShell, run the following command:
 
   ```powershell
-  Resolve-DnsName YOUR-MYSQL-SERVER-NAME-HERE.mysql.database.azure.com
+  Resolve-DnsName <your-mysql-server-name-here>.mysql.database.azure.com
   ```
 
 * Verify the *IP4Address* returned is in the *snet-privatelink-01* subnet, e.g. `10.2.2.7`.
@@ -244,7 +244,7 @@ In order to complete this smoke test, MySQL Workbench must be installed on *jump
   * Hostname:
   
     ```plaintext
-    YOUR-MYSQL-SERVER-NAME-HERE.mysql.database.azure.com
+    <your-mysql-server-name-here>.mysql.database.azure.com
     ```
 
   * Port: *3306*

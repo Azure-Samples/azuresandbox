@@ -379,9 +379,17 @@ Set-Variable `
 Set-Credential `
     -ResourceGroupName $ResourceGroupName `
     -AutomationAccountName $automationAccount.AutomationAccountName `
+    -Name 'bootstrapadmin2' `
+    -Description 'Local admin account credential' `
+    -UserName $("onprem" + $AdminUsername) `
+    -UserSecret $AdminPwd 
+
+Set-Credential `
+    -ResourceGroupName $ResourceGroupName `
+    -AutomationAccountName $automationAccount.AutomationAccountName `
     -Name 'domainadmin2' `
     -Description 'Domain admin account credential for myonprem.local' `
-    -UserName $($Domain + '\' + $AdminUsername) `
+    -UserName $($Domain + '\onprem' + $AdminUsername) `
     -UserSecret $AdminPwd 
 
 # Import DSC Configurations

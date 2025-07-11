@@ -8,7 +8,7 @@ configuration DomainControllerConfiguration2 {
     Import-DscResource -ModuleName ActiveDirectoryDsc
     Import-DscResource -ModuleName DnsServerDsc
 
-    $adminCredential = Get-AutomationPSCredential 'bootstrapadmin'
+    $adminCredential = Get-AutomationPSCredential 'bootstrapadmin2'
     $domain = Get-AutomationVariable -Name 'adds2_domain_name'
     $dnsResolverCloud = Get-AutomationVariable -Name 'dns_resolver_cloud'
 
