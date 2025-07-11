@@ -15,7 +15,7 @@ output "dns_server" {
 }
 
 output "private_dns_zones" {
-  value = {"${azurerm_private_dns_zone.this.name}" = azurerm_private_dns_zone.this}
+  value = { "privatelink.vaultcore.azure.net" = azurerm_private_dns_zone.this }
 }
 
 output "resource_ids" {

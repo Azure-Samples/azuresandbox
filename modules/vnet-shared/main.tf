@@ -10,7 +10,7 @@ resource "azurerm_key_vault" "this" {
   tenant_id                     = data.azurerm_client_config.current.tenant_id
   sku_name                      = "standard"
   enable_rbac_authorization     = true
-  public_network_access_enabled = true # Note: Public access is enabled for demos and testing from internet clients, and should be disabled in production.
+  public_network_access_enabled = false
 }
 
 resource "azurerm_role_assignment" "roles" {
@@ -27,7 +27,7 @@ resource "azurerm_key_vault_secret" "spn_password" {
   value           = var.arm_client_secret
   key_vault_id    = azurerm_key_vault.this.id
   expiration_date = timeadd(timestamp(), "8760h")
-  depends_on      = [time_sleep.wait_for_roles]
+  depends_on      = [time_sleep.wait_for_roles_and_public_access]
 
   lifecycle {
     ignore_changes = [expiration_date]
@@ -39,7 +39,7 @@ resource "azurerm_key_vault_secret" "log_primary_shared_key" {
   value           = azurerm_log_analytics_workspace.this.primary_shared_key
   key_vault_id    = azurerm_key_vault.this.id
   expiration_date = timeadd(timestamp(), "8760h")
-  depends_on      = [time_sleep.wait_for_roles]
+  depends_on      = [time_sleep.wait_for_roles_and_public_access]
 
   lifecycle {
     ignore_changes = [expiration_date]
@@ -51,7 +51,7 @@ resource "azurerm_key_vault_secret" "adminpassword" {
   value           = "${random_string.adminpassword_first_char.result}${random_password.adminpassword_middle_chars.result}${random_string.adminpassword_last_char.result}"
   key_vault_id    = azurerm_key_vault.this.id
   expiration_date = timeadd(timestamp(), "8760h")
-  depends_on      = [time_sleep.wait_for_roles]
+  depends_on      = [time_sleep.wait_for_roles_and_public_access]
 
   lifecycle {
     ignore_changes = [expiration_date]
@@ -63,7 +63,7 @@ resource "azurerm_key_vault_secret" "adminusername" {
   value           = var.admin_username
   key_vault_id    = azurerm_key_vault.this.id
   expiration_date = timeadd(timestamp(), "8760h")
-  depends_on      = [time_sleep.wait_for_roles]
+  depends_on      = [time_sleep.wait_for_roles_and_public_access]
 
   lifecycle {
     ignore_changes = [expiration_date]
@@ -109,17 +109,29 @@ resource "azurerm_log_analytics_workspace" "this" {
 #endregion
 
 #region utilities
-resource "time_sleep" "wait_for_roles" {
-  create_duration = "2m"
-  depends_on      = [azurerm_role_assignment.roles]
+resource "azapi_update_resource" "key_vault_enable_public_access" {
+  type        = "Microsoft.KeyVault/vaults@2024-11-01"
+  resource_id = azurerm_key_vault.this.id
+
+  body = { properties = { publicNetworkAccess = "Enabled" } }
+
+  lifecycle { ignore_changes = all }
 }
 
-resource "random_string" "adminpassword_first_char" {
-  length  = 1
-  upper   = true
-  lower   = true
-  numeric = false
-  special = false
+resource "azapi_update_resource" "key_vault_disable_public_access" {
+  type        = "Microsoft.KeyVault/vaults@2024-11-01"
+  resource_id = azurerm_key_vault.this.id
+
+  depends_on = [
+    azurerm_key_vault_secret.adminpassword,
+    azurerm_key_vault_secret.adminusername,
+    azurerm_key_vault_secret.spn_password,
+    azurerm_key_vault_secret.log_primary_shared_key
+  ]
+
+  body = { properties = { publicNetworkAccess = "Disabled" } }
+
+  lifecycle { ignore_changes = all }
 }
 
 resource "random_password" "adminpassword_middle_chars" {
@@ -135,12 +147,25 @@ resource "random_password" "adminpassword_middle_chars" {
   override_special = ".+-="
 }
 
+resource "random_string" "adminpassword_first_char" {
+  length  = 1
+  upper   = true
+  lower   = true
+  numeric = false
+  special = false
+}
+
 resource "random_string" "adminpassword_last_char" {
   length  = 1
   upper   = true
   lower   = true
   numeric = false
   special = false
+}
+
+resource "time_sleep" "wait_for_roles_and_public_access" {
+  create_duration = "2m"
+  depends_on      = [azurerm_role_assignment.roles]
 }
 #endregion
 

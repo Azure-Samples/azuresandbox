@@ -562,7 +562,6 @@ enable_module_vm_mssql_win | false | Set to true to enable the vm_mssql_win modu
 enable_module_vnet_app | false | Set to true to enable the vnet_app module, false to skip it.
 enable_module_vwan | false | Set to true to enable the vwan module, false to skip it.
 location | | The name of the Azure Region where resources will be provisioned.
-log_analytics_workspace_retention_days | 30 | The retention period for the log analytics workspace.
 subscription_id | | The Azure subscription id used to provision sandbox resources.
 tags | { costcenter = "mycostcenter", environment = "dev", project = "sand" } | Tags in map format to be applied to the sandbox resource group and used for resource naming.
 user_object_id | | The object id of the interactive user (e.g. Azure CLI or Az PowerShell signed in user).
@@ -571,17 +570,11 @@ user_object_id | | The object id of the interactive user (e.g. Azure CLI or Az P
 
 ### Root Module Resources
 
-The root module includes a resource group, key vault and log analytics workspace used by the child modules. It also implements Azure RBAC role assignments for both the service principal used by Terraform as well as the interactive user.
+The root module includes a resource group.
 
 Address | Name | Notes
 --- | --- | ---
-azurerm_key_vault.this | kv&#8209;sand&#8209;dev&#8209;xxxxxxxx | Key vault for storing secrets. Public network access is enabled by default to facilitate testing. This should be disabled in production environments.
-azurerm_key_vault_secret.log_primary_shared_key | | Shared key secret for log analytics workspace. The name of the secret is the same as the log analytics workspace id.
-azurerm_key_vault_secret.spn_password | | Service principal password secret. The name of the secret is the same as the service principal AppId.
-azurerm_log_analytics_workspace.this | log&#8209;sand&#8209;dev&#8209;xxxxxxxx | Log analytics workspace.
-azurerm_monitor_diagnostic_setting.this | | Diagnostic settings for key vault.
-azurerm_resource_group.this | rg&#8209;sand&#8209;dev&#8209;xxxxxxxx | Resource group for the sandbox.
-azurerm_role_assignment.roles[*] | | Assigns the `Key Vault Secrets Officer` role to the service principal and the interactive user.
+azurerm_resource_group.this | rg&#8209;sand&#8209;dev&#8209;xxxxxxxx | Resource group for the sandbox environment.
 
 ---
 
@@ -604,7 +597,7 @@ The following [modules](./modules/) are included in this configuration:
 
 Name | Required | Depends On | Description
 --- | --- | --- | ---
-[vnet-shared](./modules/vnet-shared/) | Yes | Root module | Includes a shared services virtual network including a Bastion Host, Azure Firewall and an AD domain controller/DNS server VM.
+[vnet-shared](./modules/vnet-shared/) | Yes | Root module | Includes a shared services virtual network including a Bastion Host, Azure Firewall, Key Vault, Log Analytics Workspace and an AD domain controller/DNS server VM.
 [vnet-app](./modules/vnet-app/) | No | vnet-shared module | Includes an application virtual network, a network isolated Azure Files share and a preconfigured Windows jumpbox VM.
 [vm-jumpbox-linux](./modules/vm-jumpbox-linux/) | No | vnet-app module | Creates a preconfigured Linux jumpbox VM in the application virtual network.
 [vm-mssql-win](./modules/vm-mssql-win/) | No | vnet-app module | Creates a preconfigured SQL Server VM in the application virtual network.
@@ -643,6 +636,13 @@ snet-adds-01 | `10.1.1.0/24` | `/27` | Yes | Hosts the Active Directory Domain S
 snet-misc-01 | `10.1.2.0/24` | `/27` | Yes | Reserved for optional configurations requiring connectivity in the shared virtual network.
 snet-misc-02 | `10.1.3.0/24` | `/27` | Yes | Reserved for optional configurations requiring connectivity in the shared virtual network.
 AzureFirewallSubnet | `10.1.4.0/26` | `/26` | No | Reserved for Azure Firewall to provide network security.
+snet-privatelink-02 | `10.1.5.0/24` | `/27` | Yes | Reserved for private endpoints using Azure Private Link.
+
+The following private endpoints are configured in the *snet-privatelink-02* subnet to provide secure, network-isolated access to the following Azure PaaS services:
+
+Service | Module
+--- | ---
+Key Vault | vnet-shared
 
 #### **Application Virtual Network**
 
