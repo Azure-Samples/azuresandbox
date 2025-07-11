@@ -1,4 +1,17 @@
 locals {
+  key_vault_roles = {
+    kv_secrets_officer_spn = {
+      principal_id         = data.azurerm_client_config.current.object_id
+      principal_type       = "ServicePrincipal"
+      role_definition_name = "Key Vault Secrets Officer"
+    }
+    kv_secrets_officer_user = {
+      principal_id         = var.user_object_id
+      principal_type       = "User"
+      role_definition_name = "Key Vault Secrets Officer"
+    }
+  }
+
   network_security_group_rules = flatten([
     for subnet_key, subnet in local.subnets : [
       for nsg_rule_key in subnet.nsg_rules : {
@@ -27,9 +40,9 @@ locals {
         "Domain = '${var.adds_domain_name}';",
         "VmAddsName = '${var.vm_adds_name}';",
         "AdminUserName = '${var.admin_username}';",
-        "AdminPwd = '${data.azurerm_key_vault_secret.adminpassword.value}';",
+        "AdminPwd = '${azurerm_key_vault_secret.adminpassword.value}';",
         "AppId = '${data.azurerm_client_config.current.client_id}';",
-        "AppSecret = '${data.azurerm_key_vault_secret.arm_client_secret.value}'"
+        "AppSecret = '${azurerm_key_vault_secret.spn_password.value}';",
       ]
     }
 
@@ -43,7 +56,7 @@ locals {
         "AutomationAccountName = '${module.naming.automation_account.name}';",
         "VirtualMachineName = '${var.vm_adds_name}';",
         "AppId = '${data.azurerm_client_config.current.client_id}';",
-        "AppSecret = '${data.azurerm_key_vault_secret.arm_client_secret.value}';",
+        "AppSecret = '${azurerm_key_vault_secret.spn_password.value}';",
         "DscConfigurationName = 'DomainControllerConfiguration'"
       ]
     }

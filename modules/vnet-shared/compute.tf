@@ -4,7 +4,7 @@ resource "azurerm_windows_virtual_machine" "this" {
   location                   = var.location
   size                       = var.vm_adds_size
   admin_username             = var.admin_username
-  admin_password             = data.azurerm_key_vault_secret.adminpassword.value
+  admin_password             = azurerm_key_vault_secret.adminpassword.value
   network_interface_ids      = [azurerm_network_interface.this.id]
   patch_assessment_mode      = "AutomaticByPlatform"
   patch_mode                 = "AutomaticByPlatform"

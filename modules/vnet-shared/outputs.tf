@@ -16,23 +16,27 @@ output "dns_server" {
 
 output "resource_ids" {
   value = {
-    automation_account     = azurerm_automation_account.this.id
-    bastion_host           = azurerm_bastion_host.this.id
-    firewall               = azurerm_firewall.this.id
-    firewall_route_table   = azurerm_route_table.this.id
-    virtual_machine_adds1  = azurerm_windows_virtual_machine.this.id
-    virtual_network_shared = azurerm_virtual_network.this.id
+    automation_account      = azurerm_automation_account.this.id
+    bastion_host            = azurerm_bastion_host.this.id
+    firewall                = azurerm_firewall.this.id
+    firewall_route_table    = azurerm_route_table.this.id
+    key_vault               = azurerm_key_vault.this.id
+    log_analytics_workspace = azurerm_log_analytics_workspace.this.id
+    virtual_machine_adds1   = azurerm_windows_virtual_machine.this.id
+    virtual_network_shared  = azurerm_virtual_network.this.id
   }
 }
 
 output "resource_names" {
   value = {
-    automation_account     = azurerm_automation_account.this.name
-    bastion_host           = azurerm_bastion_host.this.name
-    firewall               = azurerm_firewall.this.name
-    firewall_route_table   = azurerm_route_table.this.name
-    virtual_machine_adds1  = azurerm_windows_virtual_machine.this.name
-    virtual_network_shared = azurerm_virtual_network.this.name
+    automation_account      = azurerm_automation_account.this.name
+    bastion_host            = azurerm_bastion_host.this.name
+    firewall                = azurerm_firewall.this.name
+    firewall_route_table    = azurerm_route_table.this.name
+    key_vault               = azurerm_key_vault.this.name
+    log_analytics_workspace = azurerm_log_analytics_workspace.this.name
+    virtual_machine_adds1   = azurerm_windows_virtual_machine.this.name
+    virtual_network_shared  = azurerm_virtual_network.this.name
   }
 }
 

@@ -53,7 +53,7 @@ variable "enable_module_vm_devops_win" {
   type        = bool
   description = "Set to true to enable the vm_devops_win module, false to skip it."
   default     = false
-  
+
 }
 
 variable "enable_module_vm_jumpbox_linux" {
@@ -94,17 +94,6 @@ variable "location" {
   validation {
     condition     = can(regex("^[a-z0-9-]+$", var.location))
     error_message = "Must be a valid Azure region name. It should only contain lowercase letters, numbers, and dashes."
-  }
-}
-
-variable "log_analytics_workspace_retention_days" {
-  type        = string
-  description = "The retention period for the new log analytics workspace."
-  default     = "30"
-
-  validation {
-    condition     = can(regex("^(30|31|60|90|120|180|270|365|550|730)$", var.log_analytics_workspace_retention_days))
-    error_message = "Must be one of the valid retention periods: 30, 31, 60, 90, 120, 180, 270, 365, 550, or 730 days."
   }
 }
 
