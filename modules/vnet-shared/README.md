@@ -154,7 +154,9 @@ This section lists the output variables returned by the module.
 Output Variable | Default | Description
 --- | --- | ---
 adds_domain_name | mysandbox.local | The Active Directory Domain Services (AD DS) domain name.
-admin_password_secret | adminpassword | The name of the key vault secret containing the admin password.
+admin_password | | The strong password used for provisioning administrator accounts. Marked sensitive to prevent accidental exposure.
+admin_password_secret | adminpassword | The name of the key vault secret where the admin password is stored.
+admin_username | bootstrapadmin | The user name for provisioning administrator accounts.
 admin_username_secret | adminuser | The name of the key vault secret containing the admin username.
 dns_server | 10.1.1.4 | The primary DNS server IP address for the virtual network.
 private_dns_zones | | A map of private DNS zones used in the module.

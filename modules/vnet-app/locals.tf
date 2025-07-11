@@ -10,7 +10,7 @@ locals {
         "AutomationAccountName = '${var.automation_account_name}';",
         "VirtualMachineName = '${var.vm_jumpbox_win_name}';",
         "AppId = '${data.azurerm_client_config.current.client_id}';",
-        "AppSecret = '${data.azurerm_key_vault_secret.arm_client_secret.value}';",
+        "AppSecret = '${var.arm_client_secret}';",
         "DscConfigurationName = 'JumpBoxConfiguration'"
       ]
     }

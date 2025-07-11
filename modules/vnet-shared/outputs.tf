@@ -2,8 +2,17 @@ output "adds_domain_name" {
   value = var.adds_domain_name
 }
 
+output "admin_password" {
+  value     = local.admin_password
+  sensitive = true
+}
+
 output "admin_password_secret" {
   value = azurerm_key_vault_secret.adminpassword.name
+}
+
+output "admin_username" {
+  value = var.admin_username
 }
 
 output "admin_username_secret" {

@@ -1,4 +1,5 @@
 locals {
+  admin_password = "${random_string.adminpassword_first_char.result}${random_password.adminpassword_middle_chars.result}${random_string.adminpassword_last_char.result}"
   key_vault_roles = {
     kv_secrets_officer_spn = {
       principal_id         = data.azurerm_client_config.current.object_id

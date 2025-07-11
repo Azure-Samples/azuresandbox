@@ -146,36 +146,38 @@ This section lists the default values for the input variables used in this modul
 Variable | Default | Description
 --- | --- | ---
 adds_domain_name | mysandbox.local | The AD DS domain name defined in the *vnet-shared* module.
+admin_password |  | The password used when provisioning administrator accounts. This should be a strong password that meets Azure's complexity requirements.
 admin_password_secret | adminpassword | The name of the key vault secret that contains the password for the admin account. Defined in the *vnet-shared* module.
-admin username_secret | adminuser | The name of the key vault secret that contains the user name for the admin account. Defined in the *vnet-shared* module.
-automation_account_name | aa-sand-dev | The name of the Azure Automation account used for DSC. Defined in the *vnet-shared* module.
-dns_server | `10.1.1.4` | The IP address of the DNS server used for the virtual network. Defined in the *vnet-shared* module.
-firewall_route_table_id | | The ID of the route table used for the firewall. Defined in the *vnet-shared* module.
-key_vault_id | | The ID of the key vault defined in the root module.
-key_vault_name | | The name of the key vault defined in the root module.
-location | | The Azure region defined in the root module.
-resource_group_name | | The name of the resource group defined in the root module.
+admin_username | bootstrapadmin | The user name used when provisioning administrator accounts. This should conform to Windows username requirements (alphanumeric characters, periods, underscores, and hyphens, 1-20 characters).
+admin_username_secret | adminuser | The name of the key vault secret that contains the user name for the admin account. Defined in the *vnet-shared* module.
+automation_account_name |  | The name of the Azure Automation Account used for state configuration (DSC).
+dns_server |  | The IP address of the DNS server used for the virtual network. Defined in the *vnet-shared* module.
+firewall_route_table_id |  | The ID of the route table used for the firewall. Defined in the *vnet-shared* module.
+key_vault_id |  | The ID of the key vault defined in the root module.
+key_vault_name |  | The name of the key vault defined in the root module.
+location |  | The Azure region defined in the root module.
+resource_group_name |  | The name of the resource group defined in the root module.
 storage_container_name | scripts | The name of the storage container used to store scripts.
 storage_share_name | myfileshare | The name of the Azure Files share.
 storage_share_quota_gb | 1024 | The quota for the Azure Files share in GB.
-subnet_application_address_prefix | `10.2.0.0/24` | The address prefix for the application subnet.
-subnet_appservice_address_prefix | `10.2.4.0/24` | The address prefix for the app service subnet.
-subnet_database_address_prefix | `10.2.1.0/24` | The address prefix for the database subnet.
-subnet_misc_address_prefix | `10.2.3.0/24` | The address prefix for the miscellaneous subnet.
-subnet_privatelink_address_prefix | `10.2.2.0/24` | The address prefix for the private link subnet.
-tags | | The tags defined in the root module.
-unique_seed | | The unique seed used to generate unique names for resources. Defined in the root module.
-user_object_id | | The object ID of the interactive user. Defined in the root module.
-virtual_network_shared_id | | The resource ID of the shared services virtual network.  Defined in the *vnet-shared*  module.
-virtual_network_shared_name | | The name of the shared services virtual network.  Defined in the *vnet-shared* module.
-vm_jumpbox_win_image_offer | `WindowsServer` | The offer type of the virtual machine image used to create the VM.
-vm_jumpbox_win_image_publisher | `MicrosoftWindowsServer` | The publisher for the virtual machine image used to create VM.
-vm_jumpbox_win_image_sku | `2025-datacenter-azure-edition` | The SKU for the virtual machine image used to create the VM.
-vm_jumpbox_win_image_version | `Latest` | The version of the virtual machine image used to create the VM.
+subnet_application_address_prefix | 10.2.0.0/24 | The address prefix for the application subnet.
+subnet_appservice_address_prefix | 10.2.4.0/24 | The address prefix for the app service subnet.
+subnet_database_address_prefix | 10.2.1.0/24 | The address prefix for the database subnet.
+subnet_misc_address_prefix | 10.2.3.0/24 | The address prefix for the miscellaneous subnet.
+subnet_privatelink_address_prefix | 10.2.2.0/24 | The address prefix for the private link subnet.
+tags |  | The tags defined in the root module.
+unique_seed |  | The unique seed used to generate unique names for resources. Defined in the root module.
+user_object_id |  | The object ID of the interactive user. Defined in the root module.
+virtual_network_shared_id |  | The resource ID of the shared services virtual network.  Defined in the *vnet-shared*  module.
+virtual_network_shared_name |  | The name of the shared services virtual network.  Defined in the *vnet-shared* module.
+vm_jumpbox_win_image_offer | WindowsServer | The offer type of the virtual machine image used to create the VM.
+vm_jumpbox_win_image_publisher | MicrosoftWindowsServer | The publisher for the virtual machine image used to create VM.
+vm_jumpbox_win_image_sku | 2025-datacenter-azure-edition | The SKU for the virtual machine image used to create the VM.
+vm_jumpbox_win_image_version | Latest | The version of the virtual machine image used to create the VM.
 vm_jumpbox_win_name | jumpwin1 | The name of the VM.
-vm_jumpbox_win_size | `Standard_B2ls_v2` | The size of the VM.
-vm_jumpbox_win_storage_account_type | `Standard_LRS` | The storage account type used for the managed disks attached to the VM.
-vnet_address_space | `10.2.0.0/16` | The address space for the application virtual network.
+vm_jumpbox_win_size | Standard_B2ls_v2 | The size of the VM.
+vm_jumpbox_win_storage_account_type | Standard_LRS | The storage account type used for the managed disks attached to the VM.
+vnet_address_space | 10.2.0.0/16 | The address space for the application virtual network.
 vnet_name | app | The name of the application virtual network.
 
 ### Module Resources

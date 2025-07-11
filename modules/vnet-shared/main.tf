@@ -48,7 +48,7 @@ resource "azurerm_key_vault_secret" "log_primary_shared_key" {
 
 resource "azurerm_key_vault_secret" "adminpassword" {
   name            = var.admin_password_secret
-  value           = "${random_string.adminpassword_first_char.result}${random_password.adminpassword_middle_chars.result}${random_string.adminpassword_last_char.result}"
+  value           = local.admin_password
   key_vault_id    = azurerm_key_vault.this.id
   expiration_date = timeadd(timestamp(), "8760h")
   depends_on      = [time_sleep.wait_for_roles_and_public_access]
