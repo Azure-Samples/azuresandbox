@@ -12,7 +12,7 @@ variable "adds_domain_name" {
 variable "admin_password" {
   type        = string
   description = "The password used when provisioning administrator accounts. This should be a strong password that meets Azure's complexity requirements."
-  sensitive = true
+  sensitive   = true
 
   validation {
     condition     = length(var.admin_password) >= 8 && can(regex("[A-Z]", var.admin_password)) && can(regex("[a-z]", var.admin_password)) && can(regex("[0-9]", var.admin_password)) && can(regex("[!@#$%^&*()_+=\\[\\]{};':\"\\\\|,.<>/?-]", var.admin_password))
@@ -119,6 +119,11 @@ variable "location" {
     condition     = can(regex("^[a-z0-9-]+$", var.location))
     error_message = "Must be a valid Azure region name. It should only contain lowercase letters, numbers, and dashes."
   }
+}
+
+variable "private_dns_zones_vnet_shared" {
+  type        = map(any)
+  description = "A map of private DNS zones defined in vnet-shared module."
 }
 
 variable "resource_group_name" {

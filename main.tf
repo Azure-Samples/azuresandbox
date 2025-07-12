@@ -32,24 +32,25 @@ module "vnet_app" {
 
   count = var.enable_module_vnet_app ? 1 : 0
 
-  adds_domain_name            = module.vnet_shared.adds_domain_name
-  admin_password              = module.vnet_shared.admin_password
-  admin_password_secret       = module.vnet_shared.admin_password_secret
-  admin_username              = module.vnet_shared.admin_username
-  admin_username_secret       = module.vnet_shared.admin_username_secret
-  arm_client_secret           = var.arm_client_secret
-  automation_account_name     = module.vnet_shared.resource_names["automation_account"]
-  dns_server                  = module.vnet_shared.dns_server
-  firewall_route_table_id     = module.vnet_shared.resource_ids["firewall_route_table"]
-  key_vault_id                = module.vnet_shared.resource_ids["key_vault"]
-  key_vault_name              = module.vnet_shared.resource_names["key_vault"]
-  location                    = azurerm_resource_group.this.location
-  resource_group_name         = azurerm_resource_group.this.name
-  tags                        = var.tags
-  unique_seed                 = module.naming.unique-seed
-  user_object_id              = var.user_object_id
-  virtual_network_shared_id   = module.vnet_shared.resource_ids["virtual_network_shared"]
-  virtual_network_shared_name = module.vnet_shared.resource_names["virtual_network_shared"]
+  adds_domain_name              = module.vnet_shared.adds_domain_name
+  admin_password                = module.vnet_shared.admin_password
+  admin_password_secret         = module.vnet_shared.admin_password_secret
+  admin_username                = module.vnet_shared.admin_username
+  admin_username_secret         = module.vnet_shared.admin_username_secret
+  arm_client_secret             = var.arm_client_secret
+  automation_account_name       = module.vnet_shared.resource_names["automation_account"]
+  dns_server                    = module.vnet_shared.dns_server
+  firewall_route_table_id       = module.vnet_shared.resource_ids["firewall_route_table"]
+  key_vault_id                  = module.vnet_shared.resource_ids["key_vault"]
+  key_vault_name                = module.vnet_shared.resource_names["key_vault"]
+  location                      = azurerm_resource_group.this.location
+  private_dns_zones_vnet_shared = module.vnet_shared.private_dns_zones
+  resource_group_name           = azurerm_resource_group.this.name
+  tags                          = var.tags
+  unique_seed                   = module.naming.unique-seed
+  user_object_id                = var.user_object_id
+  virtual_network_shared_id     = module.vnet_shared.resource_ids["virtual_network_shared"]
+  virtual_network_shared_name   = module.vnet_shared.resource_names["virtual_network_shared"]
 
   depends_on = [module.vnet_shared.resource_ids] # Ensure the domain controller VM is provisioned
 }

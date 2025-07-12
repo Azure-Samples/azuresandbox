@@ -10,7 +10,7 @@ output "private_dns_zones" {
 output "resource_ids" {
   value = {
     storage_account          = azurerm_storage_account.this.id
-    storage_share            = azurerm_storage_share.this.id 
+    storage_share            = azurerm_storage_share.this.id
     virtual_machine_jumpwin1 = azurerm_windows_virtual_machine.this.id
     virtual_network_app      = azurerm_virtual_network.this.id
   }
