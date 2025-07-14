@@ -60,17 +60,17 @@ module "vm_jumpbox_linux" {
 
   count = var.enable_module_vm_jumpbox_linux ? 1 : 0
 
-  adds_domain_name      = module.vnet_shared.adds_domain_name
-  admin_username_secret = module.vnet_shared.admin_username_secret
-  dns_server            = module.vnet_shared.dns_server
-  key_vault_id          = module.vnet_shared.resource_ids["key_vault"]
-  key_vault_name        = module.vnet_shared.resource_names["key_vault"]
-  location              = azurerm_resource_group.this.location
-  resource_group_name   = azurerm_resource_group.this.name
-  storage_account_name  = module.vnet_app[0].resource_names["storage_account"]
-  storage_share_name    = module.vnet_app[0].resource_names["storage_share"]
-  subnet_id             = module.vnet_app[0].subnets["snet-app-01"].id
-  tags                  = var.tags
+  adds_domain_name     = module.vnet_shared.adds_domain_name
+  admin_username       = module.vnet_shared.admin_username
+  dns_server           = module.vnet_shared.dns_server
+  key_vault_id         = module.vnet_shared.resource_ids["key_vault"]
+  key_vault_name       = module.vnet_shared.resource_names["key_vault"]
+  location             = azurerm_resource_group.this.location
+  resource_group_name  = azurerm_resource_group.this.name
+  storage_account_name = module.vnet_app[0].resource_names["storage_account"]
+  storage_share_name   = module.vnet_app[0].resource_names["storage_share"]
+  subnet_id            = module.vnet_app[0].subnets["snet-app-01"].id
+  tags                 = var.tags
 
   depends_on = [module.vnet_app[0].azure_files_config_vm_extension_id] # Ensure that Azure Files is configured
 }

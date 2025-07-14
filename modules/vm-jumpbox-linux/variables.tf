@@ -8,13 +8,13 @@ variable "adds_domain_name" {
   }
 }
 
-variable "admin_username_secret" {
+variable "admin_username" {
   type        = string
-  description = "The name of the key vault secret containing the admin username"
+  description = "The user name used when provisioning administrator accounts. This should conform to Windows username requirements (alphanumeric characters, periods, underscores, and hyphens, 1-20 characters)."
 
   validation {
-    condition     = can(regex("^[a-zA-Z0-9-]{1,127}$", var.admin_username_secret))
-    error_message = "Must conform to Azure Key Vault secret naming requirements: it can only contain alphanumeric characters and hyphens, and must be between 1 and 127 characters long."
+    condition     = can(regex("^[a-zA-Z0-9._-]{1,20}$", var.admin_username))
+    error_message = "Must conform to Windows username requirements: it can only contain alphanumeric characters, periods (.), underscores (_), and hyphens (-), and must be between 1 and 20 characters long."
   }
 }
 
