@@ -11,6 +11,10 @@ resource "azurerm_key_vault" "this" {
   sku_name                      = "standard"
   enable_rbac_authorization     = true
   public_network_access_enabled = false
+
+  lifecycle {
+    ignore_changes = [public_network_access_enabled] # Avoid triggering recreation of resources in dependent modules if public access is temporarily enabled for terraform plan / apply operations
+  }
 }
 
 resource "azurerm_role_assignment" "roles" {
