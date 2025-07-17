@@ -22,6 +22,7 @@ module "vnet_shared" {
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
   tags                = var.tags
+  unique_seed         = module.naming.unique-seed
   user_object_id      = var.user_object_id
 }
 #endregion

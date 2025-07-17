@@ -164,6 +164,16 @@ variable "tags" {
   }
 }
 
+variable "unique_seed" {
+  type        = string
+  description = "A unique seed to be used for generating unique names for resources. This should be a string that is unique to the environment or deployment."
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9-]{1,64}$", var.unique_seed))
+    error_message = "Must only contain alphanumeric characters and hyphens (-), and must be between 1 and 32 characters long."
+  }
+}
+
 variable "user_object_id" {
   type        = string
   description = "The object id of the user in Microsoft Entra ID."
