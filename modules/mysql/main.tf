@@ -1,22 +1,10 @@
-#region data
-data "azurerm_key_vault_secret" "adminpassword" {
-  name         = var.admin_password_secret
-  key_vault_id = var.key_vault_id
-}
-
-data "azurerm_key_vault_secret" "adminuser" {
-  name         = var.admin_username_secret
-  key_vault_id = var.key_vault_id
-}
-#endregion 
-
 #region resources
 resource "azurerm_mysql_flexible_server" "this" {
   name                   = module.naming.mysql_server.name_unique
   resource_group_name    = var.resource_group_name
   location               = var.location
-  administrator_login    = data.azurerm_key_vault_secret.adminuser.value
-  administrator_password = data.azurerm_key_vault_secret.adminpassword.value
+  administrator_login    = var.admin_username
+  administrator_password = var.admin_password
   sku_name               = var.mysql_sku_name
 }
 

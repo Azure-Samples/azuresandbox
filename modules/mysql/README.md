@@ -76,9 +76,8 @@ This section lists input variables used in this module. Defaults can be overridd
 
 Variable | Default | Description
 --- | --- | ---
-admin_password_secret | adminpassword | The name of the key vault secret that contains the password for the admin account. Defined in the vnet-shared module.
-admin_username_secret | adminuser | The name of the key vault secret that contains the user name for the admin account. Defined in the vnet-shared module.
-key_vault_id | | The ID of the key vault defined in the root module.
+admin_password |  | A strong password used for admin accounts. Defined in the vnet-shared module.
+admin_username | bootstrapadmin | The user name used for admin accounts. Defined in the vnet-shared module.
 location | | The name of the Azure Region where resources will be provisioned. Defined in the root module.
 mysql_database_name | testdb | The name of the Azure MySQL Database to be provisioned.
 mysql_sku_name | B_Gen5_1 | The SKU name for the Azure MySQL Flexible Server.

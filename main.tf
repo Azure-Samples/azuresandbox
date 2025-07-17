@@ -123,14 +123,13 @@ module "mysql" {
 
   count = var.enable_module_mysql ? 1 : 0
 
-  admin_password_secret = module.vnet_shared.admin_password_secret
-  admin_username_secret = module.vnet_shared.admin_username_secret
-  key_vault_id          = module.vnet_shared.resource_ids["key_vault"]
-  location              = azurerm_resource_group.this.location
-  resource_group_name   = azurerm_resource_group.this.name
-  subnet_id             = module.vnet_app[0].subnets["snet-privatelink-01"].id
-  tags                  = var.tags
-  unique_seed           = module.naming.unique-seed
+  admin_password      = module.vnet_shared.admin_password
+  admin_username      = module.vnet_shared.admin_username
+  location            = azurerm_resource_group.this.location
+  resource_group_name = azurerm_resource_group.this.name
+  subnet_id           = module.vnet_app[0].subnets["snet-privatelink-01"].id
+  tags                = var.tags
+  unique_seed         = module.naming.unique-seed
 
   depends_on = [module.vnet_app[0].resource_ids] # Ensure vnet-app module resources are provisioned
 }
