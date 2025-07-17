@@ -1,3 +1,4 @@
+#region resources
 resource "azurerm_windows_virtual_machine" "this" {
   name                       = var.vm_mssql_win_name
   resource_group_name        = var.resource_group_name
@@ -70,7 +71,7 @@ resource "azurerm_virtual_machine_extension" "this" {
   auto_upgrade_minor_version = true
   depends_on = [
     azurerm_virtual_machine_data_disk_attachment.attachments,
-    time_sleep.wait_for_roles,
+    time_sleep.wait_for_roles_and_public_access,
     azurerm_storage_blob.remote_scripts
   ]
 
@@ -85,10 +86,4 @@ resource "azurerm_virtual_machine_extension" "this" {
     managedIdentity  = {}
   })
 }
-
-resource "time_sleep" "wait_for_roles" {
-  create_duration = "2m"
-  depends_on = [
-    azurerm_role_assignment.assignments
-  ]
-}
+#endregion
