@@ -5,8 +5,8 @@ resource "azurerm_windows_virtual_machine" "virtual_machines" {
   resource_group_name        = var.resource_group_name
   location                   = var.location
   size                       = var.vm_devops_win_size
-  admin_username             = data.azurerm_key_vault_secret.adminuser.value
-  admin_password             = data.azurerm_key_vault_secret.adminpassword.value
+  admin_username             = var.admin_username
+  admin_password             = var.admin_password
   network_interface_ids      = [azurerm_network_interface.nics[each.key].id]
   patch_assessment_mode      = "AutomaticByPlatform"
   patch_mode                 = var.vm_devops_win_patch_mode

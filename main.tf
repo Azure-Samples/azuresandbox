@@ -213,8 +213,9 @@ module "vm_devops_win" {
 
   count = var.enable_module_vm_devops_win ? 1 : 0
 
-  admin_password_secret   = module.vnet_shared.admin_password_secret
-  admin_username_secret   = module.vnet_shared.admin_username_secret
+  admin_password          = module.vnet_shared.admin_password
+  admin_username          = module.vnet_shared.admin_username
+  arm_client_secret       = var.arm_client_secret
   automation_account_name = module.vnet_shared.resource_names["automation_account"]
   key_vault_id            = module.vnet_shared.resource_ids["key_vault"]
   location                = azurerm_resource_group.this.location

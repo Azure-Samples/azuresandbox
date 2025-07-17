@@ -86,8 +86,9 @@ This section lists the input variables and default values used in this module. D
 
 Variable | Default | Description
 --- | --- | ---
-admin_password_secret |  | The name of the key vault secret containing the admin password
-admin_username_secret |  | The name of the key vault secret containing the admin username
+admin_password | | A strong password used when provisioning administrator accounts. Defined in vnet-shared module.
+admin_username | bootstrapadmin | The user name used when provisioning administrator accounts. Defined in vnet-shared module.
+arm_client_secret | | The password for the service principle. Provided interactively or by setting the TF_VAR_arm_client_secret environment variable.
 automation_account_name |  | The name of the Azure Automation Account used for state configuration (DSC).
 key_vault_id |  | The existing key vault where secrets are stored
 location |  | The name of the Azure Region where resources will be provisioned.
