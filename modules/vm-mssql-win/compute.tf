@@ -3,8 +3,8 @@ resource "azurerm_windows_virtual_machine" "this" {
   resource_group_name        = var.resource_group_name
   location                   = var.location
   size                       = var.vm_mssql_win_size
-  admin_username             = data.azurerm_key_vault_secret.adminuser.value
-  admin_password             = data.azurerm_key_vault_secret.adminpassword.value
+  admin_username             = var.admin_username
+  admin_password             = var.admin_password
   network_interface_ids      = [azurerm_network_interface.this.id]
   patch_assessment_mode      = "AutomaticByPlatform"
   provision_vm_agent         = true
