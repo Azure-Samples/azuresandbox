@@ -315,8 +315,9 @@ Variable | Default | Description
 --- | --- | ---
 adds_domain_name | myonprem.local | The AD DS domain name for the simulated on-premises environment.
 adds_domain_name_cloud | mysandbox.local | The AD DS domain name for the cloud sandbox environment.
-admin_password_secret | adminpassword | The name of the key vault secret containing the admin password
-admin_username_secret | adminuser | The name of the key vault secret containing the admin username
+admin_password | | Strong password for admin accounts. Defined in vnet-shared module.
+admin_username | bootstrapadmin | The username used for provisioning administrator accounts. *onprem* is prepended to differentiate the accounts in this module.
+arm_client_secret | | The password for the service principal used to authenticate with Azure. Defined interactively or using TF_VAR_arm_client_secret environment variable.
 automation_account_name | aa-sand-dev | The name of the Azure Automation Account used for state configuration (DSC).
 dns_server_cloud | `10.1.1.4` | The IP address of the sandbox DNS server.
 key_vault_id |  | The ID of the key vault defined in the root module.
