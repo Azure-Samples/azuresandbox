@@ -23,12 +23,12 @@ This section describes how to test the module after deployment.
   * From *jumpwin1*, run the Windows PowerShell command:
   
     ```powershell
-    Resolve-DnsName YOUR-AZURE-SQL-SERVER-NAME-HERE.database.windows.net
+    Resolve-DnsName <azure-sql-server-name-here>.database.windows.net
     ```
 
   * Verify the *IP4Address* returned is within the subnet IP address prefix for *vnet_app[0].subnets["snet-privatelink-01"]*, e.g. `10.2.2.*`.
 * From *jumpwin1*, test SQL Server Connectivity with SQL Server Management Studio (SSMS)
-  * Navigate to *Start* > *Microsoft SQL Server Tools 20* > *Microsoft SQL Server Management Studio 20*
+  * Navigate to *Start* > *Microsoft SQL Server Tools 21* > *Microsoft SQL Server Management Studio 21*
   * Connect to the network isolated Azure SQL Database server
     * Server properties:
       * Server name: *YOUR-AZURE-SQL-SERVER-NAME-HERE.database.windows.net*
@@ -77,9 +77,8 @@ This section lists input variables used in this module. Defaults can be overridd
 
 Variable | Default | Description
 --- | --- | ---
-admin_password_secret | adminpassword | The name of the key vault secret that contains the password for the admin account. Defined in the vnet-shared module.
-admin_username_secret | adminuser | The name of the key vault secret that contains the user name for the admin account. Defined in the vnet-shared module.
-key_vault_id | | The ID of the key vault defined in the root module.
+admin_password | | The strong password used when provisioning administrator accounts. Set in the vnet-shared module
+admin_username | bootstrapadmin | The user name used when provisioning administrator accounts. Set in the vnet-shared module.
 location | | The name of the Azure Region where resources will be provisioned.
 mssql_database_name | testdb | The name of the Azure SQL Database to be provisioned.
 resource_group_name | | The name of the resource group defined in the root module.

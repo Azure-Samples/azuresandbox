@@ -30,6 +30,8 @@ resource "azurerm_virtual_network_gateway" "this" {
   generation                 = "Generation1"
   private_ip_address_enabled = false
 
+  depends_on = [ azurerm_subnet.subnets ]
+
   ip_configuration {
     name                          = "Primary"
     subnet_id                     = azurerm_subnet.subnets["GatewaySubnet"].id
@@ -57,6 +59,8 @@ resource "azurerm_local_network_gateway" "this" {
   location            = var.location
   gateway_address     = tolist(azurerm_vpn_gateway.this.bgp_settings[0].instance_0_bgp_peering_address[0].tunnel_ips)[1]
 
+  depends_on = [ azurerm_subnet.subnets ]
+
   bgp_settings {
     asn                 = azurerm_vpn_gateway.this.bgp_settings[0].asn
     bgp_peering_address = tolist(azurerm_vpn_gateway.this.bgp_settings[0].instance_0_bgp_peering_address[0].default_ips)[0]
@@ -72,7 +76,9 @@ resource "azurerm_virtual_network_gateway_connection" "this" {
   type                       = "IPsec"
   connection_protocol        = "IKEv2"
   enable_bgp                 = true
-  shared_key                 = data.azurerm_key_vault_secret.adminpassword.value
+  shared_key                 = var.admin_password
+
+  depends_on = [ azurerm_subnet.subnets ]
 }
 #endregion
 
@@ -173,7 +179,7 @@ resource "azurerm_vpn_gateway_connection" "this" {
     vpn_site_link_id = azurerm_vpn_site.this.link[0].id
     bgp_enabled      = true
     protocol         = "IKEv2"
-    shared_key       = data.azurerm_key_vault_secret.adminpassword.value
+    shared_key       = var.admin_password
   }
 }
 #endregion

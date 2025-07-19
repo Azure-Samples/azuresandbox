@@ -32,6 +32,7 @@ Don't forget to disconnect from the point-to-site VPN when you are finished test
 The point-to-site VPN gateway uses a self-signed root certificate to authenticate the remote client. This root certificate and a related client certificate must be installed on the remote client machine to authenticate the VPN connection.
 
 * Perform the following steps from your Terraform execution environment:
+  * Temporarily enable public network access to the Azure Key Vault used by the sandbox environment. This is required to export the root and client certificates.
   * Export the root certificate and client certificate.
 
     ```bash
@@ -173,14 +174,14 @@ Use the following sections to test secure VPN connectivity the remote Windows cl
 * From a Windows PowerShell command prompt run the following command:
 
   ```powershell
-  Resolve-DnsName YOUR-SANDBOX-STORAGE-ACCOUNT-NAME-HERE.file.core.windows.net
+  Resolve-DnsName <storage-account-name-here>.file.core.windows.net
   ```
 
 * Verify the *IP4Address* returned is in the *vnet_app[0].subnets["snet-privatelink-01"]* subnet.
 * From a Windows PowerShell command prompt run the following command:
 
   ```powershell
-  net use z: \\YOUR-SANDBOX-STORAGE-ACCOUNT-NAME-HERE.file.core.windows.net\myfileshare /USER:bootstrapadmin@mysandbox.local
+  net use z: \\<storage-account-name-here>.file.core.windows.net\myfileshare /USER:bootstrapadmin@mysandbox.local
   ```
 
   * When prompted for a password, use the value of the *adminpassword* secret in sandbox environment key vault.
@@ -227,7 +228,7 @@ In order to complete this smoke test, SQL Server Management Studio must be insta
 
   * Verify the IP4Address returned is in the *vnet_app[0].subnets["snet-db-01"]* subnet.
   * Verify the SQL Server Management studio is installed.
-  * Navigate to *Start* > *Microsoft SQL Server Tools 20* > *Microsoft SQL Server Management Studio 20*
+  * Navigate to *Start* > *Microsoft SQL Server Tools 21* > *Microsoft SQL Server Management Studio 21*
   * Connect to the default instance of SQL Server installed on *mssqlwin1* using the following values:
     * Server name:
 
@@ -254,7 +255,7 @@ In order to complete this smoke test, SQL Server Management Studio must be insta
 * From a Windows PowerShell command prompt run the following command:
 
   ```powershell
-  Resolve-DnsName YOUR-MSSQL-SERVER-NAME-HERE.database.windows.net
+  Resolve-DnsName <mssql-server-name-here>.database.windows.net
   ```
 
 * Verify the *IP4Address* returned is in the *vnet_app[0].subnets["snet-privatelink-01"]* subnet.
@@ -263,7 +264,7 @@ In order to complete this smoke test, SQL Server Management Studio must be insta
   * Server name:
   
     ```plaintext
-    YOUR-MSSQL-SERVER-NAME-HERE.database.windows.net
+    <mssql-server-name-here>.database.windows.net
     ```
 
   * Authentication: *SQL Server Authentication*
@@ -286,7 +287,7 @@ In order to complete this smoke test, MySQL Workbench must be installed on the r
 * Using Windows PowerShell, run the following command:
 
   ```powershell
-  Resolve-DnsName YOUR-MYSQL-SERVER-NAME-HERE.mysql.database.azure.com
+  Resolve-DnsName <mysql-server-name-here>.mysql.database.azure.com
   ```
 
 * Verify the *IP4Address* returned is in the *vnet_app[0].subnets["snet-privatelink-01"]* subnet.
@@ -296,7 +297,7 @@ In order to complete this smoke test, MySQL Workbench must be installed on the r
   * Hostname:
   
     ```plaintext
-    YOUR-MYSQL-SERVER-NAME-HERE.mysql.database.azure.com
+    <mysql-server-name-here>.mysql.database.azure.com
     ```
 
   * Port: *3306*

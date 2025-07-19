@@ -8,7 +8,7 @@ resource "azurerm_storage_blob" "remote_scripts" {
   type                   = "Block"
   source                 = "./${path.module}/scripts/${each.value.name}"
 
-  depends_on = [time_sleep.wait_for_public_access]
+  depends_on = [time_sleep.wait_for_roles_and_public_access]
 }
 #endregion
 
@@ -33,8 +33,11 @@ resource "azapi_update_resource" "disable_public_access" {
   lifecycle { ignore_changes = all }
 }
 
-resource "time_sleep" "wait_for_public_access" {
+resource "time_sleep" "wait_for_roles_and_public_access" {
   create_duration = "2m"
-  depends_on      = [azapi_update_resource.enable_public_access]
+  depends_on = [
+    azurerm_role_assignment.assignments,
+    azapi_update_resource.enable_public_access
+  ]
 }
 #endregion

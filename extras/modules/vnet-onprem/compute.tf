@@ -4,8 +4,8 @@ resource "azurerm_windows_virtual_machine" "vm_adds" {
   resource_group_name        = var.resource_group_name
   location                   = var.location
   size                       = var.vm_adds_size
-  admin_username             = data.azurerm_key_vault_secret.adminuser.value
-  admin_password             = data.azurerm_key_vault_secret.adminpassword.value
+  admin_username             = "onprem${var.admin_username}"
+  admin_password             = var.admin_password
   network_interface_ids      = [azurerm_network_interface.vm_adds.id]
   patch_assessment_mode      = "AutomaticByPlatform"
   patch_mode                 = "AutomaticByPlatform"
@@ -37,8 +37,8 @@ resource "azurerm_windows_virtual_machine" "vm_jumpbox_win" {
   resource_group_name        = var.resource_group_name
   location                   = var.location
   size                       = var.vm_jumpbox_win_size
-  admin_username             = data.azurerm_key_vault_secret.adminuser.value
-  admin_password             = data.azurerm_key_vault_secret.adminpassword.value
+  admin_username             = "onprem${var.admin_username}"
+  admin_password             = var.admin_password
   network_interface_ids      = [azurerm_network_interface.vm_jumpbox_win.id]
   patch_assessment_mode      = "AutomaticByPlatform"
   patch_mode                 = "AutomaticByPlatform"

@@ -7,9 +7,7 @@ output "client_cert_pem" {
 output "resource_ids" {
   value = merge(
     {
-      key_vault               = azurerm_key_vault.this.id
-      log_analytics_workspace = azurerm_log_analytics_workspace.this.id
-      resource_group          = azurerm_resource_group.this.id
+      resource_group = azurerm_resource_group.this.id
     },
     module.vnet_shared.resource_ids,
     length(module.vnet_app) > 0 ? module.vnet_app[0].resource_ids : {},
@@ -27,9 +25,7 @@ output "resource_ids" {
 output "resource_names" {
   value = merge(
     {
-      key_vault               = azurerm_key_vault.this.name
-      log_analytics_workspace = azurerm_log_analytics_workspace.this.name
-      resource_group          = azurerm_resource_group.this.name
+      resource_group = azurerm_resource_group.this.name
     },
     module.vnet_shared.resource_names,
     length(module.vnet_app) > 0 ? module.vnet_app[0].resource_names : {},

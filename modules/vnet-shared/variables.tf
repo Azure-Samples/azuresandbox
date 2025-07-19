@@ -42,13 +42,14 @@ variable "admin_username_secret" {
   }
 }
 
-variable "key_vault_id" {
+variable "arm_client_secret" {
   type        = string
-  description = "The existing key vault where secrets are stored"
+  description = "The password for the service principal used for authenticating with Azure. Set interactively or using an environment variable 'TF_VAR_arm_client_secret'."
+  sensitive   = true
 
   validation {
-    condition     = can(regex("^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[a-zA-Z0-9-_()]+/providers/Microsoft.KeyVault/vaults/[a-zA-Z0-9-]+$", var.key_vault_id))
-    error_message = "Must be a valid Azure Resource ID for a Key Vault. It should follow the format '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.KeyVault/vaults/{keyVaultName}'."
+    condition     = length(var.arm_client_secret) >= 8
+    error_message = "Must be at least 8 characters long."
   }
 }
 
@@ -59,6 +60,17 @@ variable "location" {
   validation {
     condition     = can(regex("^[a-z0-9-]+$", var.location))
     error_message = "Must be a valid Azure region name. It should only contain lowercase letters, numbers, and dashes (e.g., 'eastus', 'westus2', 'centralus')."
+  }
+}
+
+variable "log_analytics_workspace_retention_days" {
+  type        = string
+  description = "The retention period for the new log analytics workspace."
+  default     = "30"
+
+  validation {
+    condition     = can(regex("^(30|31|60|90|120|180|270|365|550|730)$", var.log_analytics_workspace_retention_days))
+    error_message = "Must be one of the valid retention periods: 30, 31, 60, 90, 120, 180, 270, 365, 550, or 730 days."
   }
 }
 
@@ -127,6 +139,17 @@ variable "subnet_misc_02_address_prefix" {
   }
 }
 
+variable "subnet_privatelink_address_prefix" {
+  type        = string
+  description = "The address prefix for the PrivateLink subnet."
+  default     = "10.1.5.0/24"
+
+  validation {
+    condition     = can(cidrhost(var.subnet_privatelink_address_prefix, 0))
+    error_message = "Must be valid IPv4 CIDR."
+  }
+}
+
 variable "tags" {
   type        = map(any)
   description = "The tags in map format to be used when creating new resources."
@@ -138,6 +161,26 @@ variable "tags" {
       can(regex("^[a-zA-Z0-9._ -]{0,256}$", value))
     ])
     error_message = "Each tag key must be 1-512 characters long and consist of alphanumeric characters, periods (.), underscores (_), or hyphens (-). Each tag value must be 0-256 characters long and consist of alphanumeric characters, periods (.), underscores (_), spaces, or hyphens (-)."
+  }
+}
+
+variable "unique_seed" {
+  type        = string
+  description = "A unique seed to be used for generating unique names for resources. This should be a string that is unique to the environment or deployment."
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9-]{1,64}$", var.unique_seed))
+    error_message = "Must only contain alphanumeric characters and hyphens (-), and must be between 1 and 32 characters long."
+  }
+}
+
+variable "user_object_id" {
+  type        = string
+  description = "The object id of the user in Microsoft Entra ID."
+
+  validation {
+    condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.user_object_id))
+    error_message = "Must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
   }
 }
 

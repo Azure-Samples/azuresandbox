@@ -37,7 +37,7 @@ This section describes how to test the module after deployment.
 
   * Verify the IPAddress returned is within the subnet IP address prefix for *vnet_app[0].subnets["snet-db-01"]*, e.g. `10.2.1.*`.
 * From *jumpwin1*, test SQL Server Connectivity with SQL Server Management Studio (SSMS)
-  * Navigate to *Start* > *Microsoft SQL Server Tools 20* > *Microsoft SQL Server Management Studio 20*
+  * Navigate to *Start* > *Microsoft SQL Server Tools 21* > *Microsoft SQL Server Management Studio 21*
   * Connect to the default instance of SQL Server installed on the SQL Server virtual machine using the following settings:
     * Server
       * Server type: *Database Engine*
@@ -98,8 +98,11 @@ This section lists input variables used in this module. Defaults can be overridd
 Variable | Default | Description
 --- | --- | ---
 adds_domain_name | mysandbox.local | The domain name defined in the vnet-shared module.
+admin_password | | The password used when provisioning administrator accounts. This should conform to Windows password requirements (uppercase, lowercase, number, special character, 8-16 characters). Defined in the vnet-shared module.
 admin_password_secret | adminpassword | The name of the key vault secret that contains the password for the admin account. Defined in the vnet-shared module.
+admin_username | bootstrapadmin | The user name used when provisioning administrator accounts. This should conform to Windows username requirements (alphanumeric characters, periods, underscores, and hyphens, 1-20 characters). Defined in the vnet-shared module.
 admin_username_secret | adminuser | The name of the key vault secret that contains the user name for the admin account. Defined in the vnet-shared module.
+arm_client_secret | | The client secret used to authenticate with the Azure Resource Manager API. Set interactively or using *TF_VAR_arm_client_secret* environment variable.
 automation_account_name | aa-sand-dev | The name of the Azure Automation Account used for state configuration (DSC). Defined in the vnet-shared module.
 key_vault_id | | The ID of the key vault defined in the root module.
 key_vault_name | | The name of the key vault defined in the root module.

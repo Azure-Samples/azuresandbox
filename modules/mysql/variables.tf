@@ -1,30 +1,21 @@
-variable "admin_password_secret" {
+variable "admin_password" {
   type        = string
-  description = "The name of the key vault secret containing the admin password"
+  description = "The password used when provisioning administrator accounts. This should be a strong password that meets Azure's complexity requirements."
+  sensitive   = true
 
   validation {
-    condition     = can(regex("^[a-zA-Z0-9-]{1,127}$", var.admin_password_secret))
-    error_message = "Must conform to Azure Key Vault secret naming requirements: it can only contain alphanumeric characters and hyphens, and must be between 1 and 127 characters long."
+    condition     = length(var.admin_password) >= 8 && can(regex("[A-Z]", var.admin_password)) && can(regex("[a-z]", var.admin_password)) && can(regex("[0-9]", var.admin_password)) && can(regex("[!@#$%^&*()_+=\\[\\]{};':\"\\\\|,.<>/?-]", var.admin_password))
+    error_message = "Password must be at least 8 characters long and include uppercase, lowercase, number, and special character."
   }
 }
 
-variable "admin_username_secret" {
+variable "admin_username" {
   type        = string
-  description = "The name of the key vault secret containing the admin username"
+  description = "The user name used when provisioning administrator accounts. This should conform to Windows username requirements (alphanumeric characters, periods, underscores, and hyphens, 1-20 characters)."
 
   validation {
-    condition     = can(regex("^[a-zA-Z0-9-]{1,127}$", var.admin_username_secret))
-    error_message = "Must conform to Azure Key Vault secret naming requirements: it can only contain alphanumeric characters and hyphens, and must be between 1 and 127 characters long."
-  }
-}
-
-variable "key_vault_id" {
-  type        = string
-  description = "The existing key vault where secrets are stored"
-
-  validation {
-    condition     = can(regex("^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[a-zA-Z0-9-_()]+/providers/Microsoft.KeyVault/vaults/[a-zA-Z0-9-]+$", var.key_vault_id))
-    error_message = "Must be a valid Azure Resource ID for a Key Vault. It should follow the format '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.KeyVault/vaults/{keyVaultName}'."
+    condition     = can(regex("^[a-zA-Z0-9._-]{1,20}$", var.admin_username))
+    error_message = "Must conform to Windows username requirements: it can only contain alphanumeric characters, periods (.), underscores (_), and hyphens (-), and must be between 1 and 20 characters long."
   }
 }
 

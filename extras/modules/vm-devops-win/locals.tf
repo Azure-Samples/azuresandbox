@@ -10,7 +10,7 @@ locals {
         "VmDevopsWinName = '${var.vm_devops_win_name}';",
         "VmDevopsWinInstanceCount = '${var.vm_devops_win_instances}';",
         "AppId = '${data.azurerm_client_config.current.client_id}';",
-        "AppSecret = '${data.azurerm_key_vault_secret.arm_client_secret.value}';"
+        "AppSecret = '${var.arm_client_secret}';"
       ]
     }
 
@@ -23,7 +23,7 @@ locals {
         "Location = '${var.location}';",
         "AutomationAccountName = '${var.automation_account_name}';",
         "AppId = '${data.azurerm_client_config.current.client_id}';",
-        "AppSecret = '${data.azurerm_key_vault_secret.arm_client_secret.value}';",
+        "AppSecret = '${var.arm_client_secret}';",
         "DscConfigurationName = 'VmDevopsWinConfiguration';"
       ]
     }

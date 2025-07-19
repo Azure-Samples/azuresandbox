@@ -156,7 +156,7 @@ function Register-DscNode {
     $dscNodeStatus = $dscNode.Status
     Write-Log "DSC node registration id '$dscNodeId' found with status '$dscNodeStatus'..."    
     
-    $maxRetries = 30
+    $maxRetries = 60
     $retryCount = 0
     $statusCompliant = "Compliant"
 

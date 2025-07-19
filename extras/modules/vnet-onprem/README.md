@@ -39,17 +39,14 @@ This smoke testing is divided into two sections:
 
 * From the client environment, navigate to *portal.azure.com* > *Virtual machines* > *jumpwin1*
   * Click *Connect*, then click *Connect via Bastion*
-  * For *Authentication Type* choose *Password from Azure Key Vault*
+  * For *Authentication Type* choose *VM Password*
   * For *username* enter the UPN of the domain admin, which by default is:
   
     ```plaintext
     bootstrapadmin@mysandbox.local
     ```
 
-  * For *Azure Key Vault Secret* specify the following values:
-    * For *Subscription* choose the same Azure subscription used to provision the sandbox environment.
-    * For *Azure Key Vault* choose the key vault associated with the sandbox environment, e.g. *kv-sand-dev-xxxxxxxx*.
-    * For *Azure Key Vault Secret* choose *adminpassword*
+  * For *VM Password*, enter the value of the *adminpassword* secret stored in the Azure Key Vault associated with the sandbox environment.
   * Click *Connect*
   * If you see a prompt for allowing access to the clipboard, click *Allow*.
 
@@ -73,7 +70,7 @@ This smoke testing is divided into two sections:
   * For *User name*, enter the following value:
   
     ```plaintext
-    bootstrapadmin@myonprem.local
+    onprembootstrapadmin@myonprem.local
     ```
 
   * Click *Connect*
@@ -118,7 +115,7 @@ This smoke testing uses the RDP connection to *jumpwin2* established previously 
 * From a Windows PowerShell command prompt run the following command:
 
   ```powershell
-  Resolve-DnsName YOUR-SANDBOX-STORAGE-ACCOUNT-NAME-HERE.file.core.windows.net
+  Resolve-DnsName <your-storage-account-name>.file.core.windows.net
   ```
 
 * Verify the *IP4Address* returned is in the *snet-privatelink-01* subnet, e.g. `10.2.2.5`.
@@ -127,7 +124,7 @@ This smoke testing uses the RDP connection to *jumpwin2* established previously 
 
   ```powershell
   # Replace FQDN with the value copied previously.
-  net use z: \\stxxxxxxxxxxx.file.core.windows.net\myfileshare /USER:bootstrapadmin@mysandbox.local
+  net use z: \\<your-storage-account-name>.file.core.windows.net\myfileshare /USER:bootstrapadmin@mysandbox.local
   ```
 
 * For *Password*, enter the value of the *adminpassword* secret in key vault.
@@ -202,7 +199,7 @@ In order to complete this smoke test, SQL Server Management Studio must be insta
 * From a Windows PowerShell command prompt run the following command:
 
   ```powershell
-  Resolve-DnsName YOUR-MSSQL-SERVER-NAME-HERE.database.windows.net
+  Resolve-DnsName <your-mssql-server-name-here>.database.windows.net
   ```
 
 * Verify the *IP4Address* returned is in the *snet-privatelink-01* subnet.
@@ -211,7 +208,7 @@ In order to complete this smoke test, SQL Server Management Studio must be insta
   * Server name:
   
     ```plaintext
-    YOUR-MSSQL-SERVER-NAME-HERE.database.windows.net
+    <your-mssql-server-name-here>.database.windows.net
     ```
 
   * Authentication: *SQL Server Authentication*
@@ -234,7 +231,7 @@ In order to complete this smoke test, MySQL Workbench must be installed on *jump
 * Using Windows PowerShell, run the following command:
 
   ```powershell
-  Resolve-DnsName YOUR-MYSQL-SERVER-NAME-HERE.mysql.database.azure.com
+  Resolve-DnsName <your-mysql-server-name-here>.mysql.database.azure.com
   ```
 
 * Verify the *IP4Address* returned is in the *snet-privatelink-01* subnet, e.g. `10.2.2.7`.
@@ -244,7 +241,7 @@ In order to complete this smoke test, MySQL Workbench must be installed on *jump
   * Hostname:
   
     ```plaintext
-    YOUR-MYSQL-SERVER-NAME-HERE.mysql.database.azure.com
+    <your-mysql-server-name-here>.mysql.database.azure.com
     ```
 
   * Port: *3306*
@@ -315,8 +312,9 @@ Variable | Default | Description
 --- | --- | ---
 adds_domain_name | myonprem.local | The AD DS domain name for the simulated on-premises environment.
 adds_domain_name_cloud | mysandbox.local | The AD DS domain name for the cloud sandbox environment.
-admin_password_secret | adminpassword | The name of the key vault secret containing the admin password
-admin_username_secret | adminuser | The name of the key vault secret containing the admin username
+admin_password | | Strong password for admin accounts. Defined in vnet-shared module.
+admin_username | bootstrapadmin | The username used for provisioning administrator accounts. *onprem* is prepended to differentiate the accounts in this module.
+arm_client_secret | | The password for the service principal used to authenticate with Azure. Defined interactively or using TF_VAR_arm_client_secret environment variable.
 automation_account_name | aa-sand-dev | The name of the Azure Automation Account used for state configuration (DSC).
 dns_server_cloud | `10.1.1.4` | The IP address of the sandbox DNS server.
 key_vault_id |  | The ID of the key vault defined in the root module.

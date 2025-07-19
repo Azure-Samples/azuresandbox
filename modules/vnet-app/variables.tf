@@ -8,6 +8,18 @@ variable "adds_domain_name" {
   }
 }
 
+
+variable "admin_password" {
+  type        = string
+  description = "The password used when provisioning administrator accounts. This should be a strong password that meets Azure's complexity requirements."
+  sensitive   = true
+
+  validation {
+    condition     = length(var.admin_password) >= 8 && can(regex("[A-Z]", var.admin_password)) && can(regex("[a-z]", var.admin_password)) && can(regex("[0-9]", var.admin_password)) && can(regex("[!@#$%^&*()_+=\\[\\]{};':\"\\\\|,.<>/?-]", var.admin_password))
+    error_message = "Password must be at least 8 characters long and include uppercase, lowercase, number, and special character."
+  }
+}
+
 variable "admin_password_secret" {
   type        = string
   description = "The name of the key vault secret containing the admin password"
@@ -18,6 +30,16 @@ variable "admin_password_secret" {
   }
 }
 
+variable "admin_username" {
+  type        = string
+  description = "The user name used when provisioning administrator accounts. This should conform to Windows username requirements (alphanumeric characters, periods, underscores, and hyphens, 1-20 characters)."
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9._-]{1,20}$", var.admin_username))
+    error_message = "Must conform to Windows username requirements: it can only contain alphanumeric characters, periods (.), underscores (_), and hyphens (-), and must be between 1 and 20 characters long."
+  }
+}
+
 variable "admin_username_secret" {
   type        = string
   description = "The name of the key vault secret containing the admin username"
@@ -25,6 +47,17 @@ variable "admin_username_secret" {
   validation {
     condition     = can(regex("^[a-zA-Z0-9-]{1,127}$", var.admin_username_secret))
     error_message = "Must conform to Azure Key Vault secret naming requirements: it can only contain alphanumeric characters and hyphens, and must be between 1 and 127 characters long."
+  }
+}
+
+variable "arm_client_secret" {
+  type        = string
+  description = "The password for the service principal used for authenticating with Azure. Set interactively or using an environment variable 'TF_VAR_arm_client_secret'."
+  sensitive   = true
+
+  validation {
+    condition     = length(var.arm_client_secret) >= 8
+    error_message = "Must be at least 8 characters long."
   }
 }
 
@@ -86,6 +119,11 @@ variable "location" {
     condition     = can(regex("^[a-z0-9-]+$", var.location))
     error_message = "Must be a valid Azure region name. It should only contain lowercase letters, numbers, and dashes."
   }
+}
+
+variable "private_dns_zones_vnet_shared" {
+  type        = map(any)
+  description = "A map of private DNS zones defined in vnet-shared module."
 }
 
 variable "resource_group_name" {

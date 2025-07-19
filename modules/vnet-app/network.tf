@@ -108,6 +108,15 @@ resource "azurerm_private_dns_zone_virtual_network_link" "vnet_app_links" {
   depends_on            = [azurerm_virtual_network_peering.app_to_shared, azurerm_virtual_network_peering.shared_to_app]
 }
 
+resource "azurerm_private_dns_zone_virtual_network_link" "vnet_app_links_from_vnet_shared" {
+  for_each              = var.private_dns_zones_vnet_shared
+  name                  = "link-${each.value.name}-${azurerm_virtual_network.this.name}"
+  resource_group_name   = var.resource_group_name
+  private_dns_zone_name = each.value.name
+  virtual_network_id    = azurerm_virtual_network.this.id
+  depends_on            = [azurerm_virtual_network_peering.app_to_shared, azurerm_virtual_network_peering.shared_to_app]
+}
+
 resource "azurerm_private_dns_zone_virtual_network_link" "vnet_shared_links" {
   for_each              = azurerm_private_dns_zone.zones
   name                  = "link-${each.value.name}-${var.virtual_network_shared_name}"

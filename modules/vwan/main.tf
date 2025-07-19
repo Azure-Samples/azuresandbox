@@ -33,6 +33,7 @@ resource "azurerm_key_vault_secret" "this" {
   name         = "p2svpn-client-private-key-pem"
   value        = tls_private_key.client_cert_key.private_key_pem
   key_vault_id = var.key_vault_id
+  depends_on = [ time_sleep.wait_for_public_access ]
 }
 
 # Generate a client certificate signed by the root certificate
@@ -55,6 +56,35 @@ resource "tls_locally_signed_cert" "client_cert" {
     "digital_signature",
     "key_encipherment"
   ]
+}
+#endregion
+
+#region utilities
+resource "azapi_update_resource" "key_vault_enable_public_access" {
+  type        = "Microsoft.KeyVault/vaults@2024-11-01"
+  resource_id = var.key_vault_id
+
+  body = { properties = { publicNetworkAccess = "Enabled" } }
+
+  depends_on = [tls_private_key.client_cert_key]
+
+  lifecycle { ignore_changes = all }
+}
+
+resource "azapi_update_resource" "key_vault_disable_public_access" {
+  type        = "Microsoft.KeyVault/vaults@2024-11-01"
+  resource_id = var.key_vault_id
+
+  depends_on = [azurerm_key_vault_secret.this]
+
+  body = { properties = { publicNetworkAccess = "Disabled" } }
+
+  lifecycle { ignore_changes = all }
+}
+
+resource "time_sleep" "wait_for_public_access" {
+  create_duration = "2m"
+  depends_on      = [azapi_update_resource.key_vault_enable_public_access]
 }
 #endregion
 
