@@ -23,12 +23,12 @@ This section describes how to test the module after deployment.
   * From *jumpwin1*, run the Windows PowerShell command:
   
     ```powershell
-    Resolve-DnsName YOUR-AZURE-SQL-SERVER-NAME-HERE.database.windows.net
+    Resolve-DnsName <azure-sql-server-name-here>.database.windows.net
     ```
 
   * Verify the *IP4Address* returned is within the subnet IP address prefix for *vnet_app[0].subnets["snet-privatelink-01"]*, e.g. `10.2.2.*`.
 * From *jumpwin1*, test SQL Server Connectivity with SQL Server Management Studio (SSMS)
-  * Navigate to *Start* > *Microsoft SQL Server Tools 20* > *Microsoft SQL Server Management Studio 20*
+  * Navigate to *Start* > *Microsoft SQL Server Tools 21* > *Microsoft SQL Server Management Studio 21*
   * Connect to the network isolated Azure SQL Database server
     * Server properties:
       * Server name: *YOUR-AZURE-SQL-SERVER-NAME-HERE.database.windows.net*

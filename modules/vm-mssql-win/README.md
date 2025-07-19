@@ -37,7 +37,7 @@ This section describes how to test the module after deployment.
 
   * Verify the IPAddress returned is within the subnet IP address prefix for *vnet_app[0].subnets["snet-db-01"]*, e.g. `10.2.1.*`.
 * From *jumpwin1*, test SQL Server Connectivity with SQL Server Management Studio (SSMS)
-  * Navigate to *Start* > *Microsoft SQL Server Tools 20* > *Microsoft SQL Server Management Studio 20*
+  * Navigate to *Start* > *Microsoft SQL Server Tools 21* > *Microsoft SQL Server Management Studio 21*
   * Connect to the default instance of SQL Server installed on the SQL Server virtual machine using the following settings:
     * Server
       * Server type: *Database Engine*

@@ -48,24 +48,21 @@ Follow the steps in this section to test the functionality of AI Foundry hubs, p
 
 * From the client environment, navigate to *portal.azure.com* > *Virtual machines* > *jumpwin1*
   * Click *Connect*, then click *Connect via Bastion*
-  * For *Authentication Type* choose *Password from Azure Key Vault*
+  * For *Authentication Type* choose *VM Password*
   * For *username* enter the UPN of the domain admin, which by default is:
   
     ```plaintext
     bootstrapadmin@mysandbox.local
     ```
 
-  * For *Azure Key Vault Secret* specify the following values:
-    * For *Subscription* choose the same Azure subscription used to provision the sandbox environment.
-    * For *Azure Key Vault* choose the key vault associated with the sandbox environment, e.g. *kv-sand-dev-xxxxxxxx*.
-    * For *Azure Key Vault Secret* choose *adminpassword*
+  * For *VM Password*, enter the value of the *adminpassword* secret stored in the Azure Key Vault associated with the sandbox environment.
   * Click *Connect*
   * If you see a prompt for allowing access to the clipboard, click *Allow*.
 * From *jumpwin1*, map a network drive to Azure Files
   * Execute the following command from PowerShell:
   
     ```pwsh
-    net use z: \\YOUR-STORAGE-ACCOUNT-NAME-HERE.file.core.windows.net\myfileshare
+    net use z: \\<storage-account-name-here>.file.core.windows.net\myfileshare
     ```
 
 ### Explore AI Foundry hub

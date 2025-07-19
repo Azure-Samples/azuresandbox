@@ -42,20 +42,31 @@ This section describes how to test the module after deployment.
 
 * Wait for 5 minutes to proceed to allow time for cloud-init configurations to complete.
 
-* Verify *jumplinux1* cloud-init configuration is complete.
+* Retrieve SSH private key from key vault
+  * From the client environment, navigate to *portal.azure.com* > *Key Vaults* > *kv-sand-dev-xxxxxxxx*
+  * Temporarily enable public network access to the key vault.
+  * Click on *Secrets*
+  * Click on *jumplinux1-ssh-private-key*
+  * Click on *Current Version*
+  * Click on *Show Secret Value*
+  * Click on *Copy to clipboard*
+  * Paste the value into a text editor and save the file as:
+
+    ```plaintext
+    C:\Users\<your-username-here>\.ssh\jumplinux1-ssh-private-key.txt
+    ```
+
+* Connect to *jumplinux1* and verify cloud-init configuration is complete.
   * From the client environment, navigate to *portal.azure.com* > *Virtual machines* > *jumplinux1*
   * Click *Connect*, then click *Connect via Bastion*
-  * For *Authentication Type* choose *SSH Private Key from Azure Key Vault*
+  * For *Authentication Type* choose *SSH Private Key from Local File*
   * For *Username* enter the following:
 
     ```plaintext
     bootstrapadminlocal
     ```
 
-  * For *Azure Key Vault Secret* specify the following values:
-    * For *Subscription* choose the same Azure subscription used to provision the sandbox environment.
-    * For *Azure Key Vault* choose the key vault associated with the sandbox environment, e.g. *kv-sand-dev-xxxxxxxx*.`
-    * For *Azure Key Vault Secret* choose *jumplinux1-ssh-private-key*
+  * Click *Select a file* and choose the SSH private key file you saved earlier.
   * Click *Connect*
   * Execute the following command:
 
@@ -82,7 +93,7 @@ This section describes how to test the module after deployment.
 
 * From *jumpwin1*, inspect the *mysandbox.local* Active Directory domain
   * Navigate to *Start* > *Windows Tools* > *Active Directory Users and Computers*.
-  * Navigate to *mysandbox.local* > *Computers* and verify that *jumplinux1* is listed.
+  * Navigate to *mysandbox.local* > *Computers* and verify that *JUMPLINUX1* is listed.
 
 * From *jumpwin1*, inspect the *mysandbox.local* DNS zone
   * Navigate to *Start* > *Windows Tools* > *DNS*
@@ -94,7 +105,7 @@ This section describes how to test the module after deployment.
   * Navigate to *Start* > *Visual Studio Code* > *Visual Studio Code*.
   * Click on the blue *Open a Remote Window* icon in the lower left corner
   * For *Select an option to open a Remote Window* choose *SSH*
-  * Click on the blue *Open a Remote Window* icon in the lower left corner
+  * Click on the blue *Open a Remote Window* icon in the lower left corner again
   * For *Select an option to open a Remote Window* choose *Connect to Host...*
   * For *Select configured SSH host or enter user@host* choose *+ Add New SSH Host...*
   * For *Enter SSH Connection Command* enter the following:

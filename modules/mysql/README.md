@@ -23,7 +23,7 @@ This section describes how to test the module after deployment.
   * From *jumpwin1*, execute the following PowerShell command:
   
     ```powershell
-    Resolve-DnsName YOUR-MYSQL-SERVER-NAME-HERE.mysql.database.azure.com
+    Resolve-DnsName <mysql-server-name-here>.mysql.database.azure.com
     ```
 
   * Verify the *IP4Address* returned is within the subnet IP address prefix for *vnet_app[0].subnets["snet-privatelink-01"]*, e.g. `10.2.2.*`.
@@ -31,7 +31,7 @@ This section describes how to test the module after deployment.
   * Navigate to *Start* > *MySQL Workbench*
   * Navigate to *Database* > *Connect to Database* and connect using the following values:
     * Connection method: Standard (TCP/IP)
-    * Hostname: *YOUR-MYSQL-SERVER-NAME-HERE.mysql.database.azure.com*
+    * Hostname: *<mysql-server-name-here>.mysql.database.azure.com*
     * Port: *3306*
     * Username: *bootstrapadmin*
     * Schema: *testdb*

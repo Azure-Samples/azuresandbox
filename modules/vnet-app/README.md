@@ -52,17 +52,14 @@ The steps in this section verify that the Windows jumpbox VM (jumpwin1) is confi
 
 * From the client environment, navigate to *portal.azure.com* > *Virtual machines* > *jumpwin1*
   * Click *Connect*, then click *Connect via Bastion*
-  * For *Authentication Type* choose *Password from Azure Key Vault*
+  * For *Authentication Type* choose *VM Password*
   * For *username* enter the UPN of the domain admin, which by default is:
   
     ```plaintext
     bootstrapadmin@mysandbox.local
     ```
 
-  * For *Azure Key Vault Secret* specify the following values:
-    * For *Subscription* choose the same Azure subscription used to provision the sandbox environment.
-    * For *Azure Key Vault* choose the key vault associated with the sandbox environment, e.g. *kv-sand-dev-xxxxxxxx*.
-    * For *Azure Key Vault Secret* choose *adminpassword*
+  * For *VM Password*, enter the value of the *adminpassword* secret stored in the Azure Key Vault associated with the sandbox environment.
   * Click *Connect*
   * If you see a prompt for allowing access to the clipboard, click *Allow*.
   
@@ -85,7 +82,7 @@ The steps in this section verify that the Windows jumpbox VM (jumpwin1) is confi
   * From *jumpwin1*, execute the following command from PowerShell:
   
     ```pwsh
-    Resolve-DnsName "YOUR-SANDBOX-STORAGE-ACCOUNT-NAME-HERE.file.core.windows.net"
+    Resolve-DnsName "<storage-account-name-here>.file.core.windows.net"
     ```
 
   * Verify the *IP4Address* returned is within the subnet IP address prefix for the subnet *snet-privatelink-01*, e.g. `10.2.2.*`.
@@ -94,7 +91,7 @@ The steps in this section verify that the Windows jumpbox VM (jumpwin1) is confi
   * Execute the following command from PowerShell:
   
     ```pwsh
-    net use z: \\YOUR-STORAGE-ACCOUNT-NAME-HERE.file.core.windows.net\myfileshare
+    net use z: \\<storage-account-name-here>.file.core.windows.net\myfileshare
     ```
 
   * Create some test files and folders on the newly mapped Z: drive.

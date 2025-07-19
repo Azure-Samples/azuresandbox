@@ -105,6 +105,7 @@ Azure Sandbox is built with security as a core principle, ensuring that all reso
     * Shared keys
     * Administrator passwords
   * Ensures secrets are encrypted at rest and accessed only by authorized users or services.
+  * Network isolated endpoints for secure access to secrets.
 
 * **Role-Based Access Control (RBAC)**:
   * Enforces least-privilege access by assigning roles to users, groups, and services based on their specific needs.
@@ -339,12 +340,12 @@ Follow these steps to configure the variables for your sandbox:
 
   ```bash
   # Set environment variable in bash
-  export TF_VAR_arm_client_secret=YOUR-SERVICE-PRINCIPAL-PASSWORD-HERE
+  export TF_VAR_arm_client_secret=<service-principal-password-here>
   ```
 
   ```pwsh
   # Set environment variable in PowerShell
-  $env:TF_VAR_arm_client_secret = "YOUR-SERVICE-PRINCIPAL-PASSWORD-HERE"
+  $env:TF_VAR_arm_client_secret = "<service-principal-password-here>"
   ```
 
 * Next, create a `terraform.tfvars` file in the root directory of the project. This file should set the necessary variables for your deployment. Here is an example of what the `terraform.tfvars` file might look like:
@@ -380,11 +381,11 @@ Follow these steps to configure the variables for your sandbox:
 By default only the shared virtual network module (vnet-shared) is enabled which isn't very useful on it's own. You can enable additional modules by setting the `enable_module_*` variables in the `terraform.tfvars` file. At a minimum you should enable the application virtual network module (vnet-app) like this:
 
 ```hcl
-aad_tenant_id   = "YOUR-ENTRA-TENANT-ID-HERE"
-arm_client_id   = "YOUR-SERVICE-PRINCIPAL-APP-ID-HERE"
-location        = "YOUR-AZURE-REGION-HERE"
-subscription_id = "YOUR-AZURE-SUBSCRIPTION-ID-HERE"
-user_object_id  = "YOUR-USER-OBJECT-ID-HERE"
+aad_tenant_id   = "<entra-tenant-id-here>"
+arm_client_id   = "<service-principal-app-id-here>"
+location        = "<azure-region-here>"
+subscription_id = "<azure-subscription-id-here>"
+user_object_id  = "<user-object-id-here>"
 
 tags = {
   project     = "sand",
@@ -399,11 +400,11 @@ enable_module_vnet_app = true
 And here's how to enable all the modules:
 
 ```hcl
-aad_tenant_id   = "YOUR-ENTRA-TENANT-ID-HERE"
-arm_client_id   = "YOUR-SERVICE-PRINCIPAL-APP-ID-HERE"
-location        = "YOUR-AZURE-REGION-HERE"
-subscription_id = "YOUR-AZURE-SUBSCRIPTION-ID-HERE"
-user_object_id  = "YOUR-USER-OBJECT-ID-HERE"
+aad_tenant_id   = "<entra-tenant-id-here>"
+arm_client_id   = "<service-principal-app-id-here>"
+location        = "<azure-region-here>"
+subscription_id = "<azure-subscription-id-here>"
+user_object_id  = "<user-object-id-here>"
 
 tags = {
   project     = "sand",
@@ -500,7 +501,9 @@ You now have a fully provisioned Azure Sandbox environment! You can use it for e
 
 ### Step 7: Clean Up
 
-Don't forget to delete your sandbox when you're done. You don't want to have to explain to your boss why you left an unused sandbox laying around that costs your company money. The quickest way to clean up is to delete the sandbox resource group. Do this with care because data loss will occur.
+Don't forget to delete your sandbox when you're done. You don't want to have to explain to your boss why you left an unused sandbox laying around that costs your company money. The quickest way to clean up is to delete the sandbox resource group. 
+
+**IMPORTANT:** Do this with care because data loss will occur.
 
 ## Documentation
 
