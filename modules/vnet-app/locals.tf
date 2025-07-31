@@ -120,7 +120,8 @@ locals {
     "privatelink.mysql.database.azure.com",
     "privatelink.notebooks.azure.net",
     "privatelink.openai.azure.com",
-    "privatelink.search.windows.net"
+    "privatelink.search.windows.net",
+    "privatelink.services.ai.azure.com"
   ]
 
   subnets = {
