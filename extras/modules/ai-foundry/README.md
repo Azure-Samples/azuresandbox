@@ -31,7 +31,7 @@ Follow the steps in this section to test the functionality of AI Foundry hubs, p
 * [Verify Network Isolation](#verify-network-isolation)
 * [Connect to Jumpbox](#connect-to-jumpbox)
 * [Explore AI Foundry hub](#explore-ai-foundry-hub)
-* [Create a Project](#create-a-project)
+* [Open a Project](#open-a-project)
 * [Create a Model Deployment](#create-a-model-deployment)
 * [Transcribe a Call](#transcribe-a-call)
 * [Summarize a Transcript](#summarize-a-transcript)
@@ -40,7 +40,7 @@ Follow the steps in this section to test the functionality of AI Foundry hubs, p
 
 ### Verify Network Isolation
 
-* From the client environment, navigate to *portal.azure.com* > *Azure AI Foundry* > *Use with AI Foundry* > *AI Hubs* > *foundry-sand-dev*
+* From the client environment, navigate to *portal.azure.com* > *Azure AI Foundry* > *Use with AI Foundry* > *AI Hubs* > *aif-sand-dev-xxx*
 * Click *Launch Azure AI Foundry*
 * Observe the error message *Error loading Azure AI hub*. This is expected since the AI Foundry hub is network isolated and can only be accessed from the private network.
 
@@ -75,38 +75,35 @@ Follow the steps in this section to test the functionality of AI Foundry hubs, p
   * Navigate to `https://ai.azure.com`
   * Click *Sign in*
   * Click *View all resources*
-  * Click *foundry-sand-dev* to open the AI Foundry hub.
+  * Click *aif-sand-dev-xxx* to open the AI Foundry hub.
 * Explore the hub
   * Examine the hub *Overview* page
   * Navigate *Users* and examine both the *Users* tab and the *Inherited access* tab.
   * Navigate to *Connected resources* and examine the connected resources.
 
-### Create a Project
+### Open a Project
 
-* From the hub, create a project.
-  * Click *Overview*
-  * Click *New project*
-  * Note the current hub is set to *foundry-sand-dev*
-  * Enter a name for the project (e.g. *CallCenterPoC*)
-  * Click *Create*
+* From the hub *Overview* page, locate the project *api-sand-dev-xxx*.
+* Click on the project to open it.
+* Click *Go to project* to leave the hub management center and start working with the project.
 
 ### Create a Model Deployment
 
 * From the project, create a model deployment.
-  * Navigate to *My assets* > *Models + endpoints*
+  * Navigate to *Project* > *My assets* > *Models + endpoints*
   * From the *Model deployments* tab, Click on *Deploy model* > *Deploy base model*
-  * Search for `gpt-4o` and select it.
+  * Search for `gpt-4.1` and select it.
   * Review the description, then click *Confirm*.
   * Examine the deployment details, then click *Customize*.
   * Adjust the settings as follows:
 
     Setting | Value
     --- | ---
-    Deployment name | gpt-4o-2024-08-06
+    Deployment name | gpt-4.1
     Deployment type | `Global Standard`
-    Model version | `2024-08-06 (Default)`
-    Connected AI resource | ais-sand-dev_aoai
-    Tokens per Minute Rate Limit | 66K
+    Model version | `2025-04-14`
+    Connected AI resource | ais-sand-dev-xxx_aoai
+    Tokens per Minute Rate Limit | 150K
     Content filter | `DefaultV2`
   
   * Click *Deploy*

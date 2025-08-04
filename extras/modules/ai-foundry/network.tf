@@ -17,7 +17,8 @@ resource "azurerm_private_endpoint" "ai_services" {
     name = "ai_services_01"
     private_dns_zone_ids = [
       var.private_dns_zones["privatelink.cognitiveservices.azure.com"].id,
-      var.private_dns_zones["privatelink.openai.azure.com"].id
+      var.private_dns_zones["privatelink.openai.azure.com"].id,
+      var.private_dns_zones["privatelink.services.ai.azure.com"].id
     ]
   }
 }
