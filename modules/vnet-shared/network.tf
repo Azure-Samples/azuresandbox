@@ -181,6 +181,7 @@ resource "azurerm_private_endpoint" "this" {
   resource_group_name = var.resource_group_name
   location            = var.location
   subnet_id           = azurerm_subnet.subnets["snet-privatelink-02"].id
+  depends_on          = [azapi_update_resource.key_vault_disable_public_access]
 
   private_service_connection {
     name                           = "key_vault"
