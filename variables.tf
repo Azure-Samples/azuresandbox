@@ -49,6 +49,12 @@ variable "enable_module_mysql" {
 
 }
 
+variable "enable_module_petstore" {
+  type        = bool
+  description = "Set to true to enable the petstore module, false to skip it."
+  default     = false
+}
+
 variable "enable_module_vm_devops_win" {
   type        = bool
   description = "Set to true to enable the vm_devops_win module, false to skip it."

@@ -11,7 +11,7 @@ resource "azurerm_mssql_server" "this" {
 
   lifecycle {
     ignore_changes = [
-      express_vulnerability_assessment_enabled
+      express_vulnerability_assessment_enabled, azuread_administrator
     ]
   }
 }

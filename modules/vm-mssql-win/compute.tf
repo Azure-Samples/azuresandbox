@@ -85,5 +85,9 @@ resource "azurerm_virtual_machine_extension" "this" {
     commandToExecute = "powershell.exe -ExecutionPolicy Unrestricted -Command \"$params = @{ ${join(" ", local.remote_scripts["orchestrator"].parameters)}}; .\\${local.remote_scripts["orchestrator"].name} @params\""
     managedIdentity  = {}
   })
+
+  lifecycle {
+    ignore_changes = [ protected_settings ]
+  }
 }
 #endregion
