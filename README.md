@@ -167,10 +167,10 @@ This section describes the prerequisites required in order to provision an Azure
 
   ```json
   {
-    "appId": "YOUR-SERVICE-PRINCIPAL-APP-ID-HERE",
+    "appId": "<service-principal-app-id-here>",
     "displayName": "AzureSandboxSPN",
-    "password": "YOUR-SERVICE-PRINCIPAL-PASSWORD-HERE",
-    "tenant": "YOUR-ENTRA-TENANT-ID-HERE"
+    "password": "<service-principal-password-here>",
+    "tenant": "<entra-tenant-id-here>"
   }
   ```
 
@@ -311,9 +311,9 @@ git clone https://github.com/Azure-Samples/azuresandbox
 terraform {
   backend "azurerm" {
     use_azuread_auth     = true
-    tenant_id            = "YOUR-TENANT-ID-HERE"
-    storage_account_name = "YOUR-STORAGE-ACCOUNT-FOR-TFSTATE-HERE" 
-    container_name       = "YOUR-STATE-CONTAINER-NAME-HERE" 
+    tenant_id            = "<entra-tenant-id-here>"
+    storage_account_name = "<storage-account-for-tfstate-here>"
+    container_name       = "<state-container-name-here>"
     key                  = "terraform.tfstate"
   }
 }
@@ -351,11 +351,11 @@ Follow these steps to configure the variables for your sandbox:
 * Next, create a `terraform.tfvars` file in the root directory of the project. This file should set the necessary variables for your deployment. Here is an example of what the `terraform.tfvars` file might look like:
 
   ```hcl
-  aad_tenant_id   = "YOUR-ENTRA-TENANT-ID-HERE"
-  arm_client_id   = "YOUR-SERVICE-PRINCIPAL-APP-ID-HERE"
-  location        = "YOUR-AZURE-REGION-HERE"
-  subscription_id = "YOUR-AZURE-SUBSCRIPTION-ID-HERE"
-  user_object_id  = "YOUR-USER-OBJECT-ID-HERE"
+  aad_tenant_id   = "<entra-tenant-id-here>"
+  arm_client_id   = "<service-principal-app-id-here>"
+  location        = "<azure-region-here>"
+  subscription_id = "<azure-subscription-id-here>"
+  user_object_id  = "<user-object-id-here>"
 
   tags = {
     project     = "sand",
@@ -472,12 +472,12 @@ Follow these steps to validate and apply the configuration:
 
   * If you are provisioning a brand new sandbox, you will see a lot of `+` signs in the output. This indicates that new resources will be created if this plan is applied. If you are updating an existing sandbox, you may see `~` signs indicating that existing resources will be updated. If you see `-` signs, this indicates that existing resources will be deleted. Be careful with these operations as they may cause data loss.
 
-  * Public access is disabled by design for the Azure Storage account in the sandbox. This may cause errors during plan creation because your Terraform execution environment is blocked by the storage firewall. To work around this you can manually modify the storage firewall using a couple of different approaches:
+  * **IMPORTANT:** Public network access is disabled by default in the service firewall for both the storage account and key vault. This may cause errors during plan creation because your Terraform execution environment is blocked by the service firewall. To work around this you can manually modify the service firewall using a couple of different approaches:
 
-    * Add the client ip for your Terraform execution environment to the storage firewall whitelist. This should work from most home networks, but will not work on a private network that implements source network address translation (SNAT).
-    * Temporarily enable public network access on the storage account outside of Terraform.
+    * Add the client ip for your Terraform execution environment to the service firewall whitelist. This should work from most home networks, but will not work on a private network that implements source network address translation (SNAT).
+    * Temporarily enable public network access on the service firewall manually. It can take time for changes to these settings to propagate, and you may need to flush your DNS cache to get things working.
 
-  * Be sure to check that storage firewall public access is disabled again after you are done with Terraform operations.
+  * Be sure to manually disable public access after you are done with Terraform operations.
 
 * Finally, apply the configuration to create the resources:
 
@@ -501,7 +501,7 @@ You now have a fully provisioned Azure Sandbox environment! You can use it for e
 
 ### Step 7: Clean Up
 
-Don't forget to delete your sandbox when you're done. You don't want to have to explain to your boss why you left an unused sandbox laying around that costs your company money. The quickest way to clean up is to delete the sandbox resource group. 
+Don't forget to delete your sandbox when you're done. You don't want to have to explain to your boss why you left an unused sandbox laying around that costs your company money. The quickest way to clean up is to delete the sandbox resource group.
 
 **IMPORTANT:** Do this with care because data loss will occur.
 
