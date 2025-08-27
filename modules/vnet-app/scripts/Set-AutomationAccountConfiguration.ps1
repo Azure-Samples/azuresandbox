@@ -338,7 +338,7 @@ function Update-ExistingModule {
 
             # Check provisioning state
             while ($true) {
-                $automationModule = Get-AzAutomationModule -Name $ModuleName -ResourceGroupName $ResourceGroupName -AutomationAccountName $AutomationAccountName
+                $automationModule = Get-AzAutomationModule -Name $moduleName -ResourceGroupName $ResourceGroupName -AutomationAccountName $AutomationAccountName
 
                 if (($automationModule.ProvisioningState -eq 'Succeeded') -or ($automationModule.ProvisioningState -eq 'Failed') ) {
                     break
