@@ -137,6 +137,34 @@ resource "azurerm_subnet_route_table_association" "associations" {
 #endregion 
 
 #region private-endpoints
+resource "azurerm_private_endpoint" "container_registry" {
+  name                = "${module.naming.private_endpoint.name}-acr"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  subnet_id           = azurerm_subnet.subnets["snet-privatelink-01"].id
+
+  private_service_connection {
+    name                           = "${module.naming.container_registry.name_unique}-psc"
+    private_connection_resource_id = azurerm_container_registry.this.id
+    is_manual_connection           = false
+    subresource_names              = ["registry"]
+  }
+
+  depends_on = [
+    azurerm_virtual_network_peering.app_to_shared,
+    azurerm_virtual_network_peering.shared_to_app,
+    azapi_update_resource.storage_account_disable_public_access
+  ]
+}
+
+resource "azurerm_private_dns_a_record" "container_registry" {
+  name                = azurerm_container_registry.this.name
+  zone_name           = "privatelink.azurecr.io"
+  resource_group_name = var.resource_group_name
+  ttl                 = 300
+  records             = [azurerm_private_endpoint.container_registry.private_service_connection[0].private_ip_address]
+}
+
 resource "azurerm_private_endpoint" "storage_blob" {
   name                = "${module.naming.private_endpoint.name}-storage-blob"
   resource_group_name = var.resource_group_name

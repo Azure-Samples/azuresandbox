@@ -71,6 +71,17 @@ variable "automation_account_name" {
   }
 }
 
+variable "container_registry_sku" {
+  type        = string
+  description = "The SKU name of the Azure Container Registry to create. Choose from: Basic, Standard, Premium. Premium is required for use with advanced features like private endpoints."
+  default     = "Premium"
+
+  validation {
+    condition     = contains(["Premium"], var.container_registry_sku)
+    error_message = "The container_registry_sku must be one of: Premium (case-sensitive)."
+  }
+}
+
 variable "dns_server" {
   type        = string
   description = "The IP address of the DNS server. This should be the first non-reserved IP address in the subnet where the AD DS domain controller is hosted."
@@ -118,6 +129,16 @@ variable "location" {
   validation {
     condition     = can(regex("^[a-z0-9-]+$", var.location))
     error_message = "Must be a valid Azure region name. It should only contain lowercase letters, numbers, and dashes."
+  }
+}
+
+variable "log_analytics_workspace_id" {
+  type        = string
+  description = "The ID of the Log Analytics workspace to send diagnostic logs to."
+
+  validation {
+    condition     = can(regex("^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[a-zA-Z0-9._()-]+/providers/Microsoft.OperationalInsights/workspaces/[a-zA-Z0-9-]+$", var.log_analytics_workspace_id))
+    error_message = "Must be a valid Azure Log Analytics workspace resource ID in the format '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.OperationalInsights/workspaces/{workspaceName}'."
   }
 }
 

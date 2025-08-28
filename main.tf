@@ -45,6 +45,7 @@ module "vnet_app" {
   key_vault_id                  = module.vnet_shared.resource_ids["key_vault"]
   key_vault_name                = module.vnet_shared.resource_names["key_vault"]
   location                      = azurerm_resource_group.this.location
+  log_analytics_workspace_id    = module.vnet_shared.resource_ids["log_analytics_workspace"]
   private_dns_zones_vnet_shared = module.vnet_shared.private_dns_zones
   resource_group_name           = azurerm_resource_group.this.name
   tags                          = var.tags
