@@ -5,7 +5,7 @@ printf "Removing all files matching 'terraform.tfvars'...\n"
 find ../. -type f -name 'terraform.tfvars' 
 find ../. -type f -name 'terraform.tfvars' | xargs -r rm
 
-cd ..printf "Removing all files matching 'terraform.tfstate'...\n"
+printf "Removing all files matching 'terraform.tfstate'...\n"
 
 find ../. -type f -name 'terraform.tfstate' 
 find ../. -type f -name 'terraform.tfstate' | xargs -r rm

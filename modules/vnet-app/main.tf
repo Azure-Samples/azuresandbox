@@ -11,6 +11,10 @@ resource "azurerm_container_registry" "this" {
   admin_enabled                 = false
   public_network_access_enabled = false
 
+  lifecycle {
+    ignore_changes = [ public_network_access_enabled ]
+  }
+
   identity {
     type = "SystemAssigned"
   }

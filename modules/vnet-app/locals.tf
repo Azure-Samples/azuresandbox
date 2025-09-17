@@ -188,6 +188,18 @@ locals {
       route_table = "firewall"
     }
 
+    snet-containerapps-01 = {
+      address_prefix                    = var.subnet_containerapps_address_prefix
+      delegation                        = "Microsoft.App/environments"
+      private_endpoint_network_policies = "Disabled"
+      nsg_rules = [
+        "AllowVirtualNetworkInbound",
+        "AllowVirtualNetworkOutbound",
+        "AllowInternetOutbound"
+      ]
+      route_table = "firewall"
+    }
+
     snet-db-01 = {
       address_prefix                    = var.subnet_database_address_prefix
       delegation                        = ""

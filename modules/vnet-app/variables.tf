@@ -212,6 +212,17 @@ variable "subnet_appservice_address_prefix" {
   }
 }
 
+variable "subnet_containerapps_address_prefix" {
+  type        = string
+  description = "The address prefix for the Azure Container Apps subnet."
+  default     = "10.2.5.0/24"
+
+  validation {
+    condition     = can(cidrhost(var.subnet_containerapps_address_prefix, 0))
+    error_message = "Must be valid IPv4 CIDR."
+  }
+}
+
 variable "subnet_database_address_prefix" {
   type        = string
   description = "The address prefix for the database subnet."

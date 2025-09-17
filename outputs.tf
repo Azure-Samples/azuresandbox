@@ -19,6 +19,7 @@ output "resource_ids" {
     length(module.vnet_onprem) > 0 ? module.vnet_onprem[0].resource_ids : {},
     length(module.ai_foundry) > 0 ? module.ai_foundry[0].resource_ids : {},
     length(module.vm_devops_win) > 0 ? module.vm_devops_win[0].resource_ids : {}
+    # length(module.petstore) > 0 ? module.petstore[0].resource_ids : {}
   )
 }
 
@@ -37,6 +38,7 @@ output "resource_names" {
     length(module.vnet_onprem) > 0 ? module.vnet_onprem[0].resource_names : {},
     length(module.ai_foundry) > 0 ? module.ai_foundry[0].resource_names : {},
     length(module.vm_devops_win) > 0 ? module.vm_devops_win[0].resource_names : {}
+    # length(module.petstore) > 0 ? module.petstore[0].resource_names : {}
   )
 }
 

@@ -666,6 +666,7 @@ snet-db-01 | `10.2.1.0/24` | `/27` | Yes | Reserved for Database Server VMs.
 snet-privatelink-01 | `10.2.2.0/24` | `/27` | Yes |Reserved for private endpoints using Azure Private Link.
 snet-misc-03 | `10.2.3.0/24` | `/27` | Yes | Reserved for future use.
 snet-appservice-01 | `10.2.4.0/24` | `/27` | Yes | Reserved for Azure App Service with delegation to `Microsoft.Web/serverFarms`.
+snet-containerapps-01 | `10.2.5.0/24` | `/27` | Yes | Reserved for Azure Container Apps with delegation to `Microsoft.App/environments`.
 
 The following private endpoints are configured in the *snet-privatelink-01* subnet to provide secure, network-isolated access to the following Azure PaaS services:
 
