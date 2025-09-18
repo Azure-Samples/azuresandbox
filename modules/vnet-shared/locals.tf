@@ -235,12 +235,9 @@ locals {
     snet-privatelink-02 = {
       address_prefix                    = var.subnet_privatelink_address_prefix
       delegation                        = ""
-      private_endpoint_network_policies = "Enabled"
-      nsg_rules = [
-        "AllowVirtualNetworkInbound",
-        "AllowVirtualNetworkOutbound"
-      ]
-      route_table = "firewall"
+      private_endpoint_network_policies = "Disabled"
+      nsg_rules                         = []
+      route_table                       = null
     }
   }
 }

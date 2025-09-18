@@ -32,7 +32,7 @@ resource "azurerm_subnet" "subnets" {
 }
 
 resource "azurerm_network_security_group" "groups" {
-  for_each = azurerm_subnet.subnets
+  for_each = { for k, v in local.subnets : k => v if length(v.nsg_rules) > 0 }
 
   name                = "${module.naming.network_security_group.name}.${each.key}"
   location            = var.location
@@ -62,10 +62,14 @@ resource "azurerm_network_security_rule" "rules" {
 }
 
 resource "azurerm_subnet_network_security_group_association" "associations" {
-  for_each = azurerm_subnet.subnets
+  for_each = azurerm_network_security_group.groups
 
   subnet_id                 = azurerm_subnet.subnets[each.key].id
   network_security_group_id = azurerm_network_security_group.groups[each.key].id
+
+  depends_on = [
+    azurerm_network_security_rule.rules
+  ]
 }
 
 # Peering with shared services virtual network
