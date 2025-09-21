@@ -179,6 +179,7 @@ locals {
     AzureBastionSubnet = {
       address_prefix                    = var.subnet_AzureBastionSubnet_address_prefix
       private_endpoint_network_policies = "Disabled"
+
       nsg_rules = [
         "AllowHttpsInbound",
         "AllowGatewayManagerInbound",
@@ -189,39 +190,46 @@ locals {
         "AllowBastionCommunicationOutbound",
         "AllowGetSessionInformationOutbound"
       ]
+
       route_table = null
     }
 
     snet-adds-01 = {
       address_prefix                    = var.subnet_adds_address_prefix
       private_endpoint_network_policies = "Disabled"
+
       nsg_rules = [
         "AllowVirtualNetworkInbound",
         "AllowVirtualNetworkOutbound",
         "AllowInternetOutbound"
       ]
+
       route_table = "firewall"
     }
 
     snet-misc-01 = {
       address_prefix                    = var.subnet_misc_address_prefix
       private_endpoint_network_policies = "Disabled"
+
       nsg_rules = [
         "AllowVirtualNetworkInbound",
         "AllowVirtualNetworkOutbound",
         "AllowInternetOutbound"
       ]
+
       route_table = "firewall"
     }
 
     snet-misc-02 = {
       address_prefix                    = var.subnet_misc_02_address_prefix
       private_endpoint_network_policies = "Disabled"
+
       nsg_rules = [
         "AllowVirtualNetworkInbound",
         "AllowVirtualNetworkOutbound",
         "AllowInternetOutbound"
       ]
+
       route_table = "firewall"
     }
 
@@ -235,9 +243,14 @@ locals {
     snet-privatelink-02 = {
       address_prefix                    = var.subnet_privatelink_address_prefix
       delegation                        = ""
-      private_endpoint_network_policies = "Disabled"
-      nsg_rules                         = []
-      route_table                       = null
+      private_endpoint_network_policies = "Enabled"
+
+      nsg_rules = [
+        "AllowVirtualNetworkInbound",
+        "AllowVirtualNetworkOutbound"
+      ]
+
+      route_table = "firewall"
     }
   }
 }
