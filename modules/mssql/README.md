@@ -81,6 +81,7 @@ admin_password | | The strong password used when provisioning administrator acco
 admin_username | bootstrapadmin | The user name used when provisioning administrator accounts. Set in the vnet-shared module.
 location | | The name of the Azure Region where resources will be provisioned.
 mssql_database_name | testdb | The name of the Azure SQL Database to be provisioned.
+private_dns_zone_id | | The ID of the private DNS zone for Azure SQL Database. Defined in the vnet-app module.
 resource_group_name | | The name of the resource group defined in the root module.
 subnet_id | | The subnet ID defined in the vnet-app module.
 tags | |  The tags from the root module.
@@ -94,7 +95,6 @@ Address | Name | Notes
 --- | --- | ---
 module.mssql[0].azurerm_mssql_database.this | testdb | The Azure SQL Database.
 module.mssql[0].azurerm_mssql_server.this | sql&#8209;sand&#8209;dev&#8209;xxxxxxxx | The Azure SQL logical server.
-module.mssql[0].azurerm_private_dns_a_record.this | | The A record for the Azure SQL logical server.
 module.mssql[0].azurerm_private_endpoint.this | pe&#8209;sand&#8209;dev&#8209;mssql&#8209;server | The private endpoint for the Azure SQL logical server.
 
 ### Output Variables

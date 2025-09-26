@@ -111,6 +111,7 @@ module "mssql" {
   admin_password      = module.vnet_shared.admin_password
   admin_username      = module.vnet_shared.admin_username
   location            = azurerm_resource_group.this.location
+  private_dns_zone_id = module.vnet_app[0].private_dns_zones["privatelink.database.windows.net"].id
   resource_group_name = azurerm_resource_group.this.name
   subnet_id           = module.vnet_app[0].subnets["snet-privatelink-01"].id
   tags                = var.tags
@@ -127,6 +128,7 @@ module "mysql" {
   admin_password      = module.vnet_shared.admin_password
   admin_username      = module.vnet_shared.admin_username
   location            = azurerm_resource_group.this.location
+  private_dns_zone_id = module.vnet_app[0].private_dns_zones["privatelink.mysql.database.azure.com"].id
   resource_group_name = azurerm_resource_group.this.name
   subnet_id           = module.vnet_app[0].subnets["snet-privatelink-01"].id
   tags                = var.tags

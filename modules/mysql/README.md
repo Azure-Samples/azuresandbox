@@ -81,6 +81,7 @@ admin_username | bootstrapadmin | The user name used for admin accounts. Defined
 location | | The name of the Azure Region where resources will be provisioned. Defined in the root module.
 mysql_database_name | testdb | The name of the Azure MySQL Database to be provisioned.
 mysql_sku_name | B_Gen5_1 | The SKU name for the Azure MySQL Flexible Server.
+private_dns_zone_id | | The ID of the private DNS zone for Azure Database for MySQL. Defined in the vnet-app module.
 resource_group_name | | The name of the resource group defined in the root module.
 subnet_id | | The subnet ID defined in the vnet-app module.
 tags | | The tags from the root module.
@@ -94,7 +95,6 @@ Address | Name | Notes
 --- | --- | ---
 module.mysql[0].azurerm_mysql_flexible_database.this | testdb | The Azure MySQL Database.
 module.mysql[0].azurerm_mysql_flexible_server.this | mysql&#8209;sand&#8209;dev&#8209;xxxxxxxx | The Azure MySQL flexible server.
-module.mysql[0].azurerm_private_dns_a_record.this | | The A record for the Azure MySQL flexible server.
 module.mysql[0].azurerm_private_endpoint.this | pe&#8209;sand&#8209;dev&#8209;mysql&#8209;server | The private endpoint for the Azure MySQL flexible server.
 
 ### Output Variables

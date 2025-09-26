@@ -154,19 +154,18 @@ resource "azurerm_private_endpoint" "container_registry" {
     subresource_names              = ["registry"]
   }
 
+
+  private_dns_zone_group {
+    name = "default"
+    private_dns_zone_ids = [azurerm_private_dns_zone.zones["privatelink.azurecr.io"].id
+    ]
+  }
+
   depends_on = [
     azurerm_virtual_network_peering.app_to_shared,
     azurerm_virtual_network_peering.shared_to_app,
     azapi_update_resource.storage_account_disable_public_access
   ]
-}
-
-resource "azurerm_private_dns_a_record" "container_registry" {
-  name                = azurerm_container_registry.this.name
-  zone_name           = "privatelink.azurecr.io"
-  resource_group_name = var.resource_group_name
-  ttl                 = 300
-  records             = [azurerm_private_endpoint.container_registry.private_service_connection[0].private_ip_address]
 }
 
 resource "azurerm_private_endpoint" "storage_blob" {
@@ -182,19 +181,16 @@ resource "azurerm_private_endpoint" "storage_blob" {
     subresource_names              = ["blob"]
   }
 
+  private_dns_zone_group {
+    name = "default"
+    private_dns_zone_ids = [azurerm_private_dns_zone.zones["privatelink.blob.core.windows.net"].id]
+  }
+
   depends_on = [
     azurerm_virtual_network_peering.app_to_shared,
     azurerm_virtual_network_peering.shared_to_app,
     azapi_update_resource.storage_account_disable_public_access
   ]
-}
-
-resource "azurerm_private_dns_a_record" "storage_blob" {
-  name                = azurerm_storage_account.this.name
-  zone_name           = "privatelink.blob.core.windows.net"
-  resource_group_name = var.resource_group_name
-  ttl                 = 300
-  records             = [azurerm_private_endpoint.storage_blob.private_service_connection[0].private_ip_address]
 }
 
 resource "azurerm_private_endpoint" "storage_file" {
@@ -210,19 +206,16 @@ resource "azurerm_private_endpoint" "storage_file" {
     subresource_names              = ["file"]
   }
 
+  private_dns_zone_group {
+    name = "default"
+    private_dns_zone_ids = [azurerm_private_dns_zone.zones["privatelink.file.core.windows.net"].id]
+  }
+
   depends_on = [
     azurerm_virtual_network_peering.app_to_shared,
     azurerm_virtual_network_peering.shared_to_app,
     azapi_update_resource.storage_account_disable_public_access
   ]
-}
-
-resource "azurerm_private_dns_a_record" "storage_file" {
-  name                = azurerm_storage_account.this.name
-  zone_name           = "privatelink.file.core.windows.net"
-  resource_group_name = var.resource_group_name
-  ttl                 = 300
-  records             = [azurerm_private_endpoint.storage_file.private_service_connection[0].private_ip_address]
 }
 #endregion
 

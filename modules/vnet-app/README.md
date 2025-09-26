@@ -186,8 +186,6 @@ Address | Name | Notes
 module.vnet_app[0].azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;jumpwin1 | Network interface for the VM.
 module.vnet_app[0].azurerm_network_security_group.groups[*] | | NSGs for each subnet.
 module.vnet_app[0].azurerm_network_security_rule.rules[*] | | NSG rules for each NSG. See *locals.tf* for rule definitions.
-module.vnet_app[0].azurerm_private_dns_a_record.storage_blob | | DNS A record for the blob storage private endpoint.
-module.vnet_app[0].azurerm_private_dns_a_record.storage_file | | DNS A record for the file storage private endpoint.
 module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.api.azureml.ms"] | | Private DNS zone for use with AI Foundry.
 module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.azurecr.io"] | | Private DNS zone for Azure Container Registry.
 module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.blob.core.windows.net"] | | Private DNS zone for Azure Blob storage.

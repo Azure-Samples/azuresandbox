@@ -129,7 +129,6 @@ module.vnet_shared.azurerm_monitor_diagnostic_setting.this |  | The Azure Monito
 module.vnet_shared.azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;adds1 | Nic for *adds1* VM.
 module.vnet_shared.azurerm_network_security_group.groups[*] | | NSGs for each subnet except *AzureFirewallSubnet*.
 module.vnet_shared.azurerm_network_security_rule.rules[*] | | NSG rules for each NSG. See *locals.tf* for rule definitions.
-module.vnet_shared.azurerm_private_dns_a_record.this | | The A record associated with the private endpoint for the key vault.
 module.vnet_shared.azurerm_private_dns_zone.this | privatelink.vaultcore.azure.net | The private DNS zone for the key vault.
 module.vnet_shared.azurerm_private_dns_zone_virtual_network_link.this | | Links the private DNS zone for key vault to the virtual network.
 module.vnet_shared.azurerm_private_endpoint.this | | The private endpoint for the key vault.

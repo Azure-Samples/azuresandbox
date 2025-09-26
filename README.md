@@ -639,7 +639,7 @@ snet-adds-01 | `10.1.1.0/24` | `/27` | Yes | Yes | Hosts the Active Directory Do
 snet-misc-01 | `10.1.2.0/24` | `/27` | Yes | Yes | Reserved for optional configurations requiring connectivity in the shared virtual network.
 snet-misc-02 | `10.1.3.0/24` | `/27` | Yes | Yes | Reserved for optional configurations requiring connectivity in the shared virtual network.
 AzureFirewallSubnet | `10.1.4.0/26` | `/26` | No | No | Reserved for Azure Firewall to provide network security.
-snet-privatelink-02 | `10.1.5.0/24` | `/27` | Yes | Yes | Reserved for key vault private endpoint using Azure Private Link.
+snet-privatelink-02 | `10.1.5.0/24` | `/27` | No | No | Reserved for key vault private endpoint using Azure Private Link.
 
 The following private endpoints are configured in the *snet-privatelink-02* subnet to provide secure, network-isolated access to the following Azure PaaS services:
 
