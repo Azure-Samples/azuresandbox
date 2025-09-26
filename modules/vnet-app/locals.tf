@@ -1,30 +1,4 @@
 locals {
-  container_registry_roles = {
-    acr_push_spn = {
-      principal_id         = data.azurerm_client_config.current.object_id
-      principal_type       = "ServicePrincipal"
-      role_definition_name = "AcrPush"
-    }
-
-    acr_push_user = {
-      principal_id         = var.user_object_id
-      principal_type       = "User"
-      role_definition_name = "AcrPush"
-    }
-
-    acr_pull_spn = {
-      principal_id         = data.azurerm_client_config.current.object_id
-      principal_type       = "ServicePrincipal"
-      role_definition_name = "AcrPull"
-    }
-
-    acr_pull_user = {
-      principal_id         = var.user_object_id
-      principal_type       = "User"
-      role_definition_name = "AcrPull"
-    }
-  }
-
   local_scripts = {
     configure_automation = {
       name = "Set-AutomationAccountConfiguration.ps1"

@@ -9,24 +9,19 @@ resource "azurerm_container_registry" "this" {
   location                      = var.location
   sku                           = var.container_registry_sku
   admin_enabled                 = false
+  anonymous_pull_enabled        = false
+  data_endpoint_enabled         = true
+  export_policy_enabled         = false
+  network_rule_bypass_option    = "AzureServices"
   public_network_access_enabled = false
+  quarantine_policy_enabled     = false
+  retention_policy_in_days      = 7
+  trust_policy_enabled          = false
+  zone_redundancy_enabled       = false
 
   lifecycle {
-    ignore_changes = [ public_network_access_enabled ]
+    ignore_changes = [public_network_access_enabled]
   }
-
-  identity {
-    type = "SystemAssigned"
-  }
-}
-
-resource "azurerm_role_assignment" "assignments_acr" {
-  for_each = local.container_registry_roles
-
-  principal_id         = each.value.principal_id
-  principal_type       = each.value.principal_type
-  role_definition_name = each.value.role_definition_name
-  scope                = azurerm_container_registry.this.id
 }
 
 resource "azurerm_monitor_diagnostic_setting" "container_registry" {
