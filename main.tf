@@ -233,22 +233,4 @@ module "vm_devops_win" {
 
   depends_on = [module.vnet_app[0].azure_files_config_vm_extension_id] # Ensure that Azure Files is configured
 }
-
-# module "petstore" {
-#   source = "./extras/modules/petstore"
-
-#   count = var.enable_module_petstore ? 1 : 0
-
-#   arm_client_secret          = var.arm_client_secret
-#   container_apps_subnet_id   = module.vnet_app[0].subnets["snet-containerapps-01"].id
-#   container_registry_id      = module.vnet_app[0].resource_ids["container_registry"]
-#   location                   = azurerm_resource_group.this.location
-#   log_analytics_workspace_id = module.vnet_shared.resource_ids["log_analytics_workspace"]
-#   private_endpoint_subnet_id = module.vnet_app[0].subnets["snet-privatelink-01"].id
-#   resource_group_name        = azurerm_resource_group.this.name
-#   tags                       = var.tags
-#   unique_seed                = module.naming.unique-seed
-
-#   depends_on = [module.vnet_app[0].azure_files_config_vm_extension_id] # Ensure that Azure Files is configured
-# }
 #endregion
