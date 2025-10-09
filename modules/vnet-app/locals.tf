@@ -1,5 +1,18 @@
 locals {
   local_scripts = {
+    configure_automation = {
+      name = "Set-AutomationAccountConfiguration.ps1"
+      parameters = [
+        "TenantId = '${data.azurerm_client_config.current.tenant_id}';",
+        "SubscriptionId = '${data.azurerm_client_config.current.subscription_id}';",
+        "ResourceGroupName = '${var.resource_group_name}';",
+        "AutomationAccountName = '${var.automation_account_name}';",
+        "VmJumpboxWinName = '${var.vm_jumpbox_win_name}';",
+        "AppId = '${data.azurerm_client_config.current.client_id}';",
+        "AppSecret = '${var.arm_client_secret}';"
+      ]
+    }
+
     provisioner_vm_windows = {
       name = "Register-DscNode.ps1"
       parameters = [
@@ -149,6 +162,18 @@ locals {
       route_table = "firewall"
     }
 
+    snet-containerapps-01 = {
+      address_prefix                    = var.subnet_containerapps_address_prefix
+      delegation                        = "Microsoft.App/environments"
+      private_endpoint_network_policies = "Disabled"
+      nsg_rules = [
+        "AllowVirtualNetworkInbound",
+        "AllowVirtualNetworkOutbound",
+        "AllowInternetOutbound"
+      ]
+      route_table = "firewall"
+    }
+
     snet-db-01 = {
       address_prefix                    = var.subnet_database_address_prefix
       delegation                        = ""
@@ -176,12 +201,9 @@ locals {
     snet-privatelink-01 = {
       address_prefix                    = var.subnet_privatelink_address_prefix
       delegation                        = ""
-      private_endpoint_network_policies = "Enabled"
-      nsg_rules = [
-        "AllowVirtualNetworkInbound",
-        "AllowVirtualNetworkOutbound"
-      ]
-      route_table = "firewall"
+      private_endpoint_network_policies = "Disabled"
+      nsg_rules                         = []
+      route_table                       = null
     }
   }
 

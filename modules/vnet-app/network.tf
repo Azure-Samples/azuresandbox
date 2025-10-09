@@ -32,7 +32,7 @@ resource "azurerm_subnet" "subnets" {
 }
 
 resource "azurerm_network_security_group" "groups" {
-  for_each = azurerm_subnet.subnets
+  for_each = { for k, v in local.subnets : k => v if length(v.nsg_rules) > 0 }
 
   name                = "${module.naming.network_security_group.name}.${each.key}"
   location            = var.location
@@ -62,10 +62,14 @@ resource "azurerm_network_security_rule" "rules" {
 }
 
 resource "azurerm_subnet_network_security_group_association" "associations" {
-  for_each = azurerm_subnet.subnets
+  for_each = azurerm_network_security_group.groups
 
   subnet_id                 = azurerm_subnet.subnets[each.key].id
   network_security_group_id = azurerm_network_security_group.groups[each.key].id
+
+  depends_on = [
+    azurerm_network_security_rule.rules
+  ]
 }
 
 # Peering with shared services virtual network
@@ -137,6 +141,33 @@ resource "azurerm_subnet_route_table_association" "associations" {
 #endregion 
 
 #region private-endpoints
+resource "azurerm_private_endpoint" "container_registry" {
+  name                = "${module.naming.private_endpoint.name}-acr"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  subnet_id           = azurerm_subnet.subnets["snet-privatelink-01"].id
+
+  private_service_connection {
+    name                           = "${module.naming.container_registry.name_unique}-psc"
+    private_connection_resource_id = azurerm_container_registry.this.id
+    is_manual_connection           = false
+    subresource_names              = ["registry"]
+  }
+
+
+  private_dns_zone_group {
+    name = "default"
+    private_dns_zone_ids = [azurerm_private_dns_zone.zones["privatelink.azurecr.io"].id
+    ]
+  }
+
+  depends_on = [
+    azurerm_virtual_network_peering.app_to_shared,
+    azurerm_virtual_network_peering.shared_to_app,
+    azapi_update_resource.storage_account_disable_public_access
+  ]
+}
+
 resource "azurerm_private_endpoint" "storage_blob" {
   name                = "${module.naming.private_endpoint.name}-storage-blob"
   resource_group_name = var.resource_group_name
@@ -150,19 +181,16 @@ resource "azurerm_private_endpoint" "storage_blob" {
     subresource_names              = ["blob"]
   }
 
+  private_dns_zone_group {
+    name = "default"
+    private_dns_zone_ids = [azurerm_private_dns_zone.zones["privatelink.blob.core.windows.net"].id]
+  }
+
   depends_on = [
     azurerm_virtual_network_peering.app_to_shared,
     azurerm_virtual_network_peering.shared_to_app,
     azapi_update_resource.storage_account_disable_public_access
   ]
-}
-
-resource "azurerm_private_dns_a_record" "storage_blob" {
-  name                = azurerm_storage_account.this.name
-  zone_name           = "privatelink.blob.core.windows.net"
-  resource_group_name = var.resource_group_name
-  ttl                 = 300
-  records             = [azurerm_private_endpoint.storage_blob.private_service_connection[0].private_ip_address]
 }
 
 resource "azurerm_private_endpoint" "storage_file" {
@@ -178,19 +206,16 @@ resource "azurerm_private_endpoint" "storage_file" {
     subresource_names              = ["file"]
   }
 
+  private_dns_zone_group {
+    name = "default"
+    private_dns_zone_ids = [azurerm_private_dns_zone.zones["privatelink.file.core.windows.net"].id]
+  }
+
   depends_on = [
     azurerm_virtual_network_peering.app_to_shared,
     azurerm_virtual_network_peering.shared_to_app,
     azapi_update_resource.storage_account_disable_public_access
   ]
-}
-
-resource "azurerm_private_dns_a_record" "storage_file" {
-  name                = azurerm_storage_account.this.name
-  zone_name           = "privatelink.file.core.windows.net"
-  resource_group_name = var.resource_group_name
-  ttl                 = 300
-  records             = [azurerm_private_endpoint.storage_file.private_service_connection[0].private_ip_address]
 }
 #endregion
 

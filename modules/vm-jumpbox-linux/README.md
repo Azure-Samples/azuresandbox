@@ -23,12 +23,19 @@ This configuration implements a Linux virtual machine for use as a jumpbox. The 
   * autofs
   * azure-cli
   * cifs-utils
+  * containerd.io
+  * docker-buildx-plugin
+  * docker-ce
+  * docker-ce-cli
+  * docker-compose-plugin
+  * helm
   * jp
   * keyutils
   * krb5-config
   * krb5-user
   * libnss-winbind
   * libpam-winbind
+  * notary
   * ntp
   * powershell
   * python3-pip
@@ -146,6 +153,12 @@ This section describes how to test the module after deployment.
 
     # Verify Terraform version
     terraform --version
+
+    # Test Docker Engine
+    sudo docker run hello-world
+
+    # Verify Helm version
+    helm version
     ```
 
   * Run the following Bash command to test SMB/cifs connectivity with Kerberos authentication to the Azure Files private endpoint:

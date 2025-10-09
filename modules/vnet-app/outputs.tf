@@ -9,6 +9,7 @@ output "private_dns_zones" {
 
 output "resource_ids" {
   value = {
+    container_registry       = azurerm_container_registry.this.id
     storage_account          = azurerm_storage_account.this.id
     storage_share            = azurerm_storage_share.this.id
     virtual_machine_jumpwin1 = azurerm_windows_virtual_machine.this.id
@@ -18,6 +19,7 @@ output "resource_ids" {
 
 output "resource_names" {
   value = {
+    container_registry       = azurerm_container_registry.this.name
     storage_account          = azurerm_storage_account.this.name
     storage_share            = azurerm_storage_share.this.name
     virtual_machine_jumpwin1 = azurerm_windows_virtual_machine.this.name

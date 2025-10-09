@@ -632,14 +632,14 @@ Secondary DNS Server | `168.63.129.16` | Azure Recursive DNS Resolver
 
 The following subnets are configured in *vnet-shared*:
 
-Subnet Name | Default CIDR | Min prefix length | NSG | Purpose
---- | --- | --- | --- | ---
-AzureBastionSubnet | `10.1.0.0/27` | `/27` | Yes | Reserved for Azure Bastion to provide secure RDP/SSH access to virtual machines.
-snet-adds-01 | `10.1.1.0/24` | `/27` | Yes | Hosts the Active Directory Domain Services (AD DS) domain controller and DNS server.
-snet-misc-01 | `10.1.2.0/24` | `/27` | Yes | Reserved for optional configurations requiring connectivity in the shared virtual network.
-snet-misc-02 | `10.1.3.0/24` | `/27` | Yes | Reserved for optional configurations requiring connectivity in the shared virtual network.
-AzureFirewallSubnet | `10.1.4.0/26` | `/26` | No | Reserved for Azure Firewall to provide network security.
-snet-privatelink-02 | `10.1.5.0/24` | `/27` | Yes | Reserved for private endpoints using Azure Private Link.
+Subnet Name | Default CIDR | Min prefix length | NSG | UDR | Purpose
+--- | --- | --- | --- | --- | ---
+AzureBastionSubnet | `10.1.0.0/27` | `/27` | Yes | No | Reserved for Azure Bastion to provide secure RDP/SSH access to virtual machines.
+snet-adds-01 | `10.1.1.0/24` | `/27` | Yes | Yes | Hosts the Active Directory Domain Services (AD DS) domain controller and DNS server.
+snet-misc-01 | `10.1.2.0/24` | `/27` | Yes | Yes | Reserved for optional configurations requiring connectivity in the shared virtual network.
+snet-misc-02 | `10.1.3.0/24` | `/27` | Yes | Yes | Reserved for optional configurations requiring connectivity in the shared virtual network.
+AzureFirewallSubnet | `10.1.4.0/26` | `/26` | No | No | Reserved for Azure Firewall to provide network security.
+snet-privatelink-02 | `10.1.5.0/24` | `/27` | No | No | Reserved for key vault private endpoint using Azure Private Link.
 
 The following private endpoints are configured in the *snet-privatelink-02* subnet to provide secure, network-isolated access to the following Azure PaaS services:
 
@@ -659,13 +659,14 @@ Secondary DNS Server | `168.63.129.16` | Azure Recursive DNS Resolver
 
 The following subnets are configured in *vnet-app*:
 
-Subnet Name | Default CIDR | Min prefix length | NSG | Purpose
---- | --- | --- | --- | ---
-snet-app-01 | `10.2.0.0/24` | `/27` | Yes | Reserved for web server, application server, and jumpbox VMs.
-snet-db-01 | `10.2.1.0/24` | `/27` | Yes | Reserved for Database Server VMs.
-snet-privatelink-01 | `10.2.2.0/24` | `/27` | Yes |Reserved for private endpoints using Azure Private Link.
-snet-misc-03 | `10.2.3.0/24` | `/27` | Yes | Reserved for future use.
-snet-appservice-01 | `10.2.4.0/24` | `/27` | Yes | Reserved for Azure App Service with delegation to `Microsoft.Web/serverFarms`.
+Subnet Name | Default CIDR | Min prefix length | NSG | UDR | Purpose
+--- | --- | --- | --- | --- | ---
+snet-app-01 | `10.2.0.0/24` | `/27` | Yes | Yes | Reserved for web server, application server, and jumpbox VMs.
+snet-db-01 | `10.2.1.0/24` | `/27` | Yes | Yes | Reserved for Database Server VMs.
+snet-privatelink-01 | `10.2.2.0/24` | `/27` | No | No | Reserved for private endpoints using Azure Private Link.
+snet-misc-03 | `10.2.3.0/24` | `/27` | Yes | Yes | Reserved for future use.
+snet-appservice-01 | `10.2.4.0/24` | `/27` | Yes | Yes | Reserved for Azure App Service with delegation to `Microsoft.Web/serverFarms`.
+snet-containerapps-01 | `10.2.5.0/24` | `/27` | Yes | Yes | Reserved for Azure Container Apps with delegation to `Microsoft.App/environments`.
 
 The following private endpoints are configured in the *snet-privatelink-01* subnet to provide secure, network-isolated access to the following Azure PaaS services:
 

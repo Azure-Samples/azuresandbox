@@ -27,7 +27,10 @@ resource "azurerm_windows_virtual_machine" "this" {
     type = "SystemAssigned"
   }
 
-  depends_on = [azurerm_private_dns_zone_virtual_network_link.vnet_app_links]
+  depends_on = [
+    azurerm_private_dns_zone_virtual_network_link.vnet_app_links,
+    null_resource.this
+  ]
 
   provisioner "local-exec" {
     command     = "$params = @{ ${join(" ", local.local_scripts["provisioner_vm_windows"].parameters)}}; ./${path.module}/scripts/${local.local_scripts["provisioner_vm_windows"].name} @params"

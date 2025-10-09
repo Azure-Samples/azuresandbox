@@ -12,12 +12,9 @@ resource "azurerm_private_endpoint" "this" {
     is_manual_connection           = false
     subresource_names              = ["mysqlServer"]
   }
-}
 
-resource "azurerm_private_dns_a_record" "this" {
-  name                = azurerm_mysql_flexible_server.this.name
-  zone_name           = "privatelink.mysql.database.azure.com"
-  resource_group_name = var.resource_group_name
-  ttl                 = 300
-  records             = [azurerm_private_endpoint.this.private_service_connection[0].private_ip_address]
+  private_dns_zone_group {
+    name                 = "default"
+    private_dns_zone_ids = [var.private_dns_zone_id]
+  }
 }

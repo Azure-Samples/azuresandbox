@@ -9,7 +9,7 @@ resource "azurerm_key_vault" "this" {
   resource_group_name           = var.resource_group_name
   tenant_id                     = data.azurerm_client_config.current.tenant_id
   sku_name                      = "standard"
-  enable_rbac_authorization     = true
+  rbac_authorization_enabled    = true
   public_network_access_enabled = false
 
   lifecycle {
@@ -29,18 +29,6 @@ resource "azurerm_role_assignment" "roles" {
 resource "azurerm_key_vault_secret" "spn_password" {
   name            = data.azurerm_client_config.current.client_id
   value           = var.arm_client_secret
-  key_vault_id    = azurerm_key_vault.this.id
-  expiration_date = timeadd(timestamp(), "8760h")
-  depends_on      = [time_sleep.wait_for_roles_and_public_access]
-
-  lifecycle {
-    ignore_changes = [expiration_date]
-  }
-}
-
-resource "azurerm_key_vault_secret" "log_primary_shared_key" {
-  name            = azurerm_log_analytics_workspace.this.workspace_id
-  value           = azurerm_log_analytics_workspace.this.primary_shared_key
   key_vault_id    = azurerm_key_vault.this.id
   expiration_date = timeadd(timestamp(), "8760h")
   depends_on      = [time_sleep.wait_for_roles_and_public_access]
@@ -73,6 +61,7 @@ resource "azurerm_key_vault_secret" "adminusername" {
     ignore_changes = [expiration_date]
   }
 }
+
 resource "azurerm_monitor_diagnostic_setting" "this" {
   name                       = "Audit Logs"
   target_resource_id         = azurerm_key_vault.this.id
@@ -129,8 +118,7 @@ resource "azapi_update_resource" "key_vault_disable_public_access" {
   depends_on = [
     azurerm_key_vault_secret.adminpassword,
     azurerm_key_vault_secret.adminusername,
-    azurerm_key_vault_secret.spn_password,
-    azurerm_key_vault_secret.log_primary_shared_key
+    azurerm_key_vault_secret.spn_password
   ]
 
   body = { properties = { publicNetworkAccess = "Disabled" } }

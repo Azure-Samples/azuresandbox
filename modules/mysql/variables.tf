@@ -51,6 +51,16 @@ variable "mysql_sku_name" {
   }
 }
 
+variable "private_dns_zone_id" {
+  type        = string
+  description = "The resource ID of the existing Private DNS Zone to link with the Private Endpoint."
+
+  validation {
+    condition     = can(regex("^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[a-zA-Z0-9-_()]+/providers/Microsoft.Network/privateDnsZones/[a-zA-Z0-9._()-]+$", var.private_dns_zone_id))
+    error_message = "Must be a valid Azure Resource ID for a Private DNS Zone. It should follow the format '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/privateDnsZones/{zoneName}'."
+  }
+}
+
 variable "resource_group_name" {
   type        = string
   description = "The name of the existing resource group for provisioning resources."
