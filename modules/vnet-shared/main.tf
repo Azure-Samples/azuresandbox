@@ -9,7 +9,7 @@ resource "azurerm_key_vault" "this" {
   resource_group_name           = var.resource_group_name
   tenant_id                     = data.azurerm_client_config.current.tenant_id
   sku_name                      = "standard"
-  enable_rbac_authorization     = true
+  rbac_authorization_enabled    = true
   public_network_access_enabled = false
 
   lifecycle {
