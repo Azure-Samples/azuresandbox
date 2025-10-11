@@ -124,6 +124,7 @@ locals {
 
   private_dns_zones = [
     "privatelink.api.azureml.ms",
+    "privatelink.${var.location}.azurecontainerapps.io",
     "privatelink.azurecr.io",
     "privatelink.blob.core.windows.net",
     "privatelink.cognitiveservices.azure.com",

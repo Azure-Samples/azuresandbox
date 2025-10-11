@@ -30,6 +30,7 @@ This module adds an implementation of [Azure AI Foundry](https://learn.microsoft
 * [ai-foundry](./modules/ai-foundry/) enables the use of an [Azure AI Foundry hub](https://learn.microsoft.com/en-us/azure/ai-foundry/concepts/ai-resources) in a sandbox environment.
 * [vm-devops-win](./modules/vm-devops-win/) implements a collection of identical Windows developer VMs.
 * [vnet-onprem](./modules/vnet-onprem/) simulates connectivity to an on-premises network using a site-to-site VPN connection and Azure DNS private resolver.
+* [petstore](./modules/petstore/) deploys a sample microservices application using Azure Container Apps with a private endpoint.
 
 ## Demo videos
 
