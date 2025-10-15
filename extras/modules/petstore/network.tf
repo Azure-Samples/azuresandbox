@@ -1,6 +1,5 @@
-# Private endpoint for Container Apps Environment (requires Consumption + Dedicated)
 resource "azurerm_private_endpoint" "this" {
-  name                = "${module.naming.container_app_environment.name_unique}-pe"
+  name                = "${module.naming.private_endpoint.name}-cae"
   location            = var.location
   resource_group_name = var.resource_group_name
   subnet_id           = var.private_endpoint_subnet_id

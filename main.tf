@@ -249,5 +249,7 @@ module "petstore" {
   resource_group_name        = azurerm_resource_group.this.name
   tags                       = var.tags
   unique_seed                = module.naming.unique-seed
+
+  depends_on = [module.vnet_app[0].azure_files_config_vm_extension_id] # Ensure that Azure Files is configured
 }
 #endregion

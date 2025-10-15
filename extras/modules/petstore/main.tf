@@ -12,7 +12,8 @@ resource "azurerm_container_app" "this" {
 
   depends_on = [
     null_resource.this,
-    azurerm_role_assignment.this
+    azurerm_role_assignment.this,
+    azurerm_private_endpoint.this
   ]
 
   template {
@@ -32,7 +33,7 @@ resource "azurerm_container_app" "this" {
   }
 
   ingress {
-    external_enabled           = true
+    external_enabled           = true # "External" means this container app can be accessed from outside the container app environment
     transport                  = "auto"
     allow_insecure_connections = false
     target_port                = 8080
