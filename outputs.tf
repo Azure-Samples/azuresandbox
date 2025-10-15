@@ -3,6 +3,10 @@ output "client_cert_pem" {
   value       = length(module.vwan) == 1 ? module.vwan[0].client_cert_pem : null
 }
 
+output "petstore_fqdn" {
+  description = "The FQDN of the container app"
+  value       = length(module.petstore) == 1 ? module.petstore[0].petstore_fqdn : null
+}
 
 output "resource_ids" {
   value = merge(
