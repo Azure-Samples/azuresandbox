@@ -1,24 +1,3 @@
-variable "admin_password" {
-  type        = string
-  description = "The password used when provisioning administrator accounts. This should be a strong password that meets Azure's complexity requirements."
-  sensitive   = true
-
-  validation {
-    condition     = length(var.admin_password) >= 8 && can(regex("[A-Z]", var.admin_password)) && can(regex("[a-z]", var.admin_password)) && can(regex("[0-9]", var.admin_password)) && can(regex("[!@#$%^&*()_+=\\[\\]{};':\"\\\\|,.<>/?-]", var.admin_password))
-    error_message = "Password must be at least 8 characters long and include uppercase, lowercase, number, and special character."
-  }
-}
-
-variable "admin_username" {
-  type        = string
-  description = "The user name used when provisioning administrator accounts. This should conform to Windows username requirements (alphanumeric characters, periods, underscores, and hyphens, 1-20 characters)."
-
-  validation {
-    condition     = can(regex("^[a-zA-Z0-9._-]{1,20}$", var.admin_username))
-    error_message = "Must conform to Windows username requirements: it can only contain alphanumeric characters, periods (.), underscores (_), and hyphens (-), and must be between 1 and 20 characters long."
-  }
-}
-
 variable "location" {
   type        = string
   description = "The name of the Azure Region where resources will be provisioned."
@@ -91,5 +70,25 @@ variable "unique_seed" {
   validation {
     condition     = can(regex("^[a-zA-Z0-9-]{1,64}$", var.unique_seed))
     error_message = "Must only contain alphanumeric characters and hyphens (-), and must be between 1 and 32 characters long."
+  }
+}
+
+variable "user_name" {
+  type        = string
+  description = "The user name of the user in Microsoft Entra ID."
+
+  validation {
+    condition = can(regex("^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]@[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]\\.[a-zA-Z]{2,}$", var.user_name))
+    error_message = "Must be a valid User Principal Name (UPN) format like 'user@domain.com'. The username part must start and end with alphanumeric characters and can contain periods (.), underscores (_), or hyphens (-). The domain must be a valid domain name."
+  }
+}
+
+variable "user_object_id" {
+  type        = string
+  description = "The object id of the user in Microsoft Entra ID."
+
+  validation {
+    condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.user_object_id))
+    error_message = "Must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
   }
 }

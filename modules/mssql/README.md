@@ -29,14 +29,14 @@ This section describes how to test the module after deployment.
   * Verify the *IP4Address* returned is within the subnet IP address prefix for *vnet_app[0].subnets["snet-privatelink-01"]*, e.g. `10.2.2.*`.
 * From *jumpwin1*, test SQL Server Connectivity with SQL Server Management Studio (SSMS)
   * Navigate to *Start* > *Microsoft SQL Server Tools 21* > *Microsoft SQL Server Management Studio 21*
+  * Sign in using the same Entra ID work account you used to log in with Azure CLI / Azure PowerShell
   * Connect to the network isolated Azure SQL Database server
     * Server properties:
-      * Server name: *YOUR-AZURE-SQL-SERVER-NAME-HERE.database.windows.net*
-      * Authentication: *SQL Server Authentication*
-      * Login: *bootstrapadmin*
-      * Password: Use the value stored in the *adminpassword* key vault secret
-    * Connection security properties:
-      * Encryption: *Strict (SQL Server 2022 and Azure SQL)*
+      * Server name: *your-azure-sql-server-name-here.database.windows.net*
+      * Authentication: *Microsoft Entra MFA*
+      * Username: UPN of the Entra ID account you signed in with
+      * Encrypt: *Mandatory*
+      * Trust Server Certificate: enabled
   * Expand the *Databases* tab and verify you can see *testdb*
 
 ## Documentation
