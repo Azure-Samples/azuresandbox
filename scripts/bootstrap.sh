@@ -66,6 +66,7 @@ fi
 
 # Set default user from currently logged in Azure CLI user.
 default_user_object_id=$(az account get-access-token --query accessToken --output tsv | tr -d '\n' | python3 -c "import jwt, sys; print(jwt.decode(sys.stdin.read(), algorithms=['RS256'], options={'verify_signature': False})['oid'])")
+default_user_name=$(az ad user show --id $default_user_object_id --query userPrincipalName --output tsv)
 
 # Set default Microsoft Entra tenant id from currently logged in Azure CLI user.
 default_aad_tenant_id=$(az account show --query tenantId --output tsv)
@@ -73,6 +74,7 @@ default_aad_tenant_id=$(az account show --query tenantId --output tsv)
 # Get user input
 read -e                             -p "Service principal appId (arm_client_id) -----------------: " arm_client_id
 read -e -i $default_aad_tenant_id   -p "Microsoft Entra tenant id (aad_tenant_id) ---------------: " aad_tenant_id
+read -e -i $default_user_name       -p "User name for Azure CLI signed in user (user_name) ------: " user_name
 read -e -i $default_user_object_id  -p "Object id for Azure CLI signed in user (user_object_id) -: " user_object_id
 read -e -i $default_subscription_id -p "Azure subscription id (subscription_id) -----------------: " subscription_id
 read -e -i $default_location        -p "Azure location (location) -------------------------------: " location
@@ -158,6 +160,7 @@ printf "aad_tenant_id   = \"$aad_tenant_id\"\n"     > ./terraform.tfvars
 printf "arm_client_id   = \"$arm_client_id\"\n"     >> ./terraform.tfvars
 printf "location        = \"$location\"\n"          >> ./terraform.tfvars
 printf "subscription_id = \"$subscription_id\"\n"   >> ./terraform.tfvars
+printf "user_name       = \"$user_name\"\n"         >> ./terraform.tfvars
 printf "user_object_id  = \"$user_object_id\"\n"    >> ./terraform.tfvars
 printf "\ntags = $tags\n"                           >> ./terraform.tfvars
 printf "\n# Enable modules here\n\n"                >> ./terraform.tfvars

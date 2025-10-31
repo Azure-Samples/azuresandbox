@@ -4,10 +4,14 @@ resource "azurerm_mssql_server" "this" {
   resource_group_name           = var.resource_group_name
   location                      = var.location
   version                       = "12.0"
-  administrator_login           = var.admin_username
-  administrator_login_password  = var.admin_password
   minimum_tls_version           = "1.2"
   public_network_access_enabled = false
+
+  azuread_administrator {
+    azuread_authentication_only = true
+    login_username              = var.user_name
+    object_id                   = var.user_object_id
+  }
 
   lifecycle {
     ignore_changes = [

@@ -108,14 +108,14 @@ module "mssql" {
 
   count = var.enable_module_mssql ? 1 : 0
 
-  admin_password      = module.vnet_shared.admin_password
-  admin_username      = module.vnet_shared.admin_username
   location            = azurerm_resource_group.this.location
   private_dns_zone_id = module.vnet_app[0].private_dns_zones["privatelink.database.windows.net"].id
   resource_group_name = azurerm_resource_group.this.name
   subnet_id           = module.vnet_app[0].subnets["snet-privatelink-01"].id
   tags                = var.tags
   unique_seed         = module.naming.unique-seed
+  user_name           = var.user_name
+  user_object_id      = var.user_object_id
 
   depends_on = [module.vnet_app[0].resource_ids] # Ensure vnet-app module resources are provisioned
 }
