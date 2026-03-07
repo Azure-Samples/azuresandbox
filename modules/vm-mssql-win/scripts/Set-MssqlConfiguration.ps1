@@ -1,4 +1,5 @@
-# This script must be run on a domain joined Azure VM
+# This script must be run on a domain joined Azure VM provisioned with a Windows Server 2025 / SQL Server 2025 platform image
+# This script is only tested with vm size Standard_D4ds_v6
 
 param (
     [Parameter(Mandatory = $true)]
@@ -559,8 +560,27 @@ foreach ( $volume in $volumes) {
         Write-Log "Altering tempdb and setting log file location to '$filePath'..."
         Invoke-Sql $sqlCommand
 
-        Restart-SqlServer                            
+        Restart-SqlServer
         
+        # Configure page file on temporary disk
+
+        # 1) Disable automatic pagefile management (global checkbox)
+        $cs = Get-CimInstance -ClassName Win32_ComputerSystem
+        Set-CimInstance -InputObject $cs -Property @{ AutomaticManagedPagefile = $false } | Out-Null
+        # AutomaticManagedPagefile is a Win32_ComputerSystem property [3](https://learn.microsoft.com/en-us/troubleshoot/windows-server/performance/memory-dump-file-options)
+
+        # 2) Configure PagingFiles registry value (this is what Win32_PageFileSetting maps to)
+        $bootPFMB  = 4096  # 4GB fixed on C:
+        $pagingFiles = @(
+        "C:\pagefile.sys $bootPFMB $bootPFMB"
+        "$($volume.DriveLetter):\pagefile.sys 0 0"
+        )
+
+        Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management' `
+        -Name 'PagingFiles' -Value $pagingFiles
+
+        Write-Host "Paging file configuration written. Reboot is required to apply." -ForegroundColor Yellow
+
         continue 
     }
 

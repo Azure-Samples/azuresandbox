@@ -31,6 +31,7 @@ param (
 
 #region constants
 $TaskName = 'Set-MssqlConfiguration'
+$RebootTaskName = 'Set-MssqlConfiguration-Reboot'
 $MaxTaskAttempts = 10
 $SCHED_S_TASK_RUNNING = 0x00041301
 #endregion
@@ -222,6 +223,34 @@ try {
 catch {
     Exit-WithError $_
 }
+
+# Register one-time reboot task to run one minute from now.
+$rebootTaskRunAt = (Get-Date).AddMinutes(1)
+Write-Log "Registering one-time reboot scheduled task '$RebootTaskName' to run at '$rebootTaskRunAt' as '$domainAdminUser'..."
+
+$rebootTaskAction = New-ScheduledTaskAction `
+    -Execute 'powershell.exe' `
+    -Argument '-ExecutionPolicy Unrestricted -Command "Restart-Computer -Force"'
+
+$rebootTaskTrigger = New-ScheduledTaskTrigger -Once -At $rebootTaskRunAt
+
+try {
+    Register-ScheduledTask `
+        -Force `
+        -Password $adminPwd `
+        -User $domainAdminUser `
+        -TaskName $RebootTaskName `
+        -Action $rebootTaskAction `
+        -Trigger $rebootTaskTrigger `
+        -RunLevel 'Highest' `
+        -Description "Force reboot after SQL configuration completes." `
+        -ErrorAction Stop
+}
+catch {
+    Exit-WithError $_
+}
+
+Write-Log "One-time reboot scheduled task '$RebootTaskName' created successfully. Exiting without waiting for execution..."
 
 Write-Log "'$PSCommandPath' exiting normally..."
 Exit 0
