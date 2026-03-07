@@ -46,7 +46,6 @@ locals {
       ]
     }
 
-
     startup = {
       name       = "Set-MssqlStartupConfiguration.ps1"
       parameters = null
@@ -56,20 +55,29 @@ locals {
       name       = "Set-MssqlConfiguration.ps1"
       parameters = null
     }
+
+    readme = {
+      name       = "DATALOSS_WARNING_README.txt"
+      parameters = null
+    }
   }
 
   disks = {
     sqldata = {
-      name         = "vol_sqldata_M",
-      disk_size_gb = "128",
-      lun          = "0",
-      caching      = "ReadOnly"
+      name                      = "vol_sqldata_M"
+      disk_size_gb              = "128" # min setting, adjust as needed
+      lun                       = "0" 
+      caching                   = "None" # Premium SSD v2 does not support host caching
+      disk_iops_read_write      = "3000" # min setting, adjust as needed
+      disk_mbps_read_write      = "125" # min setting, adjust as needed
     },
     sqllog = {
-      name         = "vol_sqllog_L",
-      disk_size_gb = "32",
-      lun          = "1",
-      caching      = "None"
+      name                      = "vol_sqllog_L"
+      disk_size_gb              = "32" # min setting, adjust as needed
+      lun                       = "1" 
+      caching                   = "None"
+      disk_iops_read_write      = "3000" # min setting, adjust as needed
+      disk_mbps_read_write      = "125" # min setting, adjust as needed
     }
   }
 

@@ -41,6 +41,25 @@ function Write-Log {
     "$(Get-Date -Format FileDateTimeUniversal) : $msg" | Out-File -FilePath $logpath -Append -Force
 }
 
+function Write-InputParameters {
+    param(
+        [hashtable]$Parameters
+    )
+
+    Write-Log "Input parameters provided to script:"
+
+    foreach ($key in ($Parameters.Keys | Sort-Object)) {
+        $value = $Parameters[$key]
+
+        if ($null -eq $value) {
+            Write-Log "Parameter '$key' = <null>"
+            continue
+        }
+
+        Write-Log "Parameter '$key' = '$value'"
+    }
+}
+
 function Exit-WithError {
     param( [string]$msg )
     Write-Log "There was an exception during the process, please review..."
@@ -52,16 +71,20 @@ function Exit-WithError {
 #region main
 $logpath = $PSCommandPath + '.log'
 Write-Log "Running '$PSCommandPath'..."
+Write-InputParameters -Parameters $PSBoundParameters
 
 # Install Powershell Az module
 Write-Log "Installing NuGet package provider..."
-Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force 
+Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -ForceBootstrap -Scope AllUsers -Confirm:$false 
 
-Write-Log "installing PowerShellGet..."
-Install-Module -Name PowerShellGet -MinimumVersion 2.2.4.1 -Scope AllUsers -Force
+Write-Log "Configuring PSGallery installation policy 'Trusted'..."
+Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
 
-Write-Log "Installing PowerShell Az module..."
-Install-Module -Name Az -Repository PSGallery -Scope AllUsers -Force
+Write-Log "Installing PowerShell Az.Accounts module..."
+Install-Module -Name Az.Accounts -Repository PSGallery -Scope AllUsers -Force -AllowClobber
+
+Write-Log "Installing PowerShell Az.KeyVault module..."
+Install-Module -Name Az.KeyVault -Repository PSGallery -Scope AllUsers -Force -AllowClobber
 
 # Log into Azure
 Write-Log "Logging into Azure using managed identity..."

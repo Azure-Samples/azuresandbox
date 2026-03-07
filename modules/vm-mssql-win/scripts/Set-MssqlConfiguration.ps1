@@ -267,10 +267,52 @@ function Grant-SqlFullContol {
         Exit-WithError $_
     }
 }
+
+function Get-MatchingAzureDataDiskBySize {
+    param (
+        [Parameter(Mandatory = $true)]
+        $Disk,
+
+        [Parameter(Mandatory = $true)]
+        $AzureDataDisks
+    )
+
+    $diskSizeBytes = [int64]$Disk.Size
+    $matchingAzureDataDisk = $AzureDataDisks |
+        Where-Object { ([int64]$_.diskSizeGb * 1GB) -eq $diskSizeBytes } |
+        Select-Object -First 1
+
+    if ($null -eq $matchingAzureDataDisk) {
+        Exit-WithError "Unable to locate Azure data disk matching local disk '$($Disk.UniqueId)' with size '$($Disk.Size / 1Gb) Gb'..."
+    }
+
+    Write-Log "Disk '$($Disk.UniqueId)' matched to Azure data disk '$($matchingAzureDataDisk.name)' by size '$($matchingAzureDataDisk.diskSizeGb) Gb'..."
+    return $matchingAzureDataDisk
+}
+
+function Write-InputParameters {
+    param(
+        [hashtable]$Parameters
+    )
+
+    Write-Log "Input parameters provided to script:"
+
+    foreach ($key in ($Parameters.Keys | Sort-Object)) {
+        $value = $Parameters[$key]
+
+        if ($null -eq $value) {
+            Write-Log "  $key = <null>"
+            continue
+        }
+
+        Write-Log "Parameter '$key' = '$value'"
+    }
+}
 #endregion
 
 #region main
 Write-Log "Running '$PSCommandPath'..."
+Write-InputParameters -Parameters $PSBoundParameters
 
 # Log into Azure
 Write-Log "Logging into Azure using managed identity..."
@@ -298,19 +340,23 @@ if ([string]::IsNullOrEmpty($adminPwd)) {
 
 Write-Log "The length of secret '$AdminPwdSecret' is '$($adminPwd.Length)'..."
 
-# Initialize data disks
+# Initialize RAW disks
 $localRawDisks = Get-Disk | Where-Object PartitionStyle -eq 'RAW'
 
 if ($null -eq $localRawDisks ) {
-    Write-Log "No local raw disks found..."
-    Exit
+    Write-Log "No local raw disks found, exiting..."
+    Exit 0
 }
 else {
     if ($null -eq $localRawDisks.Count) {
         Write-Log "Located 1 local raw disk..."
+        Exit-WithError "Expecting 3 local raw disks..."
     }
     else {
-        Write-Log "Located $($localRawDisks.Count) local raw disks..."    
+        Write-Log "Located $($localRawDisks.Count) local raw disks..."
+        if ($localRawDisks.Count -ne 3) {
+            Exit-WithError "Expecting 3 local raw disks..."
+        }
     }
 }
 
@@ -318,10 +364,13 @@ foreach ( $disk in $localRawDisks ) {
     Write-Log "$('=' * 80)"
     Write-Log "Local disk DiskNumber -----: $($disk.DiskNumber)"
     Write-Log "Local disk UniqueId -------: $($disk.UniqueId)"
-    Write-Log "Local disk PartitionStyle -: $($disk.PartitionStyle)"
+    Write-Log "Local disk FriendlyName ---: $($disk.FriendlyName)"
     Write-Log "Local disk Size -----------: $($disk.Size / 1Gb) Gb"
     Write-Log "Local disk Location -------: $($disk.Location)"
     Write-Log "Local disk BusType --------: $($disk.BusType)"
+    Write-Log "Local disk Model ----------: $($disk.Model)"
+    Write-Log "Local disk SerialNumber ---: $($disk.SerialNumber)"
+    Write-Log "Local disk Path -----------: $($disk.Path)"
 }
 
 Write-Log "$('=' * 80)"
@@ -334,41 +383,57 @@ if (($null -eq $azureDataDisks) -or ($azureDataDisks.Count -eq 0)) {
 
 if ($null -eq $azureDataDisks.Count) {
     Write-Log "Located 1 attached Azure data disk..."
+    Exit-WithError "Expecting 2 attached Azure data disks..."
 }
 else {
     Write-Log "Located $($azureDataDisks.Count) attached Azure data disks..."
+    if ($azureDataDisks.Count -ne 2) {
+        Exit-WithError "Expecting 2 attached Azure data disks..."
+    }
 }
 
 foreach ( $azureDataDisk in $azureDataDisks ) {
     Write-Log "$('=' * 80)"
-    Write-Log "Azure data disk name ------: $($azureDataDisk.name)"
-    Write-Log "Azure data disk size ------: $($azureDataDisk.diskSizeGb) Gb"
-    Write-Log "Azure data disk LUN -------: $($azureDataDisk.lun)"
+    Write-Log "Azure data disk name --------: $($azureDataDisk.name)"
+    Write-Log "Azure data disk size --------: $($azureDataDisk.diskSizeGb) Gb"
+    Write-Log "Azure data disk caching -----: $($azureDataDisk.caching)"
+    Write-Log "Azure data disk resource id -: $($azureDataDisk.managedDisk.id)"
+    Write-Log "Azure data disk sku ---------: $($azureDataDisk.managedDisk.storageAccountType)"
+    Write-Log "Azure data disk createOpt ---: $($azureDataDisk.createOption)"
+    Write-Log "Azure data disk deleteOpt ---: $($azureDataDisk.deleteOption)"
+    Write-Log "Azure data disk LUN ---------: $($azureDataDisk.lun)"
 }
 
-# Partition and format disks
+# Partition and format RAW disks
 foreach ($disk in $localRawDisks) {
     Write-Log "$('=' * 80)"
 
-    $lun = $disk.Location.Split(":").Trim() -match 'LUN' -replace 'LUN ', ''
-    
-    if ($null -eq $azureDataDisks.Count) {
-        $azureDataDisk = $azureDataDisks
+    $tempDiskFriendlyName = "Microsoft NVMe Direct Disk v2"
+    $dataDiskFriendlyName = "Virtual_Disk NVME Ultra"
 
-        if ($azureDataDisk.lun -ne $lun) {
-            Exit-WithError "Unable to locate Azure data disk with LUN '$lun'..."
-        }
+    if ($disk.FriendlyName -eq $tempDiskFriendlyName) {
+        Write-Log "Disk '$($disk.UniqueId)' identified as local temporary disk based on friendly name '$tempDiskFriendlyName'..."
+        $fileSystemLabel = "Temporary Storage"
+        $driveLetter = "T"
+    }
+    elseif ($disk.FriendlyName -eq $dataDiskFriendlyName) {
+        Write-Log "Disk '$($disk.UniqueId)' identified as Azure data disk based on friendly name '$dataDiskFriendlyName'..."
+
+        $azureDataDisk = Get-MatchingAzureDataDiskBySize -Disk $disk -AzureDataDisks $azureDataDisks
+        
+        $fileSystemLabel = $azureDataDisk.name.Split("-").Trim()[3]
+        $driveLetter = $fileSystemLabel.Substring($fileSystemLabel.Length - 1, 1)
+
+        $matchedAzureDiskResourceId = $azureDataDisk.managedDisk.id
+        $azureDataDisks = @($azureDataDisks | Where-Object { $_.managedDisk.id -ne $matchedAzureDiskResourceId })
+        Write-Log "Removed matched Azure data disk '$($azureDataDisk.name)' from future matching candidates..."
     }
     else {
-        $azureDataDisk = $azureDataDisks | Where-Object lun -eq $lun
-
-        if ($null -eq $azureDataDisk) {
-            Exit-WithError "Unable to locate Azure data disk with LUN '$lun'..."
-        }
+        Exit-WithError "Unable to identify RAW disk '$($disk.UniqueId)' with friendly name '$($disk.FriendlyName)' as either local temporary disk or Azure data disk..."
     }
 
     $partitionStyle = "GPT"
-    Write-Log "Initializing disk '$($disk.UniqueId)' using parition style '$partitionStyle'..."
+    Write-Log "Initializing disk '$($disk.UniqueId)' using partition style '$partitionStyle'..."
     
     try {
         Initialize-Disk -UniqueId $disk.UniqueId -PartitionStyle $partitionStyle -Confirm:$false | Out-Null
@@ -377,10 +442,7 @@ foreach ($disk in $localRawDisks) {
         Exit-WithError $_
     }
 
-    $fileSystemLabel = $azureDataDisk.name.Split("-").Trim()[3]
-    $driveLetter = $fileSystemLabel.Substring($fileSystemLabel.Length - 1, 1)
-
-    Write-Log "Partitioning disk '$($disk.UniqueId)' using maximum volume size '$($azureDataDisk.diskSizeGb)' Gb and drive letter '$($driveLetter):'..."
+    Write-Log "Partitioning disk '$($disk.UniqueId)' using maximum volume size and drive letter '$($driveLetter):'..."
 
     try {
         New-Partition -DiskId $disk.UniqueId -UseMaximumSize -DriveLetter $driveLetter | Out-Null
@@ -427,11 +489,14 @@ $volumeIndex = -1
 foreach ( $volume in $volumes) {
     $volumeIndex ++ 
     Write-Log "$('=' * 80)"
-    Write-Log "Volume index -------------: $volumeIndex"
-    Write-Log "Volume DriveLetter -------: $($volume.DriveLetter)"
-    Write-Log "Volume FileSystemLabel ---: $($volume.FileSystemLabel)"
-    Write-Log "Volume FileSystemType ----: $($volume.FileSystemType)"
-    Write-Log "Volume DriveType ---------: $($volume.DriveType)"
+    Write-Log "Volume index ----------------: $volumeIndex"
+    Write-Log "Volume FileSystemType -------: $($volume.FileSystemType)"
+    Write-Log "Volume Size -----------------: $($volume.Size / 1Gb) Gb"
+    Write-Log "Volume Path -----------------: $($volume.Path)"
+    Write-Log "Volume DriveLetter ----------: $($volume.DriveLetter)"
+    Write-Log "Volume FileSystemLabel ------: $($volume.FileSystemLabel)"
+    Write-Log "Volume DriveType ------------: $($volume.DriveType)"    
+
     
     if ( $volume.FileSystemLabel -in @( 'System Reserved', 'Windows', 'Recovery' ) ) {
         Write-Log "Skipping FileSystemLabel '$($volume.FileSystemLabel)'..."
@@ -449,11 +514,27 @@ foreach ( $volume in $volumes) {
     }
 
     if ( $volume.FileSystemLabel -eq "Temporary Storage" ) {
-        Write-Log "Located local temporary disk at '$($volume.DriveLetter)'..."
+        Write-Log "Located local temporary disk at '$($volume.DriveLetter):'..."
+
+        $warningReadmeSourcePath = Join-Path -Path (Split-Path -Path $PSCommandPath -Parent) -ChildPath "DATALOSS_WARNING_README.txt"
+        $warningReadmeDestinationPath = "$($volume.DriveLetter):\DATALOSS_WARNING_README.txt"
+
+        if (-not (Test-Path -Path $warningReadmeSourcePath -PathType Leaf)) {
+            Exit-WithError "Unable to locate required file '$warningReadmeSourcePath'..."
+        }
+
+        Write-Log "Copying '$warningReadmeSourcePath' to '$warningReadmeDestinationPath'..."
+        try {
+            Copy-Item -Path $warningReadmeSourcePath -Destination $warningReadmeDestinationPath -Force -ErrorAction Stop
+        }
+        catch {
+            Exit-WithError "Failed to copy '$warningReadmeSourcePath' to '$warningReadmeDestinationPath'. $_"
+        }
+
         $path = "$($volume.DriveLetter):\SQLTEMP"
 
         if ( -not ( Test-Path $path ) ) {
-            Write-Log "Creating $path..."
+            Write-Log "Creating file path '$path'..."
 
             try {
                 New-Item -ItemType Directory -Path $path -Force 

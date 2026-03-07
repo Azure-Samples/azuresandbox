@@ -1,21 +1,25 @@
 #region resources
 resource "azurerm_windows_virtual_machine" "this" {
-  name                       = var.vm_mssql_win_name
-  resource_group_name        = var.resource_group_name
-  location                   = var.location
-  size                       = var.vm_mssql_win_size
+  name                = var.vm_mssql_win_name
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  zone                = var.vm_mssql_win_zone 
+
   admin_username             = var.admin_username
   admin_password             = var.admin_password
+  disk_controller_type       = "NVMe"
+  encryption_at_host_enabled = true
   network_interface_ids      = [azurerm_network_interface.this.id]
   patch_assessment_mode      = "AutomaticByPlatform"
-  provision_vm_agent         = true
-  encryption_at_host_enabled = true
-  
-  depends_on                 = [null_resource.this]
+  secure_boot_enabled        = true
+  size                       = var.vm_mssql_win_size
+  vtpm_enabled               = true
+
+  depends_on = [null_resource.this]
 
   os_disk {
     caching              = "ReadWrite"
-    storage_account_type = var.vm_mssql_win_storage_account_type
+    storage_account_type = var.vm_mssql_win_storage_account_type_os_disk
   }
 
   source_image_reference {
@@ -38,12 +42,16 @@ resource "azurerm_windows_virtual_machine" "this" {
 resource "azurerm_managed_disk" "disks" {
   for_each = local.disks
 
-  name                 = "${module.naming.managed_disk.name}-${each.value.name}"
-  location             = var.location
-  resource_group_name  = var.resource_group_name
-  storage_account_type = var.vm_mssql_win_storage_account_type
+  resource_group_name = var.resource_group_name
+  name                = "${module.naming.managed_disk.name}-${each.value.name}"
+  location            = var.location
+  zone                = var.vm_mssql_win_zone
+
   create_option        = "Empty"
   disk_size_gb         = each.value.disk_size_gb
+  disk_iops_read_write = each.value.disk_iops_read_write
+  disk_mbps_read_write = each.value.disk_mbps_read_write
+  storage_account_type = var.vm_mssql_win_storage_account_type_data_disks
 }
 
 resource "azurerm_virtual_machine_data_disk_attachment" "attachments" {
@@ -71,6 +79,7 @@ resource "azurerm_virtual_machine_extension" "this" {
   type                       = "CustomScriptExtension"
   type_handler_version       = "1.10"
   auto_upgrade_minor_version = true
+
   depends_on = [
     azurerm_virtual_machine_data_disk_attachment.attachments,
     time_sleep.wait_for_roles_and_public_access,
