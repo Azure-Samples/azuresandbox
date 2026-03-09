@@ -19,6 +19,14 @@ param (
 $logpath = $PSCommandPath + '.log'
 $usernameSecretSecure = ConvertTo-SecureString -String $UsernameSecret -AsPlainText -Force
 $usernameSecretSecure.MakeReadOnly()
+$dataLossWarningReadmeContent = @"
+WARNING: THIS IS A TEMPORARY DISK.
+Any data stored on this drive is SUBJECT TO LOSS and THERE IS NO WAY TO RECOVER IT.
+Please do not use this disk for storing any personal or application data.
+
+For additional details to please refer to the MSDN documentation at:
+https://learn.microsoft.com/en-us/azure/virtual-machines/managed-disks-overview#temporary-disk
+"@
 #endregion
 
 #region functions
@@ -517,19 +525,14 @@ foreach ( $volume in $volumes) {
     if ( $volume.FileSystemLabel -eq "Temporary Storage" ) {
         Write-Log "Located local temporary disk at '$($volume.DriveLetter):'..."
 
-        $warningReadmeSourcePath = Join-Path -Path (Split-Path -Path $PSCommandPath -Parent) -ChildPath "DATALOSS_WARNING_README.txt"
         $warningReadmeDestinationPath = "$($volume.DriveLetter):\DATALOSS_WARNING_README.txt"
 
-        if (-not (Test-Path -Path $warningReadmeSourcePath -PathType Leaf)) {
-            Exit-WithError "Unable to locate required file '$warningReadmeSourcePath'..."
-        }
-
-        Write-Log "Copying '$warningReadmeSourcePath' to '$warningReadmeDestinationPath'..."
+        Write-Log "Creating '$warningReadmeDestinationPath' from embedded script content..."
         try {
-            Copy-Item -Path $warningReadmeSourcePath -Destination $warningReadmeDestinationPath -Force -ErrorAction Stop
+            Set-Content -Path $warningReadmeDestinationPath -Value $dataLossWarningReadmeContent -Force -ErrorAction Stop
         }
         catch {
-            Exit-WithError "Failed to copy '$warningReadmeSourcePath' to '$warningReadmeDestinationPath'. $_"
+            Exit-WithError "Failed to create '$warningReadmeDestinationPath' from embedded content. $_"
         }
 
         $path = "$($volume.DriveLetter):\SQLTEMP"

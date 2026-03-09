@@ -1,4 +1,4 @@
-$path = "D:\SQLTEMP"
+$path = "T:\SQLTEMP"
 
 if ( -not ( Test-Path $path ) ) {
     New-Item -ItemType Directory -Path $path -Force 

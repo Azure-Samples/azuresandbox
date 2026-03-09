@@ -55,11 +55,6 @@ locals {
       name       = "Set-MssqlConfiguration.ps1"
       parameters = null
     }
-
-    readme = {
-      name       = "DATALOSS_WARNING_README.txt"
-      parameters = null
-    }
   }
 
   disks = {
