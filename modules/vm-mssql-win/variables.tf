@@ -185,17 +185,6 @@ variable "tags" {
   }
 }
 
-variable "temp_disk_size_mb" {
-  type        = number
-  description = "The size of the temporary disk in MB."
-  default     = 225280 # Standard_D4ds_v6 temp disk size is 220Gb
-
-  validation {
-    condition     = var.temp_disk_size_mb >= 0
-    error_message = "Must be greater than or equal to 0."
-  }
-}
-
 variable "vm_mssql_win_image_offer" {
   type        = string
   description = "The offer type of the virtual machine image used to create the database server VM"

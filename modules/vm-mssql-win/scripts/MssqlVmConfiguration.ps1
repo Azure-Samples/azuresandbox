@@ -33,6 +33,24 @@ configuration MssqlVmConfiguration {
             DependsOn = '[Computer]JoinDomain'
         }
 
+        Firewall EnableWmiFirewallGroup
+        {
+            Name = 'EnableWmiFirewallGroup'   
+            Group = 'Windows Management Instrumentation (WMI)'
+            Ensure = 'Present'
+            Enabled = 'True'
+            DependsOn = '[Computer]JoinDomain'
+        }
+
+        Firewall EnableRemoteServiceMgmtFirewallGroup
+        {
+            Name = 'EnableRemoteServiceMgmtFirewallGroup'
+            Group = 'Remote Service Management'
+            Ensure = 'Present'
+            Enabled = 'True'
+            DependsOn = '[Computer]JoinDomain'
+        }
+
         SqlLogin DomainAdmin {
             Name = $domainAdminShortCredential.UserName
             LoginType = 'WindowsUser'

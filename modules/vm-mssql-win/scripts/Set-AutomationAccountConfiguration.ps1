@@ -1,4 +1,10 @@
 #!/usr/bin/env pwsh
+
+# Registers a DSC node for the specified VM to the specified Azure Automation account.
+
+# This script has only been tested under the following conditions:
+# - PowerShell 7.x running on Ubuntu 22.04
+
 #region params
 param (
     [Parameter(Mandatory = $true)]
@@ -15,7 +21,7 @@ param (
 
     [Parameter(Mandatory = $true)]
     [String]$VmMssqlWinName,
-    
+
     [Parameter(Mandatory = $true)]
     [String]$AppId,
 
@@ -25,14 +31,14 @@ param (
 #endregion
 
 #region functions
-function Write-Log {
+function Write-ScriptLog {
     param( [string] $msg)
-    "$(Get-Date -Format FileDateTimeUniversal) : $msg" | Write-Host
+    "$(Get-Date -Format FileDateTimeUniversal) : $msg" | Write-Verbose
 }
 function Exit-WithError {
     param( [string]$msg )
-    Write-Log "There was an exception during the process, please review..."
-    Write-Log $msg
+    Write-ScriptLog "There was an exception during the process, please review..."
+    Write-ScriptLog $msg
     Exit 2
 }
 function Import-Module-Custom {
@@ -50,7 +56,7 @@ function Import-Module-Custom {
         [String]$ModuleUri
     )
 
-    Write-Log "Importing module '$ModuleName'..."
+    Write-ScriptLog "Importing module '$ModuleName'..."
     $automationModule = Get-AzAutomationModule -ResourceGroupName $ResourceGroupName -AutomationAccountName $AutomationAccountName | Where-Object { $_.Name -eq $ModuleName }
 
     if ($null -eq $automationModule) {
@@ -60,7 +66,7 @@ function Import-Module-Custom {
                 -ContentLinkUri $ModuleUri `
                 -ResourceGroupName $ResourceGroupName `
                 -AutomationAccountName $AutomationAccountName `
-                -ErrorAction Stop            
+                -ErrorAction Stop
         }
         catch {
             Exit-WithError $_
@@ -70,12 +76,12 @@ function Import-Module-Custom {
     if ($automationModule.ProvisioningState -ne 'Created') {
         while ($true) {
             $automationModule = Get-AzAutomationModule -Name $ModuleName -ResourceGroupName $ResourceGroupName -AutomationAccountName $AutomationAccountName
-        
+
             if (($automationModule.ProvisioningState -eq 'Succeeded') -or ($automationModule.ProvisioningState -eq 'Failed') -or ($automationModule.ProvisioningState -eq 'Created')) {
                 break
             }
 
-            Write-Log "Module '$($automationModule.Name)' provisioning state is '$($automationModule.ProvisioningState)'..."
+            Write-ScriptLog "Module '$($automationModule.Name)' provisioning state is '$($automationModule.ProvisioningState)'..."
             Start-Sleep -Seconds 10
         }
     }
@@ -84,7 +90,7 @@ function Import-Module-Custom {
         Exit-WithError "Module '$($automationModule.Name)' import failed..."
     }
 
-    Write-Log "Module '$($automationModule.Name)' provisioning state is '$($automationModule.ProvisioningState)'..."
+    Write-ScriptLog "Module '$($automationModule.Name)' provisioning state is '$($automationModule.ProvisioningState)'..."
 }
 function Import-DscConfiguration {
     param(
@@ -100,10 +106,10 @@ function Import-DscConfiguration {
         [Parameter(Mandatory = $true)]
         [String]$DscConfigurationScript
     )
-    
-    Write-Log "Importing DSC configuration '$DscConfigurationName' from '$DscConfigurationScript'..."
+
+    Write-ScriptLog "Importing DSC configuration '$DscConfigurationName' from '$DscConfigurationScript'..."
     $dscConfigurationScriptPath = Join-Path $PSScriptRoot $DscConfigurationScript
-    
+
     try {
         Import-AzAutomationDscConfiguration `
             -SourcePath $dscConfigurationScriptPath `
@@ -121,6 +127,7 @@ function Import-DscConfiguration {
 }
 
 function Start-DscCompilationJob {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'One-time run script invoked non-interactively.')]
     param(
         [Parameter(Mandatory = $true)]
         [String]$ResourceGroupName,
@@ -135,7 +142,7 @@ function Start-DscCompilationJob {
         [String]$VirtualMachineName
     )
 
-    Write-Log "Compiling DSC Configuration '$DscConfigurationName'..."
+    Write-ScriptLog "Compiling DSC Configuration '$DscConfigurationName'..."
 
     $params = @{
         ComputerName = $VirtualMachineName
@@ -162,12 +169,12 @@ function Start-DscCompilationJob {
     catch {
         Exit-WithError $_
     }
-    
+
     $jobId = $dscCompilationJob.Id
-    
+
     while (-not $dscCompilationJob.Exception) {
         $dscCompilationJob = $dscCompilationJob | Get-AzAutomationDscCompilationJob
-        Write-Log "DSC compilation job ID '$jobId' status is '$($dscCompilationJob.Status)'..."
+        Write-ScriptLog "DSC compilation job ID '$jobId' status is '$($dscCompilationJob.Status)'..."
 
         if ($dscCompilationJob.Status -in @("Queued", "Starting", "Resuming", "Running", "Stopping", "Suspending", "Activating", "New")) {
             Start-Sleep -Seconds 10
@@ -182,7 +189,7 @@ function Start-DscCompilationJob {
         # Anything else is an unexpected status
         Exit-WithError "DSC compilation job ID '$jobId' returned unexpected status '$($dscCompilationJob.Status)'..."
     }
-    
+
     if ($dscCompilationJob.Exception) {
         Exit-WithError "DSC compilation job ID '$jobId' failed with an exception..."
     }
@@ -194,10 +201,10 @@ function Start-DscCompilationJob {
 #endregion
 
 #region main
-Write-Log "Running '$PSCommandPath'..."
+Write-ScriptLog "Running '$PSCommandPath'..."
 
 # Log into Azure
-Write-Log "Logging into Azure using service principal id '$AppId'..."
+Write-ScriptLog "Logging into Azure using service principal id '$AppId'..."
 
 $AppSecretSecure = ConvertTo-SecureString $AppSecret -AsPlainText -Force
 $spCredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $AppId, $AppSecretSecure
@@ -210,7 +217,7 @@ catch {
 }
 
 # Set default subscription
-Write-Log "Setting default subscription to '$SubscriptionId'..."
+Write-ScriptLog "Setting default subscription to '$SubscriptionId'..."
 
 try {
     Set-AzContext -Subscription $SubscriptionId | Out-Null
@@ -226,7 +233,7 @@ if ($null -eq $automationAccount) {
     Exit-WithError "Automation account '$AutomationAccountName' was not found..."
 }
 
-Write-Log "Located automation account '$AutomationAccountName' in resource group '$ResourceGroupName'"
+Write-ScriptLog "Located automation account '$AutomationAccountName' in resource group '$ResourceGroupName'"
 
 # Bootstrap automation modules
 Import-Module-Custom `

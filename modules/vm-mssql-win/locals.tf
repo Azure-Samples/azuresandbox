@@ -41,8 +41,7 @@ locals {
         "KeyVaultName = '${var.key_vault_name}';",
         "Domain = '${var.adds_domain_name}';",
         "AdminUsernameSecret = '${var.admin_username_secret}';",
-        "AdminPwdSecret = '${var.admin_password_secret}';",
-        "TempDiskSizeMb = '${var.temp_disk_size_mb}'"
+        "AdminPwdSecret = '${var.admin_password_secret}'"
       ]
     }
 

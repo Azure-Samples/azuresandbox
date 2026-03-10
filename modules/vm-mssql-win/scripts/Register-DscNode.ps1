@@ -1,5 +1,10 @@
 #!/usr/bin/env pwsh
 
+# Registers a DSC node for the specified VM to the specified Azure Automation account.
+
+# This script has only been tested under the following conditions:
+# - PowerShell 7.x running on Ubuntu 22.04
+
 #region parameters
 param (
     [Parameter(Mandatory = $true)]
@@ -32,15 +37,15 @@ param (
 #endregion
 
 #region functions
-function Write-Log {
+function Write-ScriptLog {
     param( [string] $msg)
-    "$(Get-Date -Format FileDateTimeUniversal) : $msg" | Write-Host
+    "$(Get-Date -Format FileDateTimeUniversal) : $msg" | Write-Verbose
 }
 
 function Exit-WithError {
     param( [string]$msg )
-    Write-Log "There was an exception during the process, please review..."
-    Write-Log $msg
+    Write-ScriptLog "There was an exception during the process, please review..."
+    Write-ScriptLog $msg
     Exit 2
 }
 
@@ -76,12 +81,12 @@ function Register-DscNode {
     }
 
     if ($null -eq $dscNodes) {
-        Write-Log "No existing DSC node registrations for '$VirtualMachineName' with node configuration '$nodeConfigName' found..."
+        Write-ScriptLog "No existing DSC node registrations for '$VirtualMachineName' with node configuration '$nodeConfigName' found..."
     }
     else {
         foreach ($dscNode in $dscNodes) {
             $dscNodeId = $dscNode.Id
-            Write-Log "Unregistering DSC node registration '$dscNodeId'..."
+            Write-ScriptLog "Unregistering DSC node registration '$dscNodeId'..."
 
             try {
                 Unregister-AzAutomationDscNode `
@@ -96,7 +101,7 @@ function Register-DscNode {
         }
     }
 
-    Write-Log "Checking for node configuration '$nodeConfigName'..."
+    Write-ScriptLog "Checking for node configuration '$nodeConfigName'..."
 
     try {
         $nodeConfig = Get-AzAutomationDscNodeConfiguration `
@@ -110,14 +115,14 @@ function Register-DscNode {
     }
 
     $rollupStatus = $nodeConfig.RollupStatus
-    Write-Log "DSC node configuration '$nodeConfigName' RollupStatus is '$($rollupStatus)'..."
+    Write-ScriptLog "DSC node configuration '$nodeConfigName' RollupStatus is '$($rollupStatus)'..."
 
     if ($rollupStatus -ne 'Good'){
         Exit-WithError "Invalid DSC node configuration RollupStatus..."
     }
 
-    Write-Log "Registering DSC node '$VirtualMachineName' with node configuration '$nodeConfigName'..."
-    Write-Log "Warning, this process can take several minutes and the VM will be rebooted..."
+    Write-ScriptLog "Registering DSC node '$VirtualMachineName' with node configuration '$nodeConfigName'..."
+    Write-ScriptLog "Warning, this process can take several minutes and the VM will be rebooted..."
 
     Register-AzAutomationDscNode `
         -ResourceGroupName $ResourceGroupName `
@@ -133,9 +138,9 @@ function Register-DscNode {
         -ActionAfterReboot 'ContinueConfiguration' `
         -ErrorAction SilentlyContinue
 
-    Write-Log "Sleeping for 60 seconds before checking node status..."    
+    Write-ScriptLog "Sleeping for 60 seconds before checking node status..."
     Start-Sleep -Seconds 60
-    
+
     try {
         $dscNodes = Get-AzAutomationDscNode `
             -ResourceGroupName $ResourceGroupName `
@@ -154,8 +159,8 @@ function Register-DscNode {
     $dscNode = $dscNodes[0]
     $dscNodeId = $dscNode.Id
     $dscNodeStatus = $dscNode.Status
-    Write-Log "DSC node registration id '$dscNodeId' found with status '$dscNodeStatus'..."    
-    
+    Write-ScriptLog "DSC node registration id '$dscNodeId' found with status '$dscNodeStatus'..."
+
     $maxRetries = 30
     $retryCount = 0
     $statusCompliant = "Compliant"
@@ -176,24 +181,24 @@ function Register-DscNode {
         $dscNode = $dscNodes[0]
         $dscNodeId = $dscNode.Id
         $dscNodeStatus = $dscNode.Status
-        Write-Log "Retry '$retryCount': DSC node registration id '$dscNodeId' status is '$dscNodeStatus'..."
+        Write-ScriptLog "Retry '$retryCount': DSC node registration id '$dscNodeId' status is '$dscNodeStatus'..."
 
         if ($dscNodeStatus -ne $statusCompliant) {
-            Write-Log "DSC node status is not '$statusCompliant'. Retrying in 30 seconds..."
+            Write-ScriptLog "DSC node status is not '$statusCompliant'. Retrying in 30 seconds..."
             Start-Sleep -Seconds 30
         }
     }
 
     if ($dscNodeStatus -ne $statusCompliant) {
         Exit-WithError "DSC node status did not reach '$statusCompliant' after $maxRetries attempts."
-    }    
+    }
 }
 #endregion
 
 #region main
-Write-Log "Running '$PSCommandPath'..."
+Write-ScriptLog "Running '$PSCommandPath'..."
 
-Write-Log "Logging into Azure using service principal id '$AppId'..."
+Write-ScriptLog "Logging into Azure using service principal id '$AppId'..."
 
 $AppSecretSecure = ConvertTo-SecureString $AppSecret -AsPlainText -Force
 $spCredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $AppId, $AppSecretSecure
@@ -206,7 +211,7 @@ catch {
 }
 
 # Set default subscription
-Write-Log "Setting default subscription to '$SubscriptionId'..."
+Write-ScriptLog "Setting default subscription to '$SubscriptionId'..."
 
 try {
     Set-AzContext -Subscription $SubscriptionId | Out-Null
@@ -222,7 +227,7 @@ if ($null -eq $automationAccount) {
     Exit-WithError "Automation account '$AutomationAccountName' was not found..."
 }
 
-Write-Log "Located automation account '$AutomationAccountName' in resource group '$ResourceGroupName'"
+Write-ScriptLog "Located automation account '$AutomationAccountName' in resource group '$ResourceGroupName'"
 
 # Register DSC Node
 Register-DscNode `
