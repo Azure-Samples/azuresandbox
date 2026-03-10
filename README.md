@@ -754,7 +754,7 @@ Virtual Machine | Role | Module | Operating System
 --- | --- | --- | ---
 adds1 | AD DS Domain Controller / DNS Server | vnet-shared | Windows Server 2025 Datacenter Azure Edition Core
 jumpwin1 | Windows Jumpbox VM | vnet-app | Windows Server 2025 Datacenter Azure Edition
-mssqlwin1 | Windows SQL Server VM | vm-mssql-win | Windows Server 2022 / SQL Server 2022 Developer Edition
+mssqlwin1 | Windows SQL Server VM | vm-mssql-win | Windows Server 2025 / SQL Server 2025 Enterprise Developer Edition
 jumplinux1 | Linux Jumpbox VM | vm-jumpbox-linux | Ubuntu Server LTS 24.04 (Nobel Numbat)
 
 ---

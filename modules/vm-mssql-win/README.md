@@ -37,7 +37,7 @@ This section describes how to test the module after deployment.
 
   * Verify the IPAddress returned is within the subnet IP address prefix for *vnet_app[0].subnets["snet-db-01"]*, e.g. `10.2.1.*`.
 * From *jumpwin1*, test SQL Server Connectivity with SQL Server Management Studio (SSMS)
-  * Navigate to *Start* > *Microsoft SQL Server Tools 21* > *Microsoft SQL Server Management Studio 21*
+  * Navigate to *Start* > *Microsoft SQL Server Tools 22* > *Microsoft SQL Server Management Studio 22*
   * Connect to the default instance of SQL Server installed on the SQL Server virtual machine using the following settings:
     * Server
       * Server type: *Database Engine*
@@ -98,7 +98,7 @@ This section lists input variables used in this module. Defaults can be overridd
 Variable | Default | Description
 --- | --- | ---
 adds_domain_name | mysandbox.local | The domain name defined in the vnet-shared module.
-admin_password | | The password used when provisioning administrator accounts. This should conform to Windows password requirements (uppercase, lowercase, number, special character, 8-16 characters). Defined in the vnet-shared module.
+admin_password | | The password used when provisioning administrator accounts. This should conform to Windows password requirements (uppercase, lowercase, number, special character, 8 characters minimum). Defined in the vnet-shared module.
 admin_password_secret | adminpassword | The name of the key vault secret that contains the password for the admin account. Defined in the vnet-shared module.
 admin_username | bootstrapadmin | The user name used when provisioning administrator accounts. This should conform to Windows username requirements (alphanumeric characters, periods, underscores, and hyphens, 1-20 characters). Defined in the vnet-shared module.
 admin_username_secret | adminuser | The name of the key vault secret that contains the user name for the admin account. Defined in the vnet-shared module.
@@ -107,6 +107,7 @@ automation_account_name | aa-sand-dev | The name of the Azure Automation Account
 key_vault_id | | The ID of the key vault defined in the root module.
 key_vault_name | | The name of the key vault defined in the root module.
 location | | The name of the Azure Region where resources will be provisioned.
+resource_group_id | | The id of the resource group defined in the root module.
 resource_group_name | | The name of the resource group defined in the root module.
 storage_account_id | | The ID of the storage account defined in the vnet-app module.
 storage_account_name | | The name of the storage account defined in the vnet-app module.
@@ -114,14 +115,14 @@ storage_container_name | scripts | The name of the storage container defined in 
 storage_blob_endpoint | | The blob endpoint for the storage account defined in the vnet-app module.
 subnet_id | | The subnet ID defined in the vnet-app module.
 tags | | The tags from the root module.
-temp_disk_size_mb | 0 | The size of the temporary disk for the VM size selected. Should be > 0 for "diskful" VM sizes.
 vm_mssql_win_image_offer | `sql2025-ws2025` | The offer type of the virtual machine image used to create the SQL Server VM.
 vm_mssql_win_image_publisher | `MicrosoftSQLServer` | The publisher for the virtual machine image used to create the SQL Server VM.
 vm_mssql_win_image_sku | `entdev-gen2` | The SKU of the virtual machine image used to create the SQL Server VM.
 vm_mssql_win_image_version | `Latest` | The version of the virtual machine image used to create the SQL Server VM.
 vm_mssql_win_name | mssqlwin1 | The name of the SQL Server VM.
 vm_mssql_win_size | `Standard_D4ds_v6` | The size of the virtual machine. Tempdb will be configured to use the local temp disk disk for "diskful" sizes, or moved to the data disk for sizes that are not "diskful".
-vm_mssql_win_storage_account_type | `StandardSSD_LRS` | The storage type to be used for the VM's OS and data disks.
+vm_mssql_win_storage_account_type_data_disks | `PremiumV2_LRS` | The storage type to be used for the VM's data disks.
+vm_mssql_win_storage_account_type_os_disk | `Premium_LRS` | The storage type to be used for the VM's OS disk.
 
 ### Module Resources
 
