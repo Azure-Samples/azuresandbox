@@ -51,6 +51,15 @@ configuration MssqlVmConfiguration {
             DependsOn = '[Computer]JoinDomain'
         }
 
+        Firewall EnableRemoteProcedureCallFirewallGroup
+        {
+            Name = 'EnableRemoteProcedureCallFirewallGroup'
+            Group = 'Remote Procedure Call'
+            Ensure = 'Present'
+            Enabled = 'True'
+            DependsOn = '[Computer]JoinDomain'
+        }
+
         SqlLogin DomainAdmin {
             Name = $domainAdminShortCredential.UserName
             LoginType = 'WindowsUser'
