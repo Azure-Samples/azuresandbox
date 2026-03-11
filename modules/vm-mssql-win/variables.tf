@@ -100,6 +100,16 @@ variable "location" {
   }
 }
 
+variable "resource_group_id" {
+  type        = string
+  description = "The ID of the existing resource group for provisioning resources."
+
+  validation {
+    condition     = can(regex("^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[a-zA-Z0-9-_()]+$", var.resource_group_id))
+    error_message = "Must be a valid Azure Resource ID for a resource group. It should follow the format '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}'."
+  }
+}
+
 variable "resource_group_name" {
   type        = string
   description = "The name of the existing resource group for provisioning resources."
@@ -175,21 +185,10 @@ variable "tags" {
   }
 }
 
-variable "temp_disk_size_mb" {
-  type        = number
-  description = "The size of the temporary disk in MB."
-  default     = 0
-
-  validation {
-    condition     = var.temp_disk_size_mb >= 0
-    error_message = "Must be greater than or equal to 0."
-  }
-}
-
 variable "vm_mssql_win_image_offer" {
   type        = string
   description = "The offer type of the virtual machine image used to create the database server VM"
-  default     = "sql2022-ws2022"
+  default     = "sql2025-ws2025"
 
   validation {
     condition     = can(regex("^[a-zA-Z0-9-._]{1,64}$", var.vm_mssql_win_image_offer))
@@ -211,7 +210,7 @@ variable "vm_mssql_win_image_publisher" {
 variable "vm_mssql_win_image_sku" {
   type        = string
   description = "The sku of the virtual machine image used to create the database server VM"
-  default     = "sqldev-gen2"
+  default     = "entdev-gen2"
 
   validation {
     condition     = can(regex("^[a-zA-Z0-9-._]{1,64}$", var.vm_mssql_win_image_sku))
@@ -244,7 +243,7 @@ variable "vm_mssql_win_name" {
 variable "vm_mssql_win_size" {
   type        = string
   description = "The size of the virtual machine"
-  default     = "Standard_B4s_v2"
+  default     = "Standard_D4ds_v6" # use az-vm list-skus to determine if this size is available in your region
 
   validation {
     condition     = can(regex("^[a-zA-Z0-9_]+$", var.vm_mssql_win_size))
@@ -252,13 +251,35 @@ variable "vm_mssql_win_size" {
   }
 }
 
-variable "vm_mssql_win_storage_account_type" {
-  type        = string
-  description = "The storage type to be used for the VMs OS disk"
-  default     = "StandardSSD_LRS"
+variable "vm_mssql_win_storage_account_type_data_disks" {
+  type = string
+  description = "The storage type to be used for the VMs data disks."
+  default = "PremiumV2_LRS"
 
   validation {
-    condition     = contains(["Standard_LRS", "Premium_LRS", "StandardSSD_LRS", "Premium_ZRS", "StandardSSD_ZRS"], var.vm_mssql_win_storage_account_type)
+    condition     = contains(["Standard_LRS", "StandardSSD_ZRS", "Premium_LRS", "PremiumV2_LRS", "Premium_ZRS", "StandardSSD_LRS", "UltraSSD_LRS" ], var.vm_mssql_win_storage_account_type_data_disks)
+    error_message = "The 'vm_mssql_win_storage_account_type_data_disks' must be one of the valid Azure storage SKUs for managed disks: 'Standard_LRS', 'StandardSSD_LRS', 'StandardSSD_ZRS', 'Premium_LRS', 'PremiumV2_LRS', 'Premium_ZRS', or 'UltraSSD_LRS'."
+  }
+}
+
+variable "vm_mssql_win_storage_account_type_os_disk" {
+  type        = string
+  description = "The storage type to be used for the VMs OS disk"
+  default     = "Premium_LRS"
+
+  validation {
+    condition     = contains(["Standard_LRS", "StandardSSD_LRS", "Premium_LRS", "StandardSSD_ZRS", "Premium_ZRS" ], var.vm_mssql_win_storage_account_type_os_disk)
     error_message = "The 'vm_mssql_win_storage_account_type' must be one of the valid Azure storage SKUs for managed disks: 'Standard_LRS', 'Premium_LRS', 'StandardSSD_LRS', 'Premium_ZRS', or 'StandardSSD_ZRS'."
+  }
+}
+
+variable "vm_mssql_win_zone" {
+  type        = string
+  description = "The availability zone for the virtual machine."
+  default     = "2" # use az-vm list-skus to determine if this size is available in your region / zone
+
+  validation {
+    condition     = contains(["1", "2", "3"], var.vm_mssql_win_zone)
+    error_message = "Must be a valid Azure availability zone: '1', '2', or '3'."
   }
 }

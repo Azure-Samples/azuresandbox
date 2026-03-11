@@ -92,6 +92,7 @@ module "vm_mssql_win" {
   key_vault_id            = module.vnet_shared.resource_ids["key_vault"]
   key_vault_name          = module.vnet_shared.resource_names["key_vault"]
   location                = azurerm_resource_group.this.location
+  resource_group_id       = azurerm_resource_group.this.id
   resource_group_name     = azurerm_resource_group.this.name
   storage_account_id      = module.vnet_app[0].resource_ids["storage_account"]
   storage_account_name    = module.vnet_app[0].resource_names["storage_account"]
