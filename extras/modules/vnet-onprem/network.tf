@@ -25,7 +25,7 @@ resource "azurerm_virtual_network_gateway" "this" {
   type                       = "Vpn"
   vpn_type                   = "RouteBased"
   active_active              = false
-  enable_bgp                 = true
+  bgp_enabled                = true
   sku                        = "VpnGw1"
   generation                 = "Generation1"
   private_ip_address_enabled = false
@@ -75,7 +75,7 @@ resource "azurerm_virtual_network_gateway_connection" "this" {
   local_network_gateway_id   = azurerm_local_network_gateway.this.id
   type                       = "IPsec"
   connection_protocol        = "IKEv2"
-  enable_bgp                 = true
+  bgp_enabled                = true
   shared_key                 = var.admin_password
 
   depends_on = [ azurerm_subnet.subnets ]
