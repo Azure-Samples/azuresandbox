@@ -2,6 +2,7 @@ version: 2
 updates:
   - package-ecosystem: terraform
     directory: "/"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
@@ -15,6 +16,7 @@ updates:
 
   - package-ecosystem: terraform
     directory: "/modules/mssql"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
@@ -27,6 +29,7 @@ updates:
 
   - package-ecosystem: terraform
     directory: "/modules/mysql"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
@@ -39,6 +42,7 @@ updates:
 
   - package-ecosystem: terraform
     directory: "/modules/vm-jumpbox-linux"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
@@ -51,6 +55,7 @@ updates:
 
   - package-ecosystem: terraform
     directory: "/modules/vm-mssql-win"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
@@ -63,6 +68,7 @@ updates:
 
   - package-ecosystem: terraform
     directory: "/modules/vnet-app"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
@@ -75,6 +81,7 @@ updates:
 
   - package-ecosystem: terraform
     directory: "/modules/vnet-shared"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
@@ -87,6 +94,7 @@ updates:
 
   - package-ecosystem: terraform
     directory: "/modules/vwan"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
@@ -99,6 +107,7 @@ updates:
 
   - package-ecosystem: terraform
     directory: "/extras/configurations/rg-devops-iac"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
@@ -111,6 +120,7 @@ updates:
 
   - package-ecosystem: terraform
     directory: "/extras/configurations/rg-devops-iac/modules/vm-jumpbox-linux"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
@@ -123,6 +133,7 @@ updates:
 
   - package-ecosystem: terraform
     directory: "/extras/modules/ai-foundry"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
@@ -135,6 +146,7 @@ updates:
 
   - package-ecosystem: terraform
     directory: "/extras/modules/avd"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
@@ -147,6 +159,7 @@ updates:
 
   - package-ecosystem: terraform
     directory: "/extras/modules/petstore"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
@@ -159,6 +172,7 @@ updates:
 
   - package-ecosystem: terraform
     directory: "/extras/modules/vm-devops-win"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
@@ -171,6 +185,7 @@ updates:
 
   - package-ecosystem: terraform
     directory: "/extras/modules/vnet-onprem"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
