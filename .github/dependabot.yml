@@ -2,121 +2,196 @@ version: 2
 updates:
   - package-ecosystem: terraform
     directory: "/"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
       time: "08:00"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
     open-pull-requests-limit: 20
 
   - package-ecosystem: terraform
     directory: "/modules/mssql"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
       time: "08:05"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/modules/mysql"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
       time: "08:06"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/modules/vm-jumpbox-linux"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
       time: "08:07"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/modules/vm-mssql-win"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
       time: "08:08"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/modules/vnet-app"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
       time: "08:09"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/modules/vnet-shared"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
       time: "08:10"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/modules/vwan"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
       time: "08:11"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/extras/configurations/rg-devops-iac"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
       time: "08:12"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/extras/configurations/rg-devops-iac/modules/vm-jumpbox-linux"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
       time: "08:13"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/extras/modules/ai-foundry"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
       time: "08:14"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/extras/modules/avd"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
       time: "08:15"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/extras/modules/petstore"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
       time: "08:16"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/extras/modules/vm-devops-win"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
       time: "08:17"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/extras/modules/vnet-onprem"
+    target-branch: "vnext"
     schedule:
       interval: weekly
       day: monday
       time: "08:18"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
