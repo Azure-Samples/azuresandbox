@@ -7,6 +7,10 @@ updates:
       day: monday
       time: "08:00"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
     open-pull-requests-limit: 20
 
   - package-ecosystem: terraform
@@ -16,6 +20,10 @@ updates:
       day: monday
       time: "08:05"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/modules/mysql"
@@ -24,6 +32,10 @@ updates:
       day: monday
       time: "08:06"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/modules/vm-jumpbox-linux"
@@ -32,6 +44,10 @@ updates:
       day: monday
       time: "08:07"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/modules/vm-mssql-win"
@@ -40,6 +56,10 @@ updates:
       day: monday
       time: "08:08"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/modules/vnet-app"
@@ -48,6 +68,10 @@ updates:
       day: monday
       time: "08:09"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/modules/vnet-shared"
@@ -56,6 +80,10 @@ updates:
       day: monday
       time: "08:10"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/modules/vwan"
@@ -64,6 +92,10 @@ updates:
       day: monday
       time: "08:11"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/extras/configurations/rg-devops-iac"
@@ -72,6 +104,10 @@ updates:
       day: monday
       time: "08:12"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/extras/configurations/rg-devops-iac/modules/vm-jumpbox-linux"
@@ -80,6 +116,10 @@ updates:
       day: monday
       time: "08:13"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/extras/modules/ai-foundry"
@@ -88,6 +128,10 @@ updates:
       day: monday
       time: "08:14"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/extras/modules/avd"
@@ -96,6 +140,10 @@ updates:
       day: monday
       time: "08:15"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/extras/modules/petstore"
@@ -104,6 +152,10 @@ updates:
       day: monday
       time: "08:16"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/extras/modules/vm-devops-win"
@@ -112,6 +164,10 @@ updates:
       day: monday
       time: "08:17"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
 
   - package-ecosystem: terraform
     directory: "/extras/modules/vnet-onprem"
@@ -120,3 +176,7 @@ updates:
       day: monday
       time: "08:18"
       timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
