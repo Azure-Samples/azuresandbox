@@ -82,7 +82,7 @@ resource "azurerm_virtual_machine_extension" "this" {
 
   depends_on = [
     azurerm_virtual_machine_data_disk_attachment.attachments,
-    time_sleep.wait_for_roles_and_public_access,
+    time_sleep.wait_for_roles,
     azurerm_storage_blob.remote_scripts
   ]
 

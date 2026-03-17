@@ -272,3 +272,48 @@ module "avd" {
   depends_on = [module.vnet_app[0].azure_files_config_vm_extension_id] # Ensure that Azure Files is configured
 }
 #endregion
+
+#region public-access-management
+# Centralized disable of public access on shared resources using implicit dependency barriers.
+# Each barrier collects completion signals from all modules that perform data plane operations
+# requiring public access. The disable resource references the barrier's output, creating an
+# implicit dependency chain — no explicit depends_on needed.
+
+resource "terraform_data" "key_vault_access_barrier" {
+  input = {
+    key_vault_id     = module.vnet_shared.resource_ids["key_vault"]
+    vnet_shared      = module.vnet_shared.key_vault_operations_complete
+    vwan             = var.enable_module_vwan ? module.vwan[0].key_vault_operations_complete : null
+    vm_jumpbox_linux = var.enable_module_vm_jumpbox_linux ? module.vm_jumpbox_linux[0].key_vault_operations_complete : null
+  }
+}
+
+resource "azapi_update_resource" "key_vault_disable_public_access" {
+  type        = "Microsoft.KeyVault/vaults@2024-11-01"
+  resource_id = terraform_data.key_vault_access_barrier.output.key_vault_id
+
+  body = { properties = { publicNetworkAccess = "Disabled" } }
+}
+
+resource "terraform_data" "storage_access_barrier" {
+  count = var.enable_module_vnet_app ? 1 : 0
+
+  input = {
+    storage_account_id = module.vnet_app[0].resource_ids["storage_account"]
+    vnet_app           = module.vnet_app[0].storage_operations_complete
+    vm_mssql_win       = var.enable_module_vm_mssql_win ? module.vm_mssql_win[0].storage_operations_complete : null
+    ai_foundry         = var.enable_module_ai_foundry ? module.ai_foundry[0].storage_operations_complete : null
+    vm_devops_win      = var.enable_module_vm_devops_win ? module.vm_devops_win[0].storage_operations_complete : null
+  }
+}
+
+resource "azapi_update_resource" "storage_disable_public_access" {
+  count = var.enable_module_vnet_app ? 1 : 0
+
+  type        = "Microsoft.Storage/storageAccounts@2023-05-01"
+  resource_id = terraform_data.storage_access_barrier[0].output.storage_account_id
+
+  body = { properties = { publicNetworkAccess = "Disabled" } }
+}
+
+#endregion

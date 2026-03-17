@@ -472,12 +472,7 @@ Follow these steps to validate and apply the configuration:
 
   * If you are provisioning a brand new sandbox, you will see a lot of `+` signs in the output. This indicates that new resources will be created if this plan is applied. If you are updating an existing sandbox, you may see `~` signs indicating that existing resources will be updated. If you see `-` signs, this indicates that existing resources will be deleted. Be careful with these operations as they may cause data loss.
 
-  * **IMPORTANT:** Public network access is disabled by default in the service firewall for both the storage account and key vault. This may cause errors during plan creation because your Terraform execution environment is blocked by the service firewall. To work around this you can manually modify the service firewall using a couple of different approaches:
-
-    * Add the client ip for your Terraform execution environment to the service firewall whitelist. This should work from most home networks, but will not work on a private network that implements source network address translation (SNAT).
-    * Temporarily enable public network access on the service firewall manually. It can take time for changes to these settings to propagate, and you may need to flush your DNS cache to get things working.
-
-  * Be sure to manually disable public access after you are done with Terraform operations.
+  * **Note:** Public network access for the key vault and storage account is enabled during provisioning and automatically disabled at the end of `terraform apply` using a barrier pattern. You may need to manually enable public access for the storage account and key vault for subsequent `terraform plan` and `terraform apply` operations.
 
 * Finally, apply the configuration to create the resources:
 

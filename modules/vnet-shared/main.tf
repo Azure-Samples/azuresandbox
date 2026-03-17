@@ -10,10 +10,10 @@ resource "azurerm_key_vault" "this" {
   tenant_id                     = data.azurerm_client_config.current.tenant_id
   sku_name                      = "standard"
   rbac_authorization_enabled    = true
-  public_network_access_enabled = false
+  public_network_access_enabled = true
 
   lifecycle {
-    ignore_changes = [public_network_access_enabled] # Avoid triggering recreation of resources in dependent modules if public access is temporarily enabled for terraform plan / apply operations
+    ignore_changes = [public_network_access_enabled] # Centralized disable in root main.tf will set this to false after all modules complete
   }
 }
 
@@ -31,7 +31,7 @@ resource "azurerm_key_vault_secret" "spn_password" {
   value           = var.arm_client_secret
   key_vault_id    = azurerm_key_vault.this.id
   expiration_date = timeadd(timestamp(), "8760h")
-  depends_on      = [time_sleep.wait_for_roles_and_public_access]
+  depends_on      = [time_sleep.wait_for_roles]
 
   lifecycle {
     ignore_changes = [expiration_date]
@@ -43,7 +43,7 @@ resource "azurerm_key_vault_secret" "adminpassword" {
   value           = local.admin_password
   key_vault_id    = azurerm_key_vault.this.id
   expiration_date = timeadd(timestamp(), "8760h")
-  depends_on      = [time_sleep.wait_for_roles_and_public_access]
+  depends_on      = [time_sleep.wait_for_roles]
 
   lifecycle {
     ignore_changes = [expiration_date]
@@ -55,7 +55,7 @@ resource "azurerm_key_vault_secret" "adminusername" {
   value           = var.admin_username
   key_vault_id    = azurerm_key_vault.this.id
   expiration_date = timeadd(timestamp(), "8760h")
-  depends_on      = [time_sleep.wait_for_roles_and_public_access]
+  depends_on      = [time_sleep.wait_for_roles]
 
   lifecycle {
     ignore_changes = [expiration_date]
@@ -102,28 +102,12 @@ resource "azurerm_log_analytics_workspace" "this" {
 #endregion
 
 #region utilities
-resource "azapi_update_resource" "key_vault_enable_public_access" {
-  type        = "Microsoft.KeyVault/vaults@2024-11-01"
-  resource_id = azurerm_key_vault.this.id
-
-  body = { properties = { publicNetworkAccess = "Enabled" } }
-
-  lifecycle { ignore_changes = all }
-}
-
-resource "azapi_update_resource" "key_vault_disable_public_access" {
-  type        = "Microsoft.KeyVault/vaults@2024-11-01"
-  resource_id = azurerm_key_vault.this.id
-
-  depends_on = [
-    azurerm_key_vault_secret.adminpassword,
-    azurerm_key_vault_secret.adminusername,
-    azurerm_key_vault_secret.spn_password
-  ]
-
-  body = { properties = { publicNetworkAccess = "Disabled" } }
-
-  lifecycle { ignore_changes = all }
+resource "terraform_data" "key_vault_operations_complete" {
+  input = {
+    secret_adminpassword = azurerm_key_vault_secret.adminpassword.id
+    secret_adminusername = azurerm_key_vault_secret.adminusername.id
+    secret_spn_password  = azurerm_key_vault_secret.spn_password.id
+  }
 }
 
 resource "random_password" "adminpassword_middle_chars" {
@@ -155,7 +139,7 @@ resource "random_string" "adminpassword_last_char" {
   special = false
 }
 
-resource "time_sleep" "wait_for_roles_and_public_access" {
+resource "time_sleep" "wait_for_roles" {
   create_duration = "2m"
   depends_on      = [azurerm_role_assignment.roles]
 }

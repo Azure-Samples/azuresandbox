@@ -18,3 +18,8 @@ output "resource_names" {
     search_service     = azurerm_search_service.this.name
   }
 }
+
+output "storage_operations_complete" {
+  value       = terraform_data.storage_operations_complete.id
+  description = "Dependency signal: all storage data plane operations in this module are complete."
+}

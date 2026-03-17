@@ -56,3 +56,8 @@ output "resource_names" {
 output "subnets" {
   value = azurerm_subnet.subnets
 }
+
+output "key_vault_operations_complete" {
+  value       = terraform_data.key_vault_operations_complete.id
+  description = "Dependency signal: all key vault data plane operations in this module are complete."
+}
