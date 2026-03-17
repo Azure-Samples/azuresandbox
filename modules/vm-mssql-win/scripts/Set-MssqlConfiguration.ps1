@@ -386,7 +386,7 @@ if ($localRawDisks.Count -eq 0) {
 }
 
 if ($localRawDisks.Count -ne $localRawDisksExpected) {
-    Exit-WithError "Expected $localRawDisksExpected local raw disks after '$TimeoutSeconds' seconds, found '$($localRawDisks.Count)'..."
+    Exit-WithError "Expected $localRawDisksExpected local raw disks, found '$($localRawDisks.Count)'..."
 }
 
 # Log into Azure
