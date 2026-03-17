@@ -20,3 +20,8 @@ output "root_cert_pem" {
   description = "Self signed root certificate in PEM format for use with point-to-site VPN clients."
   value       = tls_self_signed_cert.root_cert.cert_pem
 }
+
+output "key_vault_operations_complete" {
+  value       = azurerm_key_vault_secret.this.id
+  description = "Dependency signal: all key vault data plane operations in this module are complete."
+}

@@ -163,8 +163,7 @@ resource "azurerm_private_endpoint" "container_registry" {
 
   depends_on = [
     azurerm_virtual_network_peering.app_to_shared,
-    azurerm_virtual_network_peering.shared_to_app,
-    azapi_update_resource.storage_account_disable_public_access
+    azurerm_virtual_network_peering.shared_to_app
   ]
 }
 
@@ -188,8 +187,7 @@ resource "azurerm_private_endpoint" "storage_blob" {
 
   depends_on = [
     azurerm_virtual_network_peering.app_to_shared,
-    azurerm_virtual_network_peering.shared_to_app,
-    azapi_update_resource.storage_account_disable_public_access
+    azurerm_virtual_network_peering.shared_to_app
   ]
 }
 
@@ -213,8 +211,7 @@ resource "azurerm_private_endpoint" "storage_file" {
 
   depends_on = [
     azurerm_virtual_network_peering.app_to_shared,
-    azurerm_virtual_network_peering.shared_to_app,
-    azapi_update_resource.storage_account_disable_public_access
+    azurerm_virtual_network_peering.shared_to_app
   ]
 }
 #endregion
