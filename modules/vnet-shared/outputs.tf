@@ -29,7 +29,6 @@ output "private_dns_zones" {
 
 output "resource_ids" {
   value = {
-    automation_account      = azurerm_automation_account.this.id
     bastion_host            = azurerm_bastion_host.this.id
     firewall                = azurerm_firewall.this.id
     firewall_route_table    = azurerm_route_table.this.id
@@ -42,7 +41,6 @@ output "resource_ids" {
 
 output "resource_names" {
   value = {
-    automation_account      = azurerm_automation_account.this.name
     bastion_host            = azurerm_bastion_host.this.name
     firewall                = azurerm_firewall.this.name
     firewall_route_table    = azurerm_route_table.this.name

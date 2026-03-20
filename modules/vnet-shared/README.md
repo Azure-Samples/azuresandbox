@@ -15,8 +15,7 @@
 
 This module implements a virtual network with shared services used by all the configurations including:
 
-* An Azure Automation account for PowerShell DSC configuration of Windows VMs.
-* A virtual network for hosting virtual machines, bastion hosts and firewalls..
+* A virtual network for hosting virtual machines, bastion hosts and firewalls.
 * An Azure Bastion for secure RDP and SSH access to virtual machines in the sandbox environment.
 * An Azure Firewall for network security.
 * A network isolated Azure Key Vault for storing secrets.
@@ -37,10 +36,6 @@ This module implements a virtual network with shared services used by all the co
   * Firewall
     * Navigate to *portal.azure.com* > *Firewalls* > *fw-sand-dev*.
     * Review the information in the *Overview* section.
-* Verify *adds1* node configuration is compliant.
-  * From the client environment, navigate to *portal.azure.com* > *Automation Accounts* > *aa-sand-dev* > *Configuration Management* > *State configuration (DSC)*.
-  * Refresh the data on the *Nodes* tab and verify that all nodes are compliant.
-  * Review the data in the *Configurations* and *Compiled configurations* tabs as well.
 
 ## Documentation
 
@@ -63,18 +58,17 @@ The module is organized as follows:
 ```plaintext
 vnet-shared/
 ├── images/                        
-│   └── vnet-shared-diagram.drawio.svg          # Architecture diagram
+│   └── vnet-shared-diagram.drawio.svg  # Architecture diagram
 ├── scripts/                                    
-│   ├── DomainControllerConfiguration.ps1       # DSC configuration for the AD DS Domain Controller VM
-│   ├── Register-DscNode.ps1                    # Script to register VM with Azure Automation DSC
-│   └── Set-AutomationAccountConfiguration.ps1  # Script to configure Azure Automation settings
-├── compute.tf                                  # Compute resource configurations
-├── locals.tf                                   # Local variables
-├── main.tf                                     # Resource configurations
-├── network.tf                                  # Network resource configurations 
-├── outputs.tf                                  # Output variables
-├── terraform.tf                                # Terraform configuration block
-└── variables.tf                                # Input variables
+│   ├── Configure-Adds.ps1              # Configures Active Directory Domain Services
+│   └── Configure-AddsDns.ps1           # Configures AD Integrated DNS Server
+├── compute.tf                          # Compute resource configurations
+├── locals.tf                           # Local variables
+├── main.tf                             # Resource configurations
+├── network.tf                          # Network resource configurations 
+├── outputs.tf                          # Output variables
+├── terraform.tf                        # Terraform configuration block
+└── variables.tf                        # Input variables
 ```
 
 ### Input Variables
@@ -114,7 +108,6 @@ vnet_name | shared | The name of the new virtual network.
 
 Address | Name | Notes
 --- | --- | ---
-module.vnet_shared.azurerm_automation_account.this | aa&#8209;sand&#8209;dev | The Azure Automation account used to configure VMs with PowerShell DSC. Configured by */scripts/Set-AutomationAccountConfiguration.ps1*.
 module.vnet_shared.azurerm_bastion_host.this | snap&#8209;sand&#8209;dev | The Azure Bastion used for secure RDP/SSH access to sandbox VMs.
 module.vnet_shared.azurerm_firewall.this | fw&#8209;sand&#8209;dev | The Azure Firewall used for network security.
 module.vnet_shared.azurerm_firewall_policy.this | awfp&#8209;sand&#8209;dev | The firewall policy. Threat intelligence mode is set to `Deny`.
@@ -122,10 +115,10 @@ module.vnet_shared.azurerm_firewall_policy_rule_collection_group.this | | The fi
 module.vnet_shared.azurerm_key_vault.this | kv&#8209;sand&#8209;dev | The Azure Key Vault used to store secrets.
 module.vnet_shared.azurerm_key_vault_secret.adminpassword | adminpassword | Randomly generated admin password used for sandbox VMs and services.
 module.vnet_shared.azurerm_key_vault_secret.adminusername | adminuser | Admin username used for sandbox VMs and services, default is *bootstrapadmin*.
-module.vnet_shared.azurerm_key_vault_secret.log_primary_shared_key || The primary shared key for the Log Analytics workspace, used to configure diagnostic settings. The secret name is the same as the workspace id.
+module.vnet_shared.azurerm_key_vault_secret.log_primary_shared_key | | The primary shared key for the Log Analytics workspace, used to configure diagnostic settings. The secret name is the same as the workspace id.
 module.vnet_shared.azurerm_key_vault_secret.spn_password | | The password for the service principal used for authenticating with Azure. The secret name is the same as the AppID / object id.
-module.vnet_shared.azurerm_log_analytics_workspace.this |  log&#8209;sand&#8209;dev&#8209;xxx | The Log Analytics workspace used to collect logs and metrics from Azure resources.
-module.vnet_shared.azurerm_monitor_diagnostic_setting.this |  | The Azure Monitor diagnostic setting used to send key vault logs and metrics to the Log Analytics workspace.
+module.vnet_shared.azurerm_log_analytics_workspace.this | log&#8209;sand&#8209;dev&#8209;xxx | The Log Analytics workspace used to collect logs and metrics from Azure resources.
+module.vnet_shared.azurerm_monitor_diagnostic_setting.this | | The Azure Monitor diagnostic setting used to send key vault logs and metrics to the Log Analytics workspace.
 module.vnet_shared.azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;adds1 | Nic for *adds1* VM.
 module.vnet_shared.azurerm_network_security_group.groups[*] | | NSGs for each subnet except *AzureFirewallSubnet*.
 module.vnet_shared.azurerm_network_security_rule.rules[*] | | NSG rules for each NSG. See *locals.tf* for rule definitions.
@@ -144,7 +137,7 @@ module.vnet_shared.azurerm_subnet.subnets["snet-misc-02"] | | Reserved for use b
 module.vnet_shared.azurerm_subnet.subnets["snet-privatelink-02"] | | Dedicated subnet for Private Link.
 module.vnet_shared.azurerm_subnet_network_security_group_association.associations[*] | | NSGs are associated with all subnets except *AzureFirewallSubnet*.
 module.vnet_shared.azurerm_subnet_route_table_association.associations[*] | | The *route-sand-dev* route table is associated with all subnets except *AzureFirewallSubnet* and *AzureBastionSubnet*.
-module.vnet_shared.azurerm_virtual_network.this | vnet&#8209;sand&#8209;dev&#8209;shared   | The shared services virtual network.
+module.vnet_shared.azurerm_virtual_network.this | vnet&#8209;sand&#8209;dev&#8209;shared | The shared services virtual network.
 module.vnet_shared.azurerm_windows_virtual_machine.this | adds1 | The AD DS Domain Controller / DNS Server VM. Registered with Azure Automation DSC by */scripts/Register-DscNode.ps1* using DSC configuration */scripts/DomainControllerConfiguration.ps1*.
 
 ### Output Variables

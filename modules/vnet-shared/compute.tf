@@ -10,7 +10,6 @@ resource "azurerm_windows_virtual_machine" "this" {
   patch_mode                 = "AutomaticByPlatform"
   provision_vm_agent         = true
   encryption_at_host_enabled = true
-  depends_on                 = [azurerm_automation_account.this]
 
   os_disk {
     caching              = "ReadWrite"
@@ -23,9 +22,71 @@ resource "azurerm_windows_virtual_machine" "this" {
     sku       = var.vm_adds_image_sku
     version   = var.vm_adds_image_version
   }
+}
 
-  provisioner "local-exec" {
-    command     = "$params = @{ ${join(" ", local.local_scripts["provisioner_vm_windows"].parameters)}}; ./${path.module}/scripts/${local.local_scripts["provisioner_vm_windows"].name} @params"
-    interpreter = ["pwsh", "-Command"]
+#region dsc-v3-configuration
+resource "azurerm_virtual_machine_run_command" "configure_adds" {
+  name               = "ConfigureAdds"
+  location           = var.location
+  virtual_machine_id = azurerm_windows_virtual_machine.this.id
+
+  source {
+    script = file("${path.module}/scripts/Configure-Adds.ps1")
+  }
+
+  parameter {
+    name  = "Domain"
+    value = var.adds_domain_name
+  }
+
+  parameter {
+    name  = "AdminUsername"
+    value = var.admin_username
+  }
+
+  parameter {
+    name  = "ComputerName"
+    value = var.vm_adds_name
+  }
+
+  protected_parameter {
+    name  = "AdminPwd"
+    value = local.admin_password
   }
 }
+
+resource "time_sleep" "wait_for_adds_reboot" {
+  create_duration = "2m"
+  depends_on      = [azurerm_virtual_machine_run_command.configure_adds]
+
+  triggers = {
+    configure_adds_id = azurerm_virtual_machine_run_command.configure_adds.id
+  }
+}
+
+resource "azurerm_virtual_machine_run_command" "configure_adds_dns" {
+  name               = "ConfigureAddsDns"
+  location           = var.location
+  virtual_machine_id = azurerm_windows_virtual_machine.this.id
+  depends_on         = [time_sleep.wait_for_adds_reboot]
+
+  source {
+    script = file("${path.module}/scripts/Configure-AddsDns.ps1")
+  }
+
+  parameter {
+    name  = "Domain"
+    value = var.adds_domain_name
+  }
+
+  parameter {
+    name  = "AdminUsername"
+    value = var.admin_username
+  }
+
+  parameter {
+    name  = "ComputerName"
+    value = var.vm_adds_name
+  }
+}
+#endregion
