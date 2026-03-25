@@ -37,25 +37,42 @@ $ERROR_SHUTDOWN_IN_PROGRESS = 0x8007045B
 #endregion
 
 #region functions
-function Write-Log {
+function Write-ScriptLog {
     param( [string] $msg)
     "$(Get-Date -Format FileDateTimeUniversal) : $msg" | Out-File -FilePath $logpath -Append -Force
 }
 
 function Exit-WithError {
     param( [string]$msg )
-    Write-Log "There was an exception during the process, please review..."
-    Write-Log $msg
+    Write-ScriptLog "There was an exception during the process, please review..."
+    Write-ScriptLog $msg
     Exit 2
 }
 #endregion
 
 #region main
 $logpath = $PSCommandPath + '.log'
-Write-Log "Running '$PSCommandPath'..."
+Write-ScriptLog "Running '$PSCommandPath'..."
+
+# Install Powershell Az module
+Write-ScriptLog "Installing NuGet package provider..."
+Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -ForceBootstrap -Scope AllUsers -Confirm:$false
+
+Write-ScriptLog "Configuring PSGallery installation policy 'Trusted'..."
+Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+
+Write-ScriptLog "Installing PowerShell Az.Accounts module..."
+Install-Module -Name Az.Accounts -Repository PSGallery -Scope AllUsers -Force -AllowClobber
+
+Write-ScriptLog "Installing PowerShell Az.KeyVault module..."
+Install-Module -Name Az.KeyVault -Repository PSGallery -Scope AllUsers -Force -AllowClobber
+
+Write-ScriptLog "Installing PowerShell Az.Storage module..."
+Install-Module -Name Az.Storage -Repository PSGallery -Scope AllUsers -Force -AllowClobber
+
 
 # Log into Azure with retry logic
-Write-Log "Logging into Azure using managed identity..."
+Write-ScriptLog "Logging into Azure using managed identity..."
 
 $maxRetries = 40
 $retryCount = 0
@@ -65,11 +82,11 @@ while (-not $success -and $retryCount -lt $maxRetries) {
     try {
         Connect-AzAccount -Identity -ErrorAction Stop
         $success = $true
-        Write-Log "Successfully logged into Azure."
+        Write-ScriptLog "Successfully logged into Azure."
     }
     catch {
         $retryCount++
-        Write-Log "Failed to log into Azure. Attempt $retryCount of $maxRetries. Retrying in 1 minute..."
+        Write-ScriptLog "Failed to log into Azure. Attempt $retryCount of $maxRetries. Retrying in 1 minute..."
         if ($retryCount -ge $maxRetries) {
             Exit-WithError "Failed to log into Azure after $maxRetries attempts."
         }
@@ -78,7 +95,7 @@ while (-not $success -and $retryCount -lt $maxRetries) {
 }
 
 # Get Secrets from key vault
-Write-Log "Getting secret '$AdminUsernameSecret' from key vault '$KeyVaultName'..."
+Write-ScriptLog "Getting secret '$AdminUsernameSecret' from key vault '$KeyVaultName'..."
 
 try {
     $adminUsername = Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name $AdminUsernameSecret -AsPlainText
@@ -91,9 +108,9 @@ if ([string]::IsNullOrEmpty($adminUsername)) {
     Exit-WithError "Secret '$AdminUsernameSecret' not found in key vault '$KeyVaultName'..."
 }
 
-Write-Log "The value of secret '$AdminUsernameSecret' is '$adminUsername'..."
+Write-ScriptLog "The value of secret '$AdminUsernameSecret' is '$adminUsername'..."
 
-Write-Log "Getting secret '$AdminPwdSecret' from key vault '$KeyVaultName'..."
+Write-ScriptLog "Getting secret '$AdminPwdSecret' from key vault '$KeyVaultName'..."
 
 try {
     $adminPwd = Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name $AdminPwdSecret -AsPlainText
@@ -106,7 +123,7 @@ if ([string]::IsNullOrEmpty($adminPwd)) {
     Exit-WithError "Secret '$AdminPwdSecret' not found in key vault '$KeyVaultName'..."
 }
 
-Write-Log "The length of secret '$AdminPwdSecret' is '$($adminPwd.Length)'..."
+Write-ScriptLog "The length of secret '$AdminPwdSecret' is '$($adminPwd.Length)'..."
 
 # Disconnect from Azure
 Disconnect-AzAccount
@@ -119,7 +136,7 @@ if ( -not (Test-Path $scriptPath) ) {
     Exit-WithError "Unable to locate '$scriptPath'..."
 }
 
-Write-Log "Registering scheduled task '$TaskName' to run '$scriptPath' as '$domainAdminUser'..."
+Write-ScriptLog "Registering scheduled task '$TaskName' to run '$scriptPath' as '$domainAdminUser'..."
 
 $commandParamParts = @(
     '$params = @{',
@@ -152,7 +169,7 @@ catch {
     Exit-WithError $_
 }
 
-Write-Log "Starting scheduled task '$TaskName'..."
+Write-ScriptLog "Starting scheduled task '$TaskName'..."
 
 try {
     Start-ScheduledTask -TaskName $TaskName -ErrorAction Stop
@@ -165,7 +182,7 @@ $i = 0
 do {
     $i++
 
-    Write-Log "Getting information for scheduled task '$TaskName' (attempt '$i' of '$MaxTaskAttempts')..."
+    Write-ScriptLog "Getting information for scheduled task '$TaskName' (attempt '$i' of '$MaxTaskAttempts')..."
 
     try {
         $taskInfo = Get-ScheduledTaskInfo -TaskName $TaskName
@@ -177,7 +194,7 @@ do {
     # Note: LastTaskResult values are documented here: https://docs.microsoft.com/en-us/windows/win32/taskschd/task-scheduler-error-and-success-constants 
     $lastTaskResult = $taskInfo.LastTaskResult
 
-    Write-Log "LastTaskResult for task '$TaskName' is '$lastTaskResult'..."
+    Write-ScriptLog "LastTaskResult for task '$TaskName' is '$lastTaskResult'..."
 
     if ($lastTaskResult -eq 0) {
         break
@@ -199,7 +216,7 @@ do {
     Exit-WithError "Scheduled task '$taskName' returned unexpected LastTaskResult '$lastTaskResult'..."
 } while ($true)
 
-Write-Log "Unregistering scheduled task '$TaskName'..."
+Write-ScriptLog "Unregistering scheduled task '$TaskName'..."
 
 try {
     Unregister-ScheduledTask `
@@ -211,6 +228,6 @@ catch {
     Exit-WithError $_
 }
 
-Write-Log "'$PSCommandPath' exiting normally..."
+Write-ScriptLog "'$PSCommandPath' exiting normally..."
 Exit 0
 #endregion

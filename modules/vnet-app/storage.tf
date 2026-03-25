@@ -10,7 +10,7 @@ resource "azurerm_storage_account" "this" {
   shared_access_key_enabled       = false
   https_traffic_only_enabled      = true
   min_tls_version                 = "TLS1_2"
-  public_network_access_enabled   = true
+  public_network_access_enabled   = true # Centralized disable in root main.tf will set this to false after all modules complete
   allow_nested_items_to_be_public = false
 
   lifecycle {

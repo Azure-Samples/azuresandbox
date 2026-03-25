@@ -24,7 +24,7 @@ resource "azurerm_windows_virtual_machine" "this" {
   }
 }
 
-#region dsc-v3-configuration
+#region vm-configuration
 resource "azurerm_virtual_machine_run_command" "configure_adds" {
   name               = "ConfigureAdds"
   location           = var.location

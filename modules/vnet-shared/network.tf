@@ -84,6 +84,10 @@ resource "azurerm_public_ip" "bastion" {
   resource_group_name = var.resource_group_name
   allocation_method   = "Static"
   sku                 = "Standard"
+
+  lifecycle {
+    ignore_changes = [ip_tags]
+  }
 }
 #endregion
 
@@ -160,6 +164,10 @@ resource "azurerm_public_ip" "firewall" {
   resource_group_name = var.resource_group_name
   allocation_method   = "Static"
   sku                 = "Standard"
+
+  lifecycle {
+    ignore_changes = [ip_tags]
+  }
 }
 #endregion
 

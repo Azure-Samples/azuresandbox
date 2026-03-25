@@ -1,33 +1,5 @@
 locals {
-  local_scripts = {
-    configure_automation = {
-      name = "Set-AutomationAccountConfiguration.ps1"
-      parameters = [
-        "TenantId = '${data.azurerm_client_config.current.tenant_id}';",
-        "SubscriptionId = '${data.azurerm_client_config.current.subscription_id}';",
-        "ResourceGroupName = '${var.resource_group_name}';",
-        "AutomationAccountName = '${var.automation_account_name}';",
-        "VmJumpboxWinName = '${var.vm_jumpbox_win_name}';",
-        "AppId = '${data.azurerm_client_config.current.client_id}';",
-        "AppSecret = '${var.arm_client_secret}';"
-      ]
-    }
-
-    provisioner_vm_windows = {
-      name = "Register-DscNode.ps1"
-      parameters = [
-        "TenantId = '${data.azurerm_client_config.current.tenant_id}';",
-        "SubscriptionId = '${data.azurerm_client_config.current.subscription_id}';",
-        "ResourceGroupName = '${var.resource_group_name}';",
-        "Location = '${var.location}';",
-        "AutomationAccountName = '${var.automation_account_name}';",
-        "VirtualMachineName = '${var.vm_jumpbox_win_name}';",
-        "AppId = '${data.azurerm_client_config.current.client_id}';",
-        "AppSecret = '${var.arm_client_secret}';",
-        "DscConfigurationName = 'JumpBoxConfiguration'"
-      ]
-    }
-  }
+  adds_domain_name_netbios = upper(replace(var.adds_domain_name, ".local", ""))
 
   remote_scripts = {
     orchestrator = {
