@@ -33,13 +33,14 @@ This section describes how to test the module after deployment.
   * Verify the IPAddress returned is within the subnet IP address prefix for *vnet_app[0].subnets["snet-db-01"]*, e.g. `10.2.1.*`.
 * From *jumpwin1*, test SQL Server Connectivity with SQL Server Management Studio (SSMS)
   * Navigate to *Start* > *Microsoft SQL Server Tools 22* > *Microsoft SQL Server Management Studio 22*
-  * Connect to the default instance of SQL Server installed on the SQL Server virtual machine using the following settings:
-    * Server
-      * Server type: *Database Engine*
-      * Server name: *mssqlwin1*
-      * Authentication: *Windows Authentication* (this will default to *MYSANDBOX\bootstrapadmin*)
-    * Connection security
-      * Encryption: *Optional*
+  * Connect to the default instance of SQL Server installed on the SQL Server virtual machine using the following connection properties:
+    * Server name: *mssqlwin1*
+    * Authentication: *Windows Authentication*
+    * User Name: *MYSANDBOX\bootstrapadmin*
+    * Database Name *default*
+    * Encryption: *Mandatory*
+    * Trust Server Certificate: *enabled*
+      * Note: In a production environment it is recommended to disable this and use certificate validation when connecting to SQL Server.
   * Create a new database named *testdb*.
     * Verify the data files were stored on the *M:* drive
     * Verify the log file were stored on the *L:* drive
@@ -68,21 +69,21 @@ The module is organized as follows:
 
 ```plaintext
 ├── images/
-|   └── vm-mssql-diagram.drawio.svg             # Architecture diagram
+|   └── vm-mssql-diagram.drawio.svg       # Architecture diagram
 ├── scripts/
-|   ├── Configure-FirewallRules.ps1             # Configures Windows firewall rules for SQL Server
-|   ├── Configure-SqlLogin.ps1                  # Creates SQL Server login for domain admin and adds it to sysadmin server role
-|   ├── Invoke-MssqlConfiguration.ps1           # Runs Set-MssqlConfiguration.ps1 as domain admin and reboots the VM
-|   ├── Set-MssqlConfiguration.ps1              # Prepares data and log disks and configures SQL Server instance
-|   └── Set-MssqlStartupConfiguration.ps1       # Re-configures SQL Server tempdb folder after VM stop/deallocate event 
-├── compute.tf                                  # Compute resource configurations
-├── locals.tf                                   # Local variables
-├── main.tf                                     # Resource configurations
-├── network.tf                                  # Network resource configurations
-├── outputs.tf                                  # Output variables
-├── storage.tf                                  # Storage resource configurations
-├── terraform.tf                                # Terraform configuration block
-└── variables.tf                                # Input variables
+|   ├── Configure-FirewallRules.ps1       # Configures Windows firewall rules for SQL Server
+|   ├── Configure-SqlLogin.ps1            # Creates SQL Server login for domain admin and adds it to sysadmin server role
+|   ├── Invoke-MssqlConfiguration.ps1     # Runs Set-MssqlConfiguration.ps1 as domain admin and reboots the VM
+|   ├── Set-MssqlConfiguration.ps1        # Prepares data and log disks and configures SQL Server instance
+|   └── Set-MssqlStartupConfiguration.ps1 # Re-configures SQL Server tempdb folder after VM stop/deallocate event 
+├── compute.tf                            # Compute resource configurations
+├── locals.tf                             # Local variables
+├── main.tf                               # Resource configurations
+├── network.tf                            # Network resource configurations
+├── outputs.tf                            # Output variables
+├── storage.tf                            # Storage resource configurations
+├── terraform.tf                          # Terraform configuration block
+└── variables.tf                          # Input variables
 ```
 
 ### Input Variables
