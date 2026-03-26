@@ -23,11 +23,6 @@ This configuration implements a SQL Server virtual machine. The VM is configured
 
 This section describes how to test the module after deployment.
 
-* Wait for 15 minutes to proceed to allow time for DSC configurations to complete.
-* Verify *mssqlwin1* node configuration is compliant.
-  * From the client environment, navigate to *portal.azure.com* > *Automation Accounts* > *aa-sand-dev* > *Configuration Management* > *State configuration (DSC)*.
-  * Refresh the data on the *Nodes* tab and verify that all nodes are compliant.
-  * Review the data in the *Configurations* and *Compiled configurations* tabs as well.
 * From *jumpwin1*, test DNS queries for SQL Server (IaaS)
   * Execute the following command from PowerShell:
 
@@ -75,12 +70,11 @@ The module is organized as follows:
 ├── images/
 |   └── vm-mssql-diagram.drawio.svg             # Architecture diagram
 ├── scripts/
-|   ├── Invoke-MssqlConfiguration.ps1           # Starts SQL Server configuration task
-|   ├── MssqlVmConfiguration.ps1                # DSC configuration for SQL Server VM
-|   ├── Register-DscNode.ps1                    # Registers SQL Server VM with Azure Automation DSC
-|   ├── Set-AutomationAccountConfiguration.ps1  # Configures Azure Automation settings
+|   ├── Configure-FirewallRules.ps1             # Configures Windows firewall rules for SQL Server
+|   ├── Configure-SqlLogin.ps1                  # Creates SQL Server login for domain admin and adds it to sysadmin server role
+|   ├── Invoke-MssqlConfiguration.ps1           # Runs Set-MssqlConfiguration.ps1 as domain admin and reboots the VM
 |   ├── Set-MssqlConfiguration.ps1              # Prepares data and log disks and configures SQL Server instance
-|   └── Set-MssqlStartupConfiguration.ps1       # Re-configures SQL Server tempdb folder for VM sizes with temporary disks 
+|   └── Set-MssqlStartupConfiguration.ps1       # Re-configures SQL Server tempdb folder after VM stop/deallocate event 
 ├── compute.tf                                  # Compute resource configurations
 ├── locals.tf                                   # Local variables
 ├── main.tf                                     # Resource configurations
@@ -103,11 +97,9 @@ admin_password_secret | adminpassword | The name of the key vault secret that co
 admin_username | bootstrapadmin | The user name used when provisioning administrator accounts. This should conform to Windows username requirements (alphanumeric characters, periods, underscores, and hyphens, 1-20 characters). Defined in the vnet-shared module.
 admin_username_secret | adminuser | The name of the key vault secret that contains the user name for the admin account. Defined in the vnet-shared module.
 arm_client_secret | | The client secret used to authenticate with the Azure Resource Manager API. Set interactively or using *TF_VAR_arm_client_secret* environment variable.
-automation_account_name | aa-sand-dev | The name of the Azure Automation Account used for state configuration (DSC). Defined in the vnet-shared module.
 key_vault_id | | The ID of the key vault defined in the root module.
 key_vault_name | | The name of the key vault defined in the root module.
 location | | The name of the Azure Region where resources will be provisioned.
-resource_group_id | | The id of the resource group defined in the root module.
 resource_group_name | | The name of the resource group defined in the root module.
 storage_account_id | | The ID of the storage account defined in the vnet-app module.
 storage_account_name | | The name of the storage account defined in the vnet-app module.
@@ -123,6 +115,7 @@ vm_mssql_win_name | mssqlwin1 | The name of the SQL Server VM.
 vm_mssql_win_size | `Standard_D4ds_v6` | The size of the virtual machine. Tempdb will be configured to use the local temp disk disk for "diskful" sizes, or moved to the data disk for sizes that are not "diskful".
 vm_mssql_win_storage_account_type_data_disks | `PremiumV2_LRS` | The storage type to be used for the VM's data disks.
 vm_mssql_win_storage_account_type_os_disk | `Premium_LRS` | The storage type to be used for the VM's OS disk.
+vm_mssql_win_zone | 2 | The availability zone to to provision the VM.
 
 ### Module Resources
 
@@ -138,7 +131,6 @@ module.vm_mssql_win[0].azurerm_storage_blob.remote_scripts["orchestrator"] | Inv
 module.vm_mssql_win[0].azurerm_storage_blob.remote_scripts["startup"] | Set&#8209;MssqlStartupConfiguration.ps1 | The script that re-configures SQL Server tempdb folder for VM sizes with temporary disks.
 module.vm_mssql_win[0].azurerm_storage_blob.remote_scripts["worker"] | Set&#8209;MssqlConfiguration.ps1 | The script that prepares data and log disks and configures SQL Server instance.
 module.vm_mssql_win[0].azurerm_virtual_machine_data_disk_attachment.attachments[*] | | The data and log disk attachments for the SQL Server VM.
-module.vm_mssql_win[0].azurerm_virtual_machine_extension.this | | The custom script extension used to configure the SQL Server instance.
 module.vm_mssql_win[0].azurerm_windows_virtual_machine.this | mssqlwin1 | The SQL Server VM resource. Configured with NVMe disk controller, encryption at host, secure boot, vTPM, and automatic patch assessment for enhanced security and performance.
 
 ### Output Variables

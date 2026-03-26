@@ -1,9 +1,9 @@
-#region resources
+#region sql-vm
 resource "azurerm_windows_virtual_machine" "this" {
   name                = var.vm_mssql_win_name
   resource_group_name = var.resource_group_name
   location            = var.location
-  zone                = var.vm_mssql_win_zone 
+  zone                = var.vm_mssql_win_zone
 
   admin_username             = var.admin_username
   admin_password             = var.admin_password
@@ -14,8 +14,6 @@ resource "azurerm_windows_virtual_machine" "this" {
   secure_boot_enabled        = true
   size                       = var.vm_mssql_win_size
   vtpm_enabled               = true
-
-  depends_on = [null_resource.this]
 
   os_disk {
     caching              = "ReadWrite"
@@ -31,11 +29,6 @@ resource "azurerm_windows_virtual_machine" "this" {
 
   identity {
     type = "SystemAssigned"
-  }
-
-  provisioner "local-exec" {
-    command     = "$params = @{ ${join(" ", local.local_scripts["provisioner"].parameters)}}; ./${path.module}/scripts/${local.local_scripts["provisioner"].name} @params"
-    interpreter = ["pwsh", "-Command"]
   }
 }
 
@@ -71,9 +64,60 @@ resource "azurerm_role_assignment" "assignments" {
   role_definition_name = each.value.role_definition_name
   scope                = each.value.scope
 }
+#endregion
 
-resource "azurerm_virtual_machine_extension" "this" {
-  name                       = "${module.naming.virtual_machine_extension.name}-${var.vm_mssql_win_name}-CustomScriptExtension"
+#region sql-vm-configuration
+resource "azurerm_virtual_machine_extension" "join_domain" {
+  name                       = "${module.naming.virtual_machine_extension.name}-${var.vm_mssql_win_name}-JsonADDomainExtension"
+  virtual_machine_id         = azurerm_windows_virtual_machine.this.id
+  publisher                  = "Microsoft.Compute"
+  type                       = "JsonADDomainExtension"
+  type_handler_version       = "1.3"
+  auto_upgrade_minor_version = true
+  depends_on                 = [azurerm_virtual_machine_data_disk_attachment.attachments]
+
+  settings = jsonencode({
+    Name    = var.adds_domain_name
+    User    = "${local.adds_domain_name_netbios}\\${var.admin_username}"
+    Restart = "true"
+    Options = "3"
+  })
+
+  protected_settings = jsonencode({
+    Password = var.admin_password
+  })
+}
+
+resource "azurerm_virtual_machine_run_command" "configure_firewall_rules" {
+  name               = "ConfigureFirewallRules"
+  location           = var.location
+  virtual_machine_id = azurerm_windows_virtual_machine.this.id
+  depends_on         = [azurerm_virtual_machine_extension.join_domain]
+
+  source {
+    script = file("${path.module}/scripts/Configure-FirewallRules.ps1")
+  }
+}
+
+resource "azurerm_virtual_machine_run_command" "configure_sql_login" {
+  name               = "ConfigureSqlLogin"
+  location           = var.location
+  virtual_machine_id = azurerm_windows_virtual_machine.this.id
+  depends_on         = [azurerm_virtual_machine_extension.join_domain]
+
+  source {
+    script = file("${path.module}/scripts/Configure-SqlLogin.ps1")
+  }
+
+  parameter {
+    name  = "DomainAdminUser"
+    value = "${local.adds_domain_name_netbios}\\${var.admin_username}"
+  }
+}
+#endregion
+
+resource "azurerm_virtual_machine_extension" "configure_sql_server" {
+  name                       = "${module.naming.virtual_machine_extension.name}-${var.vm_mssql_win_name}-ConfigureSqlServer"
   virtual_machine_id         = azurerm_windows_virtual_machine.this.id
   publisher                  = "Microsoft.Compute"
   type                       = "CustomScriptExtension"
@@ -82,6 +126,7 @@ resource "azurerm_virtual_machine_extension" "this" {
 
   depends_on = [
     azurerm_virtual_machine_data_disk_attachment.attachments,
+    azurerm_virtual_machine_run_command.configure_sql_login,
     time_sleep.wait_for_roles,
     azurerm_storage_blob.remote_scripts
   ]

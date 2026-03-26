@@ -1,34 +1,5 @@
 locals {
-  local_scripts = {
-
-    configure_automation = {
-      name = "Set-AutomationAccountConfiguration.ps1"
-      parameters = [
-        "TenantId = '${data.azurerm_client_config.current.tenant_id}';",
-        "SubscriptionId = '${data.azurerm_client_config.current.subscription_id}';",
-        "ResourceGroupName = '${var.resource_group_name}';",
-        "AutomationAccountName = '${var.automation_account_name}';",
-        "VmMssqlWinName = '${var.vm_mssql_win_name}';",
-        "AppId = '${data.azurerm_client_config.current.client_id}';",
-        "AppSecret = '${var.arm_client_secret}';"
-      ]
-    }
-
-    provisioner = {
-      name = "Register-DscNode.ps1"
-      parameters = [
-        "TenantId = '${data.azurerm_client_config.current.tenant_id}';",
-        "SubscriptionId = '${data.azurerm_client_config.current.subscription_id}';",
-        "ResourceGroupName = '${var.resource_group_name}';",
-        "Location = '${var.location}';",
-        "AutomationAccountName = '${var.automation_account_name}';",
-        "VirtualMachineName = '${var.vm_mssql_win_name}';",
-        "AppId = '${data.azurerm_client_config.current.client_id}';",
-        "AppSecret = '${var.arm_client_secret}';",
-        "DscConfigurationName = 'MssqlVmConfiguration'"
-      ]
-    }
-  }
+  adds_domain_name_netbios = upper(replace(var.adds_domain_name, ".local", ""))
 
   remote_scripts = {
     orchestrator = {
@@ -58,20 +29,20 @@ locals {
 
   disks = {
     sqldata = {
-      name                      = "vol_sqldata_M"
-      disk_size_gb              = "128" # min setting, adjust as needed
-      lun                       = "0" 
-      caching                   = "None" # Premium SSD v2 does not support host caching
-      disk_iops_read_write      = "3000" # min setting, adjust as needed
-      disk_mbps_read_write      = "125" # min setting, adjust as needed
+      name                 = "vol_sqldata_M"
+      disk_size_gb         = "128" # min setting, adjust as needed
+      lun                  = "0"
+      caching              = "None" # Premium SSD v2 does not support host caching
+      disk_iops_read_write = "3000" # min setting, adjust as needed
+      disk_mbps_read_write = "125"  # min setting, adjust as needed
     },
     sqllog = {
-      name                      = "vol_sqllog_L"
-      disk_size_gb              = "32" # min setting, adjust as needed
-      lun                       = "1" 
-      caching                   = "None"
-      disk_iops_read_write      = "3000" # min setting, adjust as needed
-      disk_mbps_read_write      = "125" # min setting, adjust as needed
+      name                 = "vol_sqllog_L"
+      disk_size_gb         = "32" # min setting, adjust as needed
+      lun                  = "1"
+      caching              = "None"
+      disk_iops_read_write = "3000" # min setting, adjust as needed
+      disk_mbps_read_write = "125"  # min setting, adjust as needed
     }
   }
 

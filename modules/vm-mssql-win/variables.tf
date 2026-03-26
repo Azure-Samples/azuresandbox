@@ -49,27 +49,6 @@ variable "admin_username_secret" {
   }
 }
 
-variable "arm_client_secret" {
-  type        = string
-  description = "The password for the service principal used for authenticating with Azure. Set interactively or using an environment variable 'TF_VAR_arm_client_secret'."
-  sensitive   = true
-
-  validation {
-    condition     = length(var.arm_client_secret) >= 8
-    error_message = "Must be at least 8 characters long."
-  }
-}
-
-variable "automation_account_name" {
-  type        = string
-  description = "The name of the Azure Automation Account used for state configuration (DSC)."
-
-  validation {
-    condition     = length(var.automation_account_name) <= 90
-    error_message = "Must not exceed 90 characters, which is the maximum length for an Azure resource name."
-  }
-}
-
 variable "key_vault_id" {
   type        = string
   description = "The existing key vault where secrets are stored"
@@ -97,16 +76,6 @@ variable "location" {
   validation {
     condition     = can(regex("^[a-z0-9-]+$", var.location))
     error_message = "Must be a valid Azure region name. It should only contain lowercase letters, numbers, and dashes (e.g., 'eastus', 'westus2', 'centralus')."
-  }
-}
-
-variable "resource_group_id" {
-  type        = string
-  description = "The ID of the existing resource group for provisioning resources."
-
-  validation {
-    condition     = can(regex("^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[a-zA-Z0-9-_()]+$", var.resource_group_id))
-    error_message = "Must be a valid Azure Resource ID for a resource group. It should follow the format '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}'."
   }
 }
 
@@ -252,12 +221,12 @@ variable "vm_mssql_win_size" {
 }
 
 variable "vm_mssql_win_storage_account_type_data_disks" {
-  type = string
+  type        = string
   description = "The storage type to be used for the VMs data disks."
-  default = "PremiumV2_LRS"
+  default     = "PremiumV2_LRS"
 
   validation {
-    condition     = contains(["Standard_LRS", "StandardSSD_ZRS", "Premium_LRS", "PremiumV2_LRS", "Premium_ZRS", "StandardSSD_LRS", "UltraSSD_LRS" ], var.vm_mssql_win_storage_account_type_data_disks)
+    condition     = contains(["Standard_LRS", "StandardSSD_ZRS", "Premium_LRS", "PremiumV2_LRS", "Premium_ZRS", "StandardSSD_LRS", "UltraSSD_LRS"], var.vm_mssql_win_storage_account_type_data_disks)
     error_message = "The 'vm_mssql_win_storage_account_type_data_disks' must be one of the valid Azure storage SKUs for managed disks: 'Standard_LRS', 'StandardSSD_LRS', 'StandardSSD_ZRS', 'Premium_LRS', 'PremiumV2_LRS', 'Premium_ZRS', or 'UltraSSD_LRS'."
   }
 }
@@ -268,7 +237,7 @@ variable "vm_mssql_win_storage_account_type_os_disk" {
   default     = "Premium_LRS"
 
   validation {
-    condition     = contains(["Standard_LRS", "StandardSSD_LRS", "Premium_LRS", "StandardSSD_ZRS", "Premium_ZRS" ], var.vm_mssql_win_storage_account_type_os_disk)
+    condition     = contains(["Standard_LRS", "StandardSSD_LRS", "Premium_LRS", "StandardSSD_ZRS", "Premium_ZRS"], var.vm_mssql_win_storage_account_type_os_disk)
     error_message = "The 'vm_mssql_win_storage_account_type' must be one of the valid Azure storage SKUs for managed disks: 'Standard_LRS', 'Premium_LRS', 'StandardSSD_LRS', 'Premium_ZRS', or 'StandardSSD_ZRS'."
   }
 }
