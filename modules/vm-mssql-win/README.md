@@ -13,7 +13,7 @@
 
 ## Overview
 
-This configuration implements a SQL Server virtual machine. The VM is configured using Azure Automation DSC and offers the following capabilities:
+This configuration implements a SQL Server virtual machine. The VM is pre-configured with the following capabilities:
 
 * Domain joined to the *mysandbox.local* Active Directory domain.
 * Pre-configured SQL Server data and log disks.

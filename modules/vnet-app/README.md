@@ -33,23 +33,6 @@ This configuration implements a virtual network for applications including:
 
 The steps in this section verify that the Windows jumpbox VM (jumpwin1) is configured correctly.
 
-* Verify *jumpwin1* node configuration is compliant.
-  * From the client environment, navigate to *portal.azure.com* > *Automation Accounts* > *aa-sand-dev* > *Configuration Management* > *State configuration (DSC)*.
-  * Refresh the *Nodes* tab until *jumpwin1* reports a status of `Compliant`.
-    * When *jumpwin1* node status is `Compliant`, click the *jumpwin1* node to view details.
-    * Click on the most recent *Consistency* report with the status `Compliant` to view details.
-    * Look for the *Resources* section. If no resources are listed, wait 15 minutes and refresh again until the latest *Consistency* report includes data in *Resources*.
-    * Verify that the *Resources* section includes the following:
-
-      Resource | Status
-      --- | ---
-      WindowsFeature | Compliant
-      cChocoInstaller | Compliant
-      cChocoPackageInstaller | Compliant
-      Script | Compliant
-      Computer | Compliant
-      PendingReboot | Compliant
-
 * From the client environment, navigate to *portal.azure.com* > *Virtual machines* > *jumpwin1*
   * Click *Connect*, then click *Connect via Bastion*
   * For *Authentication Type* choose *VM Password*
@@ -119,21 +102,20 @@ This module is organized as follows:
 
 ```plaintext
 ├── images/
-|   └── vnet-app-diagram.drawio.svg             # Architecture diagram
+|   └── vnet-app-diagram.drawio.svg         # Architecture diagram
 ├── scripts/
-|   ├── Invoke-AzureFilesConfiguration.ps1      # Starts Azure Files configuration task
-|   ├── JumpBoxConfiguration.ps1                # DSC configuration for Windows jumpbox VM    
-|   ├── Register-DscNode.ps1                    # Registers a VM with Azure Automation DSC
-|   ├── Set-AutomationAccountConfiguration.ps1  # Configures Azure Automation settings
-|   └── Set-AzureFilesConfiguration.ps1         # Configures Azure Files Kerberos authentication with mysandbox.local AD domain
-├── compute.tf                                  # Compute resource configurations   
-├── locals.tf                                   # Local variables
-├── main.tf                                     # Resource configurations  
-├── network.tf                                  # Network resource configurations  
-├── outputs.tf                                  # Output variables
-├── storage.tf                                  # Storage resource configurations
-├── terraform.tf                                # Terraform configuration block
-└── variables.tf                                # Input variables
+|   ├── Install-Software.ps1                # Installs software on jumpwin1
+|   ├── Install-WindowsFeatures.ps1         # Enables Windows features on jumpwin1
+|   ├── Invoke-AzureFilesConfiguration.ps1  # Runs Set-AzureFilesConfiguration.ps1 as domain admin
+|   └── Set-AzureFilesConfiguration.ps1     # Configures Azure Files Kerberos authentication with mysandbox.local AD domain
+├── compute.tf                              # Compute resource configurations   
+├── locals.tf                               # Local variables
+├── main.tf                                 # Resource configurations  
+├── network.tf                              # Network resource configurations  
+├── outputs.tf                              # Output variables
+├── storage.tf                              # Storage resource configurations
+├── terraform.tf                            # Terraform configuration block
+└── variables.tf                            # Input variables
 ```
 
 ### Input Variables
@@ -147,7 +129,6 @@ admin_password |  | The password used when provisioning administrator accounts. 
 admin_password_secret | adminpassword | The name of the key vault secret that contains the password for the admin account. Defined in the *vnet-shared* module.
 admin_username | bootstrapadmin | The user name used when provisioning administrator accounts. This should conform to Windows username requirements (alphanumeric characters, periods, underscores, and hyphens, 1-20 characters).
 admin_username_secret | adminuser | The name of the key vault secret that contains the user name for the admin account. Defined in the *vnet-shared* module.
-automation_account_name |  | The name of the Azure Automation Account used for state configuration (DSC).
 dns_server |  | The IP address of the DNS server used for the virtual network. Defined in the *vnet-shared* module.
 firewall_route_table_id |  | The ID of the route table used for the firewall. Defined in the *vnet-shared* module.
 key_vault_id |  | The ID of the key vault defined in the root module.

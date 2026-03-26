@@ -138,7 +138,7 @@ module.vnet_shared.azurerm_subnet.subnets["snet-privatelink-02"] | | Dedicated s
 module.vnet_shared.azurerm_subnet_network_security_group_association.associations[*] | | NSGs are associated with all subnets except *AzureFirewallSubnet*.
 module.vnet_shared.azurerm_subnet_route_table_association.associations[*] | | The *route-sand-dev* route table is associated with all subnets except *AzureFirewallSubnet* and *AzureBastionSubnet*.
 module.vnet_shared.azurerm_virtual_network.this | vnet&#8209;sand&#8209;dev&#8209;shared | The shared services virtual network.
-module.vnet_shared.azurerm_windows_virtual_machine.this | adds1 | The AD DS Domain Controller / DNS Server VM. Registered with Azure Automation DSC by */scripts/Register-DscNode.ps1* using DSC configuration */scripts/DomainControllerConfiguration.ps1*.
+module.vnet_shared.azurerm_windows_virtual_machine.this | adds1 | The AD DS Domain Controller / DNS Server VM. 
 
 ### Output Variables
 

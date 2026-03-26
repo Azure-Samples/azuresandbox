@@ -737,8 +737,6 @@ The following cross-platform scripting technologies are used in this project:
 
 The following configuration management technologies are used in this project to configure virtual machines:
 
-* **PowerShell DSC**: PowerShell Desired State Configuration is used to configure Windows virtual machines.
-* **Azure Automation DSC**: Used to configure Windows virtual machines using configurations written in PowerShell DSC.
 * **cloud-init**: Used to configure Linux virtual machines.
 
 #### **Operating Systems**

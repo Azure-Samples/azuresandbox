@@ -25,11 +25,13 @@ This section describes additional Terraform configurations that can be added to 
 
 This section describes additional Terraform modules that can be added to Azure Sandbox. These modules are not required to use Azure Sandbox, but may be useful for learning or testing purposes.
 
-* [ai-foundry](./modules/ai-foundry/) enables the use of an [Azure AI Foundry hub](https://learn.microsoft.com/en-us/azure/ai-foundry/concepts/ai-resources) in a sandbox environment.
-* [vm-devops-win](./modules/vm-devops-win/) implements a collection of identical Windows developer VMs.
-* [vnet-onprem](./modules/vnet-onprem/) simulates connectivity to an on-premises network using a site-to-site VPN connection and Azure DNS private resolver.
-* [petstore](./modules/petstore/) deploys a sample RESTful API application using Azure Container Apps.
-* [avd](./modules/avd/) deploys an Azure Virtual Desktop test environment with support for personal desktops and RemoteApp streaming.
+* Up to date extra modules:
+  * [petstore](./modules/petstore/) deploys a sample RESTful API application using Azure Container Apps.
+  * [avd](./modules/avd/) deploys an Azure Virtual Desktop test environment with support for personal desktops and RemoteApp streaming.
+* Out of date extra modules: these modules depend on retired features and will be updated in the future with a redesigned implementation.
+  * [ai-foundry](./modules/ai-foundry/) enables the use of an [Azure AI Foundry hub](https://learn.microsoft.com/en-us/azure/ai-foundry/concepts/ai-resources) in a sandbox environment.
+  * [vm-devops-win](./modules/vm-devops-win/) implements a collection of identical Windows developer VMs.
+  * [vnet-onprem](./modules/vnet-onprem/) simulates connectivity to an on-premises network using a site-to-site VPN connection and Azure DNS private resolver.
 
 ## Demo videos
 
