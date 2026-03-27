@@ -65,7 +65,6 @@ Variable | Default | Description
 arm_client_secret |  | The password for the service principal used for authenticating with Azure (sensitive).
 container_apps_subnet_id |  | Resource ID of subnet for the Container Apps Environment infrastructure.
 container_registry_id |  | The resource ID of an existing Azure Container Registry (ACR) containing / to receive the image.
-enable_container_push | false | Enable (externally) AcrPush role assignment for managed identity (pull role provided in-module).
 location |  | Azure region for deployment (lowercase, numbers, dashes only).
 log_analytics_workspace_id |  | Resource ID of Log Analytics workspace used for diagnostics.
 private_dns_zone_id |  | Resource ID of private DNS zone linked to the managed environment.
@@ -91,4 +90,4 @@ module.naming | | Azure naming module instance for consistent resource naming.
 
 Name | Description
 --- | ---
-petstore_fqdn | The public FQDN of the Petstore Container App ingress.
+petstore_fqdn | The FQDN of the Petstore Container App ingress.

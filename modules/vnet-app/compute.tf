@@ -1,3 +1,4 @@
+#region vm
 resource "azurerm_windows_virtual_machine" "this" {
   name                       = var.vm_jumpbox_win_name
   resource_group_name        = var.resource_group_name
@@ -28,14 +29,8 @@ resource "azurerm_windows_virtual_machine" "this" {
   }
 
   depends_on = [
-    azurerm_private_dns_zone_virtual_network_link.vnet_app_links,
-    null_resource.this
+    azurerm_private_dns_zone_virtual_network_link.vnet_app_links
   ]
-
-  provisioner "local-exec" {
-    command     = "$params = @{ ${join(" ", local.local_scripts["provisioner_vm_windows"].parameters)}}; ./${path.module}/scripts/${local.local_scripts["provisioner_vm_windows"].name} @params"
-    interpreter = ["pwsh", "-Command"]
-  }
 }
 
 resource "azurerm_role_assignment" "assignments_vm_win" {
@@ -46,15 +41,64 @@ resource "azurerm_role_assignment" "assignments_vm_win" {
   role_definition_name = each.value.role_definition_name
   scope                = each.value.scope
 }
+#endregion
 
-resource "azurerm_virtual_machine_extension" "this" {
-  name                       = "${module.naming.virtual_machine_extension.name}-${var.vm_jumpbox_win_name}-CustomScriptExtension"
+#region vm-configuration
+resource "azurerm_virtual_machine_run_command" "install_windows_features" {
+  name               = "${module.naming.virtual_machine_extension.name}-${var.vm_jumpbox_win_name}-InstallWindowsFeatures"
+  location           = var.location
+  virtual_machine_id = azurerm_windows_virtual_machine.this.id
+
+  source {
+    script = file("${path.module}/scripts/Install-WindowsFeatures.ps1")
+  }
+}
+
+resource "azurerm_virtual_machine_run_command" "install_software" {
+  name               = "${module.naming.virtual_machine_extension.name}-${var.vm_jumpbox_win_name}-InstallSoftware"
+  location           = var.location
+  virtual_machine_id = azurerm_windows_virtual_machine.this.id
+
+  source {
+    script = file("${path.module}/scripts/Install-Software.ps1")
+  }
+}
+
+resource "azurerm_virtual_machine_extension" "join_domain" {
+  name                       = "${module.naming.virtual_machine_extension.name}-${var.vm_jumpbox_win_name}-JsonADDomainExtension"
+  virtual_machine_id         = azurerm_windows_virtual_machine.this.id
+  publisher                  = "Microsoft.Compute"
+  type                       = "JsonADDomainExtension"
+  type_handler_version       = "1.3"
+  auto_upgrade_minor_version = true
+
+  depends_on = [
+    azurerm_virtual_machine_run_command.install_windows_features,
+    azurerm_virtual_machine_run_command.install_software
+  ]
+
+  settings = jsonencode({
+    Name    = var.adds_domain_name
+    User    = "${local.adds_domain_name_netbios}\\${var.admin_username}"
+    Restart = "true"
+    Options = "3"
+  })
+
+  protected_settings = jsonencode({
+    Password = var.admin_password
+  })
+}
+#endregion
+
+#region azure-files-configuration
+resource "azurerm_virtual_machine_extension" "configure_azure_files" {
+  name                       = "${module.naming.virtual_machine_extension.name}-${var.vm_jumpbox_win_name}-ConfigureAzureFiles"
   virtual_machine_id         = azurerm_windows_virtual_machine.this.id
   publisher                  = "Microsoft.Compute"
   type                       = "CustomScriptExtension"
   type_handler_version       = "1.10"
   auto_upgrade_minor_version = true
-  depends_on                 = [time_sleep.wait_for_vm_win_roles]
+  depends_on                 = [azurerm_virtual_machine_extension.join_domain]
 
   settings = jsonencode({
     fileUris = [
@@ -67,8 +111,4 @@ resource "azurerm_virtual_machine_extension" "this" {
     managedIdentity  = {}
   })
 }
-
-resource "time_sleep" "wait_for_vm_win_roles" {
-  create_duration = "2m"
-  depends_on      = [azurerm_role_assignment.assignments_vm_win]
-}
+#endregion

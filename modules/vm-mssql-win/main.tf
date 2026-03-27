@@ -2,15 +2,6 @@
 data "azurerm_client_config" "current" {}
 #endregion
 
-#region resources
-resource "null_resource" "this" {
-  provisioner "local-exec" {
-    command     = "$params = @{ ${join(" ", local.local_scripts["configure_automation"].parameters)}}; ./${path.module}/scripts/${local.local_scripts["configure_automation"].name} @params"
-    interpreter = ["pwsh", "-Command"]
-  }
-} # Configures the automation account for the SQL Server VM
-#endregion
-
 #region utility-resources
 resource "terraform_data" "storage_operations_complete" {
   input = values(azurerm_storage_blob.remote_scripts)[*].id

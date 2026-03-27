@@ -4,17 +4,17 @@ data "azurerm_client_config" "current" {}
 
 #region common
 resource "azurerm_virtual_desktop_workspace" "this" {
-  name                = "${module.naming.virtual_desktop_workspace.name_unique}"
+  name                = module.naming.virtual_desktop_workspace.name_unique
   location            = var.location
   resource_group_name = var.resource_group_name
   friendly_name       = "AVD Quickstart Workspace"
 }
 
 resource "azurerm_role_assignment" "vm_users" {
-  for_each             = toset(var.security_principal_object_ids)
-  scope                = var.resource_group_id
-  role_definition_id   = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/${local.vm_user_login_role}"
-  principal_id         = each.value
+  for_each           = toset(var.security_principal_object_ids)
+  scope              = var.resource_group_id
+  role_definition_id = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/${local.vm_user_login_role}"
+  principal_id       = each.value
 }
 #endregion
 
@@ -35,10 +35,10 @@ resource "azurerm_virtual_desktop_workspace_application_group_association" "pers
 }
 
 resource "azurerm_role_assignment" "personal" {
-  for_each             = toset(var.security_principal_object_ids)
-  scope                = azurerm_virtual_desktop_application_group.personal.id
-  role_definition_id   = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/${local.desktop_virtualization_user_role}"
-  principal_id         = each.value
+  for_each           = toset(var.security_principal_object_ids)
+  scope              = azurerm_virtual_desktop_application_group.personal.id
+  role_definition_id = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/${local.desktop_virtualization_user_role}"
+  principal_id       = each.value
 }
 
 resource "azurerm_virtual_desktop_host_pool" "personal" {
@@ -77,10 +77,10 @@ resource "azurerm_virtual_desktop_workspace_application_group_association" "remo
 }
 
 resource "azurerm_role_assignment" "remoteapp" {
-  for_each             = toset(var.security_principal_object_ids)
-  scope                = azurerm_virtual_desktop_application_group.remoteapp.id
-  role_definition_id   = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/${local.desktop_virtualization_user_role}"
-  principal_id         = each.value
+  for_each           = toset(var.security_principal_object_ids)
+  scope              = azurerm_virtual_desktop_application_group.remoteapp.id
+  role_definition_id = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/${local.desktop_virtualization_user_role}"
+  principal_id       = each.value
 }
 
 resource "azurerm_virtual_desktop_host_pool" "remoteapp" {

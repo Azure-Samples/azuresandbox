@@ -29,7 +29,6 @@ output "private_dns_zones" {
 
 output "resource_ids" {
   value = {
-    automation_account      = azurerm_automation_account.this.id
     bastion_host            = azurerm_bastion_host.this.id
     firewall                = azurerm_firewall.this.id
     firewall_route_table    = azurerm_route_table.this.id
@@ -42,7 +41,6 @@ output "resource_ids" {
 
 output "resource_names" {
   value = {
-    automation_account      = azurerm_automation_account.this.name
     bastion_host            = azurerm_bastion_host.this.name
     firewall                = azurerm_firewall.this.name
     firewall_route_table    = azurerm_route_table.this.name
@@ -60,4 +58,9 @@ output "subnets" {
 output "key_vault_operations_complete" {
   value       = terraform_data.key_vault_operations_complete.id
   description = "Dependency signal: all key vault data plane operations in this module are complete."
+}
+
+# Use this output to trigger dependent modules to wait until the VM is fully configured and has rebooted after creating the domain
+output "configure_adds_dns_id" {
+  value = azurerm_virtual_machine_run_command.configure_adds_dns.id
 }

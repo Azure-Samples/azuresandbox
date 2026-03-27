@@ -1,4 +1,4 @@
-# Linux Jumbox Virtual Machine Module (vm-jumpbox-linux)
+# Linux Jumpbox Virtual Machine Module (vm-jumpbox-linux)
 
 ## Contents
 
@@ -212,7 +212,7 @@ This section lists the default values for the input variables used in this modul
 Variable | Default | Description
 --- | --- | ---
 adds_domain_name | mysandbox.local | The domain name defined in the vnet-shared module.
-admin_username | bootstrapadmin | The name of the key vault secret that contains the user name for the admin account. Defined in the vnet-shared module. *local* is appended to the username to avoid ambiguity between the local admin account for the vm and the domain admin account.
+admin_username | bootstrapadmin | The admin username. Defined in the vnet-shared module. *local* is appended to the username to avoid ambiguity between the local admin account for the vm and the domain admin account.
 dns_server | `10.1.1.4` | The IP address of the DNS server used for the virtual network. Defined in the vnet-shared module.
 key_vault_id | | The ID of the key vault defined in the root module.
 key_vault_name | | The name of the key vault defined in the root module.
@@ -247,6 +247,6 @@ module.vm_jumpbox_linux[0].tls_private_key.ssh_key | | The TLS private key used 
 This section includes a list of output variables returned by the module.
 
 Name | Comments
---- |  ---
+--- | ---
 resource_ids | A map of resource IDs for key resources in the module.
 resource_names | A map of resource names for key resources in the module.

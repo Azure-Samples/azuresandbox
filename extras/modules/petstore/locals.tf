@@ -1,6 +1,6 @@
 locals {
-  image_name = split("/",split(":", var.source_container_image)[0])[1]
-  
+  image_name = split("/", split(":", var.source_container_image)[0])[1]
+
   local_scripts = {
     configure_registry = {
       name = "Set-ContainerRegistryConfiguration.ps1"
@@ -18,5 +18,5 @@ locals {
   }
 
   login_server  = "${local.registry_name}.azurecr.io"
-  registry_name = split("/", var.container_registry_id)[8]  
+  registry_name = split("/", var.container_registry_id)[8]
 }

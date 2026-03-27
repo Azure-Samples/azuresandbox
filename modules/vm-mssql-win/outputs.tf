@@ -15,3 +15,10 @@ output "storage_operations_complete" {
   description = "Dependency signal: all storage data plane operations in this module are complete."
 }
 
+output "vm_run_command_output" {
+  value = {
+    configure_firewall_rules = azurerm_virtual_machine_run_command.configure_firewall_rules.instance_view
+    configure_sql_login      = azurerm_virtual_machine_run_command.configure_sql_login.instance_view
+  }
+  description = "Instance view output from VM run commands for troubleshooting."
+}

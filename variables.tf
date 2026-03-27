@@ -10,7 +10,7 @@ variable "aad_tenant_id" {
 
 variable "arm_client_id" {
   type        = string
-  description = "The AppId of the service principal used for authenticating with Azure. Must have a 'Contributor' role assignment."
+  description = "The AppId of the service principal used for authenticating with Azure. Must have an 'Owner' role assignment."
 
   validation {
     condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.arm_client_id))
@@ -29,11 +29,11 @@ variable "arm_client_secret" {
   }
 }
 
-variable "enable_module_ai_foundry" {
-  type        = bool
-  description = "Set to true to enable the AI Foundry module, false to skip it."
-  default     = false
-}
+# variable "enable_module_ai_foundry" {
+#   type        = bool
+#   description = "Set to true to enable the AI Foundry module, false to skip it."
+#   default     = false
+# }
 
 variable "enable_module_avd" {
   type        = bool
@@ -61,12 +61,12 @@ variable "enable_module_petstore" {
   default     = false
 }
 
-variable "enable_module_vm_devops_win" {
-  type        = bool
-  description = "Set to true to enable the vm_devops_win module, false to skip it."
-  default     = false
+# variable "enable_module_vm_devops_win" {
+#   type        = bool
+#   description = "Set to true to enable the vm_devops_win module, false to skip it."
+#   default     = false
 
-}
+# }
 
 variable "enable_module_vm_jumpbox_linux" {
   type        = bool
@@ -86,11 +86,11 @@ variable "enable_module_vnet_app" {
   default     = false
 }
 
-variable "enable_module_vnet_onprem" {
-  type        = bool
-  description = "Set to true to enable the vnet_onprem module, false to skip it."
-  default     = false
-}
+# variable "enable_module_vnet_onprem" {
+#   type        = bool
+#   description = "Set to true to enable the vnet_onprem module, false to skip it."
+#   default     = false
+# }
 
 variable "enable_module_vwan" {
   type        = bool
@@ -139,7 +139,7 @@ variable "user_name" {
   description = "The user name of the user in Microsoft Entra ID."
 
   validation {
-    condition = can(regex("^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]@[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]\\.[a-zA-Z]{2,}$", var.user_name))
+    condition     = can(regex("^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]@[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]\\.[a-zA-Z]{2,}$", var.user_name))
     error_message = "Must be a valid User Principal Name (UPN) format like 'user@domain.com'. The username part must start and end with alphanumeric characters and can contain periods (.), underscores (_), or hyphens (-). The domain must be a valid domain name."
   }
 }

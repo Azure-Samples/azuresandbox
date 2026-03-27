@@ -12,7 +12,7 @@
 # - Windows Server 2025 using PowerShell 5.x for Windows
 # - Azure VM size Standard_D4ds_v6
 # - MicrosoftSQLServer platform image sql2025-ws2025 entdev-gen2
-# - VM must be pre-configured using 'MssqlVmConfiguration.ps1' DSC configuration
+# - VM must be pre-configured using 'Configure-FirewallRules.ps1' and 'Configure-SqlLogin.ps1' run commands
 # - Runs as domain administrator on the machine being configured
 
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Scope = 'Function', Target = 'Restart-SqlServer', Justification = 'Strict one-off automation script; no -WhatIf/-Confirm support required.')]

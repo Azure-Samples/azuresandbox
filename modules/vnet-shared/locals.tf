@@ -30,39 +30,6 @@ locals {
     ]
   ])
 
-  local_scripts = {
-    provisioner_automation_account = {
-      name = "Set-AutomationAccountConfiguration.ps1"
-      parameters = [
-        "TenantId = '${data.azurerm_client_config.current.tenant_id}';",
-        "SubscriptionId = '${data.azurerm_client_config.current.subscription_id}';",
-        "ResourceGroupName = '${var.resource_group_name}';",
-        "AutomationAccountName = '${module.naming.automation_account.name}';",
-        "Domain = '${var.adds_domain_name}';",
-        "VmAddsName = '${var.vm_adds_name}';",
-        "AdminUserName = '${var.admin_username}';",
-        "AdminPwd = '${azurerm_key_vault_secret.adminpassword.value}';",
-        "AppId = '${data.azurerm_client_config.current.client_id}';",
-        "AppSecret = '${azurerm_key_vault_secret.spn_password.value}';",
-      ]
-    }
-
-    provisioner_vm_windows = {
-      name = "Register-DscNode.ps1"
-      parameters = [
-        "TenantId = '${data.azurerm_client_config.current.tenant_id}';",
-        "SubscriptionId = '${data.azurerm_client_config.current.subscription_id}';",
-        "ResourceGroupName = '${var.resource_group_name}';",
-        "Location = '${var.location}';",
-        "AutomationAccountName = '${module.naming.automation_account.name}';",
-        "VirtualMachineName = '${var.vm_adds_name}';",
-        "AppId = '${data.azurerm_client_config.current.client_id}';",
-        "AppSecret = '${azurerm_key_vault_secret.spn_password.value}';",
-        "DscConfigurationName = 'DomainControllerConfiguration'"
-      ]
-    }
-  }
-
   nsg_rules = {
     AllowAzureCloudOutbound = {
       access                     = "Allow"
@@ -244,8 +211,8 @@ locals {
       address_prefix                    = var.subnet_privatelink_address_prefix
       delegation                        = ""
       private_endpoint_network_policies = "Disabled"
-      nsg_rules = []
-      route_table = null
+      nsg_rules                         = []
+      route_table                       = null
     }
   }
 }

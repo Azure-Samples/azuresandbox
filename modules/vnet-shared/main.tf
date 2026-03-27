@@ -77,20 +77,6 @@ resource "azurerm_monitor_diagnostic_setting" "this" {
 }
 #endregion
 
-#region automation-account
-resource "azurerm_automation_account" "this" {
-  name                = module.naming.automation_account.name
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  sku_name            = "Basic"
-
-  provisioner "local-exec" {
-    command     = "$params = @{ ${join(" ", local.local_scripts["provisioner_automation_account"].parameters)}}; ./${path.module}/scripts/${local.local_scripts["provisioner_automation_account"].name} @params"
-    interpreter = ["pwsh", "-Command"]
-  }
-}
-#endregion
-
 #region log-analytics
 resource "azurerm_log_analytics_workspace" "this" {
   name                = module.naming.log_analytics_workspace.name_unique

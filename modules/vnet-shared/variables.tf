@@ -22,7 +22,7 @@ variable "admin_password_secret" {
 
 variable "admin_username" {
   type        = string
-  description = "The name of the key vault secret containing the admin username"
+  description = "The admin username"
   default     = "bootstrapadmin"
 
   validation {

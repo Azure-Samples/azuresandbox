@@ -80,7 +80,7 @@ admin_password |  | A strong password used for admin accounts. Defined in the vn
 admin_username | bootstrapadmin | The user name used for admin accounts. Defined in the vnet-shared module.
 location | | The name of the Azure Region where resources will be provisioned. Defined in the root module.
 mysql_database_name | testdb | The name of the Azure MySQL Database to be provisioned.
-mysql_sku_name | B_Gen5_1 | The SKU name for the Azure MySQL Flexible Server.
+mysql_sku_name | B_Standard_B1ms | The SKU name for the Azure MySQL Flexible Server.
 private_dns_zone_id | | The ID of the private DNS zone for Azure Database for MySQL. Defined in the vnet-app module.
 resource_group_name | | The name of the resource group defined in the root module.
 subnet_id | | The subnet ID defined in the vnet-app module.

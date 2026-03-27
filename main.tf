@@ -38,8 +38,6 @@ module "vnet_app" {
   admin_password_secret         = module.vnet_shared.admin_password_secret
   admin_username                = module.vnet_shared.admin_username
   admin_username_secret         = module.vnet_shared.admin_username_secret
-  arm_client_secret             = var.arm_client_secret
-  automation_account_name       = module.vnet_shared.resource_names["automation_account"]
   dns_server                    = module.vnet_shared.dns_server
   firewall_route_table_id       = module.vnet_shared.resource_ids["firewall_route_table"]
   key_vault_id                  = module.vnet_shared.resource_ids["key_vault"]
@@ -54,7 +52,7 @@ module "vnet_app" {
   virtual_network_shared_id     = module.vnet_shared.resource_ids["virtual_network_shared"]
   virtual_network_shared_name   = module.vnet_shared.resource_names["virtual_network_shared"]
 
-  depends_on = [module.vnet_shared.resource_ids] # Ensure the domain controller VM is provisioned
+  depends_on = [module.vnet_shared.configure_adds_dns_id] # Ensures that the AD DS configuration is complete. Limits taint blast radius.
 }
 
 module "vm_jumpbox_linux" {
@@ -74,7 +72,7 @@ module "vm_jumpbox_linux" {
   subnet_id            = module.vnet_app[0].subnets["snet-app-01"].id
   tags                 = var.tags
 
-  depends_on = [module.vnet_app[0].azure_files_config_vm_extension_id] # Ensure that Azure Files is configured
+  depends_on = [module.vnet_app[0].configure_azure_files_id] # Ensures that Azure Files is configured
 }
 
 module "vm_mssql_win" {
@@ -82,26 +80,23 @@ module "vm_mssql_win" {
 
   count = var.enable_module_vm_mssql_win ? 1 : 0
 
-  adds_domain_name        = module.vnet_shared.adds_domain_name
-  admin_password          = module.vnet_shared.admin_password
-  admin_password_secret   = module.vnet_shared.admin_password_secret
-  admin_username          = module.vnet_shared.admin_username
-  admin_username_secret   = module.vnet_shared.admin_username_secret
-  arm_client_secret       = var.arm_client_secret
-  automation_account_name = module.vnet_shared.resource_names["automation_account"]
-  key_vault_id            = module.vnet_shared.resource_ids["key_vault"]
-  key_vault_name          = module.vnet_shared.resource_names["key_vault"]
-  location                = azurerm_resource_group.this.location
-  resource_group_id       = azurerm_resource_group.this.id
-  resource_group_name     = azurerm_resource_group.this.name
-  storage_account_id      = module.vnet_app[0].resource_ids["storage_account"]
-  storage_account_name    = module.vnet_app[0].resource_names["storage_account"]
-  storage_blob_endpoint   = module.vnet_app[0].storage_endpoints["blob"]
-  storage_container_name  = module.vnet_app[0].storage_container_name
-  subnet_id               = module.vnet_app[0].subnets["snet-db-01"].id
-  tags                    = var.tags
+  adds_domain_name       = module.vnet_shared.adds_domain_name
+  admin_password         = module.vnet_shared.admin_password
+  admin_password_secret  = module.vnet_shared.admin_password_secret
+  admin_username         = module.vnet_shared.admin_username
+  admin_username_secret  = module.vnet_shared.admin_username_secret
+  key_vault_id           = module.vnet_shared.resource_ids["key_vault"]
+  key_vault_name         = module.vnet_shared.resource_names["key_vault"]
+  location               = azurerm_resource_group.this.location
+  resource_group_name    = azurerm_resource_group.this.name
+  storage_account_id     = module.vnet_app[0].resource_ids["storage_account"]
+  storage_account_name   = module.vnet_app[0].resource_names["storage_account"]
+  storage_blob_endpoint  = module.vnet_app[0].storage_endpoints["blob"]
+  storage_container_name = module.vnet_app[0].storage_container_name
+  subnet_id              = module.vnet_app[0].subnets["snet-db-01"].id
+  tags                   = var.tags
 
-  depends_on = [module.vnet_app[0].resource_ids] # Ensure vnet-app module resources are provisioned
+  depends_on = [module.vnet_app[0].configure_azure_files_id] # Ensures that Azure Files is configured
 }
 
 module "mssql" {
@@ -118,7 +113,7 @@ module "mssql" {
   user_name           = var.user_name
   user_object_id      = var.user_object_id
 
-  depends_on = [module.vnet_app[0].resource_ids] # Ensure vnet-app module resources are provisioned
+  depends_on = [module.vnet_app[0].configure_azure_files_id] # Ensures that Azure Files is configured
 }
 
 module "mysql" {
@@ -135,7 +130,7 @@ module "mysql" {
   tags                = var.tags
   unique_seed         = module.naming.unique-seed
 
-  depends_on = [module.vnet_app[0].resource_ids] # Ensure vnet-app module resources are provisioned
+  depends_on = [module.vnet_app[0].configure_azure_files_id] # Ensures that Azure Files is configured
 }
 
 module "vwan" {
@@ -154,87 +149,11 @@ module "vwan" {
     virtual_network_app    = module.vnet_app[0].resource_ids["virtual_network_app"]
   }
 
-  depends_on = [module.vnet_app[0].resource_ids] # Ensure vnet-app module resources are provisioned
+  depends_on = [module.vnet_app[0].configure_azure_files_id] # Ensures that Azure Files is configured
 }
 #endregion
 
 #region extra-modules
-module "vnet_onprem" {
-  source = "./extras/modules/vnet-onprem"
-
-  count = var.enable_module_vnet_onprem ? 1 : 0
-
-  adds_domain_name_cloud  = module.vnet_shared.adds_domain_name
-  admin_password          = module.vnet_shared.admin_password
-  admin_username          = module.vnet_shared.admin_username
-  arm_client_secret       = var.arm_client_secret
-  automation_account_name = module.vnet_shared.resource_names["automation_account"]
-  dns_server_cloud        = module.vnet_shared.dns_server
-  location                = azurerm_resource_group.this.location
-  resource_group_name     = azurerm_resource_group.this.name
-  subnets_cloud           = module.vnet_shared.subnets
-  tags                    = var.tags
-
-  virtual_networks_cloud = {
-    virtual_network_shared = {
-      id   = module.vnet_shared.resource_ids["virtual_network_shared"]
-      name = module.vnet_shared.resource_names["virtual_network_shared"]
-    }
-    virtual_network_app = {
-      id   = module.vnet_app[0].resource_ids["virtual_network_app"]
-      name = module.vnet_app[0].resource_names["virtual_network_app"]
-    }
-  }
-
-  vwan_hub_id = module.vwan[0].resource_ids["virtual_wan_hub"]
-  vwan_id     = module.vwan[0].resource_ids["virtual_wan"]
-
-  depends_on = [module.vwan[0].resource_ids] # Ensure vwan module resources are provisioned
-}
-
-module "ai_foundry" {
-  source = "./extras/modules/ai-foundry"
-
-  count = var.enable_module_ai_foundry ? 1 : 0
-
-  key_vault_id          = module.vnet_shared.resource_ids["key_vault"]
-  location              = azurerm_resource_group.this.location
-  private_dns_zones     = module.vnet_app[0].private_dns_zones
-  resource_group_name   = azurerm_resource_group.this.name
-  storage_account_id    = module.vnet_app[0].resource_ids["storage_account"]
-  storage_file_endpoint = module.vnet_app[0].storage_endpoints["file"]
-  storage_share_name    = module.vnet_app[0].resource_names["storage_share"]
-  subnets               = module.vnet_app[0].subnets
-  tags                  = var.tags
-  unique_seed           = module.naming.unique-seed
-  user_object_id        = var.user_object_id
-
-  depends_on = [module.vnet_app[0].azure_files_config_vm_extension_id] # Ensure that Azure Files is configured
-}
-
-module "vm_devops_win" {
-  source = "./extras/modules/vm-devops-win"
-
-  count = var.enable_module_vm_devops_win ? 1 : 0
-
-  admin_password          = module.vnet_shared.admin_password
-  admin_username          = module.vnet_shared.admin_username
-  arm_client_secret       = var.arm_client_secret
-  automation_account_name = module.vnet_shared.resource_names["automation_account"]
-  key_vault_id            = module.vnet_shared.resource_ids["key_vault"]
-  location                = azurerm_resource_group.this.location
-  resource_group_name     = azurerm_resource_group.this.name
-  storage_account_id      = module.vnet_app[0].resource_ids["storage_account"]
-  storage_account_name    = module.vnet_app[0].resource_names["storage_account"]
-  storage_blob_endpoint   = module.vnet_app[0].storage_endpoints["blob"]
-  storage_container_name  = module.vnet_app[0].storage_container_name
-  vm_devops_win_instances = 1
-  subnet_id               = module.vnet_app[0].subnets["snet-app-01"].id
-  tags                    = var.tags
-
-  depends_on = [module.vnet_app[0].azure_files_config_vm_extension_id] # Ensure that Azure Files is configured
-}
-
 module "petstore" {
   source = "./extras/modules/petstore"
 
@@ -271,6 +190,89 @@ module "avd" {
 
   depends_on = [module.vnet_app[0].azure_files_config_vm_extension_id] # Ensure that Azure Files is configured
 }
+
+# vnet-onprem  is currently unavailable due to dependencies on retired features. It will be re-enabled in a future update with a redesigned implementation.
+
+# module "vnet_onprem" {
+#   source = "./extras/modules/vnet-onprem"
+
+#   count = var.enable_module_vnet_onprem ? 1 : 0
+
+#   adds_domain_name_cloud  = module.vnet_shared.adds_domain_name
+#   admin_password          = module.vnet_shared.admin_password
+#   admin_username          = module.vnet_shared.admin_username
+#   arm_client_secret       = var.arm_client_secret
+#   automation_account_name = module.vnet_shared.resource_names["automation_account"]
+#   dns_server_cloud        = module.vnet_shared.dns_server
+#   location                = azurerm_resource_group.this.location
+#   resource_group_name     = azurerm_resource_group.this.name
+#   subnets_cloud           = module.vnet_shared.subnets
+#   tags                    = var.tags
+
+#   virtual_networks_cloud = {
+#     virtual_network_shared = {
+#       id   = module.vnet_shared.resource_ids["virtual_network_shared"]
+#       name = module.vnet_shared.resource_names["virtual_network_shared"]
+#     }
+#     virtual_network_app = {
+#       id   = module.vnet_app[0].resource_ids["virtual_network_app"]
+#       name = module.vnet_app[0].resource_names["virtual_network_app"]
+#     }
+#   }
+
+#   vwan_hub_id = module.vwan[0].resource_ids["virtual_wan_hub"]
+#   vwan_id     = module.vwan[0].resource_ids["virtual_wan"]
+
+#   depends_on = [module.vwan[0].resource_ids] # Ensure vwan module resources are provisioned
+# }
+
+# ai-foundry is currently unavailable due to dependencies on retired features. It will be re-enabled in a future update with a redesigned implementation.
+
+# module "ai_foundry" {
+#   source = "./extras/modules/ai-foundry"
+
+#   count = var.enable_module_ai_foundry ? 1 : 0
+
+#   key_vault_id          = module.vnet_shared.resource_ids["key_vault"]
+#   location              = azurerm_resource_group.this.location
+#   private_dns_zones     = module.vnet_app[0].private_dns_zones
+#   resource_group_name   = azurerm_resource_group.this.name
+#   storage_account_id    = module.vnet_app[0].resource_ids["storage_account"]
+#   storage_file_endpoint = module.vnet_app[0].storage_endpoints["file"]
+#   storage_share_name    = module.vnet_app[0].resource_names["storage_share"]
+#   subnets               = module.vnet_app[0].subnets
+#   tags                  = var.tags
+#   unique_seed           = module.naming.unique-seed
+#   user_object_id        = var.user_object_id
+
+#   depends_on = [module.vnet_app[0].azure_files_config_vm_extension_id] # Ensure that Azure Files is configured
+# }
+
+
+# vm-devops-win is currently unavailable due to dependencies on retired features. It will be re-enabled in a future update with a redesigned implementation.
+# module "vm_devops_win" {
+#   source = "./extras/modules/vm-devops-win"
+
+#   count = var.enable_module_vm_devops_win ? 1 : 0
+
+#   admin_password          = module.vnet_shared.admin_password
+#   admin_username          = module.vnet_shared.admin_username
+#   arm_client_secret       = var.arm_client_secret
+#   automation_account_name = module.vnet_shared.resource_names["automation_account"]
+#   key_vault_id            = module.vnet_shared.resource_ids["key_vault"]
+#   location                = azurerm_resource_group.this.location
+#   resource_group_name     = azurerm_resource_group.this.name
+#   storage_account_id      = module.vnet_app[0].resource_ids["storage_account"]
+#   storage_account_name    = module.vnet_app[0].resource_names["storage_account"]
+#   storage_blob_endpoint   = module.vnet_app[0].storage_endpoints["blob"]
+#   storage_container_name  = module.vnet_app[0].storage_container_name
+#   vm_devops_win_instances = 1
+#   subnet_id               = module.vnet_app[0].subnets["snet-app-01"].id
+#   tags                    = var.tags
+
+#   depends_on = [module.vnet_app[0].azure_files_config_vm_extension_id] # Ensure that Azure Files is configured
+# }
+
 #endregion
 
 #region public-access-management
@@ -283,8 +285,8 @@ resource "terraform_data" "key_vault_access_barrier" {
   input = {
     key_vault_id     = module.vnet_shared.resource_ids["key_vault"]
     vnet_shared      = module.vnet_shared.key_vault_operations_complete
-    vwan             = var.enable_module_vwan ? module.vwan[0].key_vault_operations_complete : null
     vm_jumpbox_linux = var.enable_module_vm_jumpbox_linux ? module.vm_jumpbox_linux[0].key_vault_operations_complete : null
+    vwan             = var.enable_module_vwan ? module.vwan[0].key_vault_operations_complete : null
   }
 }
 
@@ -302,8 +304,8 @@ resource "terraform_data" "storage_access_barrier" {
     storage_account_id = module.vnet_app[0].resource_ids["storage_account"]
     vnet_app           = module.vnet_app[0].storage_operations_complete
     vm_mssql_win       = var.enable_module_vm_mssql_win ? module.vm_mssql_win[0].storage_operations_complete : null
-    ai_foundry         = var.enable_module_ai_foundry ? module.ai_foundry[0].storage_operations_complete : null
-    vm_devops_win      = var.enable_module_vm_devops_win ? module.vm_devops_win[0].storage_operations_complete : null
+    # ai_foundry         = var.enable_module_ai_foundry ? module.ai_foundry[0].storage_operations_complete : null
+    # vm_devops_win      = var.enable_module_vm_devops_win ? module.vm_devops_win[0].storage_operations_complete : null
   }
 }
 
@@ -315,5 +317,4 @@ resource "azapi_update_resource" "storage_disable_public_access" {
 
   body = { properties = { publicNetworkAccess = "Disabled" } }
 }
-
 #endregion

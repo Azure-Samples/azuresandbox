@@ -9,7 +9,7 @@
 
 ## Architecture
 
-![vnet-shared-diagram](./images/vwan-diagram.drawio.svg)
+![vwan-diagram](./images/vwan-diagram.drawio.svg)
 
 ## Overview
 
@@ -364,7 +364,7 @@ dns_server | `10.1.1.4` | The IP address of the DNS server used for the virtual 
 key_vault_id | | The ID of the key vault defined in the root module.
 location | | The Azure region defined in the root module.
 resource_group_name | | The name of the resource group defined in the root module.
-tags | | The tags defined in the root module..
+tags | | The tags defined in the root module.
 virtual_networks | | The resource ids for the virtual networks to be connected to the vwan hub. Defined in the vnet-shared and vnet-app modules.
 vwan_hub_address_prefix | `10.3.0.0/16` | The address prefix in CIDR notation for the new spoke virtual wan hub.
 
@@ -390,9 +390,9 @@ module.vwan[0].tls_self_signed_cert.root_cert | | The self-signed root certifica
 
 This section includes a list of output variables returned by the module.
 
-Name | Default | Comments
---- | --- | ---
-client_cert_pem | | The client certificate in PEM format. This can be combined with tls_private_key.client_cert_key.private_key_pem and root_cert_pem to create a pfx file using OpenSSL.
-resource_ids | | A map of resource IDs for key resources in the module.
-resource_names | | A map of resource names for key resources in the module.
-root_cert_pem | | The root certificate in PEM format. This can be combined with tls_private_key.client_cert_key.private_key_pem and client_cert_pem to create a pfx file using OpenSSL.
+Name | Description
+--- | ---
+client_cert_pem | The client certificate in PEM format. This can be combined with tls_private_key.client_cert_key.private_key_pem and root_cert_pem to create a pfx file using OpenSSL.
+resource_ids | A map of resource IDs for key resources in the module.
+resource_names | A map of resource names for key resources in the module.
+root_cert_pem | The root certificate in PEM format. This can be combined with tls_private_key.client_cert_key.private_key_pem and client_cert_pem to create a pfx file using OpenSSL.

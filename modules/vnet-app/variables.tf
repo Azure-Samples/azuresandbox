@@ -50,27 +50,6 @@ variable "admin_username_secret" {
   }
 }
 
-variable "arm_client_secret" {
-  type        = string
-  description = "The password for the service principal used for authenticating with Azure. Set interactively or using an environment variable 'TF_VAR_arm_client_secret'."
-  sensitive   = true
-
-  validation {
-    condition     = length(var.arm_client_secret) >= 8
-    error_message = "Must be at least 8 characters long."
-  }
-}
-
-variable "automation_account_name" {
-  type        = string
-  description = "The name of the Azure Automation Account used for state configuration (DSC)."
-
-  validation {
-    condition     = length(var.automation_account_name) <= 90
-    error_message = "Must not exceed 90 characters, which is the maximum length for an Azure resource name."
-  }
-}
-
 variable "container_registry_sku" {
   type        = string
   description = "The SKU name of the Azure Container Registry to create. Choose from: Basic, Standard, Premium. Premium is required for use with advanced features like private endpoints."
@@ -369,7 +348,7 @@ variable "vm_jumpbox_win_name" {
 variable "vm_jumpbox_win_size" {
   type        = string
   description = "The size of the virtual machine."
-  default     = "Standard_B2ls_v2"
+  default     = "Standard_B4ls_v2"
 
   validation {
     condition     = can(regex("^[a-zA-Z0-9_]+$", var.vm_jumpbox_win_size))
@@ -380,7 +359,7 @@ variable "vm_jumpbox_win_size" {
 variable "vm_jumpbox_win_storage_account_type" {
   type        = string
   description = "The storage type to be used for the VMs OS and data disks."
-  default     = "Standard_LRS"
+  default     = "StandardSSD_LRS"
 
   validation {
     condition     = contains(["Standard_LRS", "Premium_LRS", "StandardSSD_LRS", "Premium_ZRS", "StandardSSD_ZRS"], var.vm_jumpbox_win_storage_account_type)

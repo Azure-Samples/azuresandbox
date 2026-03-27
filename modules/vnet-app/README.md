@@ -18,6 +18,7 @@ This configuration implements a virtual network for applications including:
 * A virtual network with pre-configured subnets for hosting various application workloads, including virtual machines and private endpoints implemented using PrivateLink.
   * Pre-configured virtual network peering with the *vnet-shared* virtual network.
 * A network isolated Azure Files share to enable secure SMB file sharing between resources in the sandbox environment.
+* A network isolated Azure Container Registry
 * A Windows Server virtual machine for use as a jumpbox with the following capabilities:
   * Secure RDP access via Bastion using a password stored in Azure Key Vault.
   * Domain joined to the *mysandbox.local* Active Directory domain.
@@ -32,23 +33,6 @@ This configuration implements a virtual network for applications including:
 ## Smoke testing
 
 The steps in this section verify that the Windows jumpbox VM (jumpwin1) is configured correctly.
-
-* Verify *jumpwin1* node configuration is compliant.
-  * From the client environment, navigate to *portal.azure.com* > *Automation Accounts* > *aa-sand-dev* > *Configuration Management* > *State configuration (DSC)*.
-  * Refresh the *Nodes* tab until *jumpwin1* reports a status of `Compliant`.
-    * When *jumpwin1* node status is `Compliant`, click the *jumpwin1* node to view details.
-    * Click on the most recent *Consistency* report with the status `Compliant` to view details.
-    * Look for the *Resources* section. If no resources are listed, wait 15 minutes and refresh again until the latest *Consistency* report includes data in *Resources*.
-    * Verify that the *Resources* section includes the following:
-
-      Resource | Status
-      --- | ---
-      WindowsFeature | Compliant
-      cChocoInstaller | Compliant
-      cChocoPackageInstaller | Compliant
-      Script | Compliant
-      Computer | Compliant
-      PendingReboot | Compliant
 
 * From the client environment, navigate to *portal.azure.com* > *Virtual machines* > *jumpwin1*
   * Click *Connect*, then click *Connect via Bastion*
@@ -119,21 +103,20 @@ This module is organized as follows:
 
 ```plaintext
 ├── images/
-|   └── vnet-app-diagram.drawio.svg             # Architecture diagram
+|   └── vnet-app-diagram.drawio.svg         # Architecture diagram
 ├── scripts/
-|   ├── Invoke-AzureFilesConfiguration.ps1      # Starts Azure Files configuration task
-|   ├── JumpBoxConfiguration.ps1                # DSC configuration for Windows jumpbox VM    
-|   ├── Register-DscNode.ps1                    # Registers a VM with Azure Automation DSC
-|   ├── Set-AutomationAccountConfiguration.ps1  # Configures Azure Automation settings
-|   └── Set-AzureFilesConfiguration.ps1         # Configures Azure Files Kerberos authentication with mysandbox.local AD domain
-├── compute.tf                                  # Compute resource configurations   
-├── locals.tf                                   # Local variables
-├── main.tf                                     # Resource configurations  
-├── network.tf                                  # Network resource configurations  
-├── outputs.tf                                  # Output variables
-├── storage.tf                                  # Storage resource configurations
-├── terraform.tf                                # Terraform configuration block
-└── variables.tf                                # Input variables
+|   ├── Install-Software.ps1                # Installs software on jumpwin1
+|   ├── Install-WindowsFeatures.ps1         # Enables Windows features on jumpwin1
+|   ├── Invoke-AzureFilesConfiguration.ps1  # Runs Set-AzureFilesConfiguration.ps1 as domain admin
+|   └── Set-AzureFilesConfiguration.ps1     # Configures Azure Files Kerberos authentication with mysandbox.local AD domain
+├── compute.tf                              # Compute resource configurations   
+├── locals.tf                               # Local variables
+├── main.tf                                 # Resource configurations  
+├── network.tf                              # Network resource configurations  
+├── outputs.tf                              # Output variables
+├── storage.tf                              # Storage resource configurations
+├── terraform.tf                            # Terraform configuration block
+└── variables.tf                            # Input variables
 ```
 
 ### Input Variables
@@ -147,7 +130,6 @@ admin_password |  | The password used when provisioning administrator accounts. 
 admin_password_secret | adminpassword | The name of the key vault secret that contains the password for the admin account. Defined in the *vnet-shared* module.
 admin_username | bootstrapadmin | The user name used when provisioning administrator accounts. This should conform to Windows username requirements (alphanumeric characters, periods, underscores, and hyphens, 1-20 characters).
 admin_username_secret | adminuser | The name of the key vault secret that contains the user name for the admin account. Defined in the *vnet-shared* module.
-automation_account_name |  | The name of the Azure Automation Account used for state configuration (DSC).
 dns_server |  | The IP address of the DNS server used for the virtual network. Defined in the *vnet-shared* module.
 firewall_route_table_id |  | The ID of the route table used for the firewall. Defined in the *vnet-shared* module.
 key_vault_id |  | The ID of the key vault defined in the root module.
@@ -172,8 +154,8 @@ vm_jumpbox_win_image_publisher | MicrosoftWindowsServer | The publisher for the 
 vm_jumpbox_win_image_sku | 2025-datacenter-azure-edition | The SKU for the virtual machine image used to create the VM.
 vm_jumpbox_win_image_version | Latest | The version of the virtual machine image used to create the VM.
 vm_jumpbox_win_name | jumpwin1 | The name of the VM.
-vm_jumpbox_win_size | Standard_B2ls_v2 | The size of the VM.
-vm_jumpbox_win_storage_account_type | Standard_LRS | The storage account type used for the managed disks attached to the VM.
+vm_jumpbox_win_size | Standard_B4ls_v2 | The size of the VM.
+vm_jumpbox_win_storage_account_type | StandardSSD_LRS | The storage account type used for the managed disks attached to the VM.
 vnet_address_space | 10.2.0.0/16 | The address space for the application virtual network.
 vnet_name | app | The name of the application virtual network.
 
@@ -183,22 +165,27 @@ This section lists the resources included in this configuration.
 
 Address | Name | Notes
 --- | --- | ---
+module.vnet_app[0].azurerm_container_registry.this | crsandboxdevxxxxxxxx | Shared container registry.
+module.vnet_app[0].azurerm_monitor_diagnostic_setting.container_registry | | Diagnostic settings for container registry.
 module.vnet_app[0].azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;jumpwin1 | Network interface for the VM.
 module.vnet_app[0].azurerm_network_security_group.groups[*] | | NSGs for each subnet.
 module.vnet_app[0].azurerm_network_security_rule.rules[*] | | NSG rules for each NSG. See *locals.tf* for rule definitions.
 module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.api.azureml.ms"] | | Private DNS zone for use with AI Foundry.
 module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.azurecr.io"] | | Private DNS zone for Azure Container Registry.
+module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.&lt;region&gt;.azurecontainerapps.io"] | | Private DNS zone for Azure Container Registry.
 module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.blob.core.windows.net"] | | Private DNS zone for Azure Blob storage.
 module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.cognitiveservices.azure.com"] | | Private DNS zone for use with AI Foundry.
 module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.database.windows.net"] | | Private DNS zone for Azure SQL Database.
 module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.documents.azure.com"] | | Private DNS zone for Azure Cosmos DB.
 module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.file.core.windows.net"] | | Private DNS zone for Azure Files.
 module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.mysql.database.azure.com"] | | Private DNS zone for Azure MySQL Database.
-module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.notebooks.azure.net"] | | Private DNS zone for use with AI Foundry.
-module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.openai.azure.com"] | | Private DNS zone for use with AI Foundry.
-module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.search.windows.net"] | | Private DNS zone for use with AI Foundry.
+module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.notebooks.azure.net"] | | Private DNS zone for use with Foundry.
+module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.openai.azure.com"] | | Private DNS zone for use with Foundry.
+module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.search.windows.net"] | | Private DNS zone for use with Foundry.
+module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.services.ai.azure.com"] | | Private DNS zone for use with Foundry.
 module.vnet_app[0].azurerm_private_dns_zone_virtual_network_link.vnet_app_links[*] | | Private DNS zone virtual network links for the application virtual network.
 module.vnet_app[0].azurerm_private_dns_zone_virtual_network_link.vnet_shared_links[*] | | Private DNS zone virtual network links for the shared services virtual network.
+module.vnet_app[0].azurerm_private_endpoint.container_registry | pe&#8209;sand&#8209;dev&#8209;cr | Private endpoint for the blob storage endpoint.
 module.vnet_app[0].azurerm_private_endpoint.storage_blob | pe&#8209;sand&#8209;dev&#8209;storage&#8209;blob | Private endpoint for the blob storage endpoint.
 module.vnet_app[0].azurerm_private_endpoint.storage_file | pe&#8209;sand&#8209;dev&#8209;storage&#8209;file | Private endpoint for the file storage endpoint.
 module.vnet_app[0].azurerm_role_assignment.assignments_storage[*] | | Role assignments for the storage account as defined in *locals.tf*.
@@ -227,7 +214,6 @@ This section includes a list of output variables returned by the module.
 
 Name | Default | Comments
 --- | --- | ---
-azure_files_config_vm_extension_id | | Dependent modules can reference this output to determine if Azure Files configuration is complete.
 private_dns_zones | | A map of private DNS zones provisioned in the module.
 resource_ids | | A map of resource IDs for key resources in the module.
 resource_names | | A map of resource names for key resources in the module.
