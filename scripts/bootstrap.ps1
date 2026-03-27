@@ -216,9 +216,6 @@ tags = {
 
 # Enable extra modules here
 
-# enable_module_vnet_onprem      = true
-# enable_module_ai_foundry       = true
-# enable_module_vm_devops_win    = true
 # enable_module_petstore         = true
 # enable_module_avd              = true
 "@ | Out-File -FilePath ./terraform.tfvars -Encoding utf8

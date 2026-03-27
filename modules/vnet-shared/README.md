@@ -115,7 +115,6 @@ module.vnet_shared.azurerm_firewall_policy_rule_collection_group.this | | The fi
 module.vnet_shared.azurerm_key_vault.this | kv&#8209;sand&#8209;dev | The Azure Key Vault used to store secrets.
 module.vnet_shared.azurerm_key_vault_secret.adminpassword | adminpassword | Randomly generated admin password used for sandbox VMs and services.
 module.vnet_shared.azurerm_key_vault_secret.adminusername | adminuser | Admin username used for sandbox VMs and services, default is *bootstrapadmin*.
-module.vnet_shared.azurerm_key_vault_secret.log_primary_shared_key | | The primary shared key for the Log Analytics workspace, used to configure diagnostic settings. The secret name is the same as the workspace id.
 module.vnet_shared.azurerm_key_vault_secret.spn_password | | The password for the service principal used for authenticating with Azure. The secret name is the same as the AppID / object id.
 module.vnet_shared.azurerm_log_analytics_workspace.this | log&#8209;sand&#8209;dev&#8209;xxx | The Log Analytics workspace used to collect logs and metrics from Azure resources.
 module.vnet_shared.azurerm_monitor_diagnostic_setting.this | | The Azure Monitor diagnostic setting used to send key vault logs and metrics to the Log Analytics workspace.
@@ -135,10 +134,10 @@ module.vnet_shared.azurerm_subnet.subnets["snet-adds-01"] | | Dedicated subnet f
 module.vnet_shared.azurerm_subnet.subnets["snet-misc-01"] | | Reserved for use by optional configurations.
 module.vnet_shared.azurerm_subnet.subnets["snet-misc-02"] | | Reserved for use by optional configurations.
 module.vnet_shared.azurerm_subnet.subnets["snet-privatelink-02"] | | Dedicated subnet for Private Link.
-module.vnet_shared.azurerm_subnet_network_security_group_association.associations[*] | | NSGs are associated with all subnets except *AzureFirewallSubnet*.
-module.vnet_shared.azurerm_subnet_route_table_association.associations[*] | | The *route-sand-dev* route table is associated with all subnets except *AzureFirewallSubnet* and *AzureBastionSubnet*.
+module.vnet_shared.azurerm_subnet_network_security_group_association.associations[*] | | NSGs are associated with all subnets except *AzureFirewallSubnet* and *snet-privatelink-02*.
+module.vnet_shared.azurerm_subnet_route_table_association.associations[*] | | The *route-sand-dev* route table is associated with all subnets except *AzureFirewallSubnet*,*AzureBastionSubnet* and *snet-privatelink-02*.
 module.vnet_shared.azurerm_virtual_network.this | vnet&#8209;sand&#8209;dev&#8209;shared | The shared services virtual network.
-module.vnet_shared.azurerm_windows_virtual_machine.this | adds1 | The AD DS Domain Controller / DNS Server VM. 
+module.vnet_shared.azurerm_windows_virtual_machine.this | adds1 | The AD DS Domain Controller / DNS Server VM.
 
 ### Output Variables
 

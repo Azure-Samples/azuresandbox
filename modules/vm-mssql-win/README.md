@@ -97,7 +97,6 @@ admin_password | | The password used when provisioning administrator accounts. T
 admin_password_secret | adminpassword | The name of the key vault secret that contains the password for the admin account. Defined in the vnet-shared module.
 admin_username | bootstrapadmin | The user name used when provisioning administrator accounts. This should conform to Windows username requirements (alphanumeric characters, periods, underscores, and hyphens, 1-20 characters). Defined in the vnet-shared module.
 admin_username_secret | adminuser | The name of the key vault secret that contains the user name for the admin account. Defined in the vnet-shared module.
-arm_client_secret | | The client secret used to authenticate with the Azure Resource Manager API. Set interactively or using *TF_VAR_arm_client_secret* environment variable.
 key_vault_id | | The ID of the key vault defined in the root module.
 key_vault_name | | The name of the key vault defined in the root module.
 location | | The name of the Azure Region where resources will be provisioned.
@@ -138,7 +137,7 @@ module.vm_mssql_win[0].azurerm_windows_virtual_machine.this | mssqlwin1 | The SQ
 
 This section includes a list of output variables returned by the module.
 
-Name | Default | Comments
---- | --- | ---
-resource_ids | | A map of resource IDs for key resources in the module.
-resource_names | | A map of resource names for key resources in the module.
+Name | Description
+--- | ---
+resource_ids | A map of resource IDs for key resources in the module.
+resource_names | A map of resource names for key resources in the module.

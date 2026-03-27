@@ -29,12 +29,6 @@ variable "container_registry_id" {
   }
 }
 
-variable "enable_container_push" {
-  type        = bool
-  description = "Enable AcrPush role for the managed identity to allow pushing images to the container registry."
-  default     = false
-}
-
 variable "location" {
   type        = string
   description = "The name of the Azure Region where resources will be provisioned."

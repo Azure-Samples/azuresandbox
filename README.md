@@ -431,12 +431,12 @@ The variable defaults set in each module can be overridden by customizing the ap
 module "vnet_shared" {
   source = "./modules/vnet-shared"
 
-  key_vault_id        = azurerm_key_vault.this.id
+  arm_client_secret   = var.arm_client_secret
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
   tags                = var.tags
-
-  depends_on = [azurerm_key_vault_secret.spn_password]
+  unique_seed         = module.naming.unique-seed
+  user_object_id      = var.user_object_id
 
   # Override default values here
   vm_adds_name = "mydc1" # default was "adds1"
@@ -527,14 +527,13 @@ The Azure Sandbox project is organized into the following structure:
 │   ├── mssql/                  # Azure SQL Database module
 │   ├── mysql/                  # Azure Database for MySQL module
 │   ├── vm-jumpbox-linux/       # Linux jumpbox virtual machine module
-│   ├── vm-msssql-win/          # SQL Server virtual machine module
+│   ├── vm-mssql-win/           # SQL Server virtual machine module
 │   ├── vnet-app/               # Application virtual network module
 │   ├── vnet-shared/            # Shared services virtual network module
 │   └── vwan/                   # Point-to-site VPN module
 ├── scripts/                    # 
 │   ├── bootstrap.sh            # Bash helper script for generating terraform.tfvars
 │   └── bootstrap.ps1           # PowerShell helper script for generating terraform.tfvars
-├── locals.tf                   # Local variables 
 ├── main.tf                     # Resource configurations
 ├── outputs.tf                  # Output variables 
 ├── providers.tf                # Provider configuration blocks
@@ -562,6 +561,7 @@ enable_module_vwan | false | Set to true to enable the vwan module, false to ski
 location | | The name of the Azure Region where resources will be provisioned.
 subscription_id | | The Azure subscription id used to provision sandbox resources.
 tags | { costcenter = "mycostcenter", environment = "dev", project = "sand" } | Tags in map format to be applied to the sandbox resource group and used for resource naming.
+user_name | | The user name of the interactive user (e.g. Azure CLI or Az PowerShell signed in user).
 user_object_id | | The object id of the interactive user (e.g. Azure CLI or Az PowerShell signed in user).
 
 ---
@@ -748,7 +748,7 @@ Virtual Machine | Role | Module | Operating System
 adds1 | AD DS Domain Controller / DNS Server | vnet-shared | Windows Server 2025 Datacenter Azure Edition Core
 jumpwin1 | Windows Jumpbox VM | vnet-app | Windows Server 2025 Datacenter Azure Edition
 mssqlwin1 | Windows SQL Server VM | vm-mssql-win | Windows Server 2025 / SQL Server 2025 Enterprise Developer Edition
-jumplinux1 | Linux Jumpbox VM | vm-jumpbox-linux | Ubuntu Server LTS 24.04 (Nobel Numbat)
+jumplinux1 | Linux Jumpbox VM | vm-jumpbox-linux | Ubuntu Server LTS 24.04 (Noble Numbat)
 
 ---
 

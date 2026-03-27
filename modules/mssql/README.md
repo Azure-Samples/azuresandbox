@@ -77,8 +77,6 @@ This section lists input variables used in this module. Defaults can be overridd
 
 Variable | Default | Description
 --- | --- | ---
-admin_password | | The strong password used when provisioning administrator accounts. Set in the vnet-shared module
-admin_username | bootstrapadmin | The user name used when provisioning administrator accounts. Set in the vnet-shared module.
 location | | The name of the Azure Region where resources will be provisioned.
 mssql_database_name | testdb | The name of the Azure SQL Database to be provisioned.
 private_dns_zone_id | | The ID of the private DNS zone for Azure SQL Database. Defined in the vnet-app module.
@@ -86,6 +84,8 @@ resource_group_name | | The name of the resource group defined in the root modul
 subnet_id | | The subnet ID defined in the vnet-app module.
 tags | |  The tags from the root module.
 unique_seed | | The unique seed used to generate unique names for resources. Defined in the root module.
+user_name | | The user name of the user in Microsoft Entra ID.
+user_object_id | | The object id of the user in Microsoft Entra ID.
 
 ### Module Resources
 

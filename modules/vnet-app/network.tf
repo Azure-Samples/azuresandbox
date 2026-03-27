@@ -142,7 +142,7 @@ resource "azurerm_subnet_route_table_association" "associations" {
 
 #region private-endpoints
 resource "azurerm_private_endpoint" "container_registry" {
-  name                = "${module.naming.private_endpoint.name}-acr"
+  name                = "${module.naming.private_endpoint.name}-cr"
   location            = var.location
   resource_group_name = var.resource_group_name
   subnet_id           = azurerm_subnet.subnets["snet-privatelink-01"].id

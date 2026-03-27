@@ -10,7 +10,7 @@ variable "aad_tenant_id" {
 
 variable "arm_client_id" {
   type        = string
-  description = "The AppId of the service principal used for authenticating with Azure. Must have a 'Contributor' role assignment."
+  description = "The AppId of the service principal used for authenticating with Azure. Must have an 'Owner' role assignment."
 
   validation {
     condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.arm_client_id))

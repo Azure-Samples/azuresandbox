@@ -88,7 +88,7 @@ azurerm_virtual_desktop_application.edge | | Publishes Microsoft Edge for use wi
 azurerm_virtual_desktop_application_group.personal | vdag-sand-dev-u28d-personal | Application group for personal desktops
 azurerm_virtual_desktop_application_group.remoteapp | vdag-sand-dev-u28d-remoteapp | Application group for remote apps
 azurerm_virtual_desktop_host_pool.personal | vdpool-sand-dev-u28d-personal | Host pool for personal desktops
-azurerm_virtual_desktop_host_pool.remoteapp | vdag-sand-dev-u28d-remoteapp | Host pool for remote apps
+azurerm_virtual_desktop_host_pool.remoteapp | vdpool-sand-dev-u28d-remoteapp | Host pool for remote apps
 azurerm_virtual_desktop_host_pool_registration_info.personal | | Registration token with 2 hour expiration
 azurerm_virtual_desktop_host_pool_registration_info.remoteapp | | Registration token with 2 hour expiration
 azurerm_virtual_desktop_workspace.this | vdws-sand-dev-u28d | Azure virtual desktop workspace
