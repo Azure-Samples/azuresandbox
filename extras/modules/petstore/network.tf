@@ -12,7 +12,7 @@ resource "azurerm_private_endpoint" "this" {
   }
 
   private_dns_zone_group {
-    name = "default"
+    name                 = "default"
     private_dns_zone_ids = [var.private_dns_zone_id]
   }
 }
