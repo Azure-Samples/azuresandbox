@@ -23,12 +23,13 @@ This configuration implements a virtual network for applications including:
   * Secure RDP access via Bastion using a password stored in Azure Key Vault.
   * Domain joined to the *mysandbox.local* Active Directory domain.
   * Secure AD integrated access to network isolated Azure Files share.
-  * Pre-installed software packages and features, including:
+  * Pre-installed Windows features and software packages, including:
     * Remote Server Administration Tools (RSAT)
-    * Chocolatey
     * Visual Studio Code
     * SQL Server Management Studio (SSMS)
     * MySQL Workbench
+
+The estimated provisioning time for this module is 30 minutes.
 
 ## Smoke testing
 
@@ -149,13 +150,13 @@ unique_seed |  | The unique seed used to generate unique names for resources. De
 user_object_id |  | The object ID of the interactive user. Defined in the root module.
 virtual_network_shared_id |  | The resource ID of the shared services virtual network.  Defined in the *vnet-shared*  module.
 virtual_network_shared_name |  | The name of the shared services virtual network.  Defined in the *vnet-shared* module.
-vm_jumpbox_win_image_offer | WindowsServer | The offer type of the virtual machine image used to create the VM.
-vm_jumpbox_win_image_publisher | MicrosoftWindowsServer | The publisher for the virtual machine image used to create VM.
-vm_jumpbox_win_image_sku | 2025-datacenter-azure-edition | The SKU for the virtual machine image used to create the VM.
-vm_jumpbox_win_image_version | Latest | The version of the virtual machine image used to create the VM.
+vm_jumpbox_win_image_offer | `WindowsServer` | The offer type of the virtual machine image used to create the VM.
+vm_jumpbox_win_image_publisher | `MicrosoftWindowsServer` | The publisher for the virtual machine image used to create VM.
+vm_jumpbox_win_image_sku | `2025-datacenter-azure-edition` | The SKU for the virtual machine image used to create the VM.
+vm_jumpbox_win_image_version | `Latest` | The version of the virtual machine image used to create the VM.
 vm_jumpbox_win_name | jumpwin1 | The name of the VM.
-vm_jumpbox_win_size | Standard_B4ls_v2 | The size of the VM.
-vm_jumpbox_win_storage_account_type | StandardSSD_LRS | The storage account type used for the managed disks attached to the VM.
+vm_jumpbox_win_size | `Standard_B2ls_v2` | The size of the VM.
+vm_jumpbox_win_storage_account_type | `Standard_LRS` | The storage account type used for the managed disks attached to the VM.
 vnet_address_space | 10.2.0.0/16 | The address space for the application virtual network.
 vnet_name | app | The name of the application virtual network.
 

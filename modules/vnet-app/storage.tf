@@ -73,6 +73,11 @@ resource "terraform_data" "storage_operations_complete" {
 
 resource "time_sleep" "wait_for_roles" {
   create_duration = "2m"
-  depends_on      = [azurerm_role_assignment.assignments_storage]
+
+  triggers = {
+    storage_account_id = azurerm_storage_account.this.id
+  }
+
+  depends_on = [azurerm_role_assignment.assignments_storage]
 }
 #endregion

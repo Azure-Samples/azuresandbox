@@ -348,7 +348,7 @@ variable "vm_jumpbox_win_name" {
 variable "vm_jumpbox_win_size" {
   type        = string
   description = "The size of the virtual machine."
-  default     = "Standard_B4ls_v2"
+  default     = "Standard_B2ls_v2"
 
   validation {
     condition     = can(regex("^[a-zA-Z0-9_]+$", var.vm_jumpbox_win_size))
@@ -359,7 +359,7 @@ variable "vm_jumpbox_win_size" {
 variable "vm_jumpbox_win_storage_account_type" {
   type        = string
   description = "The storage type to be used for the VMs OS and data disks."
-  default     = "StandardSSD_LRS"
+  default     = "Standard_LRS"
 
   validation {
     condition     = contains(["Standard_LRS", "Premium_LRS", "StandardSSD_LRS", "Premium_ZRS", "StandardSSD_ZRS"], var.vm_jumpbox_win_storage_account_type)
