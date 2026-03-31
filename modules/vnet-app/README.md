@@ -29,7 +29,7 @@ This configuration implements a virtual network for applications including:
     * SQL Server Management Studio (SSMS)
     * MySQL Workbench
 
-The estimated provisioning time for this module is 30 minutes.
+The estimated provisioning time for this module is 31 minutes.
 
 ## Smoke testing
 
@@ -109,7 +109,8 @@ This module is organized as follows:
 |   ├── Install-Software.ps1                # Installs software on jumpwin1
 |   ├── Install-WindowsFeatures.ps1         # Enables Windows features on jumpwin1
 |   ├── Invoke-AzureFilesConfiguration.ps1  # Runs Set-AzureFilesConfiguration.ps1 as domain admin
-|   └── Set-AzureFilesConfiguration.ps1     # Configures Azure Files Kerberos authentication with mysandbox.local AD domain
+|   ├── Set-AzureFilesConfiguration.ps1     # Configures Azure Files Kerberos authentication with mysandbox.local AD domain
+|   └── Test-VnetApp.ps1                    # Module unit test script
 ├── compute.tf                              # Compute resource configurations   
 ├── locals.tf                               # Local variables
 ├── main.tf                                 # Resource configurations  

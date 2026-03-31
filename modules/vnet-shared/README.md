@@ -22,6 +22,8 @@ This module implements a virtual network with shared services used by all the co
 * A Log Analytics workspace for collecting logs and metrics from Azure resources.
 * A Windows virtual machine configured as an Active Directory Domain Services domain controller and DNS server.
 
+The estimated provisioning time for this module is 23 minutes.
+
 ## Smoke testing
 
 * Explore your newly provisioned resources in the Azure portal:
@@ -61,7 +63,8 @@ vnet-shared/
 │   └── vnet-shared-diagram.drawio.svg  # Architecture diagram
 ├── scripts/                                    
 │   ├── Configure-Adds.ps1              # Configures Active Directory Domain Services
-│   └── Configure-AddsDns.ps1           # Configures AD Integrated DNS Server
+│   ├── Configure-AddsDns.ps1           # Configures AD Integrated DNS Server
+│   └── Test-VnetShared.ps1             # Module unit test script
 ├── compute.tf                          # Compute resource configurations
 ├── locals.tf                           # Local variables
 ├── main.tf                             # Resource configurations

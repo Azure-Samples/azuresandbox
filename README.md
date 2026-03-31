@@ -511,6 +511,7 @@ This section provides documentation regarding the overall structure of the repos
 * [Child Modules](#child-modules)
 * [Virtual Network Design](#virtual-network-design)
 * [Dependencies](#dependencies)
+* [Unit Testing](#unit-testing)
 * [Additional Resources](#additional-resources)
 
 ### Root Module Structure
@@ -533,7 +534,8 @@ The Azure Sandbox project is organized into the following structure:
 │   └── vwan/                   # Point-to-site VPN module
 ├── scripts/                    # 
 │   ├── bootstrap.sh            # Bash helper script for generating terraform.tfvars
-│   └── bootstrap.ps1           # PowerShell helper script for generating terraform.tfvars
+│   ├── bootstrap.ps1           # PowerShell helper script for generating terraform.tfvars
+│   └── Invoke-UnitTests.ps1    # Orchestrates module unit tests
 ├── main.tf                     # Resource configurations
 ├── outputs.tf                  # Output variables 
 ├── providers.tf                # Provider configuration blocks
@@ -751,6 +753,15 @@ mssqlwin1 | Windows SQL Server VM | vm-mssql-win | Windows Server 2025 / SQL Ser
 jumplinux1 | Linux Jumpbox VM | vm-jumpbox-linux | Ubuntu Server LTS 24.04 (Noble Numbat)
 
 ---
+
+### Unit testing
+
+FUlly automated unit test scripts are provided for each module and are orchestrated by [Invoke-UnitTests.ps1](./scripts/Invoke-UnitTests.ps1). There are two types of tests:
+
+* Module unit tests: These tests focus on functionality in a single module.
+* Integration tests: These tests focus on functionality that spans multiple modules.
+
+The orchestration script returns 0 if all tests completed successfully or 1 if any tests failed. The orchestration script can be incorporated in a CI/CD pipeline.
 
 ### Additional Resources
 

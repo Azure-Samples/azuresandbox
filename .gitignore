@@ -83,3 +83,6 @@ sshkeytemp.pub
 # Ignore certificate files
 *.pem
 *.pfx
+
+# Ignore log files
+*.log
