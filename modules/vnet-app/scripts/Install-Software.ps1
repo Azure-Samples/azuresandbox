@@ -71,21 +71,15 @@ $WINGET_PACKAGE_IN_USE       = -1978335231  # 0x8A150101 APPINSTALLER_CLI_ERROR_
 # Install software using winget CLI.
 Write-Log "Installing software using winget..."
 
-# Packages installed sequentially first
-$serialPackages = @(
-    @{ Id = "Microsoft.VisualStudioCode"; Name = "Visual Studio Code" }
-)
-
-# Packages installed in parallel after serial installs complete
-$parallelPackages = @(
+$packages = @(
+    @{ Id = "Microsoft.VisualStudioCode"; Name = "Visual Studio Code" },
     @{ Id = "Microsoft.SQLServerManagementStudio.22"; Name = "SQL Server Management Studio" },
     @{ Id = "Oracle.MySQLWorkbench"; Name = "MySQL Workbench" }
 )
 
 $failed = $false
 
-# Serial installs
-foreach ($package in $serialPackages) {
+foreach ($package in $packages) {
     Write-Log "Installing $($package.Name) (winget id: $($package.Id))..."
 
     $output = & $wingetPath install --id $package.Id --source winget --silent --scope machine --accept-package-agreements --accept-source-agreements 2>&1
@@ -110,61 +104,6 @@ foreach ($package in $serialPackages) {
         $failed = $true
     }
 }
-
-# Parallel installs
-$jobs = @()
-$updatedPath = $env:PATH
-
-foreach ($package in $parallelPackages) {
-    Write-Log "Starting parallel install of $($package.Name) (winget id: $($package.Id))..."
-
-    $jobs += Start-Job -Name $package.Id -ArgumentList $package.Id, $package.Name, $wingetPath, $updatedPath -ScriptBlock {
-        param([string]$Id, [string]$Name, [string]$WingetExe, [string]$EnvPath)
-        $env:PATH = $EnvPath
-        $output = & $WingetExe install --id $Id --source winget --silent --scope machine --accept-package-agreements --accept-source-agreements 2>&1
-        [PSCustomObject]@{
-            Name       = $Name
-            Id         = $Id
-            ExitCode   = $LASTEXITCODE
-            Output     = ($output -join "`n")
-        }
-    }
-}
-
-Write-Log "Waiting for parallel installs to complete..."
-$jobs | Wait-Job | Out-Null
-
-foreach ($job in $jobs) {
-    if ($job.State -eq 'Failed') {
-        $err = $job | Receive-Job -ErrorAction SilentlyContinue 2>&1
-        Write-Log "FAILED: $($job.Name) - $err"
-        $failed = $true
-        continue
-    }
-
-    $result = $job | Receive-Job
-
-    if ($result.ExitCode -eq $WINGET_SUCCESS) {
-        Write-Log "$($result.Name) installed successfully."
-    }
-    elseif ($result.ExitCode -eq $WINGET_ALREADY_INSTALLED) {
-        Write-Log "$($result.Name) is already installed."
-    }
-    elseif ($result.ExitCode -eq $WINGET_MISSING_DEPENDENCY) {
-        Write-Log "$($result.Name) installed successfully (unmanaged dependency warning ignored)."
-    }
-    elseif ($result.ExitCode -eq $WINGET_PACKAGE_IN_USE) {
-        Write-Log "FAILED: $($result.Name). Package in use (APPINSTALLER_CLI_ERROR_INSTALL_PACKAGE_IN_USE)."
-        $failed = $true
-    }
-    else {
-        Write-Log "FAILED: $($result.Name). Exit code: $($result.ExitCode)"
-        Write-Log $result.Output
-        $failed = $true
-    }
-}
-
-$jobs | Remove-Job -Force
 
 if ($failed) {
     Exit-WithError "One or more package installations failed. See log above."
