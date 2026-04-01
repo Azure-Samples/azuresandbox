@@ -1,3 +1,10 @@
+
+output "fqdns" {
+  value = {
+    mssql_server = azurerm_mssql_server.this.fully_qualified_domain_name
+  }
+}
+
 output "resource_ids" {
   value = {
     mssql_server = azurerm_mssql_server.this.id
