@@ -19,6 +19,8 @@ This configuration implements a SQL Server virtual machine. The VM is pre-config
 * Pre-configured SQL Server data and log disks.
 * Pre-configured SQL Server instance.
 
+The estimated provisioning time for this module is 31 minutes.
+
 ## Smoke testing
 
 This section describes how to test the module after deployment.

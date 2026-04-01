@@ -14,7 +14,7 @@
 #     From bash:       pwsh -File ./scripts/Invoke-UnitTests.ps1 -Module vnet_shared
 #     From PowerShell: .\scripts\Invoke-UnitTests.ps1 -Module vnet_app
 #
-#   Valid module names: vnet_shared, vnet_app, vm_jumpbox_linux
+#   Valid module names: vnet_shared, vnet_app, vm_jumpbox_linux, vm_mssql_win
 #
 # Prerequisites:
 #   - PowerShell 7.x (pwsh) with Az.Accounts, Az.Compute, and Az.Resources modules installed
@@ -183,6 +183,7 @@ $moduleToVmKey = @{
     'vnet_shared'      = 'virtual_machine_adds1'
     'vnet_app'         = 'virtual_machine_jumpwin1'
     'vm_jumpbox_linux' = 'virtual_machine_jumplinux1'
+    'vm_mssql_win'     = 'virtual_machine_mssqlwin1'
 }
 
 # Validate -Module parameter if specified
@@ -219,6 +220,15 @@ $testConfigs = [ordered]@{
         ScriptPath = Join-Path $repoRoot 'modules' 'vm-jumpbox-linux' 'scripts' 'test-vm-jumpbox-linux.sh'
         CommandId  = 'RunShellScript'
         Parameters = @{}
+    }
+    'virtual_machine_mssqlwin1' = @{
+        Module     = 'vm-mssql-win'
+        ModuleName = 'vm_mssql_win'
+        ScriptPath = Join-Path $repoRoot 'modules' 'vm-mssql-win' 'scripts' 'Test-VmMssqlWin.ps1'
+        CommandId  = 'RunPowerShellScript'
+        Parameters = @{
+            KeyVaultName = $resourceNames['key_vault']
+        }
     }
 }
 
@@ -265,6 +275,17 @@ if (-not $Module) {
             Parameters  = @{
                 KeyVaultName = $resourceNames['key_vault']
                 TargetVmName = $resourceNames['virtual_machine_jumplinux1']
+            }
+        }
+        @{
+            Name        = 'SQL: jumpwin1 -> mssqlwin1'
+            RequiredVMs = @('virtual_machine_jumpwin1', 'virtual_machine_mssqlwin1')
+            RunOnVM     = 'virtual_machine_jumpwin1'
+            ScriptPath  = Join-Path $repoRoot 'scripts' 'Test-Integration-SqlConnectivity.ps1'
+            CommandId   = 'RunPowerShellScript'
+            Parameters  = @{
+                KeyVaultName = $resourceNames['key_vault']
+                TargetVmName = $resourceNames['virtual_machine_mssqlwin1']
             }
         }
     )

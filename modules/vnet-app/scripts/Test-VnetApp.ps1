@@ -380,4 +380,6 @@ else {
 # Summary
 $total = $passed + $failed
 Write-TestResult $moduleName 'SUMMARY' ("Passed: $passed Failed: $failed Total: $total")
+
+if ($failed -gt 0) { exit 1 } else { exit 0 }
 #endregion

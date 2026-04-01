@@ -519,28 +519,29 @@ This section provides documentation regarding the overall structure of the repos
 The Azure Sandbox project is organized into the following structure:
 
 ```plaintext
-├── extras/                     # Extend your sandbox with extra modules and configurations
-│   ├── configurations/         # 
-│   └── modules/                # 
-├── images/                     # 
-│   └── azuresandbox.drawio.svg # Architecture diagram
-├── modules/                    # 
-│   ├── mssql/                  # Azure SQL Database module
-│   ├── mysql/                  # Azure Database for MySQL module
-│   ├── vm-jumpbox-linux/       # Linux jumpbox virtual machine module
-│   ├── vm-mssql-win/           # SQL Server virtual machine module
-│   ├── vnet-app/               # Application virtual network module
-│   ├── vnet-shared/            # Shared services virtual network module
-│   └── vwan/                   # Point-to-site VPN module
-├── scripts/                    # 
-│   ├── bootstrap.sh            # Bash helper script for generating terraform.tfvars
-│   ├── bootstrap.ps1           # PowerShell helper script for generating terraform.tfvars
-│   └── Invoke-UnitTests.ps1    # Orchestrates module unit tests
-├── main.tf                     # Resource configurations
-├── outputs.tf                  # Output variables 
-├── providers.tf                # Provider configuration blocks
-├── terraform.tf                # Terraform configuration block
-└── variables.tf                # Variable definitions
+├── extras/                                   
+│   ├── configurations/          
+│   └── modules/                 
+├── images/                      
+│   └── azuresandbox.drawio.svg               # Architecture diagram
+├── modules/                     
+│   ├── mssql/                                # Azure SQL Database module
+│   ├── mysql/                                # Azure Database for MySQL module
+│   ├── vm-jumpbox-linux/                     # Linux jumpbox virtual machine module
+│   ├── vm-mssql-win/                         # SQL Server virtual machine module
+│   ├── vnet-app/                             # Application virtual network module
+│   ├── vnet-shared/                          # Shared services virtual network module
+│   └── vwan/                                 # Point-to-site VPN module
+├── scripts/
+│   ├── bootstrap.ps1                         # PowerShell helper script for generating terraform.tfvars
+│   ├── bootstrap.sh                          # Bash helper script for generating terraform.tfvars
+│   ├── Invoke-UnitTests.ps1                  # Orchestrates module unit tests
+│   └── Test-Integration-SshConnectivity.ps1  # Integration test for SSH connectivity
+├── main.tf                                   # Resource configurations
+├── outputs.tf                                # Output variables 
+├── providers.tf                              # Provider configuration blocks
+├── terraform.tf                              # Terraform configuration block
+└── variables.tf                              # Variable definitions
 ```
 
 ---
