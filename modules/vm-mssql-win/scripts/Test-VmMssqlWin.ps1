@@ -96,6 +96,106 @@ catch {
     try { Disconnect-AzAccount -ErrorAction SilentlyContinue | Out-Null } catch {}
 }
 
+# Startup validation gate: verify Set-MssqlStartupConfiguration.ps1 postconditions.
+# After a VM stop/deallocate the temp disk is wiped. The startup scheduled task must
+# reinitialize it, configure the pagefile and start SQL Server. If any of these checks
+# fail the remaining tests are meaningless, so we report and exit early.
+$startupOk = $true
+
+# Startup Check 1: Scheduled task last run succeeded
+try {
+    $stTask = Get-ScheduledTask -TaskName 'Set-MssqlStartupConfiguration' -ErrorAction Stop
+    $stTaskInfo = Get-ScheduledTaskInfo -TaskName 'Set-MssqlStartupConfiguration' -ErrorAction Stop
+
+    if ($stTaskInfo.LastTaskResult -eq 0) {
+        Write-TestResult $moduleName 'PASS' "Startup: Scheduled task 'Set-MssqlStartupConfiguration' last run succeeded (result: 0, last run: $($stTaskInfo.LastRunTime))"
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' "Startup: Scheduled task 'Set-MssqlStartupConfiguration' last run failed (result: $($stTaskInfo.LastTaskResult), last run: $($stTaskInfo.LastRunTime))"
+        $failed++
+        $startupOk = $false
+    }
+}
+catch {
+    Write-TestResult $moduleName 'FAIL' "Startup: Scheduled task 'Set-MssqlStartupConfiguration' not found"
+    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    $failed++
+    $startupOk = $false
+}
+
+# Startup Check 2: Temp disk (T:) present and NTFS
+try {
+    $tempVolume = Get-Volume -DriveLetter 'T' -ErrorAction Stop
+
+    if ($tempVolume.FileSystem -eq 'NTFS') {
+        Write-TestResult $moduleName 'PASS' "Startup: Temp disk 'T:' present (FileSystem: NTFS, Label: '$($tempVolume.FileSystemLabel)', Size: $([math]::Round($tempVolume.Size / 1GB, 1)) GB)"
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' "Startup: Temp disk 'T:' present but FileSystem is '$($tempVolume.FileSystem)' (expected NTFS)"
+        $failed++
+        $startupOk = $false
+    }
+}
+catch {
+    Write-TestResult $moduleName 'FAIL' "Startup: Temp disk 'T:' not found"
+    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    $failed++
+    $startupOk = $false
+}
+
+# Startup Check 3: T:\SQLTEMP directory exists
+if (Test-Path 'T:\SQLTEMP') {
+    Write-TestResult $moduleName 'PASS' "Startup: 'T:\SQLTEMP' directory exists"
+    $passed++
+}
+else {
+    Write-TestResult $moduleName 'FAIL' "Startup: 'T:\SQLTEMP' directory not found"
+    $failed++
+    $startupOk = $false
+}
+
+# Startup Check 4: T:\DATALOSS_WARNING_README.txt exists
+if (Test-Path 'T:\DATALOSS_WARNING_README.txt') {
+    Write-TestResult $moduleName 'PASS' "Startup: 'T:\DATALOSS_WARNING_README.txt' exists"
+    $passed++
+}
+else {
+    Write-TestResult $moduleName 'FAIL' "Startup: 'T:\DATALOSS_WARNING_README.txt' not found"
+    $failed++
+    $startupOk = $false
+}
+
+# Startup Check 5: Automatic managed pagefile is disabled
+try {
+    $pfCs = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
+
+    if (-not $pfCs.AutomaticManagedPagefile) {
+        Write-TestResult $moduleName 'PASS' "Startup: Automatic managed pagefile is disabled"
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' "Startup: Automatic managed pagefile is still enabled"
+        $failed++
+        $startupOk = $false
+    }
+}
+catch {
+    Write-TestResult $moduleName 'FAIL' "Startup: Failed to query pagefile configuration"
+    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    $failed++
+    $startupOk = $false
+}
+
+# If startup validation failed, skip remaining tests - SQL Server will not be functional
+if (-not $startupOk) {
+    Write-TestResult $moduleName 'FAIL' "Startup validation failed - skipping remaining tests"
+    $total = $passed + $failed
+    Write-TestResult $moduleName 'SUMMARY' "Passed: $passed Failed: $failed Total: $total"
+    exit 1
+}
+
 # Test 1: Domain joined
 try {
     $cs = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop

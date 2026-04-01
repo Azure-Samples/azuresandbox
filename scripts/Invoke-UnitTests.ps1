@@ -121,6 +121,57 @@ function Invoke-VMTest {
 
     return $testResult
 }
+
+function Invoke-VMStopDeallocateStart {
+    param(
+        [string]$ResourceGroupName,
+        [string]$VMName
+    )
+
+    Write-Log "Stopping VM '$VMName' (deallocate) to test startup configuration..."
+    Stop-AzVM -ResourceGroupName $ResourceGroupName -Name $VMName -Force -ErrorAction Stop | Out-Null
+
+    Write-Log "Starting VM '$VMName'..."
+    Start-AzVM -ResourceGroupName $ResourceGroupName -Name $VMName -ErrorAction Stop | Out-Null
+
+    # The startup scheduled task (Set-MssqlStartupConfiguration.ps1) runs at boot.
+    # After a deallocate the temp disk is wiped, so the task will reformat it,
+    # reconfigure the pagefile and restart the VM once more before starting SQL Server.
+    # Poll until the SQL Server service is running to confirm the full cycle completed.
+    Write-Log "Waiting for VM '$VMName' to complete startup configuration..."
+
+    $probeScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) 'probe-mssql-ready.ps1'
+    Set-Content -Path $probeScriptPath -Value "(Get-Service -Name MSSQLSERVER -ErrorAction SilentlyContinue).Status"
+
+    $ready = $false
+    $maxAttempts = 10
+
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        Start-Sleep -Seconds 30
+
+        try {
+            $probe = Invoke-AzVMRunCommand -ResourceGroupName $ResourceGroupName -VMName $VMName -CommandId 'RunPowerShellScript' -ScriptPath $probeScriptPath -ErrorAction Stop
+            $stdout = ($probe.Value | Where-Object { $_.Code -like '*StdOut*' } | Select-Object -First 1).Message
+
+            if ($stdout -match 'Running') {
+                Write-Log "VM '$VMName' is ready - SQL Server service is running."
+                $ready = $true
+                break
+            }
+
+            Write-Log "VM '$VMName' probe attempt $attempt/$maxAttempts - SQL Server status: $($stdout.Trim())"
+        }
+        catch {
+            Write-Log "VM '$VMName' probe attempt $attempt/$maxAttempts - VM agent not ready yet."
+        }
+    }
+
+    Remove-Item $probeScriptPath -Force -ErrorAction SilentlyContinue
+
+    if (-not $ready) {
+        Write-Log "[WARNING] VM '$VMName' may not be fully ready after $maxAttempts probe attempts. Proceeding with tests."
+    }
+}
 #endregion
 
 #region main
@@ -229,6 +280,7 @@ $testConfigs = [ordered]@{
         Parameters = @{
             KeyVaultName = $resourceNames['key_vault']
         }
+        StopDeallocateBeforeTest = $true
     }
 }
 
@@ -256,6 +308,19 @@ foreach ($vmKey in $testConfigs.Keys) {
     Write-Log "========================================"
     Write-Log "Module: $($config.Module) | VM: $vmName"
     Write-Log "========================================"
+
+    # Stop/deallocate and restart VM if required (tests startup configuration after temp disk wipe)
+    if ($config.StopDeallocateBeforeTest) {
+        try {
+            Invoke-VMStopDeallocateStart -ResourceGroupName $resourceGroupName -VMName $vmName
+        }
+        catch {
+            Write-Log "[MODULE:$($config.Module)] [FAIL] Failed to stop/deallocate/start VM '$vmName': $_"
+            $overallFailed++
+            $moduleResults += @{ Module = $config.Module; Passed = 0; Failed = 1 }
+            continue
+        }
+    }
 
     $testResult = Invoke-VMTest -ResourceGroupName $resourceGroupName -VMName $vmName -CommandId $config.CommandId -ScriptPath $config.ScriptPath -Parameters $config.Parameters -Label "MODULE:$($config.Module)"
     $overallPassed += $testResult.Passed
