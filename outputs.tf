@@ -46,6 +46,12 @@ output "resource_names" {
   )
 }
 
+output "fqdns" {
+  value = merge(
+    length(module.mssql) > 0 ? module.mssql[0].fqdns : {}
+  )
+}
+
 output "root_cert_pem" {
   description = "Self signed root certificate in PEM format for use with point-to-site VPN clients."
   value       = length(module.vwan) == 1 ? module.vwan[0].root_cert_pem : null
