@@ -2,6 +2,14 @@ output "configure_azure_files_id" {
   value = azurerm_virtual_machine_extension.configure_azure_files.id
 }
 
+output "fqdns" {
+  value = {
+    container_registry   = trimsuffix(trimprefix(azurerm_container_registry.this.login_server, "https://"), "/")
+    storage_account_blob = trimsuffix(trimprefix(azurerm_storage_account.this.primary_blob_endpoint, "https://"), "/")
+    storage_account_file = trimsuffix(trimprefix(azurerm_storage_account.this.primary_file_endpoint, "https://"), "/")
+  }
+}
+
 output "private_dns_zones" {
   value = azurerm_private_dns_zone.zones
 }

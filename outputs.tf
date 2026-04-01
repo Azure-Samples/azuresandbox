@@ -48,6 +48,8 @@ output "resource_names" {
 
 output "fqdns" {
   value = merge(
+    module.vnet_shared.fqdns,
+    length(module.vnet_app) > 0 ? module.vnet_app[0].fqdns : {},
     length(module.mssql) > 0 ? module.mssql[0].fqdns : {}
   )
 }

@@ -23,6 +23,12 @@ output "dns_server" {
   value = azurerm_virtual_network.this.dns_servers[0]
 }
 
+output "fqdns" {
+  value = {
+    key_vault = trimsuffix(trimprefix(azurerm_key_vault.this.vault_uri, "https://"), "/")
+  }
+}
+
 output "private_dns_zones" {
   value = { "privatelink.vaultcore.azure.net" = azurerm_private_dns_zone.this }
 }
