@@ -1,3 +1,9 @@
+provider "azuread" {
+  tenant_id     = var.aad_tenant_id
+  client_id     = var.arm_client_id
+  client_secret = var.arm_client_secret
+}
+
 provider "azapi" {
   subscription_id = var.subscription_id
   client_id       = var.arm_client_id

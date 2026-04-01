@@ -1,5 +1,5 @@
 #requires -Version 7.0
-#requires -Modules Az.Accounts, Az.Compute, Az.Resources
+#requires -Modules Az.Accounts, Az.Compute, Az.Resources, Az.Sql, Az.Network, Az.PrivateDns
 
 # Usage:
 #   Step 1: Authenticate to Azure (one-time, persisted to ~/.Azure/)
@@ -14,7 +14,7 @@
 #     From bash:       pwsh -File ./scripts/Invoke-UnitTests.ps1 -Module vnet_shared
 #     From PowerShell: .\scripts\Invoke-UnitTests.ps1 -Module vnet_app
 #
-#   Valid module names: vnet_shared, vnet_app, vm_jumpbox_linux, vm_mssql_win
+#   Valid module names: vnet_shared, vnet_app, vm_jumpbox_linux, vm_mssql_win, mssql
 #
 # Prerequisites:
 #   - PowerShell 7.x (pwsh) with Az.Accounts, Az.Compute, and Az.Resources modules installed
@@ -116,6 +116,50 @@ function Invoke-VMTest {
     }
     catch {
         Write-Log "[$Label] [FAIL] Failed to execute tests on VM '$VMName'"
+        Write-Log "[$Label] [FAIL] Exception: $_"
+    }
+
+    return $testResult
+}
+
+function Invoke-LocalTest {
+    param(
+        [string]$ScriptPath,
+        [hashtable]$Parameters,
+        [string]$Label
+    )
+
+    $testResult = @{ Passed = 0; Failed = 1 }
+
+    if (-not (Test-Path $ScriptPath)) {
+        Write-Log "[WARNING] Test script not found: $ScriptPath. Skipping."
+        return $testResult
+    }
+
+    Write-Log "Executing test script locally..."
+
+    try {
+        $output = & $ScriptPath @Parameters 2>&1
+        $stdout = $output | Out-String
+
+        if ($stdout) {
+            $lines = $stdout -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+            foreach ($line in $lines) {
+                Write-Log $line
+            }
+        }
+
+        # Parse summary line
+        $summaryLine = ($stdout -split "`n") | Where-Object { $_ -match '\[SUMMARY\]' } | Select-Object -Last 1
+        if ($summaryLine -match 'Passed:\s*(\d+)\s+Failed:\s*(\d+)\s+Total:\s*(\d+)') {
+            $testResult = @{ Passed = [int]$Matches[1]; Failed = [int]$Matches[2] }
+        }
+        else {
+            Write-Log "[WARNING] Could not parse summary line from '$Label'. Treating as failure."
+        }
+    }
+    catch {
+        Write-Log "[$Label] [FAIL] Failed to execute local tests"
         Write-Log "[$Label] [FAIL] Exception: $_"
     }
 
@@ -229,12 +273,13 @@ catch {
     Exit-WithError "Azure credentials are expired or lack access to resource group '$resourceGroupName'. Run 'Connect-AzAccount' to re-authenticate. Exception: $_"
 }
 
-# Map main.tf module names to test configuration VM keys
+# Map main.tf module names to test configuration keys
 $moduleToVmKey = @{
     'vnet_shared'      = 'virtual_machine_adds1'
     'vnet_app'         = 'virtual_machine_jumpwin1'
     'vm_jumpbox_linux' = 'virtual_machine_jumplinux1'
     'vm_mssql_win'     = 'virtual_machine_mssqlwin1'
+    'mssql'            = '$local_mssql'
 }
 
 # Validate -Module parameter if specified
@@ -282,6 +327,17 @@ $testConfigs = [ordered]@{
         }
         StopDeallocateBeforeTest = $true
     }
+    '$local_mssql' = @{
+        Module     = 'mssql'
+        ModuleName = 'mssql'
+        RunLocal   = $true
+        ScriptPath = Join-Path $repoRoot 'modules' 'mssql' 'scripts' 'Test-Mssql.ps1'
+        Parameters = @{
+            ResourceGroupName = $resourceGroupName
+            MssqlServerName   = $resourceNames['mssql_server']
+            MssqlDatabaseName = $resourceNames['mssql_db']
+        }
+    }
 }
 
 # Filter to single module if specified
@@ -296,33 +352,59 @@ $overallPassed = 0
 $overallFailed = 0
 $moduleResults = @()
 
-foreach ($vmKey in $testConfigs.Keys) {
-    $config = $testConfigs[$vmKey]
-    $vmName = $resourceNames[$vmKey]
+foreach ($configKey in $testConfigs.Keys) {
+    $config = $testConfigs[$configKey]
 
-    if (-not $vmName) {
-        Write-Log "Skipping module '$($config.Module)': VM key '$vmKey' not found in terraform outputs (module not deployed)."
-        continue
-    }
-
-    Write-Log "========================================"
-    Write-Log "Module: $($config.Module) | VM: $vmName"
-    Write-Log "========================================"
-
-    # Stop/deallocate and restart VM if required (tests startup configuration after temp disk wipe)
-    if ($config.StopDeallocateBeforeTest) {
-        try {
-            Invoke-VMStopDeallocateStart -ResourceGroupName $resourceGroupName -VMName $vmName
+    if ($config.RunLocal) {
+        # Client-side test (e.g. mssql PaaS module)
+        # Skip if required terraform output keys are missing (module not deployed)
+        $skipLocal = $false
+        foreach ($val in $config.Parameters.Values) {
+            if (-not $val) {
+                $skipLocal = $true
+                break
+            }
         }
-        catch {
-            Write-Log "[MODULE:$($config.Module)] [FAIL] Failed to stop/deallocate/start VM '$vmName': $_"
-            $overallFailed++
-            $moduleResults += @{ Module = $config.Module; Passed = 0; Failed = 1 }
+
+        if ($skipLocal) {
+            Write-Log "Skipping module '$($config.Module)': required terraform outputs not found (module not deployed)."
             continue
         }
-    }
 
-    $testResult = Invoke-VMTest -ResourceGroupName $resourceGroupName -VMName $vmName -CommandId $config.CommandId -ScriptPath $config.ScriptPath -Parameters $config.Parameters -Label "MODULE:$($config.Module)"
+        Write-Log "========================================"
+        Write-Log "Module: $($config.Module) | Local"
+        Write-Log "========================================"
+
+        $testResult = Invoke-LocalTest -ScriptPath $config.ScriptPath -Parameters $config.Parameters -Label "MODULE:$($config.Module)"
+    }
+    else {
+        # VM-based test
+        $vmName = $resourceNames[$configKey]
+
+        if (-not $vmName) {
+            Write-Log "Skipping module '$($config.Module)': VM key '$configKey' not found in terraform outputs (module not deployed)."
+            continue
+        }
+
+        Write-Log "========================================"
+        Write-Log "Module: $($config.Module) | VM: $vmName"
+        Write-Log "========================================"
+
+        # Stop/deallocate and restart VM if required (tests startup configuration after temp disk wipe)
+        if ($config.StopDeallocateBeforeTest) {
+            try {
+                Invoke-VMStopDeallocateStart -ResourceGroupName $resourceGroupName -VMName $vmName
+            }
+            catch {
+                Write-Log "[MODULE:$($config.Module)] [FAIL] Failed to stop/deallocate/start VM '$vmName': $_"
+                $overallFailed++
+                $moduleResults += @{ Module = $config.Module; Passed = 0; Failed = 1 }
+                continue
+            }
+        }
+
+        $testResult = Invoke-VMTest -ResourceGroupName $resourceGroupName -VMName $vmName -CommandId $config.CommandId -ScriptPath $config.ScriptPath -Parameters $config.Parameters -Label "MODULE:$($config.Module)"
+    }
     $overallPassed += $testResult.Passed
     $overallFailed += $testResult.Failed
     $moduleResults += @{ Module = $config.Module; Passed = $testResult.Passed; Failed = $testResult.Failed }

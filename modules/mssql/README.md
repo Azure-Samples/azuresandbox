@@ -64,6 +64,8 @@ The module is organized as follows:
 ```plaintext
 ├── images/
 |   └── mssql-diagram.drawio.svg  # Architecture diagram
+├── scripts/
+|   └── Test-Mssql.ps1            # Unit test script
 ├── main.tf                       # Resource configurations
 ├── network.tf                    # Network resource configurations
 ├── outputs.tf                    # Output variables
@@ -81,11 +83,11 @@ location | | The name of the Azure Region where resources will be provisioned.
 mssql_database_name | testdb | The name of the Azure SQL Database to be provisioned.
 private_dns_zone_id | | The ID of the private DNS zone for Azure SQL Database. Defined in the vnet-app module.
 resource_group_name | | The name of the resource group defined in the root module.
+sql_admin_login_name | | The name of the Entra ID group to be set as the SQL server administrator.
+sql_admin_object_id | | The object ID of the Entra ID group to be set as the SQL server administrator.
 subnet_id | | The subnet ID defined in the vnet-app module.
 tags | |  The tags from the root module.
 unique_seed | | The unique seed used to generate unique names for resources. Defined in the root module.
-user_name | | The user name of the user in Microsoft Entra ID.
-user_object_id | | The object id of the user in Microsoft Entra ID.
 
 ### Module Resources
 
@@ -103,5 +105,6 @@ This section includes a list of output variables returned by the module.
 
 Name | Default | Comments
 --- | --- | ---
+fqdns | | A map of fully qualified domain names in the module.
 resource_ids | | A map of resource IDs for key resources in the module.
 resource_names | | A map of resource names for key resources in the module.
