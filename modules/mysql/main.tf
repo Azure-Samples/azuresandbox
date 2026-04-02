@@ -1,11 +1,12 @@
 #region resources
 resource "azurerm_mysql_flexible_server" "this" {
-  name                   = module.naming.mysql_server.name_unique
-  resource_group_name    = var.resource_group_name
-  location               = var.location
-  administrator_login    = var.admin_username
-  administrator_password = var.admin_password
-  sku_name               = var.mysql_sku_name
+  name                          = module.naming.mysql_server.name_unique
+  resource_group_name           = var.resource_group_name
+  location                      = var.location
+  administrator_login           = var.admin_username
+  administrator_password        = var.admin_password
+  sku_name                      = var.mysql_sku_name
+  public_network_access_enabled = false
 }
 
 resource "azurerm_mysql_flexible_database" "this" {

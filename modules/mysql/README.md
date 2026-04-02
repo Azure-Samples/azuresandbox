@@ -101,7 +101,8 @@ module.mysql[0].azurerm_private_endpoint.this | pe&#8209;sand&#8209;dev&#8209;my
 
 This section includes a list of output variables returned by the module.
 
-Name | Default | Comments
---- | --- | ---
-resource_ids | | A map of resource IDs for key resources in the module.
-resource_names | | A map of resource names for key resources in the module.
+Name | Comments
+--- | ----
+fqdns | A map of fqdns for resources provisioned in the module.
+resource_ids | A map of resource IDs for key resources in the module.
+resource_names | A map of resource names for key resources in the module.

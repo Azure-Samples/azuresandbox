@@ -1,3 +1,9 @@
+output "fqdns" {
+  value = {
+    mysql_server = azurerm_mysql_flexible_server.this.fqdn
+  }
+}
+
 output "resource_ids" {
   value = {
     mysql_server = azurerm_mysql_flexible_server.this.id
