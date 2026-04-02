@@ -216,6 +216,7 @@ This section includes a list of output variables returned by the module.
 
 Name | Default | Comments
 --- | --- | ---
+fqdns | | A map of fqdns for resources provisioned in the module.
 private_dns_zones | | A map of private DNS zones provisioned in the module.
 resource_ids | | A map of resource IDs for key resources in the module.
 resource_names | | A map of resource names for key resources in the module.

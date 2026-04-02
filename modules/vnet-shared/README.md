@@ -154,6 +154,7 @@ admin_password_secret | adminpassword | The name of the key vault secret where t
 admin_username | bootstrapadmin | The user name for provisioning administrator accounts.
 admin_username_secret | adminuser | The name of the key vault secret containing the admin username.
 dns_server | 10.1.1.4 | The primary DNS server IP address for the virtual network.
+fqdns | | A map of fqdns for resources provisioned in the module.
 private_dns_zones | | A map of private DNS zones used in the module.
 resource_ids | | A map of resource IDs for key resources in the module.
 resource_names | | A map of resource names for key resources in the module.

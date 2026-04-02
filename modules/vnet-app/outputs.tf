@@ -59,11 +59,3 @@ output "storage_operations_complete" {
   value       = terraform_data.storage_operations_complete.id
   description = "Dependency signal: all storage data plane operations in this module are complete."
 }
-
-output "vm_run_command_output" {
-  value = {
-    install_windows_features = azurerm_virtual_machine_run_command.install_windows_features.instance_view
-    install_software         = azurerm_virtual_machine_run_command.install_software.instance_view
-  }
-  description = "Instance view output from VM run commands for troubleshooting."
-}

@@ -609,6 +609,7 @@ Address | Name | Notes
 --- | --- | ---
 azuread_group.sql_admins[0] | grp&#8209;sql&#8209;admins&#8209;sand&#8209;dev&#8209;xxxxxxxx | Entra ID group for Azure Sql Db admin authorization
 azurerm_resource_group.this | rg&#8209;sand&#8209;dev&#8209;xxxxxxxx | Resource group for the sandbox environment.
+azurerm_virtual_machine_run_command.create_mssql_db_user[0] | vmx&#8209;sand&#8209;dev&#8209;jumpwin1&#8209;CreateMssqlDbUser | Adds jumpwin1 as db_datareader on Azure SQL Db testdb
 
 ---
 
