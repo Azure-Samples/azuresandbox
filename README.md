@@ -555,25 +555,28 @@ The Azure Sandbox project is organized into the following structure:
 │   ├── configurations/          
 │   └── modules/                 
 ├── images/                      
-│   └── azuresandbox.drawio.svg               # Architecture diagram
+│   └── azuresandbox.drawio.svg                 # Architecture diagram
 ├── modules/                     
-│   ├── mssql/                                # Azure SQL Database module
-│   ├── mysql/                                # Azure Database for MySQL module
-│   ├── vm-jumpbox-linux/                     # Linux jumpbox virtual machine module
-│   ├── vm-mssql-win/                         # SQL Server virtual machine module
-│   ├── vnet-app/                             # Application virtual network module
-│   ├── vnet-shared/                          # Shared services virtual network module
-│   └── vwan/                                 # Point-to-site VPN module
+│   ├── mssql/                                  # Azure SQL Database module
+│   ├── mysql/                                  # Azure Database for MySQL module
+│   ├── vm-jumpbox-linux/                       # Linux jumpbox virtual machine module
+│   ├── vm-mssql-win/                           # SQL Server virtual machine module
+│   ├── vnet-app/                               # Application virtual network module
+│   ├── vnet-shared/                            # Shared services virtual network module
+│   └── vwan/                                   # Point-to-site VPN module
 ├── scripts/
-│   ├── bootstrap.ps1                         # PowerShell helper script for generating terraform.tfvars
-│   ├── bootstrap.sh                          # Bash helper script for generating terraform.tfvars
-│   ├── Invoke-UnitTests.ps1                  # Orchestrates module unit tests
-│   └── Test-Integration-SshConnectivity.ps1  # Integration test for SSH connectivity
-├── main.tf                                   # Resource configurations
-├── outputs.tf                                # Output variables 
-├── providers.tf                              # Provider configuration blocks
-├── terraform.tf                              # Terraform configuration block
-└── variables.tf                              # Variable definitions
+│   ├── bootstrap.ps1                           # PowerShell helper script for generating terraform.tfvars
+│   ├── bootstrap.sh                            # Bash helper script for generating terraform.tfvars
+│   ├── Create-AzSqlDbUser.ps1                  # Creates Azure SQL Database user
+│   ├── Invoke-UnitTests.ps1                    # Orchestrates module unit tests
+│   ├── Test-Integration-AzSqlConnectivity.ps1  # Integration test for Azure SQL connectivity
+│   ├── Test-Integration-SqlConnectivity.ps1    # Integration test for SQL Server connectivity
+│   └── Test-Integration-SshConnectivity.ps1    # Integration test for SSH connectivity
+├── main.tf                                     # Resource configurations
+├── outputs.tf                                  # Output variables 
+├── providers.tf                                # Provider configuration blocks
+├── terraform.tf                                # Terraform configuration block
+└── variables.tf                                # Variable definitions
 ```
 
 ---
@@ -620,6 +623,7 @@ This section includes a list of output variables returned by the root module.
 Name | Comments
 --- | ---
 client_cert_pem | The client certificate in PEM format for use with point-to-site VPN clients.
+fqdns | A map of fqdns for resources.
 resource_ids | A map of resource IDs for key resources in the configuration.
 resource_names | A map of resource names for key resources in the configuration.
 root_cert_pem | The root certificate in PEM format for use with point-to-site VPN clients.
@@ -791,7 +795,7 @@ jumplinux1 | Linux Jumpbox VM | vm-jumpbox-linux | Ubuntu Server LTS 24.04 (Nobl
 
 ### Unit testing
 
-FUlly automated unit test scripts are provided for each module and are orchestrated by [Invoke-UnitTests.ps1](./scripts/Invoke-UnitTests.ps1). There are two types of tests:
+Fully automated unit test scripts are provided for each module and are orchestrated by [Invoke-UnitTests.ps1](./scripts/Invoke-UnitTests.ps1). There are two types of tests:
 
 * Module unit tests: These tests focus on functionality in a single module.
 * Integration tests: These tests focus on functionality that spans multiple modules.

@@ -138,7 +138,7 @@ resource "azurerm_virtual_machine_run_command" "create_mssql_db_user" {
   virtual_machine_id = module.vnet_app[0].resource_ids.virtual_machine_jumpwin1
 
   source {
-    script = file("${path.module}/scripts/Create-MssqlDbUser.ps1")
+    script = file("${path.module}/scripts/Create-AzSqlDbUser.ps1")
   }
 
   parameter {

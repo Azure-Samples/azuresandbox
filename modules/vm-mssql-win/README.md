@@ -77,7 +77,8 @@ The module is organized as follows:
 |   ├── Configure-SqlLogin.ps1            # Creates SQL Server login for domain admin and adds it to sysadmin server role
 |   ├── Invoke-MssqlConfiguration.ps1     # Runs Set-MssqlConfiguration.ps1 as domain admin and reboots the VM
 |   ├── Set-MssqlConfiguration.ps1        # Prepares data and log disks and configures SQL Server instance
-|   └── Set-MssqlStartupConfiguration.ps1 # Re-configures SQL Server tempdb folder after VM stop/deallocate event 
+|   ├── Set-MssqlStartupConfiguration.ps1 # Re-configures SQL Server tempdb folder after VM stop/deallocate event
+|   └── Test-VmMssqlWin.ps1               # Unit test script
 ├── compute.tf                            # Compute resource configurations
 ├── locals.tf                             # Local variables
 ├── main.tf                               # Resource configurations
