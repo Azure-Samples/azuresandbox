@@ -748,6 +748,7 @@ if ( -not (Test-Path $sqlStartupScriptPath) ) {
 
 $taskAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-ExecutionPolicy Unrestricted -File `"$sqlStartupScriptPath`""
 $taskTrigger = New-ScheduledTaskTrigger -AtStartup
+$taskSettings = New-ScheduledTaskSettingsSet -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
 
 Write-ScriptLog "Registering scheduled task to execute '$sqlStartupScriptPath' under user '$DomainAdminUser'..."
 
@@ -759,6 +760,7 @@ try {
         -TaskName $taskName `
         -Action $taskAction `
         -Trigger $taskTrigger `
+        -Settings $taskSettings `
         -RunLevel 'Highest' `
         -Description "Prepare temp drive folders for tempdb and start SQL Server."
 }
