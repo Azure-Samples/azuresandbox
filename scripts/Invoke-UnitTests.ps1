@@ -14,6 +14,10 @@
 #     From bash:       pwsh -File ./scripts/Invoke-UnitTests.ps1 -Module vnet_shared
 #     From PowerShell: .\scripts\Invoke-UnitTests.ps1 -Module vnet_app
 #
+#   Step 2 (alt): Run integration tests only
+#     From bash:       pwsh -File ./scripts/Invoke-UnitTests.ps1 -IntegrationOnly
+#     From PowerShell: .\scripts\Invoke-UnitTests.ps1 -IntegrationOnly
+#
 #   Valid module names: vnet_shared, vnet_app, vm_jumpbox_linux, vm_mssql_win, mssql
 #
 # Prerequisites:
@@ -23,7 +27,10 @@
 
 param(
     [Parameter(Mandatory = $false)]
-    [string]$Module
+    [string]$Module,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$IntegrationOnly
 )
 
 #region functions
@@ -257,6 +264,21 @@ catch {
     Exit-WithError "Failed to read terraform outputs. Ensure terraform state is initialized in '$repoRoot'. Exception: $_"
 }
 
+# Read fqdns output (may be empty if no modules expose FQDNs)
+$fqdns = @{}
+try {
+    Push-Location $repoRoot
+    $fqdnJson = terraform output -json fqdns 2>&1
+    $fqdnExitCode = $LASTEXITCODE
+    Pop-Location
+    if ($fqdnExitCode -eq 0 -and $fqdnJson) {
+        $fqdns = $fqdnJson | ConvertFrom-Json -AsHashtable
+    }
+}
+catch {
+    Write-Log "[WARNING] Could not read terraform output 'fqdns': $_"
+}
+
 $resourceGroupName = $resourceNames['resource_group']
 if (-not $resourceGroupName) {
     Exit-WithError "resource_group not found in terraform output resource_names."
@@ -282,12 +304,20 @@ $moduleToVmKey = @{
     'mssql'            = '$local_mssql'
 }
 
+if ($Module -and $IntegrationOnly) {
+    Exit-WithError "-Module and -IntegrationOnly cannot be used together."
+}
+
 # Validate -Module parameter if specified
 if ($Module) {
     if (-not $moduleToVmKey.ContainsKey($Module)) {
         Exit-WithError "Unknown module '$Module'. Valid modules: $($moduleToVmKey.Keys -join ', ')"
     }
     Write-Log "Targeting single module: $Module"
+}
+
+if ($IntegrationOnly) {
+    Write-Log "Running integration tests only."
 }
 
 # Define test configurations
@@ -352,6 +382,8 @@ $overallPassed = 0
 $overallFailed = 0
 $moduleResults = @()
 
+# Module unit tests - skip when -IntegrationOnly is set
+if (-not $IntegrationOnly) {
 foreach ($configKey in $testConfigs.Keys) {
     $config = $testConfigs[$configKey]
 
@@ -409,8 +441,9 @@ foreach ($configKey in $testConfigs.Keys) {
     $overallFailed += $testResult.Failed
     $moduleResults += @{ Module = $config.Module; Passed = $testResult.Passed; Failed = $testResult.Failed }
 }
+} # end if (-not $IntegrationOnly)
 
-# Integration tests - only run when testing all modules
+# Integration tests - only run when testing all modules or -IntegrationOnly
 if (-not $Module) {
     $integrationTests = @(
         @{
@@ -435,6 +468,18 @@ if (-not $Module) {
                 TargetVmName = $resourceNames['virtual_machine_mssqlwin1']
             }
         }
+        @{
+            Name         = 'Azure SQL: jumpwin1 -> testdb'
+            RequiredVMs  = @('virtual_machine_jumpwin1')
+            RequiredFqdn = 'mssql_server'
+            RunOnVM      = 'virtual_machine_jumpwin1'
+            ScriptPath   = Join-Path $repoRoot 'scripts' 'Test-Integration-MssqlConnectivity.ps1'
+            CommandId    = 'RunPowerShellScript'
+            Parameters   = @{
+                MssqlServerFqdn   = $fqdns['mssql_server']
+                MssqlDatabaseName = $resourceNames['mssql_db']
+            }
+        }
     )
 
     foreach ($test in $integrationTests) {
@@ -452,6 +497,12 @@ if (-not $Module) {
 
         if (-not $allDeployed) {
             Write-Log "Skipping integration test '$($test.Name)': required VM '$missingVm' not deployed."
+            continue
+        }
+
+        # Check required FQDN is available (for tests that depend on PaaS modules)
+        if ($test.RequiredFqdn -and -not $fqdns[$test.RequiredFqdn]) {
+            Write-Log "Skipping integration test '$($test.Name)': required FQDN '$($test.RequiredFqdn)' not found in terraform outputs (module not deployed)."
             continue
         }
 

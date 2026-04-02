@@ -174,7 +174,39 @@ This section describes the prerequisites required in order to provision an Azure
   }
   ```
 
-Save the service principal *appId* and *password* in a secure location such as a password vault.
+* Save the service principal *appId* and *password* in a secure location such as a password vault.
+
+* If you want to deploy the Azure SQL Database module, you will need to grant the service principal privileges to create Entra ID security groups and assign members to them.
+
+  ```bash
+  # Get the SP's object ID
+  SP_OBJECT_ID=$(az ad sp show --id <service-principal-app-id-here> --query id -o tsv)
+
+  # Get the Microsoft Graph service principal object ID in the tenant
+  GRAPH_SP_ID=$(az ad sp show --id 00000003-0000-0000-c000-000000000000 --query id -o tsv)
+
+  # Grant Group.ReadWrite.All application permission via Microsoft Graph API
+  az rest --method POST \
+    --uri "https://graph.microsoft.com/v1.0/servicePrincipals/${SP_OBJECT_ID}/appRoleAssignments" \
+    --headers "Content-Type=application/json" \
+    --body "{
+      \"principalId\": \"${SP_OBJECT_ID}\",
+      \"resourceId\": \"${GRAPH_SP_ID}\",
+      \"appRoleId\": \"62a82d76-70ea-41e2-9197-370581804d09\"
+    }"
+  ```
+
+  Alternatively you can perform these steps manually from the Entra portal:
+
+  1. Sign in to [Microsoft Entra admin center](https://entra.microsoft.com) as a Global
+    Administrator or Privileged Role Administrator.
+  2. Navigate to **Identity** > **Applications** > **App registrations**.
+  3. Search for and select the service principal's app registration (matching `<service-principal-app-id-here>`).
+  4. Select **API permissions** in the left menu.
+  5. Click **Add a permission** > **Microsoft Graph** > **Application permissions**.
+  6. Search for `Group.ReadWrite.All`, check the box, and click **Add permissions**.
+  7. Back on the API permissions page, click **Grant admin consent for \<tenant name\>** and
+    confirm when prompted. A green checkmark should appear in the Status column.
 
 ### Other Prerequisites
 
@@ -575,6 +607,7 @@ The root module includes a resource group.
 
 Address | Name | Notes
 --- | --- | ---
+azuread_group.sql_admins[0] | grp&#8209;sql&#8209;admins&#8209;sand&#8209;dev&#8209;xxxxxxxx | Entra ID group for Azure Sql Db admin authorization
 azurerm_resource_group.this | rg&#8209;sand&#8209;dev&#8209;xxxxxxxx | Resource group for the sandbox environment.
 
 ---

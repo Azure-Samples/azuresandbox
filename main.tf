@@ -3,6 +3,7 @@ data "azuread_service_principal" "this" {
   count     = var.enable_module_mssql ? 1 : 0
   client_id = var.arm_client_id
 }
+
 #endregion
 
 #region resources
@@ -128,6 +129,57 @@ module "mssql" {
   unique_seed          = module.naming.unique-seed
 
   depends_on = [module.vnet_app[0].configure_azure_files_id] # Ensures that Azure Files is configured
+}
+
+resource "azurerm_virtual_machine_run_command" "create_mssql_db_user" {
+  count              = var.enable_module_mssql ? 1 : 0
+  name               = "${module.naming.virtual_machine_extension.name}-${module.vnet_app[0].resource_names.virtual_machine_jumpwin1}-CreateMssqlDbUser"
+  location           = azurerm_resource_group.this.location
+  virtual_machine_id = module.vnet_app[0].resource_ids.virtual_machine_jumpwin1
+
+  source {
+    script = file("${path.module}/scripts/Create-MssqlDbUser.ps1")
+  }
+
+  parameter {
+    name  = "ArmClientId"
+    value = var.arm_client_id
+  }
+
+  parameter {
+    name  = "AadTenantId"
+    value = var.aad_tenant_id
+  }
+
+  parameter {
+    name  = "MssqlServerFqdn"
+    value = module.mssql[0].fqdns.mssql_server
+  }
+
+  parameter {
+    name  = "MssqlDatabaseName"
+    value = module.mssql[0].resource_names.mssql_db
+  }
+
+  parameter {
+    name  = "VmName"
+    value = module.vnet_app[0].resource_names.virtual_machine_jumpwin1
+  }
+
+  parameter {
+    name  = "VmPrincipalId"
+    value = module.vnet_app[0].virtual_machine_jumpwin1_identity.principal_id
+  }
+
+  protected_parameter {
+    name  = "ArmClientSecret"
+    value = var.arm_client_secret
+  }
+
+  depends_on = [
+    module.mssql,
+    module.vnet_app,
+  ]
 }
 
 module "mysql" {

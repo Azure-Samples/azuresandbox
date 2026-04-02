@@ -34,6 +34,12 @@ output "resource_names" {
   }
 }
 
+output "virtual_machine_jumpwin1_identity" {
+  value = {
+    principal_id = azurerm_windows_virtual_machine.this.identity[0].principal_id
+  }
+}
+
 output "storage_container_name" {
   value = azurerm_storage_container.this.name
 }
