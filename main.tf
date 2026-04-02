@@ -166,11 +166,6 @@ resource "azurerm_virtual_machine_run_command" "create_mssql_db_user" {
     value = module.vnet_app[0].resource_names.virtual_machine_jumpwin1
   }
 
-  parameter {
-    name  = "VmPrincipalId"
-    value = module.vnet_app[0].virtual_machine_jumpwin1_identity.principal_id
-  }
-
   protected_parameter {
     name  = "ArmClientSecret"
     value = var.arm_client_secret
