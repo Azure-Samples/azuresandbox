@@ -21,7 +21,12 @@ if [[ "${ACTION}" != "start" && "${ACTION}" != "stop" ]]; then
 fi
 
 echo "Retrieving resource names from terraform output..."
-RESOURCE_NAMES_JSON=$(terraform -chdir="${TERRAFORM_DIR}" output -json resource_names 2>/dev/null)
+RESOURCE_NAMES_JSON=$(terraform -chdir="${TERRAFORM_DIR}" output -json resource_names 2>&1) || {
+  echo "Error: 'terraform output -json resource_names' failed."
+  echo "${RESOURCE_NAMES_JSON}"
+  echo "Run 'terraform apply' to update state."
+  exit 1
+}
 
 if [[ $# -ge 2 ]]; then
   RESOURCE_GROUP="$2"

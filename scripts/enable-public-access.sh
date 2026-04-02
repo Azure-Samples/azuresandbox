@@ -9,7 +9,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TERRAFORM_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 echo "Retrieving resource names from terraform output..."
-RESOURCE_NAMES_JSON=$(terraform -chdir="${TERRAFORM_DIR}" output -json resource_names 2>/dev/null)
+RESOURCE_NAMES_JSON=$(terraform -chdir="${TERRAFORM_DIR}" output -json resource_names 2>&1) || {
+  echo "Error: 'terraform output -json resource_names' failed."
+  echo "${RESOURCE_NAMES_JSON}"
+  echo "Run 'terraform apply' to update state."
+  exit 1
+}
 
 if [[ $# -ge 1 ]]; then
   RESOURCE_GROUP="$1"

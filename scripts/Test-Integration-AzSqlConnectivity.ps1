@@ -30,7 +30,7 @@ $ProgressPreference = 'SilentlyContinue'
 
 $moduleName = 'integration'
 $logDir = 'C:\unit-tests\integration'
-$script:logPath = Join-Path $logDir 'Test-Integration-MssqlConnectivity.ps1.log'
+$script:logPath = Join-Path $logDir 'Test-Integration-AzSqlConnectivity.ps1.log'
 
 if (-not (Test-Path $logDir)) {
     New-Item -ItemType Directory -Path $logDir -Force | Out-Null

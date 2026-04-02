@@ -473,7 +473,7 @@ if (-not $Module) {
             RequiredVMs  = @('virtual_machine_jumpwin1')
             RequiredFqdn = 'mssql_server'
             RunOnVM      = 'virtual_machine_jumpwin1'
-            ScriptPath   = Join-Path $repoRoot 'scripts' 'Test-Integration-MssqlConnectivity.ps1'
+            ScriptPath   = Join-Path $repoRoot 'scripts' 'Test-Integration-AzSqlConnectivity.ps1'
             CommandId    = 'RunPowerShellScript'
             Parameters   = @{
                 MssqlServerFqdn   = $fqdns['mssql_server']
