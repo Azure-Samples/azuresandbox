@@ -15,6 +15,8 @@
 
 This configuration implements a network isolated Azure SQL Database using private endpoints.
 
+The estimated provisioning time for this module is 6 minutes.
+
 ## Smoke Testing
 
 This section describes how to test the module after deployment.

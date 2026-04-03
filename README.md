@@ -555,28 +555,29 @@ The Azure Sandbox project is organized into the following structure:
 │   ├── configurations/          
 │   └── modules/                 
 ├── images/                      
-│   └── azuresandbox.drawio.svg                 # Architecture diagram
+│   └── azuresandbox.drawio.svg                   # Architecture diagram
 ├── modules/                     
-│   ├── mssql/                                  # Azure SQL Database module
-│   ├── mysql/                                  # Azure Database for MySQL module
-│   ├── vm-jumpbox-linux/                       # Linux jumpbox virtual machine module
-│   ├── vm-mssql-win/                           # SQL Server virtual machine module
-│   ├── vnet-app/                               # Application virtual network module
-│   ├── vnet-shared/                            # Shared services virtual network module
-│   └── vwan/                                   # Point-to-site VPN module
+│   ├── mssql/                                    # Azure SQL Database module
+│   ├── mysql/                                    # Azure Database for MySQL module
+│   ├── vm-jumpbox-linux/                         # Linux jumpbox virtual machine module
+│   ├── vm-mssql-win/                             # SQL Server virtual machine module
+│   ├── vnet-app/                                 # Application virtual network module
+│   ├── vnet-shared/                              # Shared services virtual network module
+│   └── vwan/                                     # Point-to-site VPN module
 ├── scripts/
-│   ├── bootstrap.ps1                           # PowerShell helper script for generating terraform.tfvars
-│   ├── bootstrap.sh                            # Bash helper script for generating terraform.tfvars
-│   ├── Create-AzSqlDbUser.ps1                  # Creates Azure SQL Database user
-│   ├── Invoke-UnitTests.ps1                    # Orchestrates module unit tests
-│   ├── Test-Integration-AzSqlConnectivity.ps1  # Integration test for Azure SQL connectivity
-│   ├── Test-Integration-SqlConnectivity.ps1    # Integration test for SQL Server connectivity
-│   └── Test-Integration-SshConnectivity.ps1    # Integration test for SSH connectivity
-├── main.tf                                     # Resource configurations
-├── outputs.tf                                  # Output variables 
-├── providers.tf                                # Provider configuration blocks
-├── terraform.tf                                # Terraform configuration block
-└── variables.tf                                # Variable definitions
+│   ├── bootstrap.ps1                             # PowerShell helper script for generating terraform.tfvars
+│   ├── bootstrap.sh                              # Bash helper script for generating terraform.tfvars
+│   ├── Create-AzSqlDbUser.ps1                    # Creates Azure SQL Database user
+│   ├── Invoke-UnitTests.ps1                      # Orchestrates module unit tests
+│   ├── Test-Integration-AzMySqlConnectivity.ps1  # Integration test for Azure MySQL connectivity
+│   ├── Test-Integration-AzSqlConnectivity.ps1    # Integration test for Azure SQL connectivity
+│   ├── Test-Integration-SqlConnectivity.ps1      # Integration test for SQL Server connectivity
+│   └── Test-Integration-SshConnectivity.ps1      # Integration test for SSH connectivity
+├── main.tf                                       # Resource configurations
+├── outputs.tf                                    # Output variables 
+├── providers.tf                                  # Provider configuration blocks
+├── terraform.tf                                  # Terraform configuration block
+└── variables.tf                                  # Variable definitions
 ```
 
 ---

@@ -13,7 +13,9 @@
 
 ## Overview
 
-This configuration implements a network isolated Azure Database for MySQL  using private endpoints.
+This configuration implements a network isolated Azure Database for MySQL using private endpoints.
+
+The estimated provisioning time for this module is 8 minutes.
 
 ## Smoke Testing
 
@@ -63,6 +65,8 @@ The module is organized as follows:
 ```plaintext
 ├── images/
 |   └── mysql-diagram.drawio.svg  # Architecture diagram
+├── scripts/
+|   └── Test-Mysql.ps1            # Unit test script
 ├── main.tf                       # Resource configurations
 ├── network.tf                    # Network resource configurations
 ├── outputs.tf                    # Output variables

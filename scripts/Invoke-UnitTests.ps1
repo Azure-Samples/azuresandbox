@@ -1,5 +1,5 @@
 #requires -Version 7.0
-#requires -Modules Az.Accounts, Az.Compute, Az.Resources, Az.Sql, Az.Network, Az.PrivateDns
+#requires -Modules Az.Accounts, Az.Compute, Az.Resources, Az.Sql, Az.Network, Az.PrivateDns, Az.MySql
 
 # Usage:
 #   Step 1: Authenticate to Azure (one-time, persisted to ~/.Azure/)
@@ -14,11 +14,11 @@
 #     From bash:       pwsh -File ./scripts/Invoke-UnitTests.ps1 -Module vnet_shared
 #     From PowerShell: .\scripts\Invoke-UnitTests.ps1 -Module vnet_app
 #
-#   Step 2 (alt): Run integration tests only
-#     From bash:       pwsh -File ./scripts/Invoke-UnitTests.ps1 -IntegrationOnly
-#     From PowerShell: .\scripts\Invoke-UnitTests.ps1 -IntegrationOnly
+#   Step 2 (alt): Run unit tests for a module and its associated integration tests
+#     From bash:       pwsh -File ./scripts/Invoke-UnitTests.ps1 -Module vnet_app -Integration
+#     From PowerShell: .\scripts\Invoke-UnitTests.ps1 -Module vm_mssql_win -Integration
 #
-#   Valid module names: vnet_shared, vnet_app, vm_jumpbox_linux, vm_mssql_win, mssql
+#   Valid module names: vnet_shared, vnet_app, vm_jumpbox_linux, vm_mssql_win, mssql, mysql
 #
 # Prerequisites:
 #   - PowerShell 7.x (pwsh) with Az.Accounts, Az.Compute, and Az.Resources modules installed
@@ -30,7 +30,7 @@ param(
     [string]$Module,
 
     [Parameter(Mandatory = $false)]
-    [switch]$IntegrationOnly
+    [switch]$Integration
 )
 
 #region functions
@@ -302,10 +302,11 @@ $moduleToVmKey = @{
     'vm_jumpbox_linux' = 'virtual_machine_jumplinux1'
     'vm_mssql_win'     = 'virtual_machine_mssqlwin1'
     'mssql'            = '$local_mssql'
+    'mysql'            = '$local_mysql'
 }
 
-if ($Module -and $IntegrationOnly) {
-    Exit-WithError "-Module and -IntegrationOnly cannot be used together."
+if ($Integration -and -not $Module) {
+    Exit-WithError "-Integration requires -Module to be specified."
 }
 
 # Validate -Module parameter if specified
@@ -314,10 +315,18 @@ if ($Module) {
         Exit-WithError "Unknown module '$Module'. Valid modules: $($moduleToVmKey.Keys -join ', ')"
     }
     Write-Log "Targeting single module: $Module"
+    if ($Integration) {
+        Write-Log "Integration tests enabled for module: $Module"
+    }
 }
 
-if ($IntegrationOnly) {
-    Write-Log "Running integration tests only."
+# Map modules to their associated integration test names
+$moduleIntegrationMap = @{
+    'vnet_app'         = @('SSH: jumpwin1 -> jumplinux1', 'SQL: jumpwin1 -> mssqlwin1', 'Azure SQL: jumpwin1 -> testdb', 'MySQL: jumpwin1 -> mysql')
+    'vm_jumpbox_linux' = @('SSH: jumpwin1 -> jumplinux1')
+    'vm_mssql_win'     = @('SQL: jumpwin1 -> mssqlwin1')
+    'mssql'            = @('Azure SQL: jumpwin1 -> testdb')
+    'mysql'            = @('MySQL: jumpwin1 -> mysql')
 }
 
 # Define test configurations
@@ -368,6 +377,17 @@ $testConfigs = [ordered]@{
             MssqlDatabaseName = $resourceNames['mssql_db']
         }
     }
+    '$local_mysql' = @{
+        Module     = 'mysql'
+        ModuleName = 'mysql'
+        RunLocal   = $true
+        ScriptPath = Join-Path $repoRoot 'modules' 'mysql' 'scripts' 'Test-Mysql.ps1'
+        Parameters = @{
+            ResourceGroupName = $resourceGroupName
+            MysqlServerName   = $resourceNames['mysql_server']
+            MysqlDatabaseName = $resourceNames['mysql_db']
+        }
+    }
 }
 
 # Filter to single module if specified
@@ -382,8 +402,7 @@ $overallPassed = 0
 $overallFailed = 0
 $moduleResults = @()
 
-# Module unit tests - skip when -IntegrationOnly is set
-if (-not $IntegrationOnly) {
+# Module unit tests
 foreach ($configKey in $testConfigs.Keys) {
     $config = $testConfigs[$configKey]
 
@@ -441,10 +460,10 @@ foreach ($configKey in $testConfigs.Keys) {
     $overallFailed += $testResult.Failed
     $moduleResults += @{ Module = $config.Module; Passed = $testResult.Passed; Failed = $testResult.Failed }
 }
-} # end if (-not $IntegrationOnly)
 
-# Integration tests - only run when testing all modules or -IntegrationOnly
-if (-not $Module) {
+# Integration tests - run when testing all modules or when -Module -Integration is specified
+$runIntegration = (-not $Module) -or ($Module -and $Integration)
+if ($runIntegration) {
     $integrationTests = @(
         @{
             Name        = 'SSH: jumpwin1 -> jumplinux1'
@@ -480,7 +499,31 @@ if (-not $Module) {
                 MssqlDatabaseName = $resourceNames['mssql_db']
             }
         }
+        @{
+            Name         = 'MySQL: jumpwin1 -> mysql'
+            RequiredVMs  = @('virtual_machine_jumpwin1')
+            RequiredFqdn = 'mysql_server'
+            RunOnVM      = 'virtual_machine_jumpwin1'
+            ScriptPath   = Join-Path $repoRoot 'scripts' 'Test-Integration-AzMySqlConnectivity.ps1'
+            CommandId    = 'RunPowerShellScript'
+            Parameters   = @{
+                MysqlServerFqdn   = $fqdns['mysql_server']
+                MysqlDatabaseName = $resourceNames['mysql_db']
+                KeyVaultName      = $resourceNames['key_vault']
+            }
+        }
     )
+
+    # Filter integration tests when -Module -Integration is specified
+    if ($Module -and $moduleIntegrationMap.ContainsKey($Module)) {
+        $allowedNames = $moduleIntegrationMap[$Module]
+        $integrationTests = $integrationTests | Where-Object { $_.Name -in $allowedNames }
+    }
+    elseif ($Module) {
+        # Module has no associated integration tests
+        $integrationTests = @()
+        Write-Log "No associated integration tests for module '$Module'."
+    }
 
     foreach ($test in $integrationTests) {
         # Check all required VMs are deployed
