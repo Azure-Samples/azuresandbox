@@ -50,4 +50,9 @@ printf "Removing all files matching '*.pfx'...\n"
 find ../. -type f -name '*.pfx' 
 find ../. -type f -name '*.pfx' | xargs -r rm
 
+printf "Removing all files matching '*.log'...\n"
+
+find ../. -type f -name '*.log' 
+find ../. -type f -name '*.log' | xargs -r rm
+
 exit 0
