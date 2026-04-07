@@ -344,7 +344,8 @@ The module is organized as follows:
 |   └── vwan-diagram.drawio.svg # Architecture diagram
 ├── scripts/
 |   |── Export-Certificates.ps1 # Helper script to export the root and client certificates for P2S VPN client
-|   └── export-certificates.sh  # Helper script to export the root and client certificates for P2S VPN client
+|   |── export-certificates.sh  # Helper script to export the root and client certificates for P2S VPN client
+|   └── Test-Vwan.ps1           # Unit testing script
 ├── locals.tf                   # Local variables
 ├── main.tf                     # Resource configurations
 ├── network.tf                  # Network resource configurations

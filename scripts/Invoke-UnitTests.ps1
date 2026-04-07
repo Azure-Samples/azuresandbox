@@ -18,7 +18,7 @@
 #     From bash:       pwsh -File ./scripts/Invoke-UnitTests.ps1 -Module vnet_app -Integration
 #     From PowerShell: .\scripts\Invoke-UnitTests.ps1 -Module vm_mssql_win -Integration
 #
-#   Valid module names: vnet_shared, vnet_app, vm_jumpbox_linux, vm_mssql_win, mssql, mysql
+#   Valid module names: vnet_shared, vnet_app, vm_jumpbox_linux, vm_mssql_win, mssql, mysql, vwan
 #
 # Prerequisites:
 #   - PowerShell 7.x (pwsh) with Az.Accounts, Az.Compute, and Az.Resources modules installed
@@ -303,6 +303,7 @@ $moduleToVmKey = @{
     'vm_mssql_win'     = 'virtual_machine_mssqlwin1'
     'mssql'            = '$local_mssql'
     'mysql'            = '$local_mysql'
+    'vwan'             = '$local_vwan'
 }
 
 if ($Integration -and -not $Module) {
@@ -386,6 +387,17 @@ $testConfigs = [ordered]@{
             ResourceGroupName = $resourceGroupName
             MysqlServerName   = $resourceNames['mysql_server']
             MysqlDatabaseName = $resourceNames['mysql_db']
+        }
+    }
+    '$local_vwan' = @{
+        Module     = 'vwan'
+        ModuleName = 'vwan'
+        RunLocal   = $true
+        ScriptPath = Join-Path $repoRoot 'modules' 'vwan' 'scripts' 'Test-Vwan.ps1'
+        Parameters = @{
+            ResourceGroupName = $resourceGroupName
+            VirtualWanName    = $resourceNames['virtual_wan']
+            VirtualHubName    = $resourceNames['virtual_wan_hub']
         }
     }
 }
