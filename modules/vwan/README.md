@@ -15,6 +15,8 @@
 
 This module implements a point-to-site VPN gateway for secure remote connectivity to your sandbox environment from a remote Windows client.
 
+The estimated provisioning time for this module is 60 minutes.
+
 ## Smoke testing
 
 This smoke testing is designed to be performed from a remote Windows client using a point-to-site VPN connection to an Azure Virtual WAN Hub that is connected to your sandbox environment. Upon completion you will have tested connectivity using a variety of ports and protocols to Azure resources in your sandbox environment using network isolated private endpoints.

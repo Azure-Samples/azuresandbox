@@ -572,7 +572,8 @@ The Azure Sandbox project is organized into the following structure:
 │   ├── Test-Integration-AzMySqlConnectivity.ps1  # Integration test for Azure MySQL connectivity
 │   ├── Test-Integration-AzSqlConnectivity.ps1    # Integration test for Azure SQL connectivity
 │   ├── Test-Integration-SqlConnectivity.ps1      # Integration test for SQL Server connectivity
-│   └── Test-Integration-SshConnectivity.ps1      # Integration test for SSH connectivity
+│   ├── Test-Integration-SshConnectivity.ps1      # Integration test for SSH connectivity
+│   └── Test-Integration-VwanConnectivity.ps1     # Integration test for P2S VPN connectivity
 ├── main.tf                                       # Resource configurations
 ├── outputs.tf                                    # Output variables 
 ├── providers.tf                                  # Provider configuration blocks

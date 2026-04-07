@@ -146,18 +146,21 @@ function Invoke-LocalTest {
     Write-Log "Executing test script locally..."
 
     try {
-        $output = & $ScriptPath @Parameters 2>&1
-        $stdout = $output | Out-String
+        # Stream output line-by-line so progress is visible in real time
+        $collectedLines = [System.Collections.Generic.List[string]]::new()
 
-        if ($stdout) {
-            $lines = $stdout -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-            foreach ($line in $lines) {
+        & $ScriptPath @Parameters 2>&1 | ForEach-Object {
+            $line = "$_".Trim()
+            if ($line) {
                 Write-Log $line
+                $collectedLines.Add($line)
             }
         }
 
+        $stdout = $collectedLines -join "`n"
+
         # Parse summary line
-        $summaryLine = ($stdout -split "`n") | Where-Object { $_ -match '\[SUMMARY\]' } | Select-Object -Last 1
+        $summaryLine = $collectedLines | Where-Object { $_ -match '\[SUMMARY\]' } | Select-Object -Last 1
         if ($summaryLine -match 'Passed:\s*(\d+)\s+Failed:\s*(\d+)\s+Total:\s*(\d+)') {
             $testResult = @{ Passed = [int]$Matches[1]; Failed = [int]$Matches[2] }
         }
@@ -328,6 +331,19 @@ $moduleIntegrationMap = @{
     'vm_mssql_win'     = @('SQL: jumpwin1 -> mssqlwin1')
     'mssql'            = @('Azure SQL: jumpwin1 -> testdb')
     'mysql'            = @('MySQL: jumpwin1 -> mysql')
+    'vwan'             = @('P2S VPN: local -> sandbox endpoints')
+}
+
+# Pre-validate sudo early if vwan integration tests will run (avoids waiting for prompt mid-test)
+$willRunVwanIntegration = (-not $Module) -or ($Module -eq 'vwan' -and $Integration)
+if ($willRunVwanIntegration -and ($IsLinux -or $IsMacOS)) {
+    Write-Log "Pre-validating sudo access for vwan integration test..."
+    & sudo -n true 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        if ([System.Environment]::UserInteractive -or (Test-Path /dev/tty)) {
+            & sudo -v
+        }
+    }
 }
 
 # Define test configurations
@@ -524,6 +540,25 @@ if ($runIntegration) {
                 KeyVaultName      = $resourceNames['key_vault']
             }
         }
+        @{
+            Name         = 'P2S VPN: local -> sandbox endpoints'
+            RequiredVMs  = @()
+            RunLocal     = $true
+            RequiresSudo = $true
+            ScriptPath   = Join-Path $repoRoot 'scripts' 'Test-Integration-VwanConnectivity.ps1'
+            Parameters  = @{
+                ResourceGroupName  = $resourceGroupName
+                KeyVaultName       = $resourceNames['key_vault']
+                VirtualWanName     = $resourceNames['virtual_wan']
+                VirtualHubName     = $resourceNames['virtual_wan_hub']
+                StorageAccountName = $resourceNames['storage_account']
+                StorageShareName   = $resourceNames['storage_share']
+                MssqlServerFqdn    = $fqdns['mssql_server']
+                MssqlDatabaseName  = $resourceNames['mssql_db']
+                MysqlServerFqdn    = $fqdns['mysql_server']
+                MysqlDatabaseName  = $resourceNames['mysql_db']
+            }
+        }
     )
 
     # Filter integration tests when -Module -Integration is specified
@@ -561,13 +596,46 @@ if ($runIntegration) {
             continue
         }
 
-        $vmName = $resourceNames[$test.RunOnVM]
+        # For local integration tests, skip if required parameters are missing (module not deployed)
+        if ($test.RunLocal) {
+            $skipLocal = $false
+            foreach ($key in @('ResourceGroupName', 'KeyVaultName', 'VirtualWanName', 'VirtualHubName')) {
+                if ($test.Parameters.ContainsKey($key) -and -not $test.Parameters[$key]) {
+                    Write-Log "Skipping integration test '$($test.Name)': required parameter '$key' not found in terraform outputs (module not deployed)."
+                    $skipLocal = $true
+                    break
+                }
+            }
+            if ($skipLocal) { continue }
+        }
 
-        Write-Log "========================================"
-        Write-Log "Integration: $($test.Name) | VM: $vmName"
-        Write-Log "========================================"
+        if ($test.RunLocal) {
+            # Local integration test (e.g. P2S VPN from Terraform execution environment)
+            Write-Log "========================================"
+            Write-Log "Integration: $($test.Name) | Local"
+            Write-Log "========================================"
 
-        $testResult = Invoke-VMTest -ResourceGroupName $resourceGroupName -VMName $vmName -CommandId $test.CommandId -ScriptPath $test.ScriptPath -Parameters $test.Parameters -Label "INTEGRATION:$($test.Name)"
+            # Pre-validate sudo: prompt interactively if needed, or rely on passwordless in CI
+            if ($test.RequiresSudo -and ($IsLinux -or $IsMacOS)) {
+                & sudo -n true 2>&1 | Out-Null
+                if ($LASTEXITCODE -ne 0) {
+                    if ([System.Environment]::UserInteractive -or (Test-Path /dev/tty)) {
+                        & sudo -v
+                    }
+                }
+            }
+
+            $testResult = Invoke-LocalTest -ScriptPath $test.ScriptPath -Parameters $test.Parameters -Label "INTEGRATION:$($test.Name)"
+        }
+        else {
+            $vmName = $resourceNames[$test.RunOnVM]
+
+            Write-Log "========================================"
+            Write-Log "Integration: $($test.Name) | VM: $vmName"
+            Write-Log "========================================"
+
+            $testResult = Invoke-VMTest -ResourceGroupName $resourceGroupName -VMName $vmName -CommandId $test.CommandId -ScriptPath $test.ScriptPath -Parameters $test.Parameters -Label "INTEGRATION:$($test.Name)"
+        }
         $overallPassed += $testResult.Passed
         $overallFailed += $testResult.Failed
         $moduleResults += @{ Module = "integration: $($test.Name)"; Passed = $testResult.Passed; Failed = $testResult.Failed }
