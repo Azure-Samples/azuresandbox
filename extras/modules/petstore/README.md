@@ -15,12 +15,14 @@
 
 This module deploys a demo [petstore](https://petstore.swagger.io/) RESTful API using **Azure Container Apps**. The container app is network isolated, and Azure RBAC is used to pull container images from a network isolated shared container registry.
 
+The estimated provisioning time for this module is 15 minutes.
+
 ## Smoke Testing
 
 Follow these steps after deployment to validate functionality.
 
 1. Fetch the Petstore FQDN output:
-   * In Terraform: `terraform output petstore_fqdn`
+   * In Terraform: `terraform output fqdns`
 
 2. From *jumpwin1*, launch Edge and navigate to the petstore FQDN. This should display the Swagger UI for the petstore API.
 
@@ -49,7 +51,8 @@ This module depends upon resources provisioned in the following modules:
 
 ```plaintext
 ├── scripts/
-|   └── Set-ContainerRegistryConfiguration.ps1  # Script to import container image into ACR
+|   ├── Set-ContainerRegistryConfiguration.ps1  # Script to import container image into ACR
+|   └── Test-Petstore.ps1                       # Unit test script
 ├── locals.tf                                   # Local values (derived names, script parameters)
 ├── main.tf                                     # Container App & Environment resources
 ├── network.tf                                  # Private endpoint
@@ -90,4 +93,6 @@ module.naming | | Azure naming module instance for consistent resource naming.
 
 Name | Description
 --- | ---
-petstore_fqdn | The FQDN of the Petstore Container App ingress.
+fqdns | The FQDN of the Petstore Container App ingress.
+resource_ids | Resource ids for resources provisioned in this module.
+resource_names | Resource names for resources provisioned in this module.

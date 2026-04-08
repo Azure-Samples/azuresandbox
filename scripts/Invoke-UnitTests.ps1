@@ -306,6 +306,7 @@ $moduleToVmKey = @{
     'vm_mssql_win'     = 'virtual_machine_mssqlwin1'
     'mssql'            = '$local_mssql'
     'mysql'            = '$local_mysql'
+    'petstore'         = '$local_petstore'
     'vwan'             = '$local_vwan'
 }
 
@@ -331,6 +332,7 @@ $moduleIntegrationMap = @{
     'vm_mssql_win'     = @('SQL: jumpwin1 -> mssqlwin1')
     'mssql'            = @('Azure SQL: jumpwin1 -> testdb')
     'mysql'            = @('MySQL: jumpwin1 -> mysql')
+    'petstore'         = @('Petstore API: jumpwin1 -> petstore')
     'vwan'             = @('P2S VPN: local -> sandbox endpoints')
 }
 
@@ -403,6 +405,18 @@ $testConfigs = [ordered]@{
             ResourceGroupName = $resourceGroupName
             MysqlServerName   = $resourceNames['mysql_server']
             MysqlDatabaseName = $resourceNames['mysql_db']
+        }
+    }
+    '$local_petstore' = @{
+        Module     = 'petstore'
+        ModuleName = 'petstore'
+        RunLocal   = $true
+        ScriptPath = Join-Path $repoRoot 'extras' 'modules' 'petstore' 'scripts' 'Test-Petstore.ps1'
+        Parameters = @{
+            ResourceGroupName            = $resourceGroupName
+            ContainerAppEnvironmentName  = $resourceNames['container_app_environment']
+            ContainerAppName             = 'petstore'
+            ContainerRegistryName        = $resourceNames['container_registry']
         }
     }
     '$local_vwan' = @{
@@ -538,6 +552,17 @@ if ($runIntegration) {
                 MysqlServerFqdn   = $fqdns['mysql_server']
                 MysqlDatabaseName = $resourceNames['mysql_db']
                 KeyVaultName      = $resourceNames['key_vault']
+            }
+        }
+        @{
+            Name         = 'Petstore API: jumpwin1 -> petstore'
+            RequiredVMs  = @('virtual_machine_jumpwin1')
+            RequiredFqdn = 'petstore'
+            RunOnVM      = 'virtual_machine_jumpwin1'
+            ScriptPath   = Join-Path $repoRoot 'scripts' 'Test-Integration-Petstore.ps1'
+            CommandId    = 'RunPowerShellScript'
+            Parameters   = @{
+                PetstoreFqdn = $fqdns['petstore']
             }
         }
         @{

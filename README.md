@@ -570,6 +570,7 @@ The Azure Sandbox project is organized into the following structure:
 │   ├── Invoke-UnitTests.ps1                      # Orchestrates module unit tests
 │   ├── Test-Integration-AzMySqlConnectivity.ps1  # Integration test for Azure MySQL connectivity
 │   ├── Test-Integration-AzSqlConnectivity.ps1    # Integration test for Azure SQL connectivity
+│   ├── Test-Integration-Petstore.ps1             # Integration test for Petstore container app
 │   ├── Test-Integration-SqlConnectivity.ps1      # Integration test for SQL Server connectivity
 │   ├── Test-Integration-SshConnectivity.ps1      # Integration test for SSH connectivity
 │   └── Test-Integration-VwanConnectivity.ps1     # Integration test for P2S VPN connectivity
