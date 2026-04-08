@@ -453,7 +453,7 @@ enable_module_mysql             = true
 enable_module_vwan              = true
 ```
 
-You can examine the `depends_on` blocks in the `main.tf` file to see which modules depend on each other.
+The estimated provisioning time for the required vnet-shared module and all 6 of these optional modules is 95 minutes.
 
 #### **Overriding Defaults**
 
@@ -473,7 +473,6 @@ module "vnet_shared" {
   # Override default values here
   vm_adds_name = "mydc1" # default was "adds1"
 }
-
 ```
 
 ### Step 4: Validate and Apply Configuration
