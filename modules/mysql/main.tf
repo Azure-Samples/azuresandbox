@@ -6,6 +6,7 @@ resource "azurerm_mysql_flexible_server" "this" {
   administrator_login    = var.admin_username
   administrator_password = var.admin_password
   sku_name               = var.mysql_sku_name
+  public_network_access  = "Disabled"
 }
 
 resource "azurerm_mysql_flexible_database" "this" {

@@ -43,6 +43,8 @@ This configuration implements a Linux virtual machine for use as a jumpbox. The 
   * terraform
   * winbind
 
+The estimated provisioning time for this module is 3 minutes.
+
 ## Smoke Testing
 
 This section describes how to test the module after deployment.
@@ -118,7 +120,7 @@ This section describes how to test the module after deployment.
   * For *Enter SSH Connection Command* enter the following:
   
     ```plaintext  
-    ssh bootstrapadmin@mysandbox.local@jumplinux1
+    ssh -o GSSAPIAuthentication=yes bootstrapadmin@mysandbox.local@jumplinux1
     ```
 
   * For *Select SSH configuration file to update* choose *C:\Users\bootstrapadmin\.ssh\config*
@@ -130,12 +132,10 @@ This section describes how to test the module after deployment.
   * A new Visual Studio Code window will open.
   * For *Select the platform of the remote host "jumplinux1"* choose *Linux*
   * For *"jumplinux1" has fingerprint...* choose *Continue*
-  * For *Enter password...* enter the value of the *adminpassword* secret in the sandbox environment key vault.
   * Verify that *SSH:jumplinux1* is displayed in the blue status section in the lower left corner.
   * Navigate to *View* > *Explorer*
   * Click *Open Folder*
   * For *Open Folder* select the default folder (home directory) and click *OK*.
-  * For *Enter password...* enter the value of the *adminpassword* secret in the sandbox environment key vault.
   * Select *Trust the authors of all files in the present folder 'home'*
   * Click *Yes, I trust the authors*
   * Navigate to *View* > *Terminal*.
@@ -196,7 +196,8 @@ This module is organized as follows:
 |   └── vm-jumpbox-linux-diagram.drawio.svg # Architecture diagram
 ├── scripts/
 |   ├── configure-vm-jumpbox-linux.sh       # cloud-init shell script to configure the VM
-|   └── configure-vm-jumpbox-linux.yaml     # cloud-init cloud-config file to configure the VM
+|   ├── configure-vm-jumpbox-linux.yaml     # cloud-init cloud-config file to configure the VM
+|   └── test-vm-jumpbox-linux.sh            # Module unit test script
 ├── compute.tf                              # Compute resource configurations
 ├── main.tf                                 # Resource configurations
 ├── network.tf                              # Network resource configurations

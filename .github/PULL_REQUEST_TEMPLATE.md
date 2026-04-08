@@ -26,11 +26,11 @@ What kind of change does this Pull Request introduce?
 
 ## How to Test
 * Provision a new sandbox environment
-* Complete smoke testing / unit testing
+* Run unit tests
 
 ## What to Check
 Verify that the following are valid
-* Smoke testing / unit testing should pass with no errors
+* Unit tests should all pass.
 
 ## Other Information
 <!-- Add any other helpful information that may be needed here. -->

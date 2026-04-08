@@ -80,6 +80,8 @@ sudo cp -f "$filename" "$filename.bak"
 printf "Modifying '$filename'...\n" >> $log_file
 sudo sed -i "s/#PasswordAuthentication yes/PasswordAuthentication yes/" $filename
 sudo sed -i "s/KbdInteractiveAuthentication no/KbdInteractiveAuthentication yes/" $filename
+sudo sed -i "s/#GSSAPIAuthentication no/GSSAPIAuthentication yes/" $filename
+sudo sed -i "s/#GSSAPICleanupCredentials yes/GSSAPICleanupCredentials yes/" $filename
 diff "$filename.bak" "$filename" >> $log_file
 servicename='ssh'
 printf "Restarting '$servicename'...\n" >> $log_file
@@ -142,10 +144,17 @@ printdiv
 filename=/etc/krb5.conf
 sudo cp -f "$filename" "$filename.bak"
 printf "Modifying '$filename'...\n" >> $log_file
+adds_realm_escaped=$(echo $adds_realm_name | sed 's/\./\\./g')
 echo "[libdefaults]" | sudo tee $filename > /dev/null
 echo "        default_realm = $adds_realm_name" | sudo tee -a $filename > /dev/null
 echo "        dns_lookup_realm = false" | sudo tee -a $filename > /dev/null
 echo "        dns_lookup_kdc = true" | sudo tee -a $filename > /dev/null
+echo "" | sudo tee -a $filename > /dev/null
+echo "[realms]" | sudo tee -a $filename > /dev/null
+echo "        $adds_realm_name = {" | sudo tee -a $filename > /dev/null
+echo "                auth_to_local = RULE:[1:\$1@\$0](.*@$adds_realm_escaped)s/@$adds_realm_escaped/@$adds_domain_name/" | sudo tee -a $filename > /dev/null
+echo "                auth_to_local = DEFAULT" | sudo tee -a $filename > /dev/null
+echo "        }" | sudo tee -a $filename > /dev/null
 diff "$filename.bak" "$filename" >> $log_file
 printdiv
 
@@ -185,6 +194,8 @@ printdiv
 # Join domain
 printf "Joining domain...\n" >> $log_file
 echo $admin_password | sudo net ads join -U $admin_username &>> $log_file
+printf "Verifying keytab contains host SPN...\n" >> $log_file
+sudo klist -ke /etc/krb5.keytab 2>&1 | grep -i "host/" >> $log_file
 printdiv
 
 # Configure winbind

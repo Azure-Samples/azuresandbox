@@ -54,16 +54,6 @@ resource "azurerm_virtual_machine_run_command" "install_windows_features" {
   }
 }
 
-resource "azurerm_virtual_machine_run_command" "install_software" {
-  name               = "${module.naming.virtual_machine_extension.name}-${var.vm_jumpbox_win_name}-InstallSoftware"
-  location           = var.location
-  virtual_machine_id = azurerm_windows_virtual_machine.this.id
-
-  source {
-    script = file("${path.module}/scripts/Install-Software.ps1")
-  }
-}
-
 resource "azurerm_virtual_machine_extension" "join_domain" {
   name                       = "${module.naming.virtual_machine_extension.name}-${var.vm_jumpbox_win_name}-JsonADDomainExtension"
   virtual_machine_id         = azurerm_windows_virtual_machine.this.id
@@ -71,11 +61,7 @@ resource "azurerm_virtual_machine_extension" "join_domain" {
   type                       = "JsonADDomainExtension"
   type_handler_version       = "1.3"
   auto_upgrade_minor_version = true
-
-  depends_on = [
-    azurerm_virtual_machine_run_command.install_windows_features,
-    azurerm_virtual_machine_run_command.install_software
-  ]
+  depends_on = [ azurerm_virtual_machine_run_command.install_windows_features ]
 
   settings = jsonencode({
     Name    = var.adds_domain_name
@@ -87,6 +73,17 @@ resource "azurerm_virtual_machine_extension" "join_domain" {
   protected_settings = jsonencode({
     Password = var.admin_password
   })
+}
+
+resource "azurerm_virtual_machine_run_command" "install_software" {
+  name               = "${module.naming.virtual_machine_extension.name}-${var.vm_jumpbox_win_name}-InstallSoftware"
+  location           = var.location
+  virtual_machine_id = azurerm_windows_virtual_machine.this.id
+  depends_on         = [azurerm_virtual_machine_extension.configure_azure_files]
+
+  source {
+    script = file("${path.module}/scripts/Install-Software.ps1")
+  }
 }
 #endregion
 

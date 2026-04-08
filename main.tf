@@ -1,8 +1,23 @@
+#region data
+data "azuread_service_principal" "this" {
+  count     = var.enable_module_mssql ? 1 : 0
+  client_id = var.arm_client_id
+}
+
+#endregion
+
 #region resources
 resource "azurerm_resource_group" "this" {
   name     = module.naming.resource_group.name_unique
   location = var.location
   tags     = var.tags
+}
+
+resource "azuread_group" "sql_admins" {
+  count            = var.enable_module_mssql ? 1 : 0
+  display_name     = "grp-sql-admins-${var.tags["project"]}-${var.tags["environment"]}-${element(split("-", azurerm_resource_group.this.name), length(split("-", azurerm_resource_group.this.name)) - 1)}"
+  security_enabled = true
+  members          = [var.user_object_id, data.azuread_service_principal.this[0].object_id]
 }
 #endregion
 
@@ -104,16 +119,62 @@ module "mssql" {
 
   count = var.enable_module_mssql ? 1 : 0
 
-  location            = azurerm_resource_group.this.location
-  private_dns_zone_id = module.vnet_app[0].private_dns_zones["privatelink.database.windows.net"].id
-  resource_group_name = azurerm_resource_group.this.name
-  subnet_id           = module.vnet_app[0].subnets["snet-privatelink-01"].id
-  tags                = var.tags
-  unique_seed         = module.naming.unique-seed
-  user_name           = var.user_name
-  user_object_id      = var.user_object_id
+  location             = azurerm_resource_group.this.location
+  private_dns_zone_id  = module.vnet_app[0].private_dns_zones["privatelink.database.windows.net"].id
+  resource_group_name  = azurerm_resource_group.this.name
+  sql_admin_login_name = azuread_group.sql_admins[0].display_name
+  sql_admin_object_id  = azuread_group.sql_admins[0].object_id
+  subnet_id            = module.vnet_app[0].subnets["snet-privatelink-01"].id
+  tags                 = var.tags
+  unique_seed          = module.naming.unique-seed
 
   depends_on = [module.vnet_app[0].configure_azure_files_id] # Ensures that Azure Files is configured
+}
+
+resource "azurerm_virtual_machine_run_command" "create_mssql_db_user" {
+  count              = var.enable_module_mssql ? 1 : 0
+  name               = "${module.naming.virtual_machine_extension.name}-${module.vnet_app[0].resource_names.virtual_machine_jumpwin1}-CreateMssqlDbUser"
+  location           = azurerm_resource_group.this.location
+  virtual_machine_id = module.vnet_app[0].resource_ids.virtual_machine_jumpwin1
+
+  source {
+    script = file("${path.module}/scripts/Create-AzSqlDbUser.ps1")
+  }
+
+  parameter {
+    name  = "ArmClientId"
+    value = var.arm_client_id
+  }
+
+  parameter {
+    name  = "AadTenantId"
+    value = var.aad_tenant_id
+  }
+
+  parameter {
+    name  = "MssqlServerFqdn"
+    value = module.mssql[0].fqdns.mssql_server
+  }
+
+  parameter {
+    name  = "MssqlDatabaseName"
+    value = module.mssql[0].resource_names.mssql_db
+  }
+
+  parameter {
+    name  = "VmName"
+    value = module.vnet_app[0].resource_names.virtual_machine_jumpwin1
+  }
+
+  protected_parameter {
+    name  = "ArmClientSecret"
+    value = var.arm_client_secret
+  }
+
+  depends_on = [
+    module.mssql,
+    module.vnet_app,
+  ]
 }
 
 module "mysql" {

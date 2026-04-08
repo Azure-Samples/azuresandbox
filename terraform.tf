@@ -2,6 +2,11 @@ terraform {
   required_version = "~> 1.14.8"
 
   required_providers {
+    azuread = {
+      source  = "hashicorp/azuread"
+      version = "~> 3.8.0"
+    }
+    
     azapi = {
       source  = "Azure/azapi"
       version = "~> 2.9.0"
@@ -9,7 +14,7 @@ terraform {
 
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 4.66.0"
+      version = "~> 4.67.0"
     }
 
     cloudinit = {

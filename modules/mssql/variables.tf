@@ -39,6 +39,26 @@ variable "resource_group_name" {
   }
 }
 
+variable "sql_admin_login_name" {
+  type        = string
+  description = "The display name of the Entra ID group to be set as the SQL server administrator."
+
+  validation {
+    condition     = length(var.sql_admin_login_name) > 0 && length(var.sql_admin_login_name) <= 256
+    error_message = "Must be a non-empty string with a maximum length of 256 characters."
+  }
+}
+
+variable "sql_admin_object_id" {
+  type        = string
+  description = "The object ID of the Entra ID group to be set as the SQL server administrator."
+
+  validation {
+    condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.sql_admin_object_id))
+    error_message = "Must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
+  }
+}
+
 variable "subnet_id" {
   type        = string
   description = "The ID of the existing subnet where the nic will be provisioned."
@@ -70,25 +90,5 @@ variable "unique_seed" {
   validation {
     condition     = can(regex("^[a-zA-Z0-9-]{1,64}$", var.unique_seed))
     error_message = "Must only contain alphanumeric characters and hyphens (-), and must be between 1 and 32 characters long."
-  }
-}
-
-variable "user_name" {
-  type        = string
-  description = "The user name of the user in Microsoft Entra ID."
-
-  validation {
-    condition     = can(regex("^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]@[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]\\.[a-zA-Z]{2,}$", var.user_name))
-    error_message = "Must be a valid User Principal Name (UPN) format like 'user@domain.com'. The username part must start and end with alphanumeric characters and can contain periods (.), underscores (_), or hyphens (-). The domain must be a valid domain name."
-  }
-}
-
-variable "user_object_id" {
-  type        = string
-  description = "The object id of the user in Microsoft Entra ID."
-
-  validation {
-    condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.user_object_id))
-    error_message = "Must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
   }
 }

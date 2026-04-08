@@ -9,8 +9,8 @@ resource "azurerm_mssql_server" "this" {
 
   azuread_administrator {
     azuread_authentication_only = true
-    login_username              = var.user_name
-    object_id                   = var.user_object_id
+    login_username              = var.sql_admin_login_name
+    object_id                   = var.sql_admin_object_id
   }
 
   lifecycle {

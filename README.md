@@ -174,7 +174,39 @@ This section describes the prerequisites required in order to provision an Azure
   }
   ```
 
-Save the service principal *appId* and *password* in a secure location such as a password vault.
+* Save the service principal *appId* and *password* in a secure location such as a password vault.
+
+* If you want to deploy the Azure SQL Database module, you will need to grant the service principal privileges to create Entra ID security groups and assign members to them.
+
+  ```bash
+  # Get the SP's object ID
+  SP_OBJECT_ID=$(az ad sp show --id <service-principal-app-id-here> --query id -o tsv)
+
+  # Get the Microsoft Graph service principal object ID in the tenant
+  GRAPH_SP_ID=$(az ad sp show --id 00000003-0000-0000-c000-000000000000 --query id -o tsv)
+
+  # Grant Group.ReadWrite.All application permission via Microsoft Graph API
+  az rest --method POST \
+    --uri "https://graph.microsoft.com/v1.0/servicePrincipals/${SP_OBJECT_ID}/appRoleAssignments" \
+    --headers "Content-Type=application/json" \
+    --body "{
+      \"principalId\": \"${SP_OBJECT_ID}\",
+      \"resourceId\": \"${GRAPH_SP_ID}\",
+      \"appRoleId\": \"62a82d76-70ea-41e2-9197-370581804d09\"
+    }"
+  ```
+
+  Alternatively you can perform these steps manually from the Entra portal:
+
+  1. Sign in to [Microsoft Entra admin center](https://entra.microsoft.com) as a Global
+    Administrator or Privileged Role Administrator.
+  2. Navigate to **Identity** > **Applications** > **App registrations**.
+  3. Search for and select the service principal's app registration (matching `<service-principal-app-id-here>`).
+  4. Select **API permissions** in the left menu.
+  5. Click **Add a permission** > **Microsoft Graph** > **Application permissions**.
+  6. Search for `Group.ReadWrite.All`, check the box, and click **Add permissions**.
+  7. Back on the API permissions page, click **Grant admin consent for \<tenant name\>** and
+    confirm when prompted. A green checkmark should appear in the Status column.
 
 ### Other Prerequisites
 
@@ -421,7 +453,7 @@ enable_module_mysql             = true
 enable_module_vwan              = true
 ```
 
-You can examine the `depends_on` blocks in the `main.tf` file to see which modules depend on each other.
+The estimated provisioning time for the required vnet-shared module and all 6 of these optional modules is 95 minutes.
 
 #### **Overriding Defaults**
 
@@ -441,7 +473,6 @@ module "vnet_shared" {
   # Override default values here
   vm_adds_name = "mydc1" # default was "adds1"
 }
-
 ```
 
 ### Step 4: Validate and Apply Configuration
@@ -511,6 +542,7 @@ This section provides documentation regarding the overall structure of the repos
 * [Child Modules](#child-modules)
 * [Virtual Network Design](#virtual-network-design)
 * [Dependencies](#dependencies)
+* [Unit Testing](#unit-testing)
 * [Additional Resources](#additional-resources)
 
 ### Root Module Structure
@@ -518,27 +550,34 @@ This section provides documentation regarding the overall structure of the repos
 The Azure Sandbox project is organized into the following structure:
 
 ```plaintext
-├── extras/                     # Extend your sandbox with extra modules and configurations
-│   ├── configurations/         # 
-│   └── modules/                # 
-├── images/                     # 
-│   └── azuresandbox.drawio.svg # Architecture diagram
-├── modules/                    # 
-│   ├── mssql/                  # Azure SQL Database module
-│   ├── mysql/                  # Azure Database for MySQL module
-│   ├── vm-jumpbox-linux/       # Linux jumpbox virtual machine module
-│   ├── vm-mssql-win/           # SQL Server virtual machine module
-│   ├── vnet-app/               # Application virtual network module
-│   ├── vnet-shared/            # Shared services virtual network module
-│   └── vwan/                   # Point-to-site VPN module
-├── scripts/                    # 
-│   ├── bootstrap.sh            # Bash helper script for generating terraform.tfvars
-│   └── bootstrap.ps1           # PowerShell helper script for generating terraform.tfvars
-├── main.tf                     # Resource configurations
-├── outputs.tf                  # Output variables 
-├── providers.tf                # Provider configuration blocks
-├── terraform.tf                # Terraform configuration block
-└── variables.tf                # Variable definitions
+├── extras/                                   
+│   ├── configurations/          
+│   └── modules/                 
+├── images/                      
+│   └── azuresandbox.drawio.svg                   # Architecture diagram
+├── modules/                     
+│   ├── mssql/                                    # Azure SQL Database module
+│   ├── mysql/                                    # Azure Database for MySQL module
+│   ├── vm-jumpbox-linux/                         # Linux jumpbox virtual machine module
+│   ├── vm-mssql-win/                             # SQL Server virtual machine module
+│   ├── vnet-app/                                 # Application virtual network module
+│   ├── vnet-shared/                              # Shared services virtual network module
+│   └── vwan/                                     # Point-to-site VPN module
+├── scripts/
+│   ├── bootstrap.ps1                             # PowerShell helper script for generating terraform.tfvars
+│   ├── bootstrap.sh                              # Bash helper script for generating terraform.tfvars
+│   ├── Create-AzSqlDbUser.ps1                    # Creates Azure SQL Database user
+│   ├── Invoke-UnitTests.ps1                      # Orchestrates module unit tests
+│   ├── Test-Integration-AzMySqlConnectivity.ps1  # Integration test for Azure MySQL connectivity
+│   ├── Test-Integration-AzSqlConnectivity.ps1    # Integration test for Azure SQL connectivity
+│   ├── Test-Integration-SqlConnectivity.ps1      # Integration test for SQL Server connectivity
+│   ├── Test-Integration-SshConnectivity.ps1      # Integration test for SSH connectivity
+│   └── Test-Integration-VwanConnectivity.ps1     # Integration test for P2S VPN connectivity
+├── main.tf                                       # Resource configurations
+├── outputs.tf                                    # Output variables 
+├── providers.tf                                  # Provider configuration blocks
+├── terraform.tf                                  # Terraform configuration block
+└── variables.tf                                  # Variable definitions
 ```
 
 ---
@@ -572,7 +611,9 @@ The root module includes a resource group.
 
 Address | Name | Notes
 --- | --- | ---
+azuread_group.sql_admins[0] | grp&#8209;sql&#8209;admins&#8209;sand&#8209;dev&#8209;xxxxxxxx | Entra ID group for Azure Sql Db admin authorization
 azurerm_resource_group.this | rg&#8209;sand&#8209;dev&#8209;xxxxxxxx | Resource group for the sandbox environment.
+azurerm_virtual_machine_run_command.create_mssql_db_user[0] | vmx&#8209;sand&#8209;dev&#8209;jumpwin1&#8209;CreateMssqlDbUser | Adds jumpwin1 as db_datareader on Azure SQL Db testdb
 
 ---
 
@@ -583,6 +624,7 @@ This section includes a list of output variables returned by the root module.
 Name | Comments
 --- | ---
 client_cert_pem | The client certificate in PEM format for use with point-to-site VPN clients.
+fqdns | A map of fqdns for resources.
 resource_ids | A map of resource IDs for key resources in the configuration.
 resource_names | A map of resource names for key resources in the configuration.
 root_cert_pem | The root certificate in PEM format for use with point-to-site VPN clients.
@@ -751,6 +793,15 @@ mssqlwin1 | Windows SQL Server VM | vm-mssql-win | Windows Server 2025 / SQL Ser
 jumplinux1 | Linux Jumpbox VM | vm-jumpbox-linux | Ubuntu Server LTS 24.04 (Noble Numbat)
 
 ---
+
+### Unit testing
+
+Fully automated unit test scripts are provided for each module and are orchestrated by [Invoke-UnitTests.ps1](./scripts/Invoke-UnitTests.ps1). There are two types of tests:
+
+* Module unit tests: These tests focus on functionality in a single module.
+* Integration tests: These tests focus on functionality that spans multiple modules.
+
+The orchestration script returns 0 if all tests completed successfully or 1 if any tests failed. The orchestration script can be incorporated in a CI/CD pipeline.
 
 ### Additional Resources
 

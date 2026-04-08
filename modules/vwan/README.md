@@ -15,6 +15,8 @@
 
 This module implements a point-to-site VPN gateway for secure remote connectivity to your sandbox environment from a remote Windows client.
 
+The estimated provisioning time for this module is 60 minutes.
+
 ## Smoke testing
 
 This smoke testing is designed to be performed from a remote Windows client using a point-to-site VPN connection to an Azure Virtual WAN Hub that is connected to your sandbox environment. Upon completion you will have tested connectivity using a variety of ports and protocols to Azure resources in your sandbox environment using network isolated private endpoints.
@@ -344,7 +346,8 @@ The module is organized as follows:
 |   └── vwan-diagram.drawio.svg # Architecture diagram
 ├── scripts/
 |   |── Export-Certificates.ps1 # Helper script to export the root and client certificates for P2S VPN client
-|   └── export-certificates.sh  # Helper script to export the root and client certificates for P2S VPN client
+|   |── export-certificates.sh  # Helper script to export the root and client certificates for P2S VPN client
+|   └── Test-Vwan.ps1           # Unit testing script
 ├── locals.tf                   # Local variables
 ├── main.tf                     # Resource configurations
 ├── network.tf                  # Network resource configurations
