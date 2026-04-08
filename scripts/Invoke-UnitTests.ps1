@@ -335,7 +335,7 @@ $moduleIntegrationMap = @{
 }
 
 # Pre-validate sudo early if vwan integration tests will run (avoids waiting for prompt mid-test)
-$willRunVwanIntegration = (-not $Module) -or ($Module -eq 'vwan' -and $Integration)
+$willRunVwanIntegration = ((-not $Module) -or ($Module -eq 'vwan' -and $Integration)) -and $resourceNames['virtual_wan'] -and $resourceNames['virtual_wan_hub']
 if ($willRunVwanIntegration -and ($IsLinux -or $IsMacOS)) {
     Write-Log "Pre-validating sudo access for vwan integration test..."
     & sudo -n true 2>&1 | Out-Null
