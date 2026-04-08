@@ -157,8 +157,6 @@ function Invoke-LocalTest {
             }
         }
 
-        $stdout = $collectedLines -join "`n"
-
         # Parse summary line
         $summaryLine = $collectedLines | Where-Object { $_ -match '\[SUMMARY\]' } | Select-Object -Last 1
         if ($summaryLine -match 'Passed:\s*(\d+)\s+Failed:\s*(\d+)\s+Total:\s*(\d+)') {
