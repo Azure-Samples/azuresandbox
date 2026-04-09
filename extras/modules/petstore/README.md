@@ -51,7 +51,7 @@ This module depends upon resources provisioned in the following modules:
 
 ```plaintext
 ├── images/
-|   ├── petstore-diagram.drawio.svg             # Architecture diagram for module
+|   └── petstore-diagram.drawio.svg             # Architecture diagram for module
 ├── scripts/
 |   ├── Set-ContainerRegistryConfiguration.ps1  # Script to import container image into ACR
 |   └── Test-Petstore.ps1                       # Unit test script
