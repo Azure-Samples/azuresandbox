@@ -30,6 +30,16 @@ variable "configuration_zip_url" {
   }
 }
 
+variable "key_vault_id" {
+  type        = string
+  description = "The existing key vault where secrets are stored"
+
+  validation {
+    condition     = can(regex("^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[a-zA-Z0-9-_()]+/providers/Microsoft.KeyVault/vaults/[a-zA-Z0-9-]+$", var.key_vault_id))
+    error_message = "Must be a valid Azure Resource ID for a Key Vault. It should follow the format '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.KeyVault/vaults/{keyVaultName}'."
+  }
+}
+
 variable "location" {
   type        = string
   description = "Region where the resources will be created"

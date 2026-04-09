@@ -1,5 +1,5 @@
 #requires -Version 7.0
-#requires -Modules Az.Accounts, Az.Compute, Az.Resources, Az.Sql, Az.Network, Az.PrivateDns, Az.MySql
+#requires -Modules Az.Accounts, Az.Compute, Az.Resources, Az.Sql, Az.Network, Az.PrivateDns, Az.MySql, Az.DesktopVirtualization
 
 # Usage:
 #   Step 1: Authenticate to Azure (one-time, persisted to ~/.Azure/)
@@ -280,6 +280,21 @@ catch {
     Write-Log "[WARNING] Could not read terraform output 'fqdns': $_"
 }
 
+# Read adds_domain_name output (needed for AVD integration tests)
+$addsDomainName = $null
+try {
+    Push-Location $repoRoot
+    $domainJson = terraform output -json adds_domain_name 2>&1
+    $domainExitCode = $LASTEXITCODE
+    Pop-Location
+    if ($domainExitCode -eq 0 -and $domainJson) {
+        $addsDomainName = $domainJson | ConvertFrom-Json
+    }
+}
+catch {
+    Write-Log "[WARNING] Could not read terraform output 'adds_domain_name': $_"
+}
+
 $resourceGroupName = $resourceNames['resource_group']
 if (-not $resourceGroupName) {
     Exit-WithError "resource_group not found in terraform output resource_names."
@@ -306,6 +321,7 @@ $moduleToVmKey = @{
     'mysql'            = '$local_mysql'
     'petstore'         = '$local_petstore'
     'vwan'             = '$local_vwan'
+    'avd'              = '$local_avd'
 }
 
 if ($Integration -and -not $Module) {
@@ -332,6 +348,7 @@ $moduleIntegrationMap = @{
     'mysql'            = @('MySQL: jumpwin1 -> mysql')
     'petstore'         = @('Petstore API: jumpwin1 -> petstore')
     'vwan'             = @('P2S VPN: local -> sandbox endpoints')
+    'avd'              = @('AVD: personal session host config', 'AVD: remoteapp session host config')
 }
 
 # Pre-validate sudo early if vwan integration tests will run (avoids waiting for prompt mid-test)
@@ -426,6 +443,22 @@ $testConfigs = [ordered]@{
             ResourceGroupName = $resourceGroupName
             VirtualWanName    = $resourceNames['virtual_wan']
             VirtualHubName    = $resourceNames['virtual_wan_hub']
+        }
+    }
+    '$local_avd' = @{
+        Module     = 'avd'
+        ModuleName = 'avd'
+        RunLocal   = $true
+        ScriptPath = Join-Path $repoRoot 'extras' 'modules' 'avd' 'scripts' 'Test-Avd.ps1'
+        Parameters = @{
+            ResourceGroupName     = $resourceGroupName
+            AvdWorkspaceName      = $resourceNames['avd_workspace']
+            HostPoolPersonalName  = $resourceNames['avd_host_pool_personal']
+            HostPoolRemoteappName = $resourceNames['avd_host_pool_remoteapp']
+            AppGroupPersonalName  = $resourceNames['avd_application_group_personal']
+            AppGroupRemoteappName = $resourceNames['avd_application_group_remoteapp']
+            VmNamePersonal        = $resourceNames['virtual_machine_session_host_personal']
+            VmNameRemoteapp       = $resourceNames['virtual_machine_session_host_remoteapp']
         }
     }
 }
@@ -580,6 +613,30 @@ if ($runIntegration) {
                 MssqlDatabaseName  = $resourceNames['mssql_db']
                 MysqlServerFqdn    = $fqdns['mysql_server']
                 MysqlDatabaseName  = $resourceNames['mysql_db']
+            }
+        }
+        @{
+            Name        = 'AVD: personal session host config'
+            RequiredVMs = @('virtual_machine_session_host_personal')
+            RunOnVM     = 'virtual_machine_session_host_personal'
+            ScriptPath  = Join-Path $repoRoot 'scripts' 'Test-Integration-AvdPersonal.ps1'
+            CommandId   = 'RunPowerShellScript'
+            Parameters  = @{
+                KeyVaultName       = $resourceNames['key_vault']
+                StorageAccountName = $resourceNames['storage_account']
+                StorageShareName   = $resourceNames['storage_share']
+                DomainName         = $addsDomainName
+            }
+        }
+        @{
+            Name         = 'AVD: remoteapp session host config'
+            RequiredVMs  = @('virtual_machine_session_host_remoteapp')
+            RequiredFqdn = 'petstore'
+            RunOnVM      = 'virtual_machine_session_host_remoteapp'
+            ScriptPath   = Join-Path $repoRoot 'scripts' 'Test-Integration-AvdRemoteapp.ps1'
+            CommandId    = 'RunPowerShellScript'
+            Parameters   = @{
+                PetstoreFqdn      = $fqdns['petstore']
             }
         }
     )

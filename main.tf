@@ -286,6 +286,7 @@ module "avd" {
 
   admin_password                = module.vnet_shared.admin_password
   admin_username                = module.vnet_shared.admin_username
+  key_vault_id                  = module.vnet_shared.resource_ids["key_vault"]
   location                      = azurerm_resource_group.this.location
   resource_group_id             = azurerm_resource_group.this.id
   resource_group_name           = azurerm_resource_group.this.name

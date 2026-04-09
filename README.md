@@ -567,7 +567,9 @@ The Azure Sandbox project is organized into the following structure:
 │   ├── bootstrap.ps1                             # PowerShell helper script for generating terraform.tfvars
 │   ├── bootstrap.sh                              # Bash helper script for generating terraform.tfvars
 │   ├── Create-AzSqlDbUser.ps1                    # Creates Azure SQL Database user
-│   ├── Invoke-UnitTests.ps1                      # Orchestrates module unit tests
+│   ├── Invoke-UnitTests.ps1                      # Orchestrates module unit and integration tests
+│   ├── Test-Integration-AvdPersonal.ps1          # Integration test for AVD Personal Desktop
+│   ├── Test-Integration-AvdRemoteapp.ps1         # Integration test for AVD RemoteApp
 │   ├── Test-Integration-AzMySqlConnectivity.ps1  # Integration test for Azure MySQL connectivity
 │   ├── Test-Integration-AzSqlConnectivity.ps1    # Integration test for Azure SQL connectivity
 │   ├── Test-Integration-Petstore.ps1             # Integration test for Petstore container app
@@ -624,6 +626,7 @@ This section includes a list of output variables returned by the root module.
 
 Name | Comments
 --- | ---
+adds_domain_name | The domain name used to configure Active Directory Domain Services. Default is `mysandbox.local`.
 client_cert_pem | The client certificate in PEM format for use with point-to-site VPN clients.
 fqdns | A map of fqdns for resources.
 resource_ids | A map of resource IDs for key resources in the configuration.

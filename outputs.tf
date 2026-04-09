@@ -1,3 +1,8 @@
+output "adds_domain_name" {
+  description = "Active Directory Domain Services domain name."
+  value       = module.vnet_shared.adds_domain_name
+}
+
 output "client_cert_pem" {
   description = "Client certificate in PEM format for use with point-to-site VPN clients."
   value       = length(module.vwan) == 1 ? module.vwan[0].client_cert_pem : null

@@ -16,6 +16,15 @@ resource "azurerm_role_assignment" "vm_users" {
   role_definition_id = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/${local.vm_user_login_role}"
   principal_id       = each.value
 }
+
+resource "azurerm_role_assignment" "session_host_roles" {
+  for_each = local.session_host_roles
+
+  principal_id         = each.value.principal_id
+  principal_type       = each.value.principal_type
+  role_definition_name = each.value.role_definition_name
+  scope                = each.value.scope
+}
 #endregion
 
 #region personal
