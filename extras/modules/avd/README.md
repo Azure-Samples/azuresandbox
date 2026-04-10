@@ -15,6 +15,8 @@
 
 This module deploys Azure Virtual Desktop (AVD) with both personal desktop and RemoteApp configurations. It creates a single shared workspace with two host pools and application groups. The personal desktop host pool provides full Windows desktop access (max 2 sessions), while the RemoteApp host pool streams individual applications like Microsoft Edge (max 10 sessions).
 
+The estimated provisioning time for this module is 15 minutes.
+
 ## Smoke Testing
 
 * From the client environment, launch the [Windows App](https://apps.microsoft.com/detail/9N1F85V9T8BN?hl=en-us&gl=US&ocid=pdpshare)
