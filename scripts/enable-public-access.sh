@@ -28,42 +28,41 @@ else
   echo "Using resource group: ${RESOURCE_GROUP}"
 fi
 
-KV_NAME=$(echo "${RESOURCE_NAMES_JSON}" | grep -o '"key_vault":"[^"]*"' | sed 's/"key_vault":"//;s/"//')
-SA_NAME=$(echo "${RESOURCE_NAMES_JSON}" | grep -o '"storage_account":"[^"]*"' | sed 's/"storage_account":"//;s/"//')
+KV_NAME=$(echo "${RESOURCE_NAMES_JSON}" | grep -o '"key_vault":"[^"]*"' | sed 's/"key_vault":"//;s/"//') || true
+SA_NAME=$(echo "${RESOURCE_NAMES_JSON}" | grep -o '"storage_account":"[^"]*"' | sed 's/"storage_account":"//;s/"//') || true
 
-if [[ -z "${KV_NAME}" ]]; then
-  echo "Error: Failed to get key vault name from terraform output."
-  exit 1
-fi
-
-if [[ -z "${SA_NAME}" ]]; then
-  echo "Error: Failed to get storage account name from terraform output."
+if [[ -z "${KV_NAME}" && -z "${SA_NAME}" ]]; then
+  echo "Error: No key vault or storage account found in terraform output."
   exit 1
 fi
 
 echo "Enabling public access for resources in resource group: ${RESOURCE_GROUP}"
 
 # --- Key Vault ---
-echo ""
-echo "=== Key Vault ==="
-echo "Enabling public access on key vault: ${KV_NAME}"
-az keyvault update \
-  --name "${KV_NAME}" \
-  --resource-group "${RESOURCE_GROUP}" \
-  --public-network-access Enabled \
-  --output none
-echo "  Done."
+if [[ -n "${KV_NAME}" ]]; then
+  echo ""
+  echo "=== Key Vault ==="
+  echo "Enabling public access on key vault: ${KV_NAME}"
+  az keyvault update \
+    --name "${KV_NAME}" \
+    --resource-group "${RESOURCE_GROUP}" \
+    --public-network-access Enabled \
+    --output none
+  echo "  Done."
+fi
 
 # --- Storage Account ---
-echo ""
-echo "=== Storage Account ==="
-echo "Enabling public access on storage account: ${SA_NAME}"
-az storage account update \
-  --name "${SA_NAME}" \
-  --resource-group "${RESOURCE_GROUP}" \
-  --public-network-access Enabled \
-  --output none
-echo "  Done."
+if [[ -n "${SA_NAME}" ]]; then
+  echo ""
+  echo "=== Storage Account ==="
+  echo "Enabling public access on storage account: ${SA_NAME}"
+  az storage account update \
+    --name "${SA_NAME}" \
+    --resource-group "${RESOURCE_GROUP}" \
+    --public-network-access Enabled \
+    --output none
+  echo "  Done."
+fi
 
 echo ""
 echo "Public access enablement complete."
