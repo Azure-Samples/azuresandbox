@@ -36,7 +36,7 @@ Write-Log "Running '$PSCommandPath'..."
 Write-Log "Installing AD-Domain-Services Windows feature..."
 
 try {
-    $result = Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools -ErrorAction Stop
+    $result = Install-WindowsFeature -Name AD-Domain-Services -ErrorAction Stop
     Write-Log "Feature installation result: Success=$($result.Success), RestartNeeded=$($result.RestartNeeded)"
 }
 catch {
