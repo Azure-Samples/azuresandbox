@@ -84,6 +84,10 @@ resource "azurerm_virtual_machine_run_command" "install_software" {
   source {
     script = file("${path.module}/scripts/Install-Software.ps1")
   }
+
+  timeouts {
+    create = "60m"
+  }
 }
 #endregion
 
