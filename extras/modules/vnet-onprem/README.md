@@ -322,16 +322,16 @@ admin_username | bootstrapadmin | The username used for provisioning administrat
 arm_client_secret | | The password for the service principal used to authenticate with Azure. Defined interactively or using TF_VAR_arm_client_secret environment variable.
 automation_account_name | aa-sand-dev | The name of the Azure Automation Account used for state configuration (DSC).
 dns_server_cloud | `10.1.1.4` | The IP address of the sandbox DNS server.
-key_vault_id |  | The ID of the key vault defined in the root module.
-key_vault_name |  | The name of the key vault defined in the root module.
-location |  | The Azure region defined in the root module.
-resource_group_name |  | The name of the resource group defined in the root module.
+key_vault_id | | The ID of the key vault defined in the root module.
+key_vault_name | | The name of the key vault defined in the root module.
+location | | The Azure region defined in the root module.
+resource_group_name | | The name of the resource group defined in the root module.
 subnet_adds_address_prefix | `192.168.1.0/24` | The address prefix for the AD Domain Services subnet in the simulated on-premises network.
 subnet_GatewaySubnet_address_prefix | `192.168.0.0/24` | The address prefix for the GatewaySubnet subnet in the simulated on-premises network.
 subnet_misc_address_prefix | `192.168.2.0/24` | The address prefix for the miscellaneous subnet in the simulated on-premises network.
-subnets_cloud |  | The subnets in the shared services virtual network in the cloud sandbox environment.
-tags |  | The tags defined in the root module.
-virtual_networks_cloud |  | The names and resource ids of the virtual networks in the cloud sandbox environment.
+subnets_cloud | | The subnets in the shared services virtual network in the cloud sandbox environment.
+tags | | The tags defined in the root module.
+virtual_networks_cloud | | The names and resource ids of the virtual networks in the cloud sandbox environment.
 vm_adds_image_offer | WindowsServer | The offer type of the virtual machine image used to create the VM.
 vm_adds_image_publisher | MicrosoftWindowsServer | The publisher for the virtual machine image used to create the VM.
 vm_adds_image_sku | 2025-datacenter-azure-edition-core | The sku of the virtual machine image used to create the VM.
@@ -349,8 +349,8 @@ vm_jumpbox_win_storage_account_type | Standard_LRS | The storage replication typ
 vnet_address_space | `192.168.0.0/16` | The address space in CIDR notation for the new virtual network used to simulate an on-premises network.
 vnet_asn | 65123 | The ASN for the on premises network.
 vnet_name | onprem | The name of the virtual network used to simulate the on-premises network.
-vwan_hub_id |  | The id of the virtual wan hub for the cloud sandbox environment.
-vwan_id |  | The id of the virtual wan for the cloud sandbox environment.
+vwan_hub_id | | The id of the virtual wan hub for the cloud sandbox environment.
+vwan_id | | The id of the virtual wan for the cloud sandbox environment.
 
 ### Module Resources
 
