@@ -572,6 +572,8 @@ The Azure Sandbox project is organized into the following structure:
 │   ├── Test-Integration-AvdRemoteapp.ps1         # Integration test for AVD RemoteApp
 │   ├── Test-Integration-AzMySqlConnectivity.ps1  # Integration test for Azure MySQL connectivity
 │   ├── Test-Integration-AzSqlConnectivity.ps1    # Integration test for Azure SQL connectivity
+│   ├── Test-Integration-CloudToOnpremDns.ps1     # Integration test for cloud to onprem connectivity
+│   ├── Test-Integration-OnpremToCloudDns.ps1     # Integration test for onprem to cloud connectivity
 │   ├── Test-Integration-Petstore.ps1             # Integration test for Petstore container app
 │   ├── Test-Integration-SqlConnectivity.ps1      # Integration test for SQL Server connectivity
 │   ├── Test-Integration-SshConnectivity.ps1      # Integration test for SSH connectivity

@@ -40,27 +40,6 @@ variable "admin_username" {
   }
 }
 
-variable "arm_client_secret" {
-  type        = string
-  description = "The password for the service principal used for authenticating with Azure. Set interactively or using an environment variable 'TF_VAR_arm_client_secret'."
-  sensitive   = true
-
-  validation {
-    condition     = length(var.arm_client_secret) >= 8
-    error_message = "Must be at least 8 characters long."
-  }
-}
-
-variable "automation_account_name" {
-  type        = string
-  description = "The name of the Azure Automation Account used for state configuration (DSC)."
-
-  validation {
-    condition     = length(var.automation_account_name) <= 90
-    error_message = "Must not exceed 90 characters, which is the maximum length for an Azure resource name."
-  }
-}
-
 variable "dns_server_cloud" {
   type        = string
   description = "The IP address of the cloud DNS server."

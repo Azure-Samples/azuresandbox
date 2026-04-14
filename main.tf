@@ -298,40 +298,36 @@ module "avd" {
   depends_on = [module.vnet_app[0].azure_files_config_vm_extension_id] # Ensure that Azure Files is configured
 }
 
-# vnet-onprem  is currently unavailable due to dependencies on retired features. It will be re-enabled in a future update with a redesigned implementation.
+module "vnet_onprem" {
+  source = "./extras/modules/vnet-onprem"
 
-# module "vnet_onprem" {
-#   source = "./extras/modules/vnet-onprem"
+  count = var.enable_module_vnet_onprem ? 1 : 0
 
-#   count = var.enable_module_vnet_onprem ? 1 : 0
+  adds_domain_name_cloud  = module.vnet_shared.adds_domain_name
+  admin_password          = module.vnet_shared.admin_password
+  admin_username          = module.vnet_shared.admin_username
+  dns_server_cloud        = module.vnet_shared.dns_server
+  location                = azurerm_resource_group.this.location
+  resource_group_name     = azurerm_resource_group.this.name
+  subnets_cloud           = module.vnet_shared.subnets
+  tags                    = var.tags
 
-#   adds_domain_name_cloud  = module.vnet_shared.adds_domain_name
-#   admin_password          = module.vnet_shared.admin_password
-#   admin_username          = module.vnet_shared.admin_username
-#   arm_client_secret       = var.arm_client_secret
-#   automation_account_name = module.vnet_shared.resource_names["automation_account"]
-#   dns_server_cloud        = module.vnet_shared.dns_server
-#   location                = azurerm_resource_group.this.location
-#   resource_group_name     = azurerm_resource_group.this.name
-#   subnets_cloud           = module.vnet_shared.subnets
-#   tags                    = var.tags
+  virtual_networks_cloud = {
+    virtual_network_shared = {
+      id   = module.vnet_shared.resource_ids["virtual_network_shared"]
+      name = module.vnet_shared.resource_names["virtual_network_shared"]
+    }
+    virtual_network_app = {
+      id   = module.vnet_app[0].resource_ids["virtual_network_app"]
+      name = module.vnet_app[0].resource_names["virtual_network_app"]
+    }
+  }
 
-#   virtual_networks_cloud = {
-#     virtual_network_shared = {
-#       id   = module.vnet_shared.resource_ids["virtual_network_shared"]
-#       name = module.vnet_shared.resource_names["virtual_network_shared"]
-#     }
-#     virtual_network_app = {
-#       id   = module.vnet_app[0].resource_ids["virtual_network_app"]
-#       name = module.vnet_app[0].resource_names["virtual_network_app"]
-#     }
-#   }
+  vwan_hub_id = module.vwan[0].resource_ids["virtual_wan_hub"]
+  vwan_id     = module.vwan[0].resource_ids["virtual_wan"]
 
-#   vwan_hub_id = module.vwan[0].resource_ids["virtual_wan_hub"]
-#   vwan_id     = module.vwan[0].resource_ids["virtual_wan"]
-
-#   depends_on = [module.vwan[0].resource_ids] # Ensure vwan module resources are provisioned
-# }
+  depends_on = [module.vwan[0].resource_ids] # Ensure vwan module resources are provisioned
+}
 
 # ai-foundry is currently unavailable due to dependencies on retired features. It will be re-enabled in a future update with a redesigned implementation.
 

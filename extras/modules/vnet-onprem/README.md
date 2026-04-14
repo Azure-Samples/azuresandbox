@@ -26,6 +26,8 @@ This configuration simulates connectivity between the sandbox environment and an
     * Resolve DNS queries from *mysandbox.local* to *myonprem.local* and vice versa.
     * Resolve DNS queries from *myonprem.local* to private DNS zones in the sandbox environment.
 
+The estimated provisioning time for this module is 75 minutes.
+
 ## Smoke testing
 
 This smoke testing is divided into two sections:
@@ -289,19 +291,22 @@ This module is organized as follows:
 
 ```plaintext
 ├── images/
-|   └── vnet-onprem-diagram.drawio.svg          # Architecture diagram
+|   └── vnet-onprem-diagram.drawio.svg  # Architecture diagram
 ├── scripts/
-|   ├── DomainControllerConfiguration2.ps1      # DSC configuration for Windows domain controller VM
-|   ├── JumpBoxConfiguration2.ps1               # DSC configuration for Windows jumpbox VM    
-|   ├── Register-DscNode.ps1                    # Registers a VM with Azure Automation DSC
-|   └── Set-AutomationAccountConfiguration.ps1  # Configures Azure Automation settings
-├── compute.tf                                  # Compute resource configurations   
-├── locals.tf                                   # Local variables
-├── main.tf                                     # Resource configurations  
-├── network.tf                                  # Network resource configurations  
-├── outputs.tf                                  # Output variables
-├── terraform.tf                                # Terraform configuration block
-└── variables.tf                                # Input variables
+|   ├── Configure-Adds.ps1              # Configures Active Directory Domain Services on adds2
+|   ├── Configure-AddsDns.ps1           # Configures DNS conditional forwarders on adds2
+|   ├── Install-Software.ps1            # Installs software on jumpwin2
+|   ├── Install-WindowsFeatures.ps1     # Installs Windows features on jumpwin2
+|   ├── Test-VnetOnpremAdds.ps1         # Unit tests for AD DS and DNS on adds2
+|   ├── Test-VnetOnpremJumpbox.ps1      # Unit tests for domain join and software on jumpwin2
+|   └── Test-VnetOnpremLocal.ps1        # Unit tests for VNet, VPN, and DNS resolver via Az PowerShell
+├── compute.tf                          # Compute resource configurations   
+├── locals.tf                           # Local variables
+├── main.tf                             # Resource configurations  
+├── network.tf                          # Network resource configurations  
+├── outputs.tf                          # Output variables
+├── terraform.tf                        # Terraform configuration block
+└── variables.tf                        # Input variables
 ```
 
 ### Input Variables

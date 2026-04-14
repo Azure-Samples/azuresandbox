@@ -18,7 +18,7 @@
 #     From bash:       pwsh -File ./scripts/Invoke-UnitTests.ps1 -Module vnet_app -Integration
 #     From PowerShell: .\scripts\Invoke-UnitTests.ps1 -Module vm_mssql_win -Integration
 #
-#   Valid module names: vnet_shared, vnet_app, vm_jumpbox_linux, vm_mssql_win, mssql, mysql, vwan
+#   Valid module names: vnet_shared, vnet_app, vm_jumpbox_linux, vm_mssql_win, mssql, mysql, vwan, vnet_onprem
 #
 # Prerequisites:
 #   - PowerShell 7.x (pwsh) with Az.Accounts, Az.Compute, and Az.Resources modules installed
@@ -322,6 +322,7 @@ $moduleToVmKey = @{
     'petstore'         = '$local_petstore'
     'vwan'             = '$local_vwan'
     'avd'              = '$local_avd'
+    'vnet_onprem'      = 'virtual_machine_adds2'
 }
 
 if ($Integration -and -not $Module) {
@@ -349,6 +350,7 @@ $moduleIntegrationMap = @{
     'petstore'         = @('Petstore API: jumpwin1 -> petstore')
     'vwan'             = @('P2S VPN: local -> sandbox endpoints')
     'avd'              = @('AVD: personal session host config', 'AVD: remoteapp session host config')
+    'vnet_onprem'      = @('Onprem -> cloud connectivity', 'Cloud -> onprem DNS')
 }
 
 # Pre-validate sudo early if vwan integration tests will run (avoids waiting for prompt mid-test)
@@ -461,13 +463,45 @@ $testConfigs = [ordered]@{
             VmNameRemoteapp       = $resourceNames['virtual_machine_session_host_remoteapp']
         }
     }
+    'virtual_machine_adds2' = @{
+        Module     = 'vnet-onprem'
+        ModuleName = 'vnet_onprem'
+        ScriptPath = Join-Path $repoRoot 'extras' 'modules' 'vnet-onprem' 'scripts' 'Test-VnetOnpremAdds.ps1'
+        CommandId  = 'RunPowerShellScript'
+        Parameters = @{}
+    }
+    'virtual_machine_jumpwin2' = @{
+        Module     = 'vnet-onprem'
+        ModuleName = 'vnet_onprem'
+        ScriptPath = Join-Path $repoRoot 'extras' 'modules' 'vnet-onprem' 'scripts' 'Test-VnetOnpremJumpbox.ps1'
+        CommandId  = 'RunPowerShellScript'
+        Parameters = @{}
+    }
+    '$local_vnet_onprem' = @{
+        Module     = 'vnet-onprem'
+        ModuleName = 'vnet_onprem'
+        RunLocal   = $true
+        ScriptPath = Join-Path $repoRoot 'extras' 'modules' 'vnet-onprem' 'scripts' 'Test-VnetOnpremLocal.ps1'
+        Parameters = @{
+            ResourceGroupName      = $resourceGroupName
+            VnetOnpremName         = $resourceNames['virtual_network_onprem']
+            PrivateDnsResolverName = $resourceNames['private_dns_resolver']
+        }
+    }
 }
 
 # Filter to single module if specified
 if ($Module) {
     $targetVmKey = $moduleToVmKey[$Module]
     $filteredConfigs = [ordered]@{}
-    $filteredConfigs[$targetVmKey] = $testConfigs[$targetVmKey]
+
+    # Include all test configs that belong to this module (handles modules with multiple test configs)
+    foreach ($key in $testConfigs.Keys) {
+        if ($key -eq $targetVmKey -or $testConfigs[$key].ModuleName -eq $Module) {
+            $filteredConfigs[$key] = $testConfigs[$key]
+        }
+    }
+
     $testConfigs = $filteredConfigs
 }
 
@@ -638,6 +672,29 @@ if ($runIntegration) {
             Parameters   = @{
                 PetstoreFqdn      = $fqdns['petstore']
             }
+        }
+        @{
+            Name        = 'Onprem -> cloud connectivity'
+            RequiredVMs = @('virtual_machine_jumpwin2')
+            RunOnVM     = 'virtual_machine_jumpwin2'
+            ScriptPath  = Join-Path $repoRoot 'scripts' 'Test-Integration-OnpremToCloudDns.ps1'
+            CommandId   = 'RunPowerShellScript'
+            Parameters  = @{
+                JumpLinuxFqdn      = if ($resourceNames['virtual_machine_jumplinux1']) { "$($resourceNames['virtual_machine_jumplinux1']).$addsDomainName" } else { '' }
+                MssqlWinFqdn       = if ($resourceNames['virtual_machine_mssqlwin1']) { "$($resourceNames['virtual_machine_mssqlwin1']).$addsDomainName" } else { '' }
+                MssqlServerFqdn    = if ($fqdns['mssql_server']) { $fqdns['mssql_server'] } else { '' }
+                MysqlServerFqdn    = if ($fqdns['mysql_server']) { $fqdns['mysql_server'] } else { '' }
+                StorageAccountName = if ($resourceNames['storage_account']) { $resourceNames['storage_account'] } else { '' }
+                JumpWinCloudFqdn   = if ($resourceNames['virtual_machine_jumpwin1']) { "$($resourceNames['virtual_machine_jumpwin1']).$addsDomainName" } else { '' }
+            }
+        }
+        @{
+            Name        = 'Cloud -> onprem DNS'
+            RequiredVMs = @('virtual_machine_jumpwin1', 'virtual_machine_jumpwin2')
+            RunOnVM     = 'virtual_machine_jumpwin1'
+            ScriptPath  = Join-Path $repoRoot 'scripts' 'Test-Integration-CloudToOnpremDns.ps1'
+            CommandId   = 'RunPowerShellScript'
+            Parameters  = @{}
         }
     )
 

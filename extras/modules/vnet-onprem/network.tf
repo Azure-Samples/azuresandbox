@@ -26,7 +26,7 @@ resource "azurerm_virtual_network_gateway" "this" {
   vpn_type                   = "RouteBased"
   active_active              = false
   bgp_enabled                = true
-  sku                        = "VpnGw1"
+  sku                        = "VpnGw1AZ"
   generation                 = "Generation1"
   private_ip_address_enabled = false
 
@@ -50,6 +50,7 @@ resource "azurerm_public_ip" "vpn" {
   resource_group_name = var.resource_group_name
   allocation_method   = "Static"
   sku                 = "Standard"
+  zones               = ["1", "2", "3"]
   tags                = var.tags
 }
 
