@@ -30,7 +30,7 @@ This section describes how to test the module after deployment.
 
   * Verify the *IP4Address* returned is within the subnet IP address prefix for *vnet_app[0].subnets["snet-privatelink-01"]*, e.g. `10.2.2.*`.
 * From *jumpwin1*, test SQL Server Connectivity with SQL Server Management Studio (SSMS)
-  * Navigate to *Start* > *Microsoft SQL Server Tools 21* > *Microsoft SQL Server Management Studio 21*
+  * Navigate to *Start* > *Microsoft SQL Server Tools 22* > *Microsoft SQL Server Management Studio 22*
   * Sign in using the same Entra ID work account you used to log in with Azure CLI / Azure PowerShell
   * Connect to the network isolated Azure SQL Database server
     * Server properties:
