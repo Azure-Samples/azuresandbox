@@ -97,7 +97,7 @@ This smoke testing uses the RDP connection to *jumpwin2* established previously 
   Resolve-DnsName jumplinux1.mysandbox.local
   ```
 
-* Verify the *IP4Address* returned is within the IP address prefix for the subnet *snet-app-01ss*, e.g. `10.2.0.5`.
+* Verify one of the *A* records returned is within the IP address prefix for the subnet *snet-app-01ss*, e.g. `10.2.0.5`.
 * From a Windows PowerShell command prompt, run the following command:
 
   ```powershell
@@ -106,6 +106,12 @@ This smoke testing uses the RDP connection to *jumpwin2* established previously 
 
 * Enter `yes` when prompted `Are you sure you want to continue connecting?`
 * Enter the value of the *adminpassword* secret when prompted for a password.
+* Verify you are connected to *jumplinux1* by running the following command:
+
+  ```bash
+  hostname
+  ```
+
 * End the SSH session by entering the following command:
 
   ```bash
@@ -146,8 +152,7 @@ This smoke testing uses the RDP connection to *jumpwin2* established previously 
   * Select the *Security* tab
   * Select the *SQL Server and Windows Authentication mode* option, then click "OK"
   * Disconnect from *mssqlwin1*
-  * Restart *mssqlwin1* VM from the Azure portal.
-  * Wait for the restart to complete, then connect to *mssqlwin1* again from SQL Server Management Studio.
+  * Restart the default SQL Server instance on *mssqlwin1*
   * Navigate to *Security* > *Logins* and add a new login
   * Right click on *Logins* and select *New Login...*
     * Set the Login name to:
@@ -172,7 +177,7 @@ This smoke testing uses the RDP connection to *jumpwin2* established previously 
 
   * Verify the *IP4Address* returned is within the IP address prefix for the *snet-db-01* subnet, e.g. `10.2.1.4`.
     * Verify the SQL Server Management studio is installed.
-  * Navigate to *Start* > *Microsoft SQL Server Tools 20* > *Microsoft SQL Server Management Studio 20*
+  * Navigate to *Start* > *Microsoft SQL Server Tools 22* > *Microsoft SQL Server Management Studio 22*
   * Connect to the default instance of SQL Server installed on *mssqlwin1* using the following values:
     * Server name:
 
@@ -188,7 +193,8 @@ This smoke testing uses the RDP connection to *jumpwin2* established previously 
       ```
 
     * Password: Use the value of the *adminpassword* secret in the sandbox environment key vault.
-    * Encryption: *Optional*
+    * Encryption: *Mandatory*
+    * Trust Server Certificate: *Enabled*
   * Click *Connect* and examine the SQL instance in object explorer.
   * Disconnect from the SQL instance.
 
@@ -205,26 +211,16 @@ In order to complete this smoke test, SQL Server Management Studio must be insta
   ```
 
 * Verify the *IP4Address* returned is in the *snet-privatelink-01* subnet.
-* Navigate to *Start* > *Microsoft SQL Server Tools 20* > *Microsoft SQL Server Management Studio 20*
-* Connect to the Azure SQL Database server private endpoint
-  * Server name:
-  
-    ```plaintext
-    <your-mssql-server-name-here>.database.windows.net
-    ```
-
-  * Authentication: *SQL Server Authentication*
-    * Login:
-
-      ```plaintext
-      bootstrapadmin
-      ```
-
-  * Password: Use the value of the *adminpassword* secret in the sandbox environment key vault.
-  * Encryption: *Strict*
-* Click *Connect*
-* Expand the *Databases* tab and verify you can see *testdb*.
-* Disconnect from Azure SQL Database.
+* Navigate to *Start* > *Microsoft SQL Server Tools 22* > *Microsoft SQL Server Management Studio 22*
+* Sign in using the same Entra ID work account you used to log in with Azure CLI / Azure PowerShell
+* Connect to the network isolated Azure SQL Database server
+  * Server properties:
+    * Server name: *your-azure-sql-server-name-here.database.windows.net*
+    * Authentication: *Microsoft Entra MFA*
+    * Username: UPN of the Entra ID account you signed in with
+    * Encrypt: *Mandatory*
+    * Trust Server Certificate: enabled
+* Expand the *Databases* tab and verify you can see *testdb*
 
 #### Test port 3306 connectivity to Azure MySQL Flexible Server private endpoint (PaaS)
 
