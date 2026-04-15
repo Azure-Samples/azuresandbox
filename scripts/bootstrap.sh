@@ -173,6 +173,7 @@ printf "# enable_module_vwan             = true\n"  >> ./terraform.tfvars
 printf "\n# Enable extra modules here\n\n"          >> ./terraform.tfvars
 printf "# enable_module_petstore         = true\n"  >> ./terraform.tfvars
 printf "# enable_module_avd              = true\n"  >> ./terraform.tfvars
+printf "# enable_module_vnet_onprem      = true\n"  >> ./terraform.tfvars
 cat ./terraform.tfvars
 
 exit 0

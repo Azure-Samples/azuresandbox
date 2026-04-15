@@ -218,6 +218,7 @@ tags = {
 
 # enable_module_petstore         = true
 # enable_module_avd              = true
+# enable_module_vnet_onprem      = true
 "@ | Out-File -FilePath ./terraform.tfvars -Encoding utf8
 
 Get-Content ./terraform.tfvars

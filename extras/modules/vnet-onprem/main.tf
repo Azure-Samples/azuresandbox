@@ -1,7 +1,3 @@
-#region data
-data "azurerm_client_config" "current" {}
-#endregion
-
 #region modules
 module "naming" {
   source  = "Azure/naming/azurerm"

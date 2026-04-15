@@ -26,6 +26,8 @@ This configuration simulates connectivity between the sandbox environment and an
     * Resolve DNS queries from *mysandbox.local* to *myonprem.local* and vice versa.
     * Resolve DNS queries from *myonprem.local* to private DNS zones in the sandbox environment.
 
+The estimated provisioning time for this module is 75 minutes.
+
 ## Smoke testing
 
 This smoke testing is divided into two sections:
@@ -95,7 +97,7 @@ This smoke testing uses the RDP connection to *jumpwin2* established previously 
   Resolve-DnsName jumplinux1.mysandbox.local
   ```
 
-* Verify the *IP4Address* returned is within the IP address prefix for the subnet *snet-app-01ss*, e.g. `10.2.0.5`.
+* Verify one of the *A* records returned is within the IP address prefix for the subnet *snet-app-01ss*, e.g. `10.2.0.5`.
 * From a Windows PowerShell command prompt, run the following command:
 
   ```powershell
@@ -104,6 +106,12 @@ This smoke testing uses the RDP connection to *jumpwin2* established previously 
 
 * Enter `yes` when prompted `Are you sure you want to continue connecting?`
 * Enter the value of the *adminpassword* secret when prompted for a password.
+* Verify you are connected to *jumplinux1* by running the following command:
+
+  ```bash
+  hostname
+  ```
+
 * End the SSH session by entering the following command:
 
   ```bash
@@ -144,8 +152,7 @@ This smoke testing uses the RDP connection to *jumpwin2* established previously 
   * Select the *Security* tab
   * Select the *SQL Server and Windows Authentication mode* option, then click "OK"
   * Disconnect from *mssqlwin1*
-  * Restart *mssqlwin1* VM from the Azure portal.
-  * Wait for the restart to complete, then connect to *mssqlwin1* again from SQL Server Management Studio.
+  * Restart the default SQL Server instance on *mssqlwin1*
   * Navigate to *Security* > *Logins* and add a new login
   * Right click on *Logins* and select *New Login...*
     * Set the Login name to:
@@ -170,7 +177,7 @@ This smoke testing uses the RDP connection to *jumpwin2* established previously 
 
   * Verify the *IP4Address* returned is within the IP address prefix for the *snet-db-01* subnet, e.g. `10.2.1.4`.
     * Verify the SQL Server Management studio is installed.
-  * Navigate to *Start* > *Microsoft SQL Server Tools 20* > *Microsoft SQL Server Management Studio 20*
+  * Navigate to *Start* > *Microsoft SQL Server Tools 22* > *Microsoft SQL Server Management Studio 22*
   * Connect to the default instance of SQL Server installed on *mssqlwin1* using the following values:
     * Server name:
 
@@ -186,7 +193,8 @@ This smoke testing uses the RDP connection to *jumpwin2* established previously 
       ```
 
     * Password: Use the value of the *adminpassword* secret in the sandbox environment key vault.
-    * Encryption: *Optional*
+    * Encryption: *Mandatory*
+    * Trust Server Certificate: *Enabled*
   * Click *Connect* and examine the SQL instance in object explorer.
   * Disconnect from the SQL instance.
 
@@ -203,26 +211,16 @@ In order to complete this smoke test, SQL Server Management Studio must be insta
   ```
 
 * Verify the *IP4Address* returned is in the *snet-privatelink-01* subnet.
-* Navigate to *Start* > *Microsoft SQL Server Tools 20* > *Microsoft SQL Server Management Studio 20*
-* Connect to the Azure SQL Database server private endpoint
-  * Server name:
-  
-    ```plaintext
-    <your-mssql-server-name-here>.database.windows.net
-    ```
-
-  * Authentication: *SQL Server Authentication*
-    * Login:
-
-      ```plaintext
-      bootstrapadmin
-      ```
-
-  * Password: Use the value of the *adminpassword* secret in the sandbox environment key vault.
-  * Encryption: *Strict*
-* Click *Connect*
-* Expand the *Databases* tab and verify you can see *testdb*.
-* Disconnect from Azure SQL Database.
+* Navigate to *Start* > *Microsoft SQL Server Tools 22* > *Microsoft SQL Server Management Studio 22*
+* Sign in using the same Entra ID work account you used to log in with Azure CLI / Azure PowerShell
+* Connect to the network isolated Azure SQL Database server
+  * Server properties:
+    * Server name: *your-azure-sql-server-name-here.database.windows.net*
+    * Authentication: *Microsoft Entra MFA*
+    * Username: UPN of the Entra ID account you signed in with
+    * Encrypt: *Mandatory*
+    * Trust Server Certificate: enabled
+* Expand the *Databases* tab and verify you can see *testdb*
 
 #### Test port 3306 connectivity to Azure MySQL Flexible Server private endpoint (PaaS)
 
@@ -289,19 +287,22 @@ This module is organized as follows:
 
 ```plaintext
 ├── images/
-|   └── vnet-onprem-diagram.drawio.svg          # Architecture diagram
+|   └── vnet-onprem-diagram.drawio.svg  # Architecture diagram
 ├── scripts/
-|   ├── DomainControllerConfiguration2.ps1      # DSC configuration for Windows domain controller VM
-|   ├── JumpBoxConfiguration2.ps1               # DSC configuration for Windows jumpbox VM    
-|   ├── Register-DscNode.ps1                    # Registers a VM with Azure Automation DSC
-|   └── Set-AutomationAccountConfiguration.ps1  # Configures Azure Automation settings
-├── compute.tf                                  # Compute resource configurations   
-├── locals.tf                                   # Local variables
-├── main.tf                                     # Resource configurations  
-├── network.tf                                  # Network resource configurations  
-├── outputs.tf                                  # Output variables
-├── terraform.tf                                # Terraform configuration block
-└── variables.tf                                # Input variables
+|   ├── Configure-Adds.ps1              # Configures Active Directory Domain Services on adds2
+|   ├── Configure-AddsDns.ps1           # Configures DNS conditional forwarders on adds2
+|   ├── Install-Software.ps1            # Installs software on jumpwin2
+|   ├── Install-WindowsFeatures.ps1     # Installs Windows features on jumpwin2
+|   ├── Test-VnetOnpremAdds.ps1         # Unit tests for AD DS and DNS on adds2
+|   ├── Test-VnetOnpremJumpbox.ps1      # Unit tests for domain join and software on jumpwin2
+|   └── Test-VnetOnpremLocal.ps1        # Unit tests for VNet, VPN, and DNS resolver via Az PowerShell
+├── compute.tf                          # Compute resource configurations   
+├── locals.tf                           # Local variables
+├── main.tf                             # Resource configurations  
+├── network.tf                          # Network resource configurations  
+├── outputs.tf                          # Output variables
+├── terraform.tf                        # Terraform configuration block
+└── variables.tf                        # Input variables
 ```
 
 ### Input Variables
@@ -317,16 +318,16 @@ admin_username | bootstrapadmin | The username used for provisioning administrat
 arm_client_secret | | The password for the service principal used to authenticate with Azure. Defined interactively or using TF_VAR_arm_client_secret environment variable.
 automation_account_name | aa-sand-dev | The name of the Azure Automation Account used for state configuration (DSC).
 dns_server_cloud | `10.1.1.4` | The IP address of the sandbox DNS server.
-key_vault_id |  | The ID of the key vault defined in the root module.
-key_vault_name |  | The name of the key vault defined in the root module.
-location |  | The Azure region defined in the root module.
-resource_group_name |  | The name of the resource group defined in the root module.
+key_vault_id | | The ID of the key vault defined in the root module.
+key_vault_name | | The name of the key vault defined in the root module.
+location | | The Azure region defined in the root module.
+resource_group_name | | The name of the resource group defined in the root module.
 subnet_adds_address_prefix | `192.168.1.0/24` | The address prefix for the AD Domain Services subnet in the simulated on-premises network.
 subnet_GatewaySubnet_address_prefix | `192.168.0.0/24` | The address prefix for the GatewaySubnet subnet in the simulated on-premises network.
 subnet_misc_address_prefix | `192.168.2.0/24` | The address prefix for the miscellaneous subnet in the simulated on-premises network.
-subnets_cloud |  | The subnets in the shared services virtual network in the cloud sandbox environment.
-tags |  | The tags defined in the root module.
-virtual_networks_cloud |  | The names and resource ids of the virtual networks in the cloud sandbox environment.
+subnets_cloud | | The subnets in the shared services virtual network in the cloud sandbox environment.
+tags | | The tags defined in the root module.
+virtual_networks_cloud | | The names and resource ids of the virtual networks in the cloud sandbox environment.
 vm_adds_image_offer | WindowsServer | The offer type of the virtual machine image used to create the VM.
 vm_adds_image_publisher | MicrosoftWindowsServer | The publisher for the virtual machine image used to create the VM.
 vm_adds_image_sku | 2025-datacenter-azure-edition-core | The sku of the virtual machine image used to create the VM.
@@ -344,8 +345,8 @@ vm_jumpbox_win_storage_account_type | Standard_LRS | The storage replication typ
 vnet_address_space | `192.168.0.0/16` | The address space in CIDR notation for the new virtual network used to simulate an on-premises network.
 vnet_asn | 65123 | The ASN for the on premises network.
 vnet_name | onprem | The name of the virtual network used to simulate the on-premises network.
-vwan_hub_id |  | The id of the virtual wan hub for the cloud sandbox environment.
-vwan_id |  | The id of the virtual wan for the cloud sandbox environment.
+vwan_hub_id | | The id of the virtual wan hub for the cloud sandbox environment.
+vwan_id | | The id of the virtual wan for the cloud sandbox environment.
 
 ### Module Resources
 

@@ -46,13 +46,14 @@ resource "azurerm_container_app" "this" {
 }
 
 resource "azurerm_container_app_environment" "this" {
-  name                           = module.naming.container_app_environment.name_unique
-  location                       = var.location
-  resource_group_name            = var.resource_group_name
-  infrastructure_subnet_id       = var.container_apps_subnet_id
-  log_analytics_workspace_id     = var.log_analytics_workspace_id
-  logs_destination               = "log-analytics"
-  internal_load_balancer_enabled = true
+  name                               = module.naming.container_app_environment.name_unique
+  location                           = var.location
+  resource_group_name                = var.resource_group_name
+  infrastructure_subnet_id           = var.container_apps_subnet_id
+  infrastructure_resource_group_name = "ME_${module.naming.container_app_environment.name_unique}_${var.resource_group_name}_${var.location}"
+  log_analytics_workspace_id         = var.log_analytics_workspace_id
+  logs_destination                   = "log-analytics"
+  internal_load_balancer_enabled     = true
 
   identity {
     type = "SystemAssigned"

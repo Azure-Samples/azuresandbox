@@ -7,17 +7,108 @@ data "azuread_service_principal" "this" {
 #endregion
 
 #region resources
+resource "azuread_group" "sql_admins" {
+  count            = var.enable_module_mssql ? 1 : 0
+  display_name     = "grp-sql-admins-${var.tags["project"]}-${var.tags["environment"]}-${element(split("-", azurerm_resource_group.this.name), length(split("-", azurerm_resource_group.this.name)) - 1)}"
+  security_enabled = true
+  members          = [var.user_object_id, data.azuread_service_principal.this[0].object_id]
+}
+
 resource "azurerm_resource_group" "this" {
   name     = module.naming.resource_group.name_unique
   location = var.location
   tags     = var.tags
 }
 
-resource "azuread_group" "sql_admins" {
-  count            = var.enable_module_mssql ? 1 : 0
-  display_name     = "grp-sql-admins-${var.tags["project"]}-${var.tags["environment"]}-${element(split("-", azurerm_resource_group.this.name), length(split("-", azurerm_resource_group.this.name)) - 1)}"
-  security_enabled = true
-  members          = [var.user_object_id, data.azuread_service_principal.this[0].object_id]
+resource "azurerm_virtual_machine_run_command" "create_mssql_db_user" {
+  count              = var.enable_module_mssql ? 1 : 0
+  name               = "${module.naming.virtual_machine_extension.name}-${module.vnet_app[0].resource_names.virtual_machine_jumpwin1}-CreateMssqlDbUser"
+  location           = azurerm_resource_group.this.location
+  virtual_machine_id = module.vnet_app[0].resource_ids.virtual_machine_jumpwin1
+
+  source {
+    script = file("${path.module}/scripts/Create-AzSqlDbUser.ps1")
+  }
+
+  parameter {
+    name  = "ArmClientId"
+    value = var.arm_client_id
+  }
+
+  parameter {
+    name  = "AadTenantId"
+    value = var.aad_tenant_id
+  }
+
+  parameter {
+    name  = "MssqlServerFqdn"
+    value = module.mssql[0].fqdns.mssql_server
+  }
+
+  parameter {
+    name  = "MssqlDatabaseName"
+    value = module.mssql[0].resource_names.mssql_db
+  }
+
+  parameter {
+    name  = "VmName"
+    value = module.vnet_app[0].resource_names.virtual_machine_jumpwin1
+  }
+
+  protected_parameter {
+    name  = "ArmClientSecret"
+    value = var.arm_client_secret
+  }
+
+  depends_on = [
+    module.mssql,
+    module.vnet_app,
+  ]
+}
+#endregion
+
+#region public-access-management
+
+# Centralized disable of public access on shared resources using implicit dependency barriers.
+# Each barrier collects completion signals from all modules that perform data plane operations
+# requiring public access. The disable resource references the barrier's output, creating an
+# implicit dependency chain — no explicit depends_on needed.
+
+resource "terraform_data" "key_vault_access_barrier" {
+  input = {
+    key_vault_id     = module.vnet_shared.resource_ids["key_vault"]
+    vnet_shared      = module.vnet_shared.key_vault_operations_complete
+    vm_jumpbox_linux = var.enable_module_vm_jumpbox_linux ? module.vm_jumpbox_linux[0].key_vault_operations_complete : null
+    vwan             = var.enable_module_vwan ? module.vwan[0].key_vault_operations_complete : null
+  }
+}
+
+resource "azapi_update_resource" "key_vault_disable_public_access" {
+  type        = "Microsoft.KeyVault/vaults@2024-11-01"
+  resource_id = terraform_data.key_vault_access_barrier.output.key_vault_id
+
+  body = { properties = { publicNetworkAccess = "Disabled" } }
+}
+
+resource "terraform_data" "storage_access_barrier" {
+  count = var.enable_module_vnet_app ? 1 : 0
+
+  input = {
+    storage_account_id = module.vnet_app[0].resource_ids["storage_account"]
+    vnet_app           = module.vnet_app[0].storage_operations_complete
+    vm_mssql_win       = var.enable_module_vm_mssql_win ? module.vm_mssql_win[0].storage_operations_complete : null
+    # ai_foundry         = var.enable_module_ai_foundry ? module.ai_foundry[0].storage_operations_complete : null
+    # vm_devops_win      = var.enable_module_vm_devops_win ? module.vm_devops_win[0].storage_operations_complete : null
+  }
+}
+
+resource "azapi_update_resource" "storage_disable_public_access" {
+  count = var.enable_module_vnet_app ? 1 : 0
+
+  type        = "Microsoft.Storage/storageAccounts@2023-05-01"
+  resource_id = terraform_data.storage_access_barrier[0].output.storage_account_id
+
+  body = { properties = { publicNetworkAccess = "Disabled" } }
 }
 #endregion
 
@@ -131,52 +222,6 @@ module "mssql" {
   depends_on = [module.vnet_app[0].configure_azure_files_id] # Ensures that Azure Files is configured
 }
 
-resource "azurerm_virtual_machine_run_command" "create_mssql_db_user" {
-  count              = var.enable_module_mssql ? 1 : 0
-  name               = "${module.naming.virtual_machine_extension.name}-${module.vnet_app[0].resource_names.virtual_machine_jumpwin1}-CreateMssqlDbUser"
-  location           = azurerm_resource_group.this.location
-  virtual_machine_id = module.vnet_app[0].resource_ids.virtual_machine_jumpwin1
-
-  source {
-    script = file("${path.module}/scripts/Create-AzSqlDbUser.ps1")
-  }
-
-  parameter {
-    name  = "ArmClientId"
-    value = var.arm_client_id
-  }
-
-  parameter {
-    name  = "AadTenantId"
-    value = var.aad_tenant_id
-  }
-
-  parameter {
-    name  = "MssqlServerFqdn"
-    value = module.mssql[0].fqdns.mssql_server
-  }
-
-  parameter {
-    name  = "MssqlDatabaseName"
-    value = module.mssql[0].resource_names.mssql_db
-  }
-
-  parameter {
-    name  = "VmName"
-    value = module.vnet_app[0].resource_names.virtual_machine_jumpwin1
-  }
-
-  protected_parameter {
-    name  = "ArmClientSecret"
-    value = var.arm_client_secret
-  }
-
-  depends_on = [
-    module.mssql,
-    module.vnet_app,
-  ]
-}
-
 module "mysql" {
   source = "./modules/mysql"
 
@@ -241,6 +286,7 @@ module "avd" {
 
   admin_password                = module.vnet_shared.admin_password
   admin_username                = module.vnet_shared.admin_username
+  key_vault_id                  = module.vnet_shared.resource_ids["key_vault"]
   location                      = azurerm_resource_group.this.location
   resource_group_id             = azurerm_resource_group.this.id
   resource_group_name           = azurerm_resource_group.this.name
@@ -252,40 +298,36 @@ module "avd" {
   depends_on = [module.vnet_app[0].azure_files_config_vm_extension_id] # Ensure that Azure Files is configured
 }
 
-# vnet-onprem  is currently unavailable due to dependencies on retired features. It will be re-enabled in a future update with a redesigned implementation.
+module "vnet_onprem" {
+  source = "./extras/modules/vnet-onprem"
 
-# module "vnet_onprem" {
-#   source = "./extras/modules/vnet-onprem"
+  count = var.enable_module_vnet_onprem ? 1 : 0
 
-#   count = var.enable_module_vnet_onprem ? 1 : 0
+  adds_domain_name_cloud  = module.vnet_shared.adds_domain_name
+  admin_password          = module.vnet_shared.admin_password
+  admin_username          = module.vnet_shared.admin_username
+  dns_server_cloud        = module.vnet_shared.dns_server
+  location                = azurerm_resource_group.this.location
+  resource_group_name     = azurerm_resource_group.this.name
+  subnets_cloud           = module.vnet_shared.subnets
+  tags                    = var.tags
 
-#   adds_domain_name_cloud  = module.vnet_shared.adds_domain_name
-#   admin_password          = module.vnet_shared.admin_password
-#   admin_username          = module.vnet_shared.admin_username
-#   arm_client_secret       = var.arm_client_secret
-#   automation_account_name = module.vnet_shared.resource_names["automation_account"]
-#   dns_server_cloud        = module.vnet_shared.dns_server
-#   location                = azurerm_resource_group.this.location
-#   resource_group_name     = azurerm_resource_group.this.name
-#   subnets_cloud           = module.vnet_shared.subnets
-#   tags                    = var.tags
+  virtual_networks_cloud = {
+    virtual_network_shared = {
+      id   = module.vnet_shared.resource_ids["virtual_network_shared"]
+      name = module.vnet_shared.resource_names["virtual_network_shared"]
+    }
+    virtual_network_app = {
+      id   = module.vnet_app[0].resource_ids["virtual_network_app"]
+      name = module.vnet_app[0].resource_names["virtual_network_app"]
+    }
+  }
 
-#   virtual_networks_cloud = {
-#     virtual_network_shared = {
-#       id   = module.vnet_shared.resource_ids["virtual_network_shared"]
-#       name = module.vnet_shared.resource_names["virtual_network_shared"]
-#     }
-#     virtual_network_app = {
-#       id   = module.vnet_app[0].resource_ids["virtual_network_app"]
-#       name = module.vnet_app[0].resource_names["virtual_network_app"]
-#     }
-#   }
+  vwan_hub_id = module.vwan[0].resource_ids["virtual_wan_hub"]
+  vwan_id     = module.vwan[0].resource_ids["virtual_wan"]
 
-#   vwan_hub_id = module.vwan[0].resource_ids["virtual_wan_hub"]
-#   vwan_id     = module.vwan[0].resource_ids["virtual_wan"]
-
-#   depends_on = [module.vwan[0].resource_ids] # Ensure vwan module resources are provisioned
-# }
+  depends_on = [module.vwan[0].resource_ids] # Ensure vwan module resources are provisioned
+}
 
 # ai-foundry is currently unavailable due to dependencies on retired features. It will be re-enabled in a future update with a redesigned implementation.
 
@@ -334,48 +376,4 @@ module "avd" {
 #   depends_on = [module.vnet_app[0].azure_files_config_vm_extension_id] # Ensure that Azure Files is configured
 # }
 
-#endregion
-
-#region public-access-management
-# Centralized disable of public access on shared resources using implicit dependency barriers.
-# Each barrier collects completion signals from all modules that perform data plane operations
-# requiring public access. The disable resource references the barrier's output, creating an
-# implicit dependency chain — no explicit depends_on needed.
-
-resource "terraform_data" "key_vault_access_barrier" {
-  input = {
-    key_vault_id     = module.vnet_shared.resource_ids["key_vault"]
-    vnet_shared      = module.vnet_shared.key_vault_operations_complete
-    vm_jumpbox_linux = var.enable_module_vm_jumpbox_linux ? module.vm_jumpbox_linux[0].key_vault_operations_complete : null
-    vwan             = var.enable_module_vwan ? module.vwan[0].key_vault_operations_complete : null
-  }
-}
-
-resource "azapi_update_resource" "key_vault_disable_public_access" {
-  type        = "Microsoft.KeyVault/vaults@2024-11-01"
-  resource_id = terraform_data.key_vault_access_barrier.output.key_vault_id
-
-  body = { properties = { publicNetworkAccess = "Disabled" } }
-}
-
-resource "terraform_data" "storage_access_barrier" {
-  count = var.enable_module_vnet_app ? 1 : 0
-
-  input = {
-    storage_account_id = module.vnet_app[0].resource_ids["storage_account"]
-    vnet_app           = module.vnet_app[0].storage_operations_complete
-    vm_mssql_win       = var.enable_module_vm_mssql_win ? module.vm_mssql_win[0].storage_operations_complete : null
-    # ai_foundry         = var.enable_module_ai_foundry ? module.ai_foundry[0].storage_operations_complete : null
-    # vm_devops_win      = var.enable_module_vm_devops_win ? module.vm_devops_win[0].storage_operations_complete : null
-  }
-}
-
-resource "azapi_update_resource" "storage_disable_public_access" {
-  count = var.enable_module_vnet_app ? 1 : 0
-
-  type        = "Microsoft.Storage/storageAccounts@2023-05-01"
-  resource_id = terraform_data.storage_access_barrier[0].output.storage_account_id
-
-  body = { properties = { publicNetworkAccess = "Disabled" } }
-}
 #endregion

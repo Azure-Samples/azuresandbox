@@ -15,6 +15,8 @@
 
 This module deploys Azure Virtual Desktop (AVD) with both personal desktop and RemoteApp configurations. It creates a single shared workspace with two host pools and application groups. The personal desktop host pool provides full Windows desktop access (max 2 sessions), while the RemoteApp host pool streams individual applications like Microsoft Edge (max 10 sessions).
 
+The estimated provisioning time for this module is 15 minutes.
+
 ## Smoke Testing
 
 * From the client environment, launch the [Windows App](https://apps.microsoft.com/detail/9N1F85V9T8BN?hl=en-us&gl=US&ocid=pdpshare)
@@ -47,13 +49,17 @@ Additional requirements:
 ### Module Structure
 
 ```plaintext
-├── compute.tf      # Virtual machines and extensions for both host pools
-├── locals.tf       # Local values (role IDs, RDP properties)
-├── main.tf         # AVD control plane resources (workspaces, host pools, app groups)
-├── network.tf      # Network interfaces for session hosts
-├── outputs.tf      # Module outputs
-├── terraform.tf    # Terraform configuration block
-└── variables.tf    # Input variables
+├── images/
+|   └── avd-diagram.drawio.svg  # Architecture diagram for module
+├── scripts/
+|   └── Test-Avd.ps1            # Unit test script
+├── compute.tf                  # Virtual machines and extensions for both host pools
+├── locals.tf                   # Local values (role IDs, RDP properties)
+├── main.tf                     # AVD control plane resources (workspaces, host pools, app groups)
+├── network.tf                  # Network interfaces for session hosts
+├── outputs.tf                  # Module outputs
+├── terraform.tf                # Terraform configuration block
+└── variables.tf                # Input variables
 ```
 
 ### Input Variables
@@ -63,6 +69,7 @@ Variable | Default | Description
 admin_password | | Administrator password for session host VMs (sensitive).
 admin_username | | Administrator username for session host VMs.
 configuration_zip_url | Microsoft Gallery URL | URL to DSC configuration ZIP file for AVD agent installation.
+key_vault_id | | The resource id for the shared key vault.
 location | | Azure region where resources will be created.
 resource_group_id | | Resource ID of the existing resource group.
 resource_group_name | | Name of the existing resource group.
@@ -83,6 +90,7 @@ azurerm_network_interface.personal | nic-sand-dev-sessionhost1 | Nic for session
 azurerm_network_interface.remoteapp | nic-sand-dev-sessionhost2 | Nic for sessionhost2 VM
 azurerm_role_assignment.personal | | Grants access to personal app group
 azurerm_role_assignment.remoteapp | | Grants access to remoteapp app group
+azurerm_role_assignment.session_host_roles | | Grants Key Vault secrets user rights to sessionhost1 VM
 azurerm_role_assignment.vm_users | | Grants sign in privileges to session host VMs
 azurerm_virtual_desktop_application.edge | | Publishes Microsoft Edge for use with RemoteApp
 azurerm_virtual_desktop_application_group.personal | vdag-sand-dev-u28d-personal | Application group for personal desktops

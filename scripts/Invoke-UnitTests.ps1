@@ -1,5 +1,5 @@
 #requires -Version 7.0
-#requires -Modules Az.Accounts, Az.Compute, Az.Resources, Az.Sql, Az.Network, Az.PrivateDns, Az.MySql
+#requires -Modules Az.Accounts, Az.Compute, Az.Resources, Az.Sql, Az.Network, Az.PrivateDns, Az.MySql, Az.DesktopVirtualization
 
 # Usage:
 #   Step 1: Authenticate to Azure (one-time, persisted to ~/.Azure/)
@@ -18,7 +18,7 @@
 #     From bash:       pwsh -File ./scripts/Invoke-UnitTests.ps1 -Module vnet_app -Integration
 #     From PowerShell: .\scripts\Invoke-UnitTests.ps1 -Module vm_mssql_win -Integration
 #
-#   Valid module names: vnet_shared, vnet_app, vm_jumpbox_linux, vm_mssql_win, mssql, mysql, vwan
+#   Valid module names: vnet_shared, vnet_app, vm_jumpbox_linux, vm_mssql_win, mssql, mysql, vwan, vnet_onprem
 #
 # Prerequisites:
 #   - PowerShell 7.x (pwsh) with Az.Accounts, Az.Compute, and Az.Resources modules installed
@@ -157,8 +157,6 @@ function Invoke-LocalTest {
             }
         }
 
-        $stdout = $collectedLines -join "`n"
-
         # Parse summary line
         $summaryLine = $collectedLines | Where-Object { $_ -match '\[SUMMARY\]' } | Select-Object -Last 1
         if ($summaryLine -match 'Passed:\s*(\d+)\s+Failed:\s*(\d+)\s+Total:\s*(\d+)') {
@@ -282,6 +280,21 @@ catch {
     Write-Log "[WARNING] Could not read terraform output 'fqdns': $_"
 }
 
+# Read adds_domain_name output (needed for AVD integration tests)
+$addsDomainName = $null
+try {
+    Push-Location $repoRoot
+    $domainJson = terraform output -json adds_domain_name 2>&1
+    $domainExitCode = $LASTEXITCODE
+    Pop-Location
+    if ($domainExitCode -eq 0 -and $domainJson) {
+        $addsDomainName = $domainJson | ConvertFrom-Json
+    }
+}
+catch {
+    Write-Log "[WARNING] Could not read terraform output 'adds_domain_name': $_"
+}
+
 $resourceGroupName = $resourceNames['resource_group']
 if (-not $resourceGroupName) {
     Exit-WithError "resource_group not found in terraform output resource_names."
@@ -306,7 +319,10 @@ $moduleToVmKey = @{
     'vm_mssql_win'     = 'virtual_machine_mssqlwin1'
     'mssql'            = '$local_mssql'
     'mysql'            = '$local_mysql'
+    'petstore'         = '$local_petstore'
     'vwan'             = '$local_vwan'
+    'avd'              = '$local_avd'
+    'vnet_onprem'      = 'virtual_machine_adds2'
 }
 
 if ($Integration -and -not $Module) {
@@ -331,11 +347,14 @@ $moduleIntegrationMap = @{
     'vm_mssql_win'     = @('SQL: jumpwin1 -> mssqlwin1')
     'mssql'            = @('Azure SQL: jumpwin1 -> testdb')
     'mysql'            = @('MySQL: jumpwin1 -> mysql')
+    'petstore'         = @('Petstore API: jumpwin1 -> petstore')
     'vwan'             = @('P2S VPN: local -> sandbox endpoints')
+    'avd'              = @('AVD: personal session host config', 'AVD: remoteapp session host config')
+    'vnet_onprem'      = @('Onprem -> cloud connectivity', 'Cloud -> onprem DNS')
 }
 
 # Pre-validate sudo early if vwan integration tests will run (avoids waiting for prompt mid-test)
-$willRunVwanIntegration = (-not $Module) -or ($Module -eq 'vwan' -and $Integration)
+$willRunVwanIntegration = ((-not $Module) -or ($Module -eq 'vwan' -and $Integration)) -and $resourceNames['virtual_wan'] -and $resourceNames['virtual_wan_hub']
 if ($willRunVwanIntegration -and ($IsLinux -or $IsMacOS)) {
     Write-Log "Pre-validating sudo access for vwan integration test..."
     & sudo -n true 2>&1 | Out-Null
@@ -405,6 +424,18 @@ $testConfigs = [ordered]@{
             MysqlDatabaseName = $resourceNames['mysql_db']
         }
     }
+    '$local_petstore' = @{
+        Module     = 'petstore'
+        ModuleName = 'petstore'
+        RunLocal   = $true
+        ScriptPath = Join-Path $repoRoot 'extras' 'modules' 'petstore' 'scripts' 'Test-Petstore.ps1'
+        Parameters = @{
+            ResourceGroupName            = $resourceGroupName
+            ContainerAppEnvironmentName  = $resourceNames['container_app_environment']
+            ContainerAppName             = 'petstore'
+            ContainerRegistryName        = $resourceNames['container_registry']
+        }
+    }
     '$local_vwan' = @{
         Module     = 'vwan'
         ModuleName = 'vwan'
@@ -416,13 +447,61 @@ $testConfigs = [ordered]@{
             VirtualHubName    = $resourceNames['virtual_wan_hub']
         }
     }
+    '$local_avd' = @{
+        Module     = 'avd'
+        ModuleName = 'avd'
+        RunLocal   = $true
+        ScriptPath = Join-Path $repoRoot 'extras' 'modules' 'avd' 'scripts' 'Test-Avd.ps1'
+        Parameters = @{
+            ResourceGroupName     = $resourceGroupName
+            AvdWorkspaceName      = $resourceNames['avd_workspace']
+            HostPoolPersonalName  = $resourceNames['avd_host_pool_personal']
+            HostPoolRemoteappName = $resourceNames['avd_host_pool_remoteapp']
+            AppGroupPersonalName  = $resourceNames['avd_application_group_personal']
+            AppGroupRemoteappName = $resourceNames['avd_application_group_remoteapp']
+            VmNamePersonal        = $resourceNames['virtual_machine_session_host_personal']
+            VmNameRemoteapp       = $resourceNames['virtual_machine_session_host_remoteapp']
+        }
+    }
+    'virtual_machine_adds2' = @{
+        Module     = 'vnet-onprem'
+        ModuleName = 'vnet_onprem'
+        ScriptPath = Join-Path $repoRoot 'extras' 'modules' 'vnet-onprem' 'scripts' 'Test-VnetOnpremAdds.ps1'
+        CommandId  = 'RunPowerShellScript'
+        Parameters = @{}
+    }
+    'virtual_machine_jumpwin2' = @{
+        Module     = 'vnet-onprem'
+        ModuleName = 'vnet_onprem'
+        ScriptPath = Join-Path $repoRoot 'extras' 'modules' 'vnet-onprem' 'scripts' 'Test-VnetOnpremJumpbox.ps1'
+        CommandId  = 'RunPowerShellScript'
+        Parameters = @{}
+    }
+    '$local_vnet_onprem' = @{
+        Module     = 'vnet-onprem'
+        ModuleName = 'vnet_onprem'
+        RunLocal   = $true
+        ScriptPath = Join-Path $repoRoot 'extras' 'modules' 'vnet-onprem' 'scripts' 'Test-VnetOnpremLocal.ps1'
+        Parameters = @{
+            ResourceGroupName      = $resourceGroupName
+            VnetOnpremName         = $resourceNames['virtual_network_onprem']
+            PrivateDnsResolverName = $resourceNames['private_dns_resolver']
+        }
+    }
 }
 
 # Filter to single module if specified
 if ($Module) {
     $targetVmKey = $moduleToVmKey[$Module]
     $filteredConfigs = [ordered]@{}
-    $filteredConfigs[$targetVmKey] = $testConfigs[$targetVmKey]
+
+    # Include all test configs that belong to this module (handles modules with multiple test configs)
+    foreach ($key in $testConfigs.Keys) {
+        if ($key -eq $targetVmKey -or $testConfigs[$key].ModuleName -eq $Module) {
+            $filteredConfigs[$key] = $testConfigs[$key]
+        }
+    }
+
     $testConfigs = $filteredConfigs
 }
 
@@ -541,6 +620,17 @@ if ($runIntegration) {
             }
         }
         @{
+            Name         = 'Petstore API: jumpwin1 -> petstore'
+            RequiredVMs  = @('virtual_machine_jumpwin1')
+            RequiredFqdn = 'petstore'
+            RunOnVM      = 'virtual_machine_jumpwin1'
+            ScriptPath   = Join-Path $repoRoot 'scripts' 'Test-Integration-Petstore.ps1'
+            CommandId    = 'RunPowerShellScript'
+            Parameters   = @{
+                PetstoreFqdn = $fqdns['petstore']
+            }
+        }
+        @{
             Name         = 'P2S VPN: local -> sandbox endpoints'
             RequiredVMs  = @()
             RunLocal     = $true
@@ -558,6 +648,53 @@ if ($runIntegration) {
                 MysqlServerFqdn    = $fqdns['mysql_server']
                 MysqlDatabaseName  = $resourceNames['mysql_db']
             }
+        }
+        @{
+            Name        = 'AVD: personal session host config'
+            RequiredVMs = @('virtual_machine_session_host_personal')
+            RunOnVM     = 'virtual_machine_session_host_personal'
+            ScriptPath  = Join-Path $repoRoot 'scripts' 'Test-Integration-AvdPersonal.ps1'
+            CommandId   = 'RunPowerShellScript'
+            Parameters  = @{
+                KeyVaultName       = $resourceNames['key_vault']
+                StorageAccountName = $resourceNames['storage_account']
+                StorageShareName   = $resourceNames['storage_share']
+                DomainName         = $addsDomainName
+            }
+        }
+        @{
+            Name         = 'AVD: remoteapp session host config'
+            RequiredVMs  = @('virtual_machine_session_host_remoteapp')
+            RequiredFqdn = 'petstore'
+            RunOnVM      = 'virtual_machine_session_host_remoteapp'
+            ScriptPath   = Join-Path $repoRoot 'scripts' 'Test-Integration-AvdRemoteapp.ps1'
+            CommandId    = 'RunPowerShellScript'
+            Parameters   = @{
+                PetstoreFqdn      = $fqdns['petstore']
+            }
+        }
+        @{
+            Name        = 'Onprem -> cloud connectivity'
+            RequiredVMs = @('virtual_machine_jumpwin2')
+            RunOnVM     = 'virtual_machine_jumpwin2'
+            ScriptPath  = Join-Path $repoRoot 'scripts' 'Test-Integration-OnpremToCloudDns.ps1'
+            CommandId   = 'RunPowerShellScript'
+            Parameters  = @{
+                JumpLinuxFqdn      = if ($resourceNames['virtual_machine_jumplinux1']) { "$($resourceNames['virtual_machine_jumplinux1']).$addsDomainName" } else { '' }
+                MssqlWinFqdn       = if ($resourceNames['virtual_machine_mssqlwin1']) { "$($resourceNames['virtual_machine_mssqlwin1']).$addsDomainName" } else { '' }
+                MssqlServerFqdn    = if ($fqdns['mssql_server']) { $fqdns['mssql_server'] } else { '' }
+                MysqlServerFqdn    = if ($fqdns['mysql_server']) { $fqdns['mysql_server'] } else { '' }
+                StorageAccountName = if ($resourceNames['storage_account']) { $resourceNames['storage_account'] } else { '' }
+                JumpWinCloudFqdn   = if ($resourceNames['virtual_machine_jumpwin1']) { "$($resourceNames['virtual_machine_jumpwin1']).$addsDomainName" } else { '' }
+            }
+        }
+        @{
+            Name        = 'Cloud -> onprem DNS'
+            RequiredVMs = @('virtual_machine_jumpwin1', 'virtual_machine_jumpwin2')
+            RunOnVM     = 'virtual_machine_jumpwin1'
+            ScriptPath  = Join-Path $repoRoot 'scripts' 'Test-Integration-CloudToOnpremDns.ps1'
+            CommandId   = 'RunPowerShellScript'
+            Parameters  = @{}
         }
     )
 

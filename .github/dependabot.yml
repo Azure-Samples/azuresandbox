@@ -184,20 +184,6 @@ updates:
     versioning-strategy: increase
 
   - package-ecosystem: terraform
-    directory: "/extras/modules/vm-devops-win"
-    target-branch: "vnext"
-    schedule:
-      interval: weekly
-      day: monday
-      time: "08:17"
-      timezone: "UTC"
-    groups:
-      terraform-all:
-        patterns:
-          - "*"
-    versioning-strategy: increase
-
-  - package-ecosystem: terraform
     directory: "/extras/modules/vnet-onprem"
     target-branch: "vnext"
     schedule:

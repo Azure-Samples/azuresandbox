@@ -61,13 +61,6 @@ variable "enable_module_petstore" {
   default     = false
 }
 
-# variable "enable_module_vm_devops_win" {
-#   type        = bool
-#   description = "Set to true to enable the vm_devops_win module, false to skip it."
-#   default     = false
-
-# }
-
 variable "enable_module_vm_jumpbox_linux" {
   type        = bool
   description = "Set to true to enable the vm_jumpbox_linux module, false to skip it."
@@ -86,11 +79,11 @@ variable "enable_module_vnet_app" {
   default     = false
 }
 
-# variable "enable_module_vnet_onprem" {
-#   type        = bool
-#   description = "Set to true to enable the vnet_onprem module, false to skip it."
-#   default     = false
-# }
+variable "enable_module_vnet_onprem" {
+  type        = bool
+  description = "Set to true to enable the vnet_onprem module, false to skip it."
+  default     = false
+}
 
 variable "enable_module_vwan" {
   type        = bool

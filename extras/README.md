@@ -30,8 +30,9 @@ This section describes additional Terraform modules that can be added to Azure S
   * [avd](./modules/avd/) deploys an Azure Virtual Desktop test environment with support for personal desktops and RemoteApp streaming.
 * Out of date extra modules: these modules depend on retired features and will be updated in the future with a redesigned implementation.
   * [ai-foundry](./modules/ai-foundry/) enables the use of an [Azure AI Foundry hub](https://learn.microsoft.com/en-us/azure/ai-foundry/concepts/ai-resources) in a sandbox environment.
-  * [vm-devops-win](./modules/vm-devops-win/) implements a collection of identical Windows developer VMs.
   * [vnet-onprem](./modules/vnet-onprem/) simulates connectivity to an on-premises network using a site-to-site VPN connection and Azure DNS private resolver.
+* Retired modules:
+  * [vm-devops-win](./modules/retired/vm-devops-win/) implements a collection of identical Windows developer VMs.
 
 ## Demo videos
 
