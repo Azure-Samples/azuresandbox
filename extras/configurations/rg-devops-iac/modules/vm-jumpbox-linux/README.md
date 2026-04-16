@@ -47,7 +47,7 @@ This section describes how to test the module after deployment.
 * Paste the public SSH key value into a text editor and save it locally as:
 
   ```plaintext
-  C:\Users\YOUR-USER-NAME-HERE\.ssh\devopsbootstrapadmin-ssh-key-public.txt
+  C:\Users\<user-name-here>\.ssh\devopsbootstrapadmin-ssh-key-private.txt
   ```
 
 ### Determine public IP address of *jumplinux2*

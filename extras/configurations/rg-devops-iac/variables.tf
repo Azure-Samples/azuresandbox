@@ -83,6 +83,28 @@ variable "subnet_name" {
   }
 }
 
+variable "subnet_privatelink_address_prefix" {
+  type        = string
+  description = "The address prefix for the private link subnet."
+  default     = "10.0.1.0/24"
+
+  validation {
+    condition     = can(cidrhost(var.subnet_privatelink_address_prefix, 0))
+    error_message = "Must be valid IPv4 CIDR."
+  }
+}
+
+variable "subnet_privatelink_name" {
+  type        = string
+  description = "The name of the private link subnet to be created in the new virtual network."
+  default     = "snet-privatelink-03"
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9-]{1,64}$", var.subnet_privatelink_name))
+    error_message = "Must conform to Azure subnet naming standards: it can only contain alphanumeric characters and hyphens (-), must start and end with an alphanumeric character, and must be between 1 and 64 characters long."
+  }
+}
+
 variable "subscription_id" {
   type        = string
   description = "The Azure subscription id used to provision resources."
