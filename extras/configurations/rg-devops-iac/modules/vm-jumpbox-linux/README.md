@@ -193,6 +193,7 @@ enable_public_access | false | When enabled a public IP address is created for t
 key_vault_id | | The ID of the key vault defined in the root module.
 location | | The Azure region where the resources will be created. Defined in the root module.
 resource_group_name | | The name of the resource group defined in the root module.
+ssh_private_key_version | 1 | Increment to create new ssh_private_key.
 storage_account_id | | The resource ID of of the storage account defined in the root module.
 subnet_id | | The resource ID of the subnet where the VM will be deployed. Defined in the vnet-shared module.
 tags | | The tags from the root module.

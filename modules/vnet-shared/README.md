@@ -82,6 +82,7 @@ Variable | Default | Description
 --- | --- | ---
 adds_domain_name | mysandbox.local | The AD DS domain name.
 admin_password_secret | adminpassword | The name of the key vault secret containing the admin password.
+admin_password_secret_version | 1 | Increment to create a new admin password secret.
 admin_username | bootstrapadmin | The default admin username used when configuring services.
 admin_username_secret | adminuser | The name of the key vault secret containing the admin username.
 arm_client_secret | | The password for the service principal used for authenticating with Azure. Set interactively or using an environment variable 'TF_VAR_arm_client_secret'.

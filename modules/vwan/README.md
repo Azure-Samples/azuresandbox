@@ -366,6 +366,7 @@ client_address_pool | `10.4.0.0/16` | The address range used for point-to-site V
 dns_server | `10.1.1.4` | The IP address of the DNS server used for the virtual network. Defined in the vnet-shared module.
 key_vault_id | | The ID of the key vault defined in the root module.
 location | | The Azure region defined in the root module.
+private_key_secret_version | 1 | Increment to create a new private key secret.
 resource_group_name | | The name of the resource group defined in the root module.
 tags | | The tags defined in the root module.
 virtual_networks | | The resource ids for the virtual networks to be connected to the vwan hub. Defined in the vnet-shared and vnet-app modules.

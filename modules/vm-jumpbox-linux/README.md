@@ -219,6 +219,7 @@ key_vault_id | | The ID of the key vault defined in the root module.
 key_vault_name | | The name of the key vault defined in the root module.
 location | | The Azure region defined in the root module.
 resource_group_name | | The name of the resource group defined in the root module.
+ssh_private_key_version | 1 | Increment to create new ssh_private_key.
 storage_account_name | | The storage account name from the vnet-app module.
 storage_share_name | | The Azure Files share name from the vnet-app module.
 subnet_id | | The subnet ID from the vnet-app module.

@@ -68,6 +68,12 @@ variable "resource_group_name" {
   }
 }
 
+variable "ssh_private_key_version" {
+  type = number
+  description = "Increment to create new ssh_private_key."
+  default = 1
+}
+
 variable "storage_account_name" {
   type        = string
   description = "The existing storage account where the Azure Files share is located."

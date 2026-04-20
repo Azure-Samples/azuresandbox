@@ -32,10 +32,11 @@ resource "tls_private_key" "ssh_key" {
 }
 
 resource "azurerm_key_vault_secret" "ssh_private_key" {
-  name            = "${var.vm_jumpbox_linux_name}-ssh-private-key"
-  value           = tls_private_key.ssh_key.private_key_pem
-  key_vault_id    = var.key_vault_id
-  expiration_date = timeadd(timestamp(), "8760h")
+  name             = "${var.vm_jumpbox_linux_name}-ssh-private-key"
+  value_wo         = tls_private_key.ssh_key.private_key_pem
+  value_wo_version = var.ssh_private_key_version
+  key_vault_id     = var.key_vault_id
+  expiration_date  = timeadd(timestamp(), "8760h")
 
   lifecycle {
     ignore_changes = [expiration_date]
