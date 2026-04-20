@@ -39,6 +39,12 @@ variable "location" {
   }
 }
 
+variable "private_key_secret_version" {
+  type        = number
+  description = "Increment to create a new private key secret."
+  default     = 1
+}
+
 variable "resource_group_name" {
   type        = string
   description = "The name of the existing resource group."

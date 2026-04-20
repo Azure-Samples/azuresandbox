@@ -20,6 +20,12 @@ variable "admin_password_secret" {
   }
 }
 
+variable "admin_password_secret_version" {
+  type        = number
+  description = "Increment to create a new admin password secret."
+  default     = 1
+}
+
 variable "admin_username" {
   type        = string
   description = "The admin username"
@@ -53,6 +59,11 @@ variable "arm_client_secret" {
   }
 }
 
+variable "arm_client_secret_version" {
+  type        = number
+  description = "Increment to create new arm_client_secret."
+  default     = 1
+}
 variable "location" {
   type        = string
   description = "The name of the Azure Region where resources will be provisioned."

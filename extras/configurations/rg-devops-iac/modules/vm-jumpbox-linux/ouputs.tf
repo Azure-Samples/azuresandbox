@@ -9,3 +9,7 @@ output "resource_names" {
     virtual_machine_jumplinux2 = azurerm_linux_virtual_machine.this.name
   }
 }
+
+output "key_vault_operations_complete" {
+  value = azurerm_key_vault_secret.ssh_private_key.id
+}

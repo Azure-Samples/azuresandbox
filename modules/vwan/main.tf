@@ -30,9 +30,10 @@ resource "tls_private_key" "client_cert_key" {
 
 # Store the private key in key vault so it can be used later to create a pfx file
 resource "azurerm_key_vault_secret" "this" {
-  name         = "p2svpn-client-private-key-pem"
-  value        = tls_private_key.client_cert_key.private_key_pem
-  key_vault_id = var.key_vault_id
+  name             = "p2svpn-client-private-key-pem"
+  value_wo         = tls_private_key.client_cert_key.private_key_pem
+  value_wo_version = var.private_key_secret_version
+  key_vault_id     = var.key_vault_id
 }
 
 # Generate a client certificate signed by the root certificate

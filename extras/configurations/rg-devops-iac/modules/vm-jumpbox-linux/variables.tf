@@ -52,6 +52,12 @@ variable "resource_group_name" {
   }
 }
 
+variable "ssh_private_key_version" {
+  type = number
+  description = "Increment to create new ssh_private_key."
+  default = 1
+}
+
 variable "storage_account_id" {
   type        = string
   description = "The ID of the existing storage account with the blob storage container to be used for Terraform state files."

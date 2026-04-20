@@ -347,18 +347,20 @@ This section lists input variables used in the root module. Defaults can be over
 
 Variable | Default | Description
 --- | --- | ---
-aad_tenant_id |  | The Microsoft Entra tenant id.
-arm_client_id |  | The AppId of the service principal used for authenticating with Azure. Must have a 'Contributor' role assignment.
-arm_client_secret |  | The password for the service principal used for authenticating with Azure. Set interactively or using an environment variable 'TF_VAR_arm_client_secret'.
+aad_tenant_id | | The Microsoft Entra tenant id.
+arm_client_id | | The AppId of the service principal used for authenticating with Azure. Must have a 'Contributor' role assignment.
+arm_client_secret | | The password for the service principal used for authenticating with Azure. Set interactively or using an environment variable 'TF_VAR_arm_client_secret'.
 location | eastus2 | The name of the Azure Region where resources will be provisioned.
 storage_access_tier | Hot | The access tier for the new storage account.
 storage_replication_type | LRS | The type of replication for the new storage account.
 subnet_address_prefix | 10.0.0.0/24 | The address prefix for the miscellaneous subnet. The minimum size is /29.
 subnet_name | snet-devops-01 | The name of the subnet to be created in the new virtual network.
-subscription_id |  | The Azure subscription id used to provision resources.
+subnet_privatelink_address_prefix | 10.0.1.0/24 | The address prefix for the PrivateLink subnet
+subnet_privatelink_name | snet-privatelink-03 | The name of the subnet for PrivateLink endpoints
+subscription_id | | The Azure subscription id used to provision resources.
 storage_container_name | tfstate | The name of the storage container to be created in the new storage account.
 tags | | The tags in map format to be used when creating new resources.
-user_object_id |  | The object id of the user in Microsoft Entra ID.
+user_object_id | | The object id of the user in Microsoft Entra ID.
 vnet_address_space | 10.0.0.0/16 | The address space in CIDR notation for the new virtual network. The minimum size is /24.
 vnet_name | devops | The name of the new virtual
 
@@ -371,15 +373,22 @@ Address | Name | Notes
 azurerm_key_vault.this | kv-devops-dev-xxx | Used to store secrets for the Linux virtual machine.
 azurerm_nat_gateway.this | ng-devops-dev | NAT gateway for outbound internet connectivity.
 azurerm_nat_gateway_public_ip_association.this | | Associates the NAT gateway with the public IP address.
-azurerm_network_security_group.this | | NSG used to open inbound connectivity for port 22 (SSH) to the Linux virtual machine.
+azurerm_network_security_group.devops | nsg-devops-dev-snet-devops-01 | NSG used to open inbound connectivity for port 22 (SSH) to the Linux virtual machine.
+azurerm_private_dns_zone.key_vault | privatelink.vaultcore.azure.net | Private DNS zone for Azure Key Vault
+azurerm_private_dns_zone.storage_blob | privatelink.blob.core.windows.net | Private DNS zone for Azure blob storage
+azurerm_private_dns_zone_virtual_network_link.key_vault | | Links private dns zone to azurerm_virtual_network.this
+azurerm_private_dns_zone_virtual_network_link.storage_blob | | Links private dns zone to azurerm_virtual_network.this
+azurerm_private_endpoint.key_vault | pe-devops-dev-key-vault | Private endpoint for Azure key vault
+azurerm_private_endpoint.storage_blob | pe-devops-dev-storage-blob | Private endpoint for Azure blob storage
 azurerm_public_ip.this | pip-devops-dev-nat | Public IP address for the NAT gateway.
 azurerm_resource_group.this | rg-devops-dev-xxx | Resource group for all resources in this configuration.
 azurerm_role_assignment.keyvault_roles[*] | | Assigns `Key Vault Secrets Officer` to both the service principal and the interactive user.
 azurerm_role_assignment.storage_roles[*] | | Assigns `Storage Blob Data Contributor` to both the service principal and the interactive user.
 azurerm_storage_account.this | stdevopsdevxxx | Storage account for storing Terraform state files.
 azurerm_storage_container.this | tfstate | Storage container for storing Terraform state files.
-azurerm_subnet.this | snet-devops-01 | Subnet for the Linux virtual machine.
-azurerm_subnet_nat_gateway_association.this | vnet-devops-dev-devops| Associates the NAT gateway with the subnet.
+azurerm_subnet.devops | snet-devops-01 | Subnet for jumplinux2 VM
+azurerm_subnet.privatelink | snet-privatelink-03 | Subnet for PrivateLink endpoints
+azurerm_subnet_nat_gateway_association.devops | vnet-devops-dev-devops| Associates the NAT gateway with the subnet.
 azurerm_subnet_network_security_group_association.this | | Associates the NSG with the subnet.
 azurerm_virtual_network.this | vnet-devops-dev-devops | Virtual network for the Linux virtual machine.
 
@@ -402,7 +411,10 @@ Name | Required | Depends On | Description
 
 ### Virtual Network Design
 
-This configuration implements a virtual network design that includes a single subnet for the Linux virtual machine. The subnet is configured with a NAT gateway for outbound internet connectivity and an NSG to control inbound traffic. Default address ranges are set artificially high for demos and readability and can be overridden with smaller ranges to meet specific requirements. An firewall is not included in this configuration by design as it may be used as an startup environment to provision a platform landing zone or sandbox that does include a firewall.
+This configuration implements a virtual network. Default address ranges are set artificially high for demos and readability and can be overridden with smaller ranges to meet specific requirements. An firewall is not included in this configuration by design as it may be used as an startup environment to provision a platform landing zone or sandbox that does include a firewall. The virtual network includes two subnets:
+
+* A subnet for the Linux virtual machine. The subnet is configured with a NAT gateway for outbound internet connectivity and an NSG to control inbound traffic.
+* A subnet for PrivateLink endpoints for Azure Key Vault and Azure Blob Storage
 
 ### Dependencies
 
