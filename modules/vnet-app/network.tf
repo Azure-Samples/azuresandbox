@@ -81,7 +81,11 @@ resource "azurerm_virtual_network_peering" "shared_to_app" {
   allow_virtual_network_access = true
   allow_forwarded_traffic      = true
   allow_gateway_transit        = true
-  depends_on                   = [azurerm_subnet_network_security_group_association.associations]
+
+  depends_on = [
+    azurerm_subnet_network_security_group_association.associations,
+    azurerm_subnet_route_table_association.associations,
+  ]
 }
 
 resource "azurerm_virtual_network_peering" "app_to_shared" {
