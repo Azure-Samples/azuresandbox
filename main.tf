@@ -132,6 +132,9 @@ resource "terraform_data" "ampls_access_barrier" {
 
     # Signal from vnet-app (conditional): AMPLS DNS zone links on vnet-app + AMA/DCR/DCE on jumpwin1 + ACR diag setting.
     vnet_app = var.enable_module_vnet_app ? module.vnet_app[0].log_analytics_operations_complete : null
+
+    # Signal from vm-mssql-win (conditional): AMA/DCR/DCE on mssqlwin1.
+    vm_mssql_win = var.enable_module_vm_mssql_win ? module.vm_mssql_win[0].log_analytics_operations_complete : null
   }
 }
 
@@ -242,21 +245,23 @@ module "vm_mssql_win" {
 
   count = var.enable_module_vm_mssql_win ? 1 : 0
 
-  adds_domain_name       = module.vnet_shared.adds_domain_name
-  admin_password         = module.vnet_shared.admin_password
-  admin_password_secret  = module.vnet_shared.admin_password_secret
-  admin_username         = module.vnet_shared.admin_username
-  admin_username_secret  = module.vnet_shared.admin_username_secret
-  key_vault_id           = module.vnet_shared.resource_ids["key_vault"]
-  key_vault_name         = module.vnet_shared.resource_names["key_vault"]
-  location               = azurerm_resource_group.this.location
-  resource_group_name    = azurerm_resource_group.this.name
-  storage_account_id     = module.vnet_app[0].resource_ids["storage_account"]
-  storage_account_name   = module.vnet_app[0].resource_names["storage_account"]
-  storage_blob_endpoint  = module.vnet_app[0].storage_endpoints["blob"]
-  storage_container_name = module.vnet_app[0].storage_container_name
-  subnet_id              = module.vnet_app[0].subnets["snet-db-01"].id
-  tags                   = var.tags
+  adds_domain_name                = module.vnet_shared.adds_domain_name
+  admin_password                  = module.vnet_shared.admin_password
+  admin_password_secret           = module.vnet_shared.admin_password_secret
+  admin_username                  = module.vnet_shared.admin_username
+  admin_username_secret           = module.vnet_shared.admin_username_secret
+  data_collection_endpoint_id     = module.vnet_shared.resource_ids["data_collection_endpoint"]
+  data_collection_rule_windows_id = module.vnet_shared.resource_ids["data_collection_rule_windows"]
+  key_vault_id                    = module.vnet_shared.resource_ids["key_vault"]
+  key_vault_name                  = module.vnet_shared.resource_names["key_vault"]
+  location                        = azurerm_resource_group.this.location
+  resource_group_name             = azurerm_resource_group.this.name
+  storage_account_id              = module.vnet_app[0].resource_ids["storage_account"]
+  storage_account_name            = module.vnet_app[0].resource_names["storage_account"]
+  storage_blob_endpoint           = module.vnet_app[0].storage_endpoints["blob"]
+  storage_container_name          = module.vnet_app[0].storage_container_name
+  subnet_id                       = module.vnet_app[0].subnets["snet-db-01"].id
+  tags                            = var.tags
 
   depends_on = [module.vnet_app[0].configure_azure_files_id] # Ensures that Azure Files is configured
 }
