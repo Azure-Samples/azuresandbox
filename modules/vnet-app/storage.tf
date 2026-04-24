@@ -64,13 +64,6 @@ resource "azurerm_storage_share" "this" {
 #endregion
 
 #region utility-resources
-resource "terraform_data" "storage_operations_complete" {
-  input = {
-    share = azurerm_storage_share.this.id
-    blobs = values(azurerm_storage_blob.remote_scripts)[*].id
-  }
-}
-
 resource "time_sleep" "wait_for_roles" {
   create_duration = "2m"
 

@@ -129,6 +129,9 @@ resource "terraform_data" "ampls_access_barrier" {
 
     # Signal from vnet-shared: AMPLS scoped services + AMA/DCR/DCE on adds1 + Key Vault diag setting.
     vnet_shared = module.vnet_shared.log_analytics_operations_complete
+
+    # Signal from vnet-app (conditional): AMPLS DNS zone links on vnet-app + AMA/DCR/DCE on jumpwin1 + ACR diag setting.
+    vnet_app = var.enable_module_vnet_app ? module.vnet_app[0].log_analytics_operations_complete : null
   }
 }
 
@@ -190,24 +193,26 @@ module "vnet_app" {
 
   count = var.enable_module_vnet_app ? 1 : 0
 
-  adds_domain_name              = module.vnet_shared.adds_domain_name
-  admin_password                = module.vnet_shared.admin_password
-  admin_password_secret         = module.vnet_shared.admin_password_secret
-  admin_username                = module.vnet_shared.admin_username
-  admin_username_secret         = module.vnet_shared.admin_username_secret
-  dns_server                    = module.vnet_shared.dns_server
-  firewall_route_table_id       = module.vnet_shared.resource_ids["firewall_route_table"]
-  key_vault_id                  = module.vnet_shared.resource_ids["key_vault"]
-  key_vault_name                = module.vnet_shared.resource_names["key_vault"]
-  location                      = azurerm_resource_group.this.location
-  log_analytics_workspace_id    = module.vnet_shared.resource_ids["log_analytics_workspace"]
-  private_dns_zones_vnet_shared = module.vnet_shared.private_dns_zones
-  resource_group_name           = azurerm_resource_group.this.name
-  tags                          = var.tags
-  unique_seed                   = module.naming.unique-seed
-  user_object_id                = var.user_object_id
-  virtual_network_shared_id     = module.vnet_shared.resource_ids["virtual_network_shared"]
-  virtual_network_shared_name   = module.vnet_shared.resource_names["virtual_network_shared"]
+  adds_domain_name                = module.vnet_shared.adds_domain_name
+  admin_password                  = module.vnet_shared.admin_password
+  admin_password_secret           = module.vnet_shared.admin_password_secret
+  admin_username                  = module.vnet_shared.admin_username
+  admin_username_secret           = module.vnet_shared.admin_username_secret
+  data_collection_endpoint_id     = module.vnet_shared.resource_ids["data_collection_endpoint"]
+  data_collection_rule_windows_id = module.vnet_shared.resource_ids["data_collection_rule_windows"]
+  dns_server                      = module.vnet_shared.dns_server
+  firewall_route_table_id         = module.vnet_shared.resource_ids["firewall_route_table"]
+  key_vault_id                    = module.vnet_shared.resource_ids["key_vault"]
+  key_vault_name                  = module.vnet_shared.resource_names["key_vault"]
+  location                        = azurerm_resource_group.this.location
+  log_analytics_workspace_id      = module.vnet_shared.resource_ids["log_analytics_workspace"]
+  private_dns_zones_vnet_shared   = module.vnet_shared.private_dns_zones
+  resource_group_name             = azurerm_resource_group.this.name
+  tags                            = var.tags
+  unique_seed                     = module.naming.unique-seed
+  user_object_id                  = var.user_object_id
+  virtual_network_shared_id       = module.vnet_shared.resource_ids["virtual_network_shared"]
+  virtual_network_shared_name     = module.vnet_shared.resource_names["virtual_network_shared"]
 
   depends_on = [module.vnet_shared.configure_adds_dns_id] # Ensures that the AD DS configuration is complete. Limits taint blast radius.
 }

@@ -132,6 +132,8 @@ admin_password |  | The password used when provisioning administrator accounts. 
 admin_password_secret | adminpassword | The name of the key vault secret that contains the password for the admin account. Defined in the *vnet-shared* module.
 admin_username | bootstrapadmin | The user name used when provisioning administrator accounts. This should conform to Windows username requirements (alphanumeric characters, periods, underscores, and hyphens, 1-20 characters).
 admin_username_secret | adminuser | The name of the key vault secret that contains the user name for the admin account. Defined in the *vnet-shared* module.
+data_collection_endpoint_id | | The ID of the data collection endpoint (DCE) to associate with jumpwin1.
+data_collection_rule_windows_id | | The ID of the Windows data collection rule (DCR) to associate with jumpwin1.
 dns_server |  | The IP address of the DNS server used for the virtual network. Defined in the *vnet-shared* module.
 firewall_route_table_id |  | The ID of the route table used for the firewall. Defined in the *vnet-shared* module.
 key_vault_id |  | The ID of the key vault defined in the root module.
@@ -168,6 +170,8 @@ This section lists the resources included in this configuration.
 Address | Name | Notes
 --- | --- | ---
 module.vnet_app[0].azurerm_container_registry.this | crsandboxdevxxxxxxxx | Shared container registry.
+module.vnet_app[0].azurerm_monitor_data_collection_rule_association.jumpwin1_dce | | Data collection endpoint association for jumpwin1.
+module.vnet_app[0].azurerm_monitor_data_collection_rule_association.jumpwin1_dcr | | Data collection rule association for jumpwin1.
 module.vnet_app[0].azurerm_monitor_diagnostic_setting.container_registry | | Diagnostic settings for container registry.
 module.vnet_app[0].azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;jumpwin1 | Network interface for the VM.
 module.vnet_app[0].azurerm_network_security_group.groups[*] | | NSGs for each subnet.
@@ -186,7 +190,8 @@ module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.openai.azure.com"
 module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.search.windows.net"] | | Private DNS zone for use with Foundry.
 module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.services.ai.azure.com"] | | Private DNS zone for use with Foundry.
 module.vnet_app[0].azurerm_private_dns_zone_virtual_network_link.vnet_app_links[*] | | Private DNS zone virtual network links for the application virtual network.
-module.vnet_app[0].azurerm_private_dns_zone_virtual_network_link.vnet_shared_links[*] | | Private DNS zone virtual network links for the shared services virtual network.
+module.vnet_app[0].azurerm_private_dns_zone_virtual_network_link.vnet_app_links_from_vnet_shared[*} | | Private DNS zone virtual network links for the applicatino virtual network for zones created in shared services virtual network.
+module.vnet_app[0].azurerm_private_dns_zone_virtual_network_link.vnet_shared_links[*] | | Private DNS zone virtual network links for the shared services virtual network for zones zreated in applicatiion virtual network.
 module.vnet_app[0].azurerm_private_endpoint.container_registry | pe&#8209;sand&#8209;dev&#8209;cr | Private endpoint for the blob storage endpoint.
 module.vnet_app[0].azurerm_private_endpoint.storage_blob | pe&#8209;sand&#8209;dev&#8209;storage&#8209;blob | Private endpoint for the blob storage endpoint.
 module.vnet_app[0].azurerm_private_endpoint.storage_file | pe&#8209;sand&#8209;dev&#8209;storage&#8209;file | Private endpoint for the file storage endpoint.
@@ -214,7 +219,7 @@ module.vnet_app[0].azurerm_windows_virtual_machine.this | jumpwin1 | Domain join
 
 This section includes a list of output variables returned by the module.
 
-Name | Default | Comments
+Name | Comments
 --- | --- | ---
 fqdns | | A map of fqdns for resources provisioned in the module.
 private_dns_zones | | A map of private DNS zones provisioned in the module.

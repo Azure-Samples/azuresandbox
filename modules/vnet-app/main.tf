@@ -1,5 +1,22 @@
 #region data
 data "azurerm_client_config" "current" {}
+
+resource "terraform_data" "log_analytics_operations_complete" {
+  input = {
+    ampls_dns_zone_links           = join(",", [for l in azurerm_private_dns_zone_virtual_network_link.vnet_app_links_from_vnet_shared : l.id])
+    container_registry_diagnostics = azurerm_monitor_diagnostic_setting.container_registry.id
+    jumpwin1_ama                   = azurerm_virtual_machine_extension.ama.id
+    jumpwin1_dcr_association       = azurerm_monitor_data_collection_rule_association.jumpwin1_dcr.id
+    jumpwin1_dce_association       = azurerm_monitor_data_collection_rule_association.jumpwin1_dce.id
+  }
+}
+
+resource "terraform_data" "storage_operations_complete" {
+  input = {
+    share = azurerm_storage_share.this.id
+    blobs = values(azurerm_storage_blob.remote_scripts)[*].id
+  }
+}
 #endregion
 
 #region resources
@@ -37,7 +54,6 @@ resource "azurerm_monitor_diagnostic_setting" "container_registry" {
     category = "AllMetrics"
   }
 }
-
 #endregion
 
 #region modules

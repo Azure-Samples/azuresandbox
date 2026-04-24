@@ -10,6 +10,11 @@ output "fqdns" {
   }
 }
 
+output "log_analytics_operations_complete" {
+  value       = terraform_data.log_analytics_operations_complete.id
+  description = "Dependency signal: AMA install and DCR/DCE associations on jumpwin1 are complete and AMPLS DNS zone links are in place. Consumed by the root ampls_access_barrier."
+}
+
 output "private_dns_zones" {
   value = azurerm_private_dns_zone.zones
 }
