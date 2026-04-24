@@ -115,19 +115,33 @@ Address | Name | Notes
 module.vnet_shared.azurerm_bastion_host.this | snap&#8209;sand&#8209;dev | The Azure Bastion used for secure RDP/SSH access to sandbox VMs.
 module.vnet_shared.azurerm_firewall.this | fw&#8209;sand&#8209;dev | The Azure Firewall used for network security.
 module.vnet_shared.azurerm_firewall_policy.this | awfp&#8209;sand&#8209;dev | The firewall policy. Threat intelligence mode is set to `Deny`.
-module.vnet_shared.azurerm_firewall_policy_rule_collection_group.this | | The firewall rules. Allows all outbound traffic for ports `80`, `443` and `1688` (Windows Activation).
+module.vnet_shared.azurerm_firewall_policy_rule_collection_group.this | fwprcg&#8209;sand&#8209;dev | The firewall rules. Allows all outbound traffic for ports `80`, `443` and `1688` (Windows Activation).
 module.vnet_shared.azurerm_key_vault.this | kv&#8209;sand&#8209;dev | The Azure Key Vault used to store secrets.
 module.vnet_shared.azurerm_key_vault_secret.adminpassword | adminpassword | Randomly generated admin password used for sandbox VMs and services.
 module.vnet_shared.azurerm_key_vault_secret.adminusername | adminuser | Admin username used for sandbox VMs and services, default is *bootstrapadmin*.
 module.vnet_shared.azurerm_key_vault_secret.spn_password | | The password for the service principal used for authenticating with Azure. The secret name is the same as the AppID / object id.
 module.vnet_shared.azurerm_log_analytics_workspace.this | log&#8209;sand&#8209;dev&#8209;xxx | The Log Analytics workspace used to collect logs and metrics from Azure resources.
-module.vnet_shared.azurerm_monitor_diagnostic_setting.this | | The Azure Monitor diagnostic setting used to send key vault logs and metrics to the Log Analytics workspace.
+module.vnet_shared.azurerm_monitor_data_collection_endpoint.this | dce&#8209;sand&#8209;dev&#8209;xxx | The data collection endpoint (DCE) for Azure Monitor.
+module.vnet_shared.azurerm_monitor_data_collection_rule.linux | dcr&#8209;sand&#8209;dev&#8209;linux | The data collection rules (DCR) for Linux VMs.
+module.vnet_shared.azurerm_monitor_data_collection_rule.windows | dcr&#8209;sand&#8209;dev&#8209;windows | The data collection rules (DCR) for Windows VMs.
+module.vnet_shared.azurerm_monitor_data_collection_rule_association.adds1_dce | configurationAccessEndpoint | Associates the DCE with adds1.
+module.vnet_shared.azurerm_monitor_data_collection_rule_association.adds1_dcr | dcr&#8209;sand&#8209;dev&#8209;adds1&#8209;association | Associates the DCR with adds1.
+module.vnet_shared.azurerm_monitor_diagnostic_setting.this | Audit Logs | The Azure Monitor diagnostic setting used to send key vault logs and metrics to the Log Analytics workspace.
+module.vnet_shared.azurerm_monitor_private_link_scope.this | ampls&#8209;sand&#8209;dev | The Azure Monitor Private Link Scope (AMPLS) resource.
+module.vnet_shared.azurerm_monitor_private_link_scoped_service.dce | ampls&#8209;scope&#8209;dce | Associates the AMPLS with the DCE.
+module.vnet_shared.azurerm_monitor_private_link_scoped_service.log_analytics | ampls&#8209;scope&#8209;log&#8209;analytics | Associates the AMPLS with the shared log analytics workspace.
 module.vnet_shared.azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;adds1 | Nic for *adds1* VM.
 module.vnet_shared.azurerm_network_security_group.groups[*] | | NSGs for each subnet except *AzureFirewallSubnet*.
 module.vnet_shared.azurerm_network_security_rule.rules[*] | | NSG rules for each NSG. See *locals.tf* for rule definitions.
-module.vnet_shared.azurerm_private_dns_zone.this | privatelink.vaultcore.azure.net | The private DNS zone for the key vault.
-module.vnet_shared.azurerm_private_dns_zone_virtual_network_link.this | | Links the private DNS zone for key vault to the virtual network.
-module.vnet_shared.azurerm_private_endpoint.this | | The private endpoint for the key vault.
+module.vnet_shared.azurerm_private_dns_zone.ampls["privatelink.agentsvc.azure-automation.net"] | | Private DNS zone for Azure Monitor Agent.
+module.vnet_shared.azurerm_private_dns_zone.ampls["privatelink.monitor.azure.com"] | | Private DNS zone for Azure Monitor.
+module.vnet_shared.azurerm_private_dns_zone.ampls["privatelink.ods.opinsights.azure.com"] | | Private DNS zone for Log Analytics data ingestion.
+module.vnet_shared.azurerm_private_dns_zone.ampls["privatelink.oms.opinsights.azure.com"] | | Private DNS zone for Log Analytics agent onboarding.
+module.vnet_shared.azurerm_private_dns_zone.key_vault | privatelink.vaultcore.azure.net | The private DNS zone for the key vault.
+module.vnet_shared.azurerm_private_dns_zone_virtual_network_link.ampls[*] | | Private DNS zone links to the virtual network.
+module.vnet_shared.azurerm_private_dns_zone_virtual_network_link.key_vault | link&#8209;privatelink.vaultcore.azure.net&#8209;vnet&#8209;sand&#8209;dev&#8209;shared | Links the private DNS zone for key vault to the virtual network.
+module.vnet_shared.azurerm_private_endpoint.ampls | pe&#8209;sand&#8209;dev&#8209;ampls | The private endpoint for Azure Monitor.
+module.vnet_shared.azurerm_private_endpoint.key_vault | pe&#8209;sand&#8209;dev&#8209;key&#8209;vault | The private endpoint for the key vault.
 module.vnet_shared.azurerm_public_ip.bastion | pip&#8209;sand&#8209;dev&#8209;bastion | Public IP for Azure Bastion.
 module.vnet_shared.azurerm_public_ip.firewall | pip&#8209;sand&#8209;dev&#8209;firewall | Public IP for Azure Firewall.
 module.vnet_shared.azurerm_role_assignment.roles[*] | | Assigns `Key Vault Secrets Officer` role to the service principal and user for managing key vault secrets.

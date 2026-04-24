@@ -110,6 +110,57 @@ resource "azapi_update_resource" "storage_disable_public_access" {
 
   body = { properties = { publicNetworkAccess = "Disabled" } }
 }
+
+# Barrier for AMPLS + Log Analytics public-access disable. Collects completion signals from
+# every module that installs Azure Monitor Agent or wires diagnostic settings into the
+# shared workspace. Downstream `azapi_update_resource` blocks reference this barrier's
+# output, creating an implicit dependency chain — no explicit depends_on needed.
+# Do not flip AMPLS/LA to PrivateOnly until every enabled module has confirmed its
+# telemetry pipeline is wired up, otherwise agents cannot complete initial onboarding.
+#
+# NOTE: This is root batch #1 of the incremental rollout (see AMPLS_IMPLEMENTATION_PLAN.md
+# Section 9, step 1f). Only `vnet_shared` is wired in at this stage. Subsequent batches
+# (1j, 1m, 1p) will append `vnet_app`, `vm_jumpbox_linux`, and `vm_mssql_win` signals as
+# each module is onboarded with AMA + DCR/DCE associations.
+resource "terraform_data" "ampls_access_barrier" {
+  input = {
+    ampls_id                   = module.vnet_shared.resource_ids["monitor_private_link_scope"]
+    log_analytics_workspace_id = module.vnet_shared.resource_ids["log_analytics_workspace"]
+
+    # Signal from vnet-shared: AMPLS scoped services + AMA/DCR/DCE on adds1 + Key Vault diag setting.
+    vnet_shared = module.vnet_shared.log_analytics_operations_complete
+  }
+}
+
+# Flip AMPLS access mode to PrivateOnly. All AMA agents must use the private endpoint for
+# ingestion and queries from this point on.
+resource "azapi_update_resource" "ampls_disable_public_access" {
+  type        = "microsoft.insights/privateLinkScopes@2021-07-01-preview"
+  resource_id = terraform_data.ampls_access_barrier.output.ampls_id
+
+  body = {
+    properties = {
+      accessModeSettings = {
+        ingestionAccessMode = "PrivateOnly"
+        queryAccessMode     = "PrivateOnly"
+      }
+    }
+  }
+}
+
+# Disable public network access on the Log Analytics workspace itself. AMPLS PrivateOnly
+# alone does not prevent ingestion from outside the scope; this closes that path too.
+resource "azapi_update_resource" "log_analytics_disable_public_ingestion" {
+  type        = "Microsoft.OperationalInsights/workspaces@2023-09-01"
+  resource_id = terraform_data.ampls_access_barrier.output.log_analytics_workspace_id
+
+  body = {
+    properties = {
+      publicNetworkAccessForIngestion = "Disabled"
+      publicNetworkAccessForQuery     = "Disabled"
+    }
+  }
+}
 #endregion
 
 #region required-modules
@@ -303,14 +354,14 @@ module "vnet_onprem" {
 
   count = var.enable_module_vnet_onprem ? 1 : 0
 
-  adds_domain_name_cloud  = module.vnet_shared.adds_domain_name
-  admin_password          = module.vnet_shared.admin_password
-  admin_username          = module.vnet_shared.admin_username
-  dns_server_cloud        = module.vnet_shared.dns_server
-  location                = azurerm_resource_group.this.location
-  resource_group_name     = azurerm_resource_group.this.name
-  subnets_cloud           = module.vnet_shared.subnets
-  tags                    = var.tags
+  adds_domain_name_cloud = module.vnet_shared.adds_domain_name
+  admin_password         = module.vnet_shared.admin_password
+  admin_username         = module.vnet_shared.admin_username
+  dns_server_cloud       = module.vnet_shared.dns_server
+  location               = azurerm_resource_group.this.location
+  resource_group_name    = azurerm_resource_group.this.name
+  subnets_cloud          = module.vnet_shared.subnets
+  tags                   = var.tags
 
   virtual_networks_cloud = {
     virtual_network_shared = {
