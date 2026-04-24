@@ -214,6 +214,8 @@ Variable | Default | Description
 --- | --- | ---
 adds_domain_name | mysandbox.local | The domain name defined in the vnet-shared module.
 admin_username | bootstrapadmin | The admin username. Defined in the vnet-shared module. *local* is appended to the username to avoid ambiguity between the local admin account for the vm and the domain admin account.
+data_collection_endpoint_id | | The DCE endpoint connected to jumplinux1.
+data_collection_rule_linux_id | | The DCR rules connected to jumplinux1.
 dns_server | `10.1.1.4` | The IP address of the DNS server used for the virtual network. Defined in the vnet-shared module.
 key_vault_id | | The ID of the key vault defined in the root module.
 key_vault_name | | The name of the key vault defined in the root module.

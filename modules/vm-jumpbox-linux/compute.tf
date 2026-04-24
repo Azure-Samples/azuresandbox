@@ -38,3 +38,30 @@ resource "azurerm_role_assignment" "kv_secrets_user_vm_linux" {
   role_definition_name = "Key Vault Secrets User"
   principal_id         = azurerm_linux_virtual_machine.this.identity[0].principal_id
 }
+
+#region azure-monitor-agent
+resource "azurerm_virtual_machine_extension" "ama" {
+  name                       = "AzureMonitorLinuxAgent"
+  virtual_machine_id         = azurerm_linux_virtual_machine.this.id
+  publisher                  = "Microsoft.Azure.Monitor"
+  type                       = "AzureMonitorLinuxAgent"
+  type_handler_version       = "1.33"
+  auto_upgrade_minor_version = true
+  automatic_upgrade_enabled  = true
+}
+
+resource "azurerm_monitor_data_collection_rule_association" "jumplinux1_dcr" {
+  name                    = "${module.naming.monitor_data_collection_rule.name}-${var.vm_jumpbox_linux_name}-association"
+  target_resource_id      = azurerm_linux_virtual_machine.this.id
+  data_collection_rule_id = var.data_collection_rule_linux_id
+
+  depends_on = [azurerm_virtual_machine_extension.ama]
+}
+
+resource "azurerm_monitor_data_collection_rule_association" "jumplinux1_dce" {
+  target_resource_id          = azurerm_linux_virtual_machine.this.id
+  data_collection_endpoint_id = var.data_collection_endpoint_id
+
+  depends_on = [azurerm_virtual_machine_extension.ama]
+}
+#endregion

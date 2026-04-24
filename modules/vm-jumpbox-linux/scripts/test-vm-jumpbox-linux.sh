@@ -222,6 +222,48 @@ if [ "$has_krb_ticket" = true ]; then
     write_log "Kerberos TGT destroyed"
 fi
 
+# AMA - Azure Monitor Agent systemd service is active.
+# Unlike the Windows agent, AMA on Linux registers a systemd unit (azuremonitoragent.service)
+# and the canonical health check is systemctl is-active.
+ama_status=$(systemctl is-active azuremonitoragent 2>/dev/null)
+if [ "$ama_status" = "active" ]; then
+    ama_version=$(dpkg-query -W -f='${Version}' azuremonitoragent 2>/dev/null)
+    if [ -z "$ama_version" ]; then
+        ama_version='unknown'
+    fi
+    write_test_result 'PASS' "AMA: azuremonitoragent.service is active (version $ama_version)"
+    passed=$((passed + 1))
+else
+    write_test_result 'FAIL' "AMA: azuremonitoragent.service is '$ama_status' (expected 'active')"
+    failed=$((failed + 1))
+fi
+
+# AMPLS DNS - well-known Azure Monitor control FQDN resolves to a private IP.
+# Confirms the privatelink.monitor.azure.com zone is linked to this VNet and the PE is reachable.
+ampls_fqdn='global.handler.control.monitor.azure.com'
+ampls_ip=$(getent hosts "$ampls_fqdn" 2>/dev/null | awk '{print $1}' | head -1)
+if [ -n "$ampls_ip" ]; then
+    if echo "$ampls_ip" | grep -qE '^10\.'; then
+        write_test_result 'PASS' "AMPLS DNS: '$ampls_fqdn' resolves to private IP '$ampls_ip'"
+        passed=$((passed + 1))
+    else
+        write_test_result 'FAIL' "AMPLS DNS: '$ampls_fqdn' resolved to '$ampls_ip' (expected private IP 10.x.x.x)"
+        failed=$((failed + 1))
+    fi
+else
+    write_test_result 'FAIL' "AMPLS DNS: '$ampls_fqdn' does not resolve"
+    failed=$((failed + 1))
+fi
+
+# AMPLS - TCP port 443 reachable on AMPLS private endpoint.
+if timeout 5 bash -c ">/dev/tcp/$ampls_fqdn/443" 2>/dev/null; then
+    write_test_result 'PASS' "AMPLS: TCP port 443 reachable on '$ampls_fqdn'"
+    passed=$((passed + 1))
+else
+    write_test_result 'FAIL' "AMPLS: TCP port 443 not reachable on '$ampls_fqdn'"
+    failed=$((failed + 1))
+fi
+
 # Summary
 total=$((passed + failed))
 write_test_result 'SUMMARY' "Passed: $passed Failed: $failed Total: $total"

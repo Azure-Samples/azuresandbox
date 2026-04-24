@@ -135,6 +135,9 @@ resource "terraform_data" "ampls_access_barrier" {
 
     # Signal from vm-mssql-win (conditional): AMA/DCR/DCE on mssqlwin1.
     vm_mssql_win = var.enable_module_vm_mssql_win ? module.vm_mssql_win[0].log_analytics_operations_complete : null
+
+    # Signal from vm-jumpbox-linux (conditional): AMA/DCR/DCE on jumplinux1.
+    vm_jumpbox_linux = var.enable_module_vm_jumpbox_linux ? module.vm_jumpbox_linux[0].log_analytics_operations_complete : null
   }
 }
 
@@ -225,17 +228,19 @@ module "vm_jumpbox_linux" {
 
   count = var.enable_module_vm_jumpbox_linux ? 1 : 0
 
-  adds_domain_name     = module.vnet_shared.adds_domain_name
-  admin_username       = module.vnet_shared.admin_username
-  dns_server           = module.vnet_shared.dns_server
-  key_vault_id         = module.vnet_shared.resource_ids["key_vault"]
-  key_vault_name       = module.vnet_shared.resource_names["key_vault"]
-  location             = azurerm_resource_group.this.location
-  resource_group_name  = azurerm_resource_group.this.name
-  storage_account_name = module.vnet_app[0].resource_names["storage_account"]
-  storage_share_name   = module.vnet_app[0].resource_names["storage_share"]
-  subnet_id            = module.vnet_app[0].subnets["snet-app-01"].id
-  tags                 = var.tags
+  adds_domain_name              = module.vnet_shared.adds_domain_name
+  admin_username                = module.vnet_shared.admin_username
+  data_collection_endpoint_id   = module.vnet_shared.resource_ids["data_collection_endpoint"]
+  data_collection_rule_linux_id = module.vnet_shared.resource_ids["data_collection_rule_linux"]
+  dns_server                    = module.vnet_shared.dns_server
+  key_vault_id                  = module.vnet_shared.resource_ids["key_vault"]
+  key_vault_name                = module.vnet_shared.resource_names["key_vault"]
+  location                      = azurerm_resource_group.this.location
+  resource_group_name           = azurerm_resource_group.this.name
+  storage_account_name          = module.vnet_app[0].resource_names["storage_account"]
+  storage_share_name            = module.vnet_app[0].resource_names["storage_share"]
+  subnet_id                     = module.vnet_app[0].subnets["snet-app-01"].id
+  tags                          = var.tags
 
   depends_on = [module.vnet_app[0].configure_azure_files_id] # Ensures that Azure Files is configured
 }
