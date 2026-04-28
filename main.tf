@@ -170,6 +170,28 @@ resource "azapi_update_resource" "log_analytics_disable_public_ingestion" {
     }
   }
 }
+
+# Disable public network access on the workspace-based Application Insights resource owned by
+# vnet-app. AMPLS PrivateOnly does not by itself prevent App Insights ingestion or queries
+# from public networks; flipping these App Insights flags closes that path. The implicit
+# dependency on the AMPLS access barrier ensures the App Insights resource and its scoped
+# service exist before public access is removed (the barrier triggers on
+# module.vnet_app.log_analytics_operations_complete which includes both signals).
+resource "azapi_update_resource" "app_insights_disable_public_access" {
+  count = var.enable_module_vnet_app ? 1 : 0
+
+  type        = "Microsoft.Insights/components@2020-02-02"
+  resource_id = module.vnet_app[0].resource_ids["application_insights"]
+
+  body = {
+    properties = {
+      publicNetworkAccessForIngestion = "Disabled"
+      publicNetworkAccessForQuery     = "Disabled"
+    }
+  }
+
+  depends_on = [terraform_data.ampls_access_barrier]
+}
 #endregion
 
 #region required-modules
@@ -212,6 +234,8 @@ module "vnet_app" {
   key_vault_name                  = module.vnet_shared.resource_names["key_vault"]
   location                        = azurerm_resource_group.this.location
   log_analytics_workspace_id      = module.vnet_shared.resource_ids["log_analytics_workspace"]
+  monitor_private_link_scope_id   = module.vnet_shared.resource_ids["monitor_private_link_scope"]
+  monitor_private_link_scope_name = module.vnet_shared.resource_names["monitor_private_link_scope"]
   private_dns_zones_vnet_shared   = module.vnet_shared.private_dns_zones
   resource_group_name             = azurerm_resource_group.this.name
   tags                            = var.tags

@@ -1,3 +1,9 @@
+output "app_insights_connection_string" {
+  value       = azurerm_application_insights.this.connection_string
+  sensitive   = true
+  description = "Application Insights connection string. Use this in application code instead of the legacy instrumentation key."
+}
+
 output "configure_azure_files_id" {
   value = azurerm_virtual_machine_extension.configure_azure_files.id
 }
@@ -21,6 +27,7 @@ output "private_dns_zones" {
 
 output "resource_ids" {
   value = {
+    application_insights     = azurerm_application_insights.this.id
     container_registry       = azurerm_container_registry.this.id
     storage_account          = azurerm_storage_account.this.id
     storage_share            = azurerm_storage_share.this.id
@@ -31,17 +38,12 @@ output "resource_ids" {
 
 output "resource_names" {
   value = {
+    application_insights     = azurerm_application_insights.this.name
     container_registry       = azurerm_container_registry.this.name
     storage_account          = azurerm_storage_account.this.name
     storage_share            = azurerm_storage_share.this.name
     virtual_machine_jumpwin1 = azurerm_windows_virtual_machine.this.name
     virtual_network_app      = azurerm_virtual_network.this.name
-  }
-}
-
-output "virtual_machine_jumpwin1_identity" {
-  value = {
-    principal_id = azurerm_windows_virtual_machine.this.identity[0].principal_id
   }
 }
 
@@ -63,4 +65,10 @@ output "subnets" {
 output "storage_operations_complete" {
   value       = terraform_data.storage_operations_complete.id
   description = "Dependency signal: all storage data plane operations in this module are complete."
+}
+
+output "virtual_machine_jumpwin1_identity" {
+  value = {
+    principal_id = azurerm_windows_virtual_machine.this.identity[0].principal_id
+  }
 }

@@ -141,6 +141,26 @@ variable "log_analytics_workspace_id" {
   }
 }
 
+variable "monitor_private_link_scope_id" {
+  type        = string
+  description = "The ID of the Azure Monitor Private Link Scope (AMPLS) owned by vnet-shared. Used to register Application Insights as a scoped service."
+
+  validation {
+    condition     = can(regex("^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[a-zA-Z0-9._()-]+/providers/[Mm]icrosoft\\.[Ii]nsights/privateLinkScopes/[a-zA-Z0-9._()-]+$", var.monitor_private_link_scope_id))
+    error_message = "Must be a valid Azure Monitor Private Link Scope resource ID in the format '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Insights/privateLinkScopes/{amplsName}'."
+  }
+}
+
+variable "monitor_private_link_scope_name" {
+  type        = string
+  description = "The name of the Azure Monitor Private Link Scope (AMPLS) owned by vnet-shared. Required by azurerm_monitor_private_link_scoped_service."
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9._()-]{1,255}$", var.monitor_private_link_scope_name))
+    error_message = "Must conform to AMPLS naming requirements: alphanumeric characters, periods (.), underscores (_), parentheses (()), and hyphens (-), 1-255 characters."
+  }
+}
+
 variable "private_dns_zones_vnet_shared" {
   type        = map(any)
   description = "A map of private DNS zones defined in vnet-shared module."

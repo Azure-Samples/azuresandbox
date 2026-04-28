@@ -193,5 +193,16 @@ locals {
       role_definition_name = "Storage Blob Data Reader"
       scope                = azurerm_storage_account.this.id
     }
+    # Required for unit-test ARM GETs against Application Insights
+    # (Microsoft.Insights/components/read) and the AMPLS scoped service
+    # (Microsoft.Insights/privateLinkScopes/scopedResources/read). Scoped to the
+    # resource group so the same grant covers both resource types and any future
+    # Monitor-resource read paths consumed by Test-VnetApp.ps1.
+    monitoring_reader_vm_win = {
+      principal_id         = azurerm_windows_virtual_machine.this.identity[0].principal_id
+      principal_type       = "ServicePrincipal"
+      role_definition_name = "Monitoring Reader"
+      scope                = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/resourceGroups/${var.resource_group_name}"
+    }
   }
 }
