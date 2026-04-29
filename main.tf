@@ -244,7 +244,7 @@ module "vnet_app" {
   virtual_network_shared_id       = module.vnet_shared.resource_ids["virtual_network_shared"]
   virtual_network_shared_name     = module.vnet_shared.resource_names["virtual_network_shared"]
 
-  depends_on = [module.vnet_shared.configure_adds_dns_id] # Ensures that the AD DS configuration is complete. Limits taint blast radius.
+  depends_on = [module.vnet_shared.log_analytics_operations_complete] # Transitively waits for AD DS config + all vnet-shared AMPLS-touching writes (PE, scoped services, DNS links, adds1 DCR/DCE). Eliminates 409 race on vnet-app's AMPLS scoped service. Limits taint blast radius. See AMPLS_IMPLEMENTATION_PLAN.md Phase 2a.
 }
 
 module "vm_jumpbox_linux" {

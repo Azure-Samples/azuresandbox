@@ -80,10 +80,13 @@ resource "azurerm_application_insights" "this" {
 # flows over the existing AMPLS private endpoint and resolves via privatelink.monitor.azure.com.
 # The scoped-service attachment is a control-plane PATCH on the parent AMPLS and serializes
 # server-side with sibling scoped-service writes -- if Terraform issues this concurrently with
-# another scope mutation, Azure returns 409 AnotherOperationInProgress. depends_on enforces
-# ordering relative to the App Insights resource; vnet-shared does not export individual
-# sibling scoped-service IDs so a second `terraform apply` may be required if a 409 surfaces.
-# The retry is idempotent. See AMPLS_IMPLEMENTATION_PLAN.md "Lessons from steps 1a-1g" #1.
+# another scope mutation, Azure returns 409 AnotherOperationInProgress. Cross-module
+# serialization is enforced at the root level via
+# `module.vnet_app.depends_on = [module.vnet_shared.log_analytics_operations_complete]`,
+# which transitively waits for every vnet-shared AMPLS-touching write to settle before any
+# vnet-app resource is created. The intra-module depends_on below orders this resource after
+# the App Insights it points at and the AMPLS scope it attaches to.
+# See AMPLS_IMPLEMENTATION_PLAN.md "Lessons from steps 1a-1g" #1 and #8, and Phase 2a.
 resource "azurerm_monitor_private_link_scoped_service" "app_insights" {
   name                = "ampls-scope-app-insights"
   resource_group_name = var.resource_group_name
