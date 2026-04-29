@@ -49,6 +49,26 @@ variable "admin_username_secret" {
   }
 }
 
+variable "data_collection_endpoint_id" {
+  type        = string
+  description = "The ID of the data collection endpoint (DCE) to associate with mssqlwin1."
+
+  validation {
+    condition     = can(regex("^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[a-zA-Z0-9._()-]+/providers/Microsoft.Insights/dataCollectionEndpoints/[a-zA-Z0-9-]+$", var.data_collection_endpoint_id))
+    error_message = "Must be a valid Azure Data Collection Endpoint resource ID in the format '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Insights/dataCollectionEndpoints/{dceName}'."
+  }
+}
+
+variable "data_collection_rule_windows_id" {
+  type        = string
+  description = "The ID of the Windows data collection rule (DCR) to associate with mssqlwin1."
+
+  validation {
+    condition     = can(regex("^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[a-zA-Z0-9._()-]+/providers/Microsoft.Insights/dataCollectionRules/[a-zA-Z0-9-]+$", var.data_collection_rule_windows_id))
+    error_message = "Must be a valid Azure Data Collection Rule resource ID in the format '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Insights/dataCollectionRules/{dcrName}'."
+  }
+}
+
 variable "key_vault_id" {
   type        = string
   description = "The existing key vault where secrets are stored"

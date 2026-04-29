@@ -1,5 +1,5 @@
 terraform {
-  required_version = "~> 1.14.8"
+  required_version = "~> 1.14.9"
 
   required_providers {
     azapi = {
@@ -9,7 +9,7 @@ terraform {
     
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 4.69.0"
+      version = "~> 4.70.0"
     }
 
     cloudinit = {

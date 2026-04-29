@@ -128,16 +128,21 @@ This section lists the default values for the input variables used in this modul
 Variable | Default | Description
 --- | --- | ---
 adds_domain_name | mysandbox.local | The AD DS domain name defined in the *vnet-shared* module.
-admin_password |  | The password used when provisioning administrator accounts. This should be a strong password that meets Azure's complexity requirements.
+admin_password | | The password used when provisioning administrator accounts. This should be a strong password that meets Azure's complexity requirements.
 admin_password_secret | adminpassword | The name of the key vault secret that contains the password for the admin account. Defined in the *vnet-shared* module.
 admin_username | bootstrapadmin | The user name used when provisioning administrator accounts. This should conform to Windows username requirements (alphanumeric characters, periods, underscores, and hyphens, 1-20 characters).
 admin_username_secret | adminuser | The name of the key vault secret that contains the user name for the admin account. Defined in the *vnet-shared* module.
-dns_server |  | The IP address of the DNS server used for the virtual network. Defined in the *vnet-shared* module.
-firewall_route_table_id |  | The ID of the route table used for the firewall. Defined in the *vnet-shared* module.
-key_vault_id |  | The ID of the key vault defined in the root module.
-key_vault_name |  | The name of the key vault defined in the root module.
-location |  | The Azure region defined in the root module.
-resource_group_name |  | The name of the resource group defined in the root module.
+data_collection_endpoint_id | | The ID of the data collection endpoint (DCE) to associate with jumpwin1.
+data_collection_rule_windows_id | | The ID of the Windows data collection rule (DCR) to associate with jumpwin1.
+dns_server | | The IP address of the DNS server used for the virtual network. Defined in the *vnet-shared* module.
+firewall_route_table_id | | The ID of the route table used for the firewall. Defined in the *vnet-shared* module.
+key_vault_id | | The ID of the key vault defined in the root module.
+key_vault_name | | The name of the key vault defined in the root module.
+location | | The Azure region defined in the root module.
+log_analytics_workspace_id | | The ID of the shared log analytics workspace.
+monitor_private_link_scope_id | | The ID of the Azure Monitor Private Link Scope (AMPLS) owned by vnet-shared. Used to register Application Insights as a scoped service.
+monitor_private_link_scope_name | | The name of the Azure Monitor Private Link Scope (AMPLS) owned by vnet-shared. Required by azurerm_monitor_private_link_scoped_service.
+resource_group_name | | The name of the resource group defined in the root module.
 storage_container_name | scripts | The name of the storage container used to store scripts.
 storage_share_name | myfileshare | The name of the Azure Files share.
 storage_share_quota_gb | 1024 | The quota for the Azure Files share in GB.
@@ -146,11 +151,11 @@ subnet_appservice_address_prefix | 10.2.4.0/24 | The address prefix for the app 
 subnet_database_address_prefix | 10.2.1.0/24 | The address prefix for the database subnet.
 subnet_misc_address_prefix | 10.2.3.0/24 | The address prefix for the miscellaneous subnet.
 subnet_privatelink_address_prefix | 10.2.2.0/24 | The address prefix for the private link subnet.
-tags |  | The tags defined in the root module.
-unique_seed |  | The unique seed used to generate unique names for resources. Defined in the root module.
-user_object_id |  | The object ID of the interactive user. Defined in the root module.
-virtual_network_shared_id |  | The resource ID of the shared services virtual network.  Defined in the *vnet-shared*  module.
-virtual_network_shared_name |  | The name of the shared services virtual network.  Defined in the *vnet-shared* module.
+tags | | The tags defined in the root module.
+unique_seed | | The unique seed used to generate unique names for resources. Defined in the root module.
+user_object_id | | The object ID of the interactive user. Defined in the root module.
+virtual_network_shared_id | | The resource ID of the shared services virtual network.  Defined in the *vnet-shared*  module.
+virtual_network_shared_name | | The name of the shared services virtual network.  Defined in the *vnet-shared* module.
 vm_jumpbox_win_image_offer | `WindowsServer` | The offer type of the virtual machine image used to create the VM.
 vm_jumpbox_win_image_publisher | `MicrosoftWindowsServer` | The publisher for the virtual machine image used to create VM.
 vm_jumpbox_win_image_sku | `2025-datacenter-azure-edition` | The SKU for the virtual machine image used to create the VM.
@@ -167,8 +172,12 @@ This section lists the resources included in this configuration.
 
 Address | Name | Notes
 --- | --- | ---
+module.vnet_app[0].azurerm_application_insights.this | appi-sand-dev-xxx | Workspace-based Application Insights linked to the shared Log Analytics workspace.
 module.vnet_app[0].azurerm_container_registry.this | crsandboxdevxxxxxxxx | Shared container registry.
+module.vnet_app[0].azurerm_monitor_data_collection_rule_association.jumpwin1_dce | | Data collection endpoint association for jumpwin1.
+module.vnet_app[0].azurerm_monitor_data_collection_rule_association.jumpwin1_dcr | | Data collection rule association for jumpwin1.
 module.vnet_app[0].azurerm_monitor_diagnostic_setting.container_registry | | Diagnostic settings for container registry.
+module.vnet_app[0].azurerm_monitor_private_link_scoped_service.app_insights | | Adds app insights to the AMPLS scoped services.
 module.vnet_app[0].azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;jumpwin1 | Network interface for the VM.
 module.vnet_app[0].azurerm_network_security_group.groups[*] | | NSGs for each subnet.
 module.vnet_app[0].azurerm_network_security_rule.rules[*] | | NSG rules for each NSG. See *locals.tf* for rule definitions.
@@ -186,7 +195,8 @@ module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.openai.azure.com"
 module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.search.windows.net"] | | Private DNS zone for use with Foundry.
 module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.services.ai.azure.com"] | | Private DNS zone for use with Foundry.
 module.vnet_app[0].azurerm_private_dns_zone_virtual_network_link.vnet_app_links[*] | | Private DNS zone virtual network links for the application virtual network.
-module.vnet_app[0].azurerm_private_dns_zone_virtual_network_link.vnet_shared_links[*] | | Private DNS zone virtual network links for the shared services virtual network.
+module.vnet_app[0].azurerm_private_dns_zone_virtual_network_link.vnet_app_links_from_vnet_shared[*} | | Private DNS zone virtual network links for the applicatino virtual network for zones created in shared services virtual network.
+module.vnet_app[0].azurerm_private_dns_zone_virtual_network_link.vnet_shared_links[*] | | Private DNS zone virtual network links for the shared services virtual network for zones zreated in applicatiion virtual network.
 module.vnet_app[0].azurerm_private_endpoint.container_registry | pe&#8209;sand&#8209;dev&#8209;cr | Private endpoint for the blob storage endpoint.
 module.vnet_app[0].azurerm_private_endpoint.storage_blob | pe&#8209;sand&#8209;dev&#8209;storage&#8209;blob | Private endpoint for the blob storage endpoint.
 module.vnet_app[0].azurerm_private_endpoint.storage_file | pe&#8209;sand&#8209;dev&#8209;storage&#8209;file | Private endpoint for the file storage endpoint.
@@ -214,8 +224,9 @@ module.vnet_app[0].azurerm_windows_virtual_machine.this | jumpwin1 | Domain join
 
 This section includes a list of output variables returned by the module.
 
-Name | Default | Comments
+Name | Comments
 --- | --- | ---
+app_insights_connection_string | | Application Insights connection string. Use this in application code instead of the legacy instrumentation key.
 fqdns | | A map of fqdns for resources provisioned in the module.
 private_dns_zones | | A map of private DNS zones provisioned in the module.
 resource_ids | | A map of resource IDs for key resources in the module.

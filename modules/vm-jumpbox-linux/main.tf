@@ -51,3 +51,13 @@ module "naming" {
   suffix  = [var.tags["project"], var.tags["environment"]]
 }
 #endregion
+
+#region utility-resources
+resource "terraform_data" "log_analytics_operations_complete" {
+  input = {
+    jumplinux1_ama             = azurerm_virtual_machine_extension.ama.id
+    jumplinux1_dcr_association = azurerm_monitor_data_collection_rule_association.jumplinux1_dcr.id
+    jumplinux1_dce_association = azurerm_monitor_data_collection_rule_association.jumplinux1_dce.id
+  }
+}
+#endregion

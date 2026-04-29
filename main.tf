@@ -110,6 +110,88 @@ resource "azapi_update_resource" "storage_disable_public_access" {
 
   body = { properties = { publicNetworkAccess = "Disabled" } }
 }
+
+# Barrier for AMPLS + Log Analytics public-access disable. Collects completion signals from
+# every module that installs Azure Monitor Agent or wires diagnostic settings into the
+# shared workspace. Downstream `azapi_update_resource` blocks reference this barrier's
+# output, creating an implicit dependency chain — no explicit depends_on needed.
+# Do not flip AMPLS/LA to PrivateOnly until every enabled module has confirmed its
+# telemetry pipeline is wired up, otherwise agents cannot complete initial onboarding.
+#
+# NOTE: This is root batch #1 of the incremental rollout (see AMPLS_IMPLEMENTATION_PLAN.md
+# Section 9, step 1f). Only `vnet_shared` is wired in at this stage. Subsequent batches
+# (1j, 1m, 1p) will append `vnet_app`, `vm_jumpbox_linux`, and `vm_mssql_win` signals as
+# each module is onboarded with AMA + DCR/DCE associations.
+resource "terraform_data" "ampls_access_barrier" {
+  input = {
+    ampls_id                   = module.vnet_shared.resource_ids["monitor_private_link_scope"]
+    log_analytics_workspace_id = module.vnet_shared.resource_ids["log_analytics_workspace"]
+
+    # Signal from vnet-shared: AMPLS scoped services + AMA/DCR/DCE on adds1 + Key Vault diag setting.
+    vnet_shared = module.vnet_shared.log_analytics_operations_complete
+
+    # Signal from vnet-app (conditional): AMPLS DNS zone links on vnet-app + AMA/DCR/DCE on jumpwin1 + ACR diag setting.
+    vnet_app = var.enable_module_vnet_app ? module.vnet_app[0].log_analytics_operations_complete : null
+
+    # Signal from vm-mssql-win (conditional): AMA/DCR/DCE on mssqlwin1.
+    vm_mssql_win = var.enable_module_vm_mssql_win ? module.vm_mssql_win[0].log_analytics_operations_complete : null
+
+    # Signal from vm-jumpbox-linux (conditional): AMA/DCR/DCE on jumplinux1.
+    vm_jumpbox_linux = var.enable_module_vm_jumpbox_linux ? module.vm_jumpbox_linux[0].log_analytics_operations_complete : null
+  }
+}
+
+# Flip AMPLS access mode to PrivateOnly. All AMA agents must use the private endpoint for
+# ingestion and queries from this point on.
+resource "azapi_update_resource" "ampls_disable_public_access" {
+  type        = "microsoft.insights/privateLinkScopes@2021-07-01-preview"
+  resource_id = terraform_data.ampls_access_barrier.output.ampls_id
+
+  body = {
+    properties = {
+      accessModeSettings = {
+        ingestionAccessMode = "PrivateOnly"
+        queryAccessMode     = "PrivateOnly"
+      }
+    }
+  }
+}
+
+# Disable public network access on the Log Analytics workspace itself. AMPLS PrivateOnly
+# alone does not prevent ingestion from outside the scope; this closes that path too.
+resource "azapi_update_resource" "log_analytics_disable_public_ingestion" {
+  type        = "Microsoft.OperationalInsights/workspaces@2023-09-01"
+  resource_id = terraform_data.ampls_access_barrier.output.log_analytics_workspace_id
+
+  body = {
+    properties = {
+      publicNetworkAccessForIngestion = "Disabled"
+      publicNetworkAccessForQuery     = "Disabled"
+    }
+  }
+}
+
+# Disable public network access on the workspace-based Application Insights resource owned by
+# vnet-app. AMPLS PrivateOnly does not by itself prevent App Insights ingestion or queries
+# from public networks; flipping these App Insights flags closes that path. The implicit
+# dependency on the AMPLS access barrier ensures the App Insights resource and its scoped
+# service exist before public access is removed (the barrier triggers on
+# module.vnet_app.log_analytics_operations_complete which includes both signals).
+resource "azapi_update_resource" "app_insights_disable_public_access" {
+  count = var.enable_module_vnet_app ? 1 : 0
+
+  type        = "Microsoft.Insights/components@2020-02-02"
+  resource_id = module.vnet_app[0].resource_ids["application_insights"]
+
+  body = {
+    properties = {
+      publicNetworkAccessForIngestion = "Disabled"
+      publicNetworkAccessForQuery     = "Disabled"
+    }
+  }
+
+  depends_on = [terraform_data.ampls_access_barrier]
+}
 #endregion
 
 #region required-modules
@@ -139,26 +221,30 @@ module "vnet_app" {
 
   count = var.enable_module_vnet_app ? 1 : 0
 
-  adds_domain_name              = module.vnet_shared.adds_domain_name
-  admin_password                = module.vnet_shared.admin_password
-  admin_password_secret         = module.vnet_shared.admin_password_secret
-  admin_username                = module.vnet_shared.admin_username
-  admin_username_secret         = module.vnet_shared.admin_username_secret
-  dns_server                    = module.vnet_shared.dns_server
-  firewall_route_table_id       = module.vnet_shared.resource_ids["firewall_route_table"]
-  key_vault_id                  = module.vnet_shared.resource_ids["key_vault"]
-  key_vault_name                = module.vnet_shared.resource_names["key_vault"]
-  location                      = azurerm_resource_group.this.location
-  log_analytics_workspace_id    = module.vnet_shared.resource_ids["log_analytics_workspace"]
-  private_dns_zones_vnet_shared = module.vnet_shared.private_dns_zones
-  resource_group_name           = azurerm_resource_group.this.name
-  tags                          = var.tags
-  unique_seed                   = module.naming.unique-seed
-  user_object_id                = var.user_object_id
-  virtual_network_shared_id     = module.vnet_shared.resource_ids["virtual_network_shared"]
-  virtual_network_shared_name   = module.vnet_shared.resource_names["virtual_network_shared"]
+  adds_domain_name                = module.vnet_shared.adds_domain_name
+  admin_password                  = module.vnet_shared.admin_password
+  admin_password_secret           = module.vnet_shared.admin_password_secret
+  admin_username                  = module.vnet_shared.admin_username
+  admin_username_secret           = module.vnet_shared.admin_username_secret
+  data_collection_endpoint_id     = module.vnet_shared.resource_ids["data_collection_endpoint"]
+  data_collection_rule_windows_id = module.vnet_shared.resource_ids["data_collection_rule_windows"]
+  dns_server                      = module.vnet_shared.dns_server
+  firewall_route_table_id         = module.vnet_shared.resource_ids["firewall_route_table"]
+  key_vault_id                    = module.vnet_shared.resource_ids["key_vault"]
+  key_vault_name                  = module.vnet_shared.resource_names["key_vault"]
+  location                        = azurerm_resource_group.this.location
+  log_analytics_workspace_id      = module.vnet_shared.resource_ids["log_analytics_workspace"]
+  monitor_private_link_scope_id   = module.vnet_shared.resource_ids["monitor_private_link_scope"]
+  monitor_private_link_scope_name = module.vnet_shared.resource_names["monitor_private_link_scope"]
+  private_dns_zones_vnet_shared   = module.vnet_shared.private_dns_zones
+  resource_group_name             = azurerm_resource_group.this.name
+  tags                            = var.tags
+  unique_seed                     = module.naming.unique-seed
+  user_object_id                  = var.user_object_id
+  virtual_network_shared_id       = module.vnet_shared.resource_ids["virtual_network_shared"]
+  virtual_network_shared_name     = module.vnet_shared.resource_names["virtual_network_shared"]
 
-  depends_on = [module.vnet_shared.configure_adds_dns_id] # Ensures that the AD DS configuration is complete. Limits taint blast radius.
+  depends_on = [module.vnet_shared.log_analytics_operations_complete] # Transitively waits for AD DS config + all vnet-shared AMPLS-touching writes (PE, scoped services, DNS links, adds1 DCR/DCE). Eliminates 409 race on vnet-app's AMPLS scoped service. Limits taint blast radius. See AMPLS_IMPLEMENTATION_PLAN.md Phase 2a.
 }
 
 module "vm_jumpbox_linux" {
@@ -166,17 +252,19 @@ module "vm_jumpbox_linux" {
 
   count = var.enable_module_vm_jumpbox_linux ? 1 : 0
 
-  adds_domain_name     = module.vnet_shared.adds_domain_name
-  admin_username       = module.vnet_shared.admin_username
-  dns_server           = module.vnet_shared.dns_server
-  key_vault_id         = module.vnet_shared.resource_ids["key_vault"]
-  key_vault_name       = module.vnet_shared.resource_names["key_vault"]
-  location             = azurerm_resource_group.this.location
-  resource_group_name  = azurerm_resource_group.this.name
-  storage_account_name = module.vnet_app[0].resource_names["storage_account"]
-  storage_share_name   = module.vnet_app[0].resource_names["storage_share"]
-  subnet_id            = module.vnet_app[0].subnets["snet-app-01"].id
-  tags                 = var.tags
+  adds_domain_name              = module.vnet_shared.adds_domain_name
+  admin_username                = module.vnet_shared.admin_username
+  data_collection_endpoint_id   = module.vnet_shared.resource_ids["data_collection_endpoint"]
+  data_collection_rule_linux_id = module.vnet_shared.resource_ids["data_collection_rule_linux"]
+  dns_server                    = module.vnet_shared.dns_server
+  key_vault_id                  = module.vnet_shared.resource_ids["key_vault"]
+  key_vault_name                = module.vnet_shared.resource_names["key_vault"]
+  location                      = azurerm_resource_group.this.location
+  resource_group_name           = azurerm_resource_group.this.name
+  storage_account_name          = module.vnet_app[0].resource_names["storage_account"]
+  storage_share_name            = module.vnet_app[0].resource_names["storage_share"]
+  subnet_id                     = module.vnet_app[0].subnets["snet-app-01"].id
+  tags                          = var.tags
 
   depends_on = [module.vnet_app[0].configure_azure_files_id] # Ensures that Azure Files is configured
 }
@@ -186,21 +274,23 @@ module "vm_mssql_win" {
 
   count = var.enable_module_vm_mssql_win ? 1 : 0
 
-  adds_domain_name       = module.vnet_shared.adds_domain_name
-  admin_password         = module.vnet_shared.admin_password
-  admin_password_secret  = module.vnet_shared.admin_password_secret
-  admin_username         = module.vnet_shared.admin_username
-  admin_username_secret  = module.vnet_shared.admin_username_secret
-  key_vault_id           = module.vnet_shared.resource_ids["key_vault"]
-  key_vault_name         = module.vnet_shared.resource_names["key_vault"]
-  location               = azurerm_resource_group.this.location
-  resource_group_name    = azurerm_resource_group.this.name
-  storage_account_id     = module.vnet_app[0].resource_ids["storage_account"]
-  storage_account_name   = module.vnet_app[0].resource_names["storage_account"]
-  storage_blob_endpoint  = module.vnet_app[0].storage_endpoints["blob"]
-  storage_container_name = module.vnet_app[0].storage_container_name
-  subnet_id              = module.vnet_app[0].subnets["snet-db-01"].id
-  tags                   = var.tags
+  adds_domain_name                = module.vnet_shared.adds_domain_name
+  admin_password                  = module.vnet_shared.admin_password
+  admin_password_secret           = module.vnet_shared.admin_password_secret
+  admin_username                  = module.vnet_shared.admin_username
+  admin_username_secret           = module.vnet_shared.admin_username_secret
+  data_collection_endpoint_id     = module.vnet_shared.resource_ids["data_collection_endpoint"]
+  data_collection_rule_windows_id = module.vnet_shared.resource_ids["data_collection_rule_windows"]
+  key_vault_id                    = module.vnet_shared.resource_ids["key_vault"]
+  key_vault_name                  = module.vnet_shared.resource_names["key_vault"]
+  location                        = azurerm_resource_group.this.location
+  resource_group_name             = azurerm_resource_group.this.name
+  storage_account_id              = module.vnet_app[0].resource_ids["storage_account"]
+  storage_account_name            = module.vnet_app[0].resource_names["storage_account"]
+  storage_blob_endpoint           = module.vnet_app[0].storage_endpoints["blob"]
+  storage_container_name          = module.vnet_app[0].storage_container_name
+  subnet_id                       = module.vnet_app[0].subnets["snet-db-01"].id
+  tags                            = var.tags
 
   depends_on = [module.vnet_app[0].configure_azure_files_id] # Ensures that Azure Files is configured
 }
@@ -303,14 +393,14 @@ module "vnet_onprem" {
 
   count = var.enable_module_vnet_onprem ? 1 : 0
 
-  adds_domain_name_cloud  = module.vnet_shared.adds_domain_name
-  admin_password          = module.vnet_shared.admin_password
-  admin_username          = module.vnet_shared.admin_username
-  dns_server_cloud        = module.vnet_shared.dns_server
-  location                = azurerm_resource_group.this.location
-  resource_group_name     = azurerm_resource_group.this.name
-  subnets_cloud           = module.vnet_shared.subnets
-  tags                    = var.tags
+  adds_domain_name_cloud = module.vnet_shared.adds_domain_name
+  admin_password         = module.vnet_shared.admin_password
+  admin_username         = module.vnet_shared.admin_username
+  dns_server_cloud       = module.vnet_shared.dns_server
+  location               = azurerm_resource_group.this.location
+  resource_group_name    = azurerm_resource_group.this.name
+  subnets_cloud          = module.vnet_shared.subnets
+  tags                   = var.tags
 
   virtual_networks_cloud = {
     virtual_network_shared = {

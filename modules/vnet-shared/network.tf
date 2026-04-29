@@ -172,19 +172,19 @@ resource "azurerm_public_ip" "firewall" {
 #endregion
 
 #region private-endpoints
-resource "azurerm_private_dns_zone" "this" {
+resource "azurerm_private_dns_zone" "key_vault" {
   name                = "privatelink.vaultcore.azure.net"
   resource_group_name = var.resource_group_name
 }
 
-resource "azurerm_private_dns_zone_virtual_network_link" "this" {
-  name                  = "link-${azurerm_private_dns_zone.this.name}-${azurerm_virtual_network.this.name}"
+resource "azurerm_private_dns_zone_virtual_network_link" "key_vault" {
+  name                  = "link-${azurerm_private_dns_zone.key_vault.name}-${azurerm_virtual_network.this.name}"
   resource_group_name   = var.resource_group_name
-  private_dns_zone_name = azurerm_private_dns_zone.this.name
+  private_dns_zone_name = azurerm_private_dns_zone.key_vault.name
   virtual_network_id    = azurerm_virtual_network.this.id
 }
 
-resource "azurerm_private_endpoint" "this" {
+resource "azurerm_private_endpoint" "key_vault" {
   name                = "${module.naming.private_endpoint.name}-key-vault"
   resource_group_name = var.resource_group_name
   location            = var.location
@@ -199,8 +199,60 @@ resource "azurerm_private_endpoint" "this" {
 
   private_dns_zone_group {
     name                 = "default"
-    private_dns_zone_ids = [azurerm_private_dns_zone.this.id]
+    private_dns_zone_ids = [azurerm_private_dns_zone.key_vault.id]
   }
+}
+
+resource "azurerm_private_dns_zone" "ampls" {
+  for_each = toset([
+    "privatelink.monitor.azure.com",            # App Insights ingestion + Live Metrics + API; AMA config pull
+    "privatelink.oms.opinsights.azure.com",     # Log Analytics agent onboarding / registration
+    "privatelink.ods.opinsights.azure.com",     # Log Analytics data ingestion (log writes)
+    "privatelink.agentsvc.azure-automation.net" # Legacy agent service channel
+  ])
+
+  name                = each.value
+  resource_group_name = var.resource_group_name
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "ampls" {
+  for_each = azurerm_private_dns_zone.ampls
+
+  name                  = "link-${each.value.name}-${azurerm_virtual_network.this.name}"
+  resource_group_name   = var.resource_group_name
+  private_dns_zone_name = each.value.name
+  virtual_network_id    = azurerm_virtual_network.this.id
+}
+
+resource "azurerm_private_endpoint" "ampls" {
+  name                = "${module.naming.private_endpoint.name}-ampls"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  subnet_id           = azurerm_subnet.subnets["snet-privatelink-02"].id
+
+  private_service_connection {
+    name                           = "ampls"
+    private_connection_resource_id = azurerm_monitor_private_link_scope.this.id
+    is_manual_connection           = false
+    subresource_names              = ["azuremonitor"]
+  }
+
+  private_dns_zone_group {
+    name                 = "default"
+    private_dns_zone_ids = [for z in azurerm_private_dns_zone.ampls : z.id]
+  }
+
+  # Serialize control-plane writes on the AMPLS scope. Creating the PE issues a PATCH on the
+  # parent `Microsoft.Insights/privateLinkScopes` resource. If scoped-service attachments
+  # (LA workspace, DCE) or DCR/DCE associations targeting the DCE are still settling in
+  # Azure's backend, the PE create returns 409 AnotherOperationInProgress. These depends_on
+  # entries force sequential execution to eliminate that race.
+  depends_on = [
+    azurerm_monitor_private_link_scoped_service.log_analytics,
+    azurerm_monitor_private_link_scoped_service.dce,
+    azurerm_monitor_data_collection_rule_association.adds1_dcr,
+    azurerm_monitor_data_collection_rule_association.adds1_dce,
+  ]
 }
 #endregion
 

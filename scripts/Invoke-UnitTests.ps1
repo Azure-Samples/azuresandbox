@@ -380,9 +380,14 @@ $testConfigs = [ordered]@{
         ScriptPath = Join-Path $repoRoot 'modules' 'vnet-app' 'scripts' 'Test-VnetApp.ps1'
         CommandId  = 'RunPowerShellScript'
         Parameters = @{
-            KeyVaultName       = $resourceNames['key_vault']
-            StorageAccountName = $resourceNames['storage_account']
-            StorageShareName   = $resourceNames['storage_share']
+            KeyVaultName                = $resourceNames['key_vault']
+            StorageAccountName          = $resourceNames['storage_account']
+            StorageShareName            = $resourceNames['storage_share']
+            ApplicationInsightsName     = $resourceNames['application_insights']
+            MonitorPrivateLinkScopeName = $resourceNames['monitor_private_link_scope']
+            ResourceGroupName           = $resourceGroupName
+            SubscriptionId              = $context.Subscription.Id
+            LogAnalyticsWorkspaceId     = "/subscriptions/$($context.Subscription.Id)/resourceGroups/$resourceGroupName/providers/Microsoft.OperationalInsights/workspaces/$($resourceNames['log_analytics_workspace'])"
         }
     }
     'virtual_machine_jumplinux1' = @{

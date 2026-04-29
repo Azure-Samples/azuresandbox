@@ -41,6 +41,7 @@ variable "enable_module_avd" {
   default     = false
 }
 
+
 variable "enable_module_mssql" {
   type        = bool
   description = "Set to true to enable the Azure SQL Database (mssql) module, false to skip it."

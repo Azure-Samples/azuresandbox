@@ -6,7 +6,22 @@ param(
     [string]$StorageAccountName,
 
     [Parameter(Mandatory = $true)]
-    [string]$StorageShareName
+    [string]$StorageShareName,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ApplicationInsightsName,
+
+    [Parameter(Mandatory = $true)]
+    [string]$MonitorPrivateLinkScopeName,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ResourceGroupName,
+
+    [Parameter(Mandatory = $true)]
+    [string]$SubscriptionId,
+
+    [Parameter(Mandatory = $true)]
+    [string]$LogAnalyticsWorkspaceId
 )
 
 #region functions
@@ -44,7 +59,7 @@ if (Test-Path $script:logPath) {
 }
 
 Write-Log "Starting unit tests for module '$moduleName' on '$env:COMPUTERNAME'..."
-Write-Log ("Parameters: KeyVaultName='$KeyVaultName' StorageAccountName='$StorageAccountName' StorageShareName='$StorageShareName'")
+Write-Log ("Parameters: KeyVaultName='$KeyVaultName' StorageAccountName='$StorageAccountName' StorageShareName='$StorageShareName' ApplicationInsightsName='$ApplicationInsightsName' MonitorPrivateLinkScopeName='$MonitorPrivateLinkScopeName' ResourceGroupName='$ResourceGroupName' SubscriptionId='$SubscriptionId' LogAnalyticsWorkspaceId='$LogAnalyticsWorkspaceId'")
 
 $passed = 0
 $failed = 0
@@ -374,6 +389,167 @@ if ($smbTestPassed) {
 }
 else {
     Write-TestResult $moduleName 'FAIL' $smbTestReason
+    $failed++
+}
+
+# Test 14: AMA - Azure Monitor Agent is installed and running.
+# AMA 1.41+ on Windows Server Core does NOT register a Windows service -- it runs as a set
+# of processes launched by the extension handler. Evidence of a healthy agent is:
+#   MonAgentCore, MonAgentHost, MonAgentLauncher, MonAgentManager, AMAExtHealthMonitor
+# running from C:\Packages\Plugins\Microsoft.Azure.Monitor.AzureMonitorWindowsAgent\<ver>\.
+# We require MonAgentCore (the data-plane collector) at minimum.
+try {
+    $amaProcs = Get-Process -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^(MonAgent|AMAExt)' }
+    $core = $amaProcs | Where-Object { $_.Name -eq 'MonAgentCore' } | Select-Object -First 1
+
+    if ($core) {
+        $amaDir = Get-ChildItem 'C:\Packages\Plugins\Microsoft.Azure.Monitor.AzureMonitorWindowsAgent' -Directory -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match '^[0-9.]+$' } |
+            Sort-Object Name -Descending |
+            Select-Object -First 1
+        $version = if ($amaDir) { $amaDir.Name } else { 'unknown' }
+        $names = ($amaProcs | Select-Object -ExpandProperty Name -Unique) -join ', '
+        Write-TestResult $moduleName 'PASS' "AMA: Running (version $version, processes: $names)"
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' "AMA: MonAgentCore process not running (found: $(($amaProcs | Select-Object -ExpandProperty Name -Unique) -join ', '))"
+        $failed++
+    }
+}
+catch {
+    Write-TestResult $moduleName 'FAIL' "AMA: Exception: $_"
+    $failed++
+}
+
+# Test 15: AMPLS DNS - well-known Azure Monitor control FQDN resolves to a private IP.
+# Confirms the privatelink.monitor.azure.com zone is linked to this VNet and the PE is reachable.
+try {
+    $amplsFqdn = 'global.handler.control.monitor.azure.com'
+    $dnsResult = Resolve-DnsName $amplsFqdn -ErrorAction Stop
+    $ip = ($dnsResult | Where-Object { $_.QueryType -eq 'A' } | Select-Object -First 1).IPAddress
+
+    if ($ip -match '^10\.') {
+        Write-TestResult $moduleName 'PASS' "AMPLS DNS: '$amplsFqdn' resolves to private IP '$ip'"
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' "AMPLS DNS: '$amplsFqdn' resolved to '$ip' (expected private IP 10.x.x.x)"
+        $failed++
+    }
+}
+catch {
+    Write-TestResult $moduleName 'FAIL' "AMPLS DNS: '$amplsFqdn' does not resolve"
+    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    $failed++
+}
+
+# Test 16: AMPLS - TCP port 443 reachable on AMPLS private endpoint.
+try {
+    $amplsFqdn = 'global.handler.control.monitor.azure.com'
+    $tcpTest = Test-NetConnection -ComputerName $amplsFqdn -Port 443 -ErrorAction Stop
+
+    if ($tcpTest.TcpTestSucceeded) {
+        Write-TestResult $moduleName 'PASS' ("AMPLS: TCP port 443 reachable on '$amplsFqdn' (remote IP: " + $tcpTest.RemoteAddress + ")")
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' "AMPLS: TCP port 443 not reachable on '$amplsFqdn'"
+        $failed++
+    }
+}
+catch {
+    Write-TestResult $moduleName 'FAIL' "AMPLS: Failed to test TCP connectivity to '$amplsFqdn':443"
+    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    $failed++
+}
+
+# Acquire managed identity token from IMDS for ARM access (used by Tests 17-18).
+$armToken = $null
+try {
+    $tokenUri = 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fmanagement.azure.com%2F'
+    $tokenResponse = Invoke-RestMethod -Uri $tokenUri -Headers @{ Metadata = 'true' } -ErrorAction Stop
+    $armToken = $tokenResponse.access_token
+    Write-Log "Acquired managed identity token for ARM (expires: $($tokenResponse.expires_on))"
+}
+catch {
+    Write-TestResult $moduleName 'FAIL' "ARM token: Failed to acquire managed identity token from IMDS"
+    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    $failed++
+}
+
+# Test 17: Application Insights - workspace-based, local auth disabled, public access disabled.
+# Confirms Phase 2 wiring: workspace-based App Insights linked to the shared LA workspace,
+# with DisableLocalAuth = true and both ingestion/query public access flipped to Disabled
+# by the root azapi_update_resource (gated on the AMPLS access barrier).
+if ($armToken) {
+    try {
+        $appiUri = "https://management.azure.com/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.Insights/components/$($ApplicationInsightsName)?api-version=2020-02-02"
+        $appi = Invoke-RestMethod -Uri $appiUri -Headers @{ Authorization = "Bearer $armToken" } -ErrorAction Stop
+        $checks = @()
+        $appType = $appi.properties.Application_Type
+        if ($appType -eq 'web') { $checks += 'application_type=web' } else { $checks += "FAIL application_type='$appType' (expected 'web')" }
+
+        $wsId = $appi.properties.WorkspaceResourceId
+        if ($wsId -and ($wsId -ieq $LogAnalyticsWorkspaceId)) { $checks += 'WorkspaceResourceId=match' } else { $checks += "FAIL WorkspaceResourceId='$wsId' (expected '$LogAnalyticsWorkspaceId')" }
+
+        $disableLocal = $appi.properties.DisableLocalAuth
+        if ($disableLocal -eq $true) { $checks += 'DisableLocalAuth=true' } else { $checks += "FAIL DisableLocalAuth='$disableLocal' (expected true)" }
+
+        $pnaIng = $appi.properties.publicNetworkAccessForIngestion
+        if ($pnaIng -eq 'Disabled') { $checks += 'publicNetworkAccessForIngestion=Disabled' } else { $checks += "FAIL publicNetworkAccessForIngestion='$pnaIng'" }
+
+        $pnaQry = $appi.properties.publicNetworkAccessForQuery
+        if ($pnaQry -eq 'Disabled') { $checks += 'publicNetworkAccessForQuery=Disabled' } else { $checks += "FAIL publicNetworkAccessForQuery='$pnaQry'" }
+
+        if ($checks -match '^FAIL') {
+            Write-TestResult $moduleName 'FAIL' ("Application Insights: " + ($checks -join '; '))
+            $failed++
+        }
+        else {
+            Write-TestResult $moduleName 'PASS' ("Application Insights: " + ($checks -join '; '))
+            $passed++
+        }
+    }
+    catch {
+        Write-TestResult $moduleName 'FAIL' "Application Insights: ARM GET failed for '$ApplicationInsightsName'"
+        Write-TestResult $moduleName 'FAIL' "Exception: $_"
+        $failed++
+    }
+}
+else {
+    Write-TestResult $moduleName 'FAIL' "Application Insights: Skipped - no ARM token"
+    $failed++
+}
+
+# Test 18: AMPLS scoped service - 'ampls-scope-app-insights' exists and links to App Insights.
+# Confirms Phase 2 step 2c: vnet-app contributed a scoped-service attachment to the
+# vnet-shared-owned AMPLS for App Insights private ingestion/queries.
+if ($armToken) {
+    try {
+        $scopedName = 'ampls-scope-app-insights'
+        $ssUri = "https://management.azure.com/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.Insights/privateLinkScopes/$MonitorPrivateLinkScopeName/scopedResources/$($scopedName)?api-version=2021-07-01-preview"
+        $ss = Invoke-RestMethod -Uri $ssUri -Headers @{ Authorization = "Bearer $armToken" } -ErrorAction Stop
+        $linked = $ss.properties.linkedResourceId
+        $expected = "/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.Insights/components/$ApplicationInsightsName"
+        if ($linked -ieq $expected) {
+            Write-TestResult $moduleName 'PASS' "AMPLS scoped service: '$scopedName' exists and links to '$ApplicationInsightsName'"
+            $passed++
+        }
+        else {
+            Write-TestResult $moduleName 'FAIL' "AMPLS scoped service: '$scopedName' linkedResourceId='$linked' (expected '$expected')"
+            $failed++
+        }
+    }
+    catch {
+        Write-TestResult $moduleName 'FAIL' "AMPLS scoped service: ARM GET failed for 'ampls-scope-app-insights' on AMPLS '$MonitorPrivateLinkScopeName'"
+        Write-TestResult $moduleName 'FAIL' "Exception: $_"
+        $failed++
+    }
+}
+else {
+    Write-TestResult $moduleName 'FAIL' "AMPLS scoped service: Skipped - no ARM token"
     $failed++
 }
 

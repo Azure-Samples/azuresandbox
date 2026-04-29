@@ -100,6 +100,8 @@ admin_password | | The password used when provisioning administrator accounts. T
 admin_password_secret | adminpassword | The name of the key vault secret that contains the password for the admin account. Defined in the vnet-shared module.
 admin_username | bootstrapadmin | The user name used when provisioning administrator accounts. This should conform to Windows username requirements (alphanumeric characters, periods, underscores, and hyphens, 1-20 characters). Defined in the vnet-shared module.
 admin_username_secret | adminuser | The name of the key vault secret that contains the user name for the admin account. Defined in the vnet-shared module.
+data_collection_endpoint_id | | The resource ID for the DCE used by mssqlwin1.
+data_collection_rule_windows_id | | The resource ID for DCR rules used by mssqlwin1.
 key_vault_id | | The ID of the key vault defined in the root module.
 key_vault_name | | The name of the key vault defined in the root module.
 location | | The name of the Azure Region where resources will be provisioned.

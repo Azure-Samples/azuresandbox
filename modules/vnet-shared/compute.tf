@@ -22,6 +22,10 @@ resource "azurerm_windows_virtual_machine" "this" {
     sku       = var.vm_adds_image_sku
     version   = var.vm_adds_image_version
   }
+
+  identity {
+    type = "SystemAssigned"
+  }
 }
 
 #region vm-configuration
@@ -88,5 +92,32 @@ resource "azurerm_virtual_machine_run_command" "configure_adds_dns" {
     name  = "ComputerName"
     value = var.vm_adds_name
   }
+}
+
+resource "azurerm_virtual_machine_extension" "ama" {
+  name                       = "AzureMonitorWindowsAgent"
+  virtual_machine_id         = azurerm_windows_virtual_machine.this.id
+  publisher                  = "Microsoft.Azure.Monitor"
+  type                       = "AzureMonitorWindowsAgent"
+  type_handler_version       = "1.2"
+  auto_upgrade_minor_version = true
+  automatic_upgrade_enabled  = true
+
+  depends_on = [azurerm_virtual_machine_run_command.configure_adds_dns]
+}
+
+resource "azurerm_monitor_data_collection_rule_association" "adds1_dcr" {
+  name                    = "${module.naming.monitor_data_collection_rule.name}-${var.vm_adds_name}-association"
+  target_resource_id      = azurerm_windows_virtual_machine.this.id
+  data_collection_rule_id = azurerm_monitor_data_collection_rule.windows.id
+
+  depends_on = [azurerm_virtual_machine_extension.ama]
+}
+
+resource "azurerm_monitor_data_collection_rule_association" "adds1_dce" {
+  target_resource_id          = azurerm_windows_virtual_machine.this.id
+  data_collection_endpoint_id = azurerm_monitor_data_collection_endpoint.this.id
+
+  depends_on = [azurerm_virtual_machine_extension.ama]
 }
 #endregion

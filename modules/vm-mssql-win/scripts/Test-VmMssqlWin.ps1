@@ -648,6 +648,79 @@ else {
     $failed++
 }
 
+# AMA - Azure Monitor Agent is installed and running.
+# AMA 1.41+ on Windows Server Core does NOT register a Windows service -- it runs as a set
+# of processes launched by the extension handler. Evidence of a healthy agent is:
+#   MonAgentCore, MonAgentHost, MonAgentLauncher, MonAgentManager, AMAExtHealthMonitor
+# running from C:\Packages\Plugins\Microsoft.Azure.Monitor.AzureMonitorWindowsAgent\<ver>\.
+# We require MonAgentCore (the data-plane collector) at minimum.
+try {
+    $amaProcs = Get-Process -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^(MonAgent|AMAExt)' }
+    $core = $amaProcs | Where-Object { $_.Name -eq 'MonAgentCore' } | Select-Object -First 1
+
+    if ($core) {
+        $amaDir = Get-ChildItem 'C:\Packages\Plugins\Microsoft.Azure.Monitor.AzureMonitorWindowsAgent' -Directory -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match '^[0-9.]+$' } |
+            Sort-Object Name -Descending |
+            Select-Object -First 1
+        $version = if ($amaDir) { $amaDir.Name } else { 'unknown' }
+        $names = ($amaProcs | Select-Object -ExpandProperty Name -Unique) -join ', '
+        Write-TestResult $moduleName 'PASS' "AMA: Running (version $version, processes: $names)"
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' "AMA: MonAgentCore process not running (found: $(($amaProcs | Select-Object -ExpandProperty Name -Unique) -join ', '))"
+        $failed++
+    }
+}
+catch {
+    Write-TestResult $moduleName 'FAIL' "AMA: Exception: $_"
+    $failed++
+}
+
+# AMPLS DNS - well-known Azure Monitor control FQDN resolves to a private IP.
+# Confirms the privatelink.monitor.azure.com zone is linked to this VNet and the PE is reachable.
+try {
+    $amplsFqdn = 'global.handler.control.monitor.azure.com'
+    $dnsResult = Resolve-DnsName $amplsFqdn -ErrorAction Stop
+    $ip = ($dnsResult | Where-Object { $_.QueryType -eq 'A' } | Select-Object -First 1).IPAddress
+
+    if ($ip -match '^10\.') {
+        Write-TestResult $moduleName 'PASS' "AMPLS DNS: '$amplsFqdn' resolves to private IP '$ip'"
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' "AMPLS DNS: '$amplsFqdn' resolved to '$ip' (expected private IP 10.x.x.x)"
+        $failed++
+    }
+}
+catch {
+    Write-TestResult $moduleName 'FAIL' "AMPLS DNS: '$amplsFqdn' does not resolve"
+    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    $failed++
+}
+
+# AMPLS - TCP port 443 reachable on AMPLS private endpoint.
+try {
+    $amplsFqdn = 'global.handler.control.monitor.azure.com'
+    $tcpTest = Test-NetConnection -ComputerName $amplsFqdn -Port 443 -ErrorAction Stop
+
+    if ($tcpTest.TcpTestSucceeded) {
+        Write-TestResult $moduleName 'PASS' ("AMPLS: TCP port 443 reachable on '$amplsFqdn' (remote IP: " + $tcpTest.RemoteAddress + ")")
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' "AMPLS: TCP port 443 not reachable on '$amplsFqdn'"
+        $failed++
+    }
+}
+catch {
+    Write-TestResult $moduleName 'FAIL' "AMPLS: Failed to test TCP connectivity to '$amplsFqdn':443"
+    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    $failed++
+}
+
 # Summary
 $total = $passed + $failed
 Write-TestResult $moduleName 'SUMMARY' ("Passed: $passed Failed: $failed Total: $total")

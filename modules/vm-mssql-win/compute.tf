@@ -143,3 +143,34 @@ resource "azurerm_virtual_machine_extension" "configure_sql_server" {
   })
 }
 #endregion
+
+#region azure-monitor-agent
+resource "azurerm_virtual_machine_extension" "ama" {
+  name                       = "AzureMonitorWindowsAgent"
+  virtual_machine_id         = azurerm_windows_virtual_machine.this.id
+  publisher                  = "Microsoft.Azure.Monitor"
+  type                       = "AzureMonitorWindowsAgent"
+  type_handler_version       = "1.2"
+  auto_upgrade_minor_version = true
+  automatic_upgrade_enabled  = true
+
+  # Install AMA after domain join and configuration extensions to avoid extension sequencing
+  # conflicts (see AMPLS_IMPLEMENTATION_PLAN.md Section 10, risk table).
+  depends_on = [azurerm_virtual_machine_extension.configure_sql_server]
+}
+
+resource "azurerm_monitor_data_collection_rule_association" "mssqlwin1_dcr" {
+  name                    = "${module.naming.monitor_data_collection_rule.name}-${var.vm_mssql_win_name}-association"
+  target_resource_id      = azurerm_windows_virtual_machine.this.id
+  data_collection_rule_id = var.data_collection_rule_windows_id
+
+  depends_on = [azurerm_virtual_machine_extension.ama]
+}
+
+resource "azurerm_monitor_data_collection_rule_association" "mssqlwin1_dce" {
+  target_resource_id          = azurerm_windows_virtual_machine.this.id
+  data_collection_endpoint_id = var.data_collection_endpoint_id
+
+  depends_on = [azurerm_virtual_machine_extension.ama]
+}
+#endregion
