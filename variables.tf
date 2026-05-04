@@ -39,6 +39,11 @@ variable "enable_module_avd" {
   type        = bool
   description = "Set to true to enable the Azure Virtual Desktop (AVD) module, false to skip it."
   default     = false
+
+  validation {
+    condition     = !var.enable_module_avd || var.enable_module_vnet_app
+    error_message = "enable_module_vnet_app must be true when enable_module_avd is true because the avd module references resources from the vnet_app module."
+  }
 }
 
 
@@ -47,6 +52,10 @@ variable "enable_module_mssql" {
   description = "Set to true to enable the Azure SQL Database (mssql) module, false to skip it."
   default     = false
 
+  validation {
+    condition     = !var.enable_module_mssql || var.enable_module_vnet_app
+    error_message = "enable_module_vnet_app must be true when enable_module_mssql is true because the mssql module references resources from the vnet_app module."
+  }
 }
 
 variable "enable_module_mysql" {
@@ -54,24 +63,43 @@ variable "enable_module_mysql" {
   description = "Set to true to enable the Azure Database for MySQL (mysql) module, false to skip it."
   default     = false
 
+  validation {
+    condition     = !var.enable_module_mysql || var.enable_module_vnet_app
+    error_message = "enable_module_vnet_app must be true when enable_module_mysql is true because the mysql module references resources from the vnet_app module."
+  }
 }
 
 variable "enable_module_petstore" {
   type        = bool
   description = "Set to true to enable the petstore module, false to skip it."
   default     = false
+
+  validation {
+    condition     = !var.enable_module_petstore || var.enable_module_vnet_app
+    error_message = "enable_module_vnet_app must be true when enable_module_petstore is true because the petstore module references resources from the vnet_app module."
+  }
 }
 
 variable "enable_module_vm_jumpbox_linux" {
   type        = bool
   description = "Set to true to enable the vm_jumpbox_linux module, false to skip it."
   default     = false
+
+  validation {
+    condition     = !var.enable_module_vm_jumpbox_linux || var.enable_module_vnet_app
+    error_message = "enable_module_vnet_app must be true when enable_module_vm_jumpbox_linux is true because the vm_jumpbox_linux module references resources from the vnet_app module."
+  }
 }
 
 variable "enable_module_vm_mssql_win" {
   type        = bool
   description = "Set to true to enable the vm_mssql_win module, false to skip it."
   default     = false
+
+  validation {
+    condition     = !var.enable_module_vm_mssql_win || var.enable_module_vnet_app
+    error_message = "enable_module_vnet_app must be true when enable_module_vm_mssql_win is true because the vm_mssql_win module references resources from the vnet_app module."
+  }
 }
 
 variable "enable_module_vnet_app" {
@@ -84,6 +112,11 @@ variable "enable_module_vnet_onprem" {
   type        = bool
   description = "Set to true to enable the vnet_onprem module, false to skip it."
   default     = false
+
+  validation {
+    condition     = !var.enable_module_vnet_onprem || (var.enable_module_vnet_app && var.enable_module_vwan)
+    error_message = "enable_module_vnet_app and enable_module_vwan must both be true when enable_module_vnet_onprem is true because the vnet_onprem module references resources from both."
+  }
 }
 
 variable "enable_module_vwan" {
@@ -91,6 +124,10 @@ variable "enable_module_vwan" {
   description = "Set to true to enable the vwan module, false to skip it."
   default     = false
 
+  validation {
+    condition     = !var.enable_module_vwan || var.enable_module_vnet_app
+    error_message = "enable_module_vnet_app must be true when enable_module_vwan is true because the vwan module references resources from the vnet_app module."
+  }
 }
 
 variable "location" {
