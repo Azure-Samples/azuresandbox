@@ -231,12 +231,17 @@ variable "vm_mssql_win_name" {
 
 variable "vm_mssql_win_size" {
   type        = string
-  description = "The size of the virtual machine"
+  description = "The size of the virtual machine. Must be a Diskful Ddsv6 (general purpose) or Edsv6 (memory optimized) size with local NVMe temp disks and a minimum of 4 vCPUs."
   default     = "Standard_D4ds_v6" # use az-vm list-skus to determine if this size is available in your region
 
   validation {
-    condition     = can(regex("^[a-zA-Z0-9_]+$", var.vm_mssql_win_size))
-    error_message = "The 'vm_mssql_win_size' must conform to Azure virtual machine size naming conventions: it can only contain alphanumeric characters and underscores (_). Examples include 'Standard_DS1_v2' or 'Standard_B2ms'."
+    condition     = can(regex("^Standard_(D|E)[0-9]+ds_v6$", var.vm_mssql_win_size))
+    error_message = "The 'vm_mssql_win_size' must be a Ddsv6 or Edsv6 Diskful size matching the pattern 'Standard_(D|E)<vCPU>ds_v6' (e.g. 'Standard_D4ds_v6', 'Standard_D8ds_v6', 'Standard_E4ds_v6', 'Standard_E16ds_v6'). Other Azure VM sizes are not currently supported by this module."
+  }
+
+  validation {
+    condition     = !can(regex("^Standard_(D|E)[0-9]+ds_v6$", var.vm_mssql_win_size)) || tonumber(regex("^Standard_[DE]([0-9]+)ds_v6$", var.vm_mssql_win_size)[0]) >= 4
+    error_message = "The 'vm_mssql_win_size' must specify a minimum of 4 vCPUs (e.g. 'Standard_D4ds_v6' or larger). Smaller sizes such as 'Standard_D2ds_v6' are not supported by this module."
   }
 }
 

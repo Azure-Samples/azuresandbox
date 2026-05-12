@@ -16,8 +16,11 @@
 This configuration implements a SQL Server virtual machine. The VM is pre-configured with the following capabilities:
 
 * Domain joined to the *mysandbox.local* Active Directory domain.
-* Pre-configured SQL Server data and log disks.
-* Pre-configured SQL Server instance.
+* Pre-configured [temporary disk(s)](https://learn.microsoft.com/en-us/azure/virtual-machines/managed-disks-overview#temporary-disk) to host SQL Server tempdb and system paging file.
+* Pre-configured SQL Server data and log disks on [Azure Premium SSD v2 managed disks](https://learn.microsoft.com/en-us/azure/virtual-machines/disks-deploy-premium-v2?tabs=azure-cli)
+* Pre-configured SQL Server instance for the above storage configurations.
+
+**Note:** Only [Ddsv6](https://learn.microsoft.com/en-us/azure/virtual-machines/sizes/general-purpose/ddsv6-series?tabs=sizebasic) and [Edsv6](https://learn.microsoft.com/en-us/azure/virtual-machines/sizes/memory-optimized/edsv6-series?tabs=sizebasic) virtual machine sizes with a minimum of 4 vCPUs are supported by this module.
 
 The estimated provisioning time for this module is 31 minutes.
 
@@ -117,7 +120,7 @@ vm_mssql_win_image_publisher | `MicrosoftSQLServer` | The publisher for the virt
 vm_mssql_win_image_sku | `entdev-gen2` | The SKU of the virtual machine image used to create the SQL Server VM.
 vm_mssql_win_image_version | `Latest` | The version of the virtual machine image used to create the SQL Server VM.
 vm_mssql_win_name | mssqlwin1 | The name of the SQL Server VM.
-vm_mssql_win_size | `Standard_D4ds_v6` | The size of the virtual machine. Tempdb will be configured to use the local temp disk disk for "diskful" sizes, or moved to the data disk for sizes that are not "diskful".
+vm_mssql_win_size | `Standard_D4ds_v6` | The size of the virtual machine. Officially supported series are [Ddsv6](https://learn.microsoft.com/azure/virtual-machines/sizes/general-purpose/ddsv6-series) (general purpose) and [Edsv6](https://learn.microsoft.com/azure/virtual-machines/sizes/memory-optimized/edsv6-series) (memory optimized) — both Diskful series with local NVMe temp disks. All local NVMe temp disks are striped into a single `T:` volume via Windows [Storage Spaces](https://learn.microsoft.com/azure/azure-sql/virtual-machines/windows/storage-configuration?view=azuresql#disk-striping) (Simple resiliency, NumberOfColumns = N, 64 KB interleave) and used for tempdb. Storage Spaces is used uniformly for all temp-disk counts (including N=1) so that VM resize across SKUs with different temp-disk counts is handled by the same code path on the next boot.
 vm_mssql_win_storage_account_type_data_disks | `PremiumV2_LRS` | The storage type to be used for the VM's data disks.
 vm_mssql_win_storage_account_type_os_disk | `Premium_LRS` | The storage type to be used for the VM's OS disk.
 vm_mssql_win_zone | 2 | The availability zone to to provision the VM.
@@ -133,7 +136,7 @@ module.vm_mssql_win[0].azurerm_managed_disk.disks["sqllog"] | disk&#8209;sand&#8
 module.vm_mssql_win[0].azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;mssqlwin1 | The network interface associated with the SQL Server VM. Configured with accelerated networking enabled for improved performance.
 module.vm_mssql_win[0].azurerm_role_assignment.assignments[*] | | Key vault and storage role assignments for the SQL Server VM. See *locals.tf* for definitions.
 module.vm_mssql_win[0].azurerm_storage_blob.remote_scripts["orchestrator"] | Invoke&#8209;MssqlConfiguration.ps1 | The script that starts the SQL Server configuration task.
-module.vm_mssql_win[0].azurerm_storage_blob.remote_scripts["startup"] | Set&#8209;MssqlStartupConfiguration.ps1 | The script that re-configures SQL Server tempdb folder for VM sizes with temporary disks.
+module.vm_mssql_win[0].azurerm_storage_blob.remote_scripts["startup"] | Set&#8209;MssqlStartupConfiguration.ps1 | The script that re-creates the Storage Spaces stripe across all local NVMe temp disks and re-configures the SQL Server tempdb folder after VM stop/deallocate.
 module.vm_mssql_win[0].azurerm_storage_blob.remote_scripts["worker"] | Set&#8209;MssqlConfiguration.ps1 | The script that prepares data and log disks and configures SQL Server instance.
 module.vm_mssql_win[0].azurerm_virtual_machine_data_disk_attachment.attachments[*] | | The data and log disk attachments for the SQL Server VM.
 module.vm_mssql_win[0].azurerm_windows_virtual_machine.this | mssqlwin1 | The SQL Server VM resource. Configured with NVMe disk controller, encryption at host, secure boot, vTPM, and automatic patch assessment for enhanced security and performance.

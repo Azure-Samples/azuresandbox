@@ -145,6 +145,34 @@ catch {
     $startupOk = $false
 }
 
+# Startup Check 2b: Temp disk (T:) backed by Storage Spaces virtual disk striped across all local NVMe temp disks
+try {
+    $expectedPoolName = 'StoragePool-Temp'
+    $expectedVirtualDiskName = 'VirtualDisk-Temp'
+    $tempPhysicalDiskFriendlyName = 'Microsoft NVMe Direct Disk v2'
+
+    $vd = Get-VirtualDisk -FriendlyName $expectedVirtualDiskName -ErrorAction Stop
+    $pool = Get-StoragePool -FriendlyName $expectedPoolName -ErrorAction Stop
+    $expectedDiskCount = @(Get-PhysicalDisk | Where-Object FriendlyName -eq $tempPhysicalDiskFriendlyName).Count
+    $columns = $vd.NumberOfColumns
+
+    if ($columns -eq $expectedDiskCount -and $pool.HealthStatus -eq 'Healthy' -and $vd.HealthStatus -eq 'Healthy') {
+        Write-TestResult $moduleName 'PASS' "Startup: Temp disk 'T:' backed by Storage Spaces stripe (Pool: '$expectedPoolName' Healthy, VirtualDisk: '$expectedVirtualDiskName' Healthy, NumberOfColumns: $columns, NVMe temp disks: $expectedDiskCount)"
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' "Startup: Storage Spaces stripe configuration mismatch (Pool Health: '$($pool.HealthStatus)', VirtualDisk Health: '$($vd.HealthStatus)', NumberOfColumns: $columns, NVMe temp disks: $expectedDiskCount)"
+        $failed++
+        $startupOk = $false
+    }
+}
+catch {
+    Write-TestResult $moduleName 'FAIL' "Startup: Temp disk 'T:' is not backed by the expected Storage Spaces virtual disk"
+    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    $failed++
+    $startupOk = $false
+}
+
 # Startup Check 3: T:\SQLTEMP directory exists
 if (Test-Path 'T:\SQLTEMP') {
     Write-TestResult $moduleName 'PASS' "Startup: 'T:\SQLTEMP' directory exists"
