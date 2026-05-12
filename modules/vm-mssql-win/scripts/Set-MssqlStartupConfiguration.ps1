@@ -5,7 +5,8 @@
 
 # This script has only been tested under the following conditions:
 # - Windows Server 2025 using PowerShell 5.x for Windows
-# - Azure VM size Standard_D4ds_v6
+# - Azure VM sizes from the Ddsv6 series (e.g. Standard_D4ds_v6, Standard_D8ds_v6) and the Edsv6 series (e.g. Standard_E4ds_v6, Standard_E16ds_v6)
+# - VM sizes with multiple local NVMe temp disks are supported: all temp disks are striped into a single 'T:' volume via Windows Storage Spaces (Simple resiliency, NumberOfColumns = N, 64 KB interleave). Storage Spaces is used uniformly for all temp-disk counts (including N=1) so that VM resize across SKUs with different temp-disk counts is handled by the same code path on the next boot.
 # - MicrosoftSQLServer platform image sql2025-ws2025 entdev-gen2
 # - VM must be pre-configured at first boot using 'Set-MssqlConfiguration.ps1' VM extension script
 # - Default SQL Server instance is configured for manual startup
@@ -36,6 +37,102 @@ function Write-ScriptLog {
     param( [string] $msg)
     "$(Get-Date -Format FileDateTimeUniversal) : $msg" | Out-File -FilePath $logpath -Append -Force
 }
+
+function New-TempDiskStripe {
+    # Creates a single striped volume across all local NVMe temp disks identified by friendly name,
+    # using Windows Storage Spaces (Simple resiliency, one column per disk, 64 KB interleave).
+    # Cleans up any stale Storage Pool / Virtual Disk objects left over from a previous boot, since
+    # Azure wipes local NVMe data on stop/deallocate but the WMI Storage Spaces objects from the
+    # previous boot may persist as 'Lost communication' / 'Stale metadata' / 'Unrecognized metadata'.
+    # See https://learn.microsoft.com/windows-server/storage/storage-spaces/storage-spaces-states
+    # NOTE: This function is intentionally duplicated from Set-MssqlConfiguration.ps1 -- each script
+    # uploads as its own remote-script blob, so a shared helper would require a third blob.
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Internal helper invoked unconditionally during boot; ShouldProcess is unnecessary.')]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$PhysicalDiskFriendlyName,
+
+        [Parameter(Mandatory = $true)]
+        [string]$DriveLetter,
+
+        [Parameter(Mandatory = $true)]
+        [string]$FileSystemLabel,
+
+        [string]$StoragePoolFriendlyName = "StoragePool-Temp",
+        [string]$VirtualDiskFriendlyName = "VirtualDisk-Temp",
+        [int]$InterleaveBytes = 65536,
+        [int]$AllocationUnitSize = 65536
+    )
+
+    # Step 1: Remove any stale virtual disk left over from a previous boot
+    $existingVirtualDisk = Get-VirtualDisk -FriendlyName $VirtualDiskFriendlyName -ErrorAction SilentlyContinue
+    if ($null -ne $existingVirtualDisk) {
+        Write-ScriptLog "Removing stale virtual disk '$VirtualDiskFriendlyName'..."
+        Remove-VirtualDisk -InputObject $existingVirtualDisk -Confirm:$false
+    }
+
+    # Step 2: Remove any stale storage pool left over from a previous boot
+    $existingStoragePool = Get-StoragePool -FriendlyName $StoragePoolFriendlyName -ErrorAction SilentlyContinue
+    if ($null -ne $existingStoragePool) {
+        Write-ScriptLog "Removing stale storage pool '$StoragePoolFriendlyName'..."
+        Remove-StoragePool -InputObject $existingStoragePool -Confirm:$false
+    }
+
+    # Step 3: Reset any NVMe temp physical disks reporting unrecognized/stale Storage Spaces metadata
+    $allTempPhysicalDisks = @(Get-PhysicalDisk | Where-Object FriendlyName -eq $PhysicalDiskFriendlyName)
+    foreach ($pd in $allTempPhysicalDisks) {
+        $opStatus = @($pd.OperationalStatus) -join ','
+        if ($opStatus -match 'Unrecognized|Stale|Lost') {
+            Write-ScriptLog "Resetting physical disk '$($pd.UniqueId)' (OperationalStatus: $opStatus)..."
+            Reset-PhysicalDisk -InputObject $pd
+        }
+    }
+
+    # Step 4: Get the now-poolable physical disks
+    $physicalDisks = @(Get-PhysicalDisk -CanPool $true | Where-Object FriendlyName -eq $PhysicalDiskFriendlyName)
+    if ($physicalDisks.Count -eq 0) {
+        Exit-WithError "No poolable physical disks found with friendly name '$PhysicalDiskFriendlyName'..."
+    }
+    $diskCount = $physicalDisks.Count
+    Write-ScriptLog "Found $diskCount poolable physical disk(s) with friendly name '$PhysicalDiskFriendlyName'..."
+
+    # Step 5: Create the storage pool
+    $storageSubSystem = Get-StorageSubSystem -FriendlyName "Windows Storage*"
+    Write-ScriptLog "Creating storage pool '$StoragePoolFriendlyName' from $diskCount physical disk(s)..."
+    New-StoragePool `
+        -FriendlyName $StoragePoolFriendlyName `
+        -StorageSubSystemUniqueId $storageSubSystem.UniqueId `
+        -PhysicalDisks $physicalDisks | Out-Null
+
+    # Step 6: Create the virtual disk (Simple = RAID-0 stripe)
+    Write-ScriptLog "Creating virtual disk '$VirtualDiskFriendlyName' (Simple, NumberOfColumns=$diskCount, Interleave=$InterleaveBytes)..."
+    $virtualDisk = New-VirtualDisk `
+        -StoragePoolFriendlyName $StoragePoolFriendlyName `
+        -FriendlyName $VirtualDiskFriendlyName `
+        -ResiliencySettingName Simple `
+        -NumberOfColumns $diskCount `
+        -Interleave $InterleaveBytes `
+        -UseMaximumSize
+
+    # Step 7: Initialize, partition, and format the virtual disk
+    $disk = Get-Disk -VirtualDisk $virtualDisk
+    Write-ScriptLog "Initializing virtual disk '$($disk.UniqueId)' as GPT..."
+    Initialize-Disk -InputObject $disk -PartitionStyle GPT -Confirm:$false | Out-Null
+
+    Write-ScriptLog "Creating partition on virtual disk with drive letter '$($DriveLetter):'..."
+    New-Partition -InputObject $disk -UseMaximumSize -DriveLetter $DriveLetter | Out-Null
+
+    Write-ScriptLog "Formatting volume '$($DriveLetter):' as NTFS, label '$FileSystemLabel', allocation unit size $AllocationUnitSize..."
+    Format-Volume `
+        -DriveLetter $DriveLetter `
+        -FileSystem NTFS `
+        -NewFileSystemLabel $FileSystemLabel `
+        -AllocationUnitSize $AllocationUnitSize `
+        -Confirm:$false `
+        -Force | Out-Null
+
+    Write-ScriptLog "Temp disk stripe '$($DriveLetter):' created across $diskCount disk(s)."
+}
 #endregion
 
 #region main
@@ -49,27 +146,21 @@ try {
     $tempVolume = Get-Volume -DriveLetter $tempDiskDriveLetter -ErrorAction SilentlyContinue
 
     if ($null -eq $tempVolume) {
-        # Initialize, partition and format the temporary disk after a stop/deallocate operation
+        # Recreate the temporary disk after a stop/deallocate operation. Azure wipes the underlying
+        # local NVMe disks, so they come back RAW. We rebuild the Storage Spaces stripe from scratch;
+        # New-TempDiskStripe handles cleanup of any stale Storage Pool / Virtual Disk objects from
+        # the previous boot.
         $rawTempDisks = @(Get-Disk | Where-Object { $_.PartitionStyle -eq "RAW" -and $_.FriendlyName -eq $tempDiskFriendlyName })
 
-        if ($rawTempDisks.Count -ne 1) {
-            Exit-WithError "Expected exactly 1 RAW temporary disk with friendly name '$tempDiskFriendlyName', found '$($rawTempDisks.Count)'."
+        if ($rawTempDisks.Count -lt 1) {
+            Exit-WithError "Expected at least 1 RAW temporary disk with friendly name '$tempDiskFriendlyName', found '$($rawTempDisks.Count)'."
         }
 
-        $tempDisk = $rawTempDisks[0]
-
-        $partitionStyle = "GPT"
-        Write-ScriptLog "Initializing disk '$($tempDisk.UniqueId)' using partition style '$partitionStyle'..."
-        Initialize-Disk -UniqueId $tempDisk.UniqueId -PartitionStyle GPT -Confirm:$false | Out-Null
-
-        Write-ScriptLog "Partitioning disk '$($tempDisk.UniqueId)' using maximum volume size and drive letter '$($tempDiskDriveLetter):'..."
-        New-Partition -DiskId $tempDisk.UniqueId -UseMaximumSize -DriveLetter $tempDiskDriveLetter | Out-Null
-
-        $fileSystem = "NTFS"
-        $allocationUnitSize = 65536
-        $fileSystemLabel = "Temporary Storage"
-        Write-ScriptLog "Formatting volume '$($tempDiskDriveLetter):' using file system '$fileSystem', label '$fileSystemLabel' and allocation unit size '$allocationUnitSize'..."
-        Format-Volume -DriveLetter $tempDiskDriveLetter -FileSystem $fileSystem -NewFileSystemLabel $fileSystemLabel -AllocationUnitSize $allocationUnitSize -Confirm:$false -Force | Out-Null
+        Write-ScriptLog "Recreating temp disk stripe across $($rawTempDisks.Count) NVMe temp disk(s)..."
+        New-TempDiskStripe `
+            -PhysicalDiskFriendlyName $tempDiskFriendlyName `
+            -DriveLetter $tempDiskDriveLetter `
+            -FileSystemLabel "Temporary Storage"
 
         $restartRequired = $true
         Write-ScriptLog "Restart required..."

@@ -10,7 +10,8 @@
 
 # This script has only been tested under the following conditions:
 # - Windows Server 2025 using PowerShell 5.x for Windows
-# - Azure VM size Standard_D4ds_v6
+# - Azure VM sizes from the Ddsv6 series (e.g. Standard_D4ds_v6, Standard_D8ds_v6) and the Edsv6 series (e.g. Standard_E4ds_v6, Standard_E16ds_v6)
+# - VM sizes with multiple local NVMe temp disks are supported: all temp disks are striped into a single 'T:' volume via Windows Storage Spaces (Simple resiliency, NumberOfColumns = N, 64 KB interleave). Storage Spaces is used uniformly for all temp-disk counts (including N=1) so that VM resize across SKUs with different temp-disk counts is handled by the same code path on the next boot.
 # - MicrosoftSQLServer platform image sql2025-ws2025 entdev-gen2
 # - VM must be pre-configured using 'Configure-FirewallRules.ps1' and 'Configure-SqlLogin.ps1' run commands
 # - Runs as domain administrator on the machine being configured
@@ -96,33 +97,114 @@ function Get-DataDisk {
 
 function Get-LocalRawDisk {
     param(
-        [int]$ExpectedCount = 3
+        [Parameter(Mandatory = $true)]
+        [string]$TempDiskFriendlyName,
+
+        [Parameter(Mandatory = $true)]
+        [string]$DataDiskFriendlyName,
+
+        [int]$ExpectedDataDiskCount = 2,
+        [int]$MinExpectedTempDiskCount = 1,
+        [int]$TimeoutSeconds = 60,
+        [int]$SleepSeconds = 10
     )
 
     $elapsedSeconds = 0
     $localRawDisks = @()
-    $sleepSeconds = 10
-    $timeoutSeconds = 60
 
     do {
         $localRawDisks = @(Get-Disk | Where-Object PartitionStyle -eq 'RAW')
-        Write-ScriptLog "Located $($localRawDisks.Count) local raw disks..."
+        $tempCount = @($localRawDisks | Where-Object FriendlyName -eq $TempDiskFriendlyName).Count
+        $dataCount = @($localRawDisks | Where-Object FriendlyName -eq $DataDiskFriendlyName).Count
 
-        if ($localRawDisks.Count -eq $ExpectedCount) {
+        Write-ScriptLog "Located $($localRawDisks.Count) local raw disks (temp '$TempDiskFriendlyName': $tempCount, data '$DataDiskFriendlyName': $dataCount)..."
+
+        if ($tempCount -ge $MinExpectedTempDiskCount -and $dataCount -ge $ExpectedDataDiskCount) {
             break
         }
 
-        if ($elapsedSeconds -ge $timeoutSeconds) {
+        if ($elapsedSeconds -ge $TimeoutSeconds) {
             break
         }
 
-        Write-ScriptLog "Waiting '$sleepSeconds' seconds for expected RAW disks to appear..."
-        Start-Sleep -Seconds $sleepSeconds
-        $elapsedSeconds += $sleepSeconds
+        Write-ScriptLog "Waiting '$SleepSeconds' seconds for expected RAW disks to appear..."
+        Start-Sleep -Seconds $SleepSeconds
+        $elapsedSeconds += $SleepSeconds
     }
-    while ($elapsedSeconds -le $timeoutSeconds)
+    while ($elapsedSeconds -le $TimeoutSeconds)
 
     return $localRawDisks
+}
+
+function New-TempDiskStripe {
+    # Creates a single striped volume across all local NVMe temp disks identified by friendly name,
+    # using Windows Storage Spaces (Simple resiliency, one column per disk, 64 KB interleave).
+    # First-boot only: this function runs from the Custom Script Extension on a fresh VM where the
+    # NVMe disks have no prior Storage Spaces metadata, so no cleanup of stale pool/virtual disk
+    # objects is needed. The parallel function in Set-MssqlStartupConfiguration.ps1 (which runs on
+    # every boot) is responsible for cleaning up stale Storage Spaces state left over after
+    # stop/deallocate.
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Internal helper invoked unconditionally during VM provisioning; ShouldProcess is unnecessary.')]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$PhysicalDiskFriendlyName,
+
+        [Parameter(Mandatory = $true)]
+        [string]$DriveLetter,
+
+        [Parameter(Mandatory = $true)]
+        [string]$FileSystemLabel,
+
+        [string]$StoragePoolFriendlyName = "StoragePool-Temp",
+        [string]$VirtualDiskFriendlyName = "VirtualDisk-Temp",
+        [int]$InterleaveBytes = 65536,
+        [int]$AllocationUnitSize = 65536
+    )
+
+    # Step 1: Get the poolable physical disks
+    $physicalDisks = @(Get-PhysicalDisk -CanPool $true | Where-Object FriendlyName -eq $PhysicalDiskFriendlyName)
+    if ($physicalDisks.Count -eq 0) {
+        Exit-WithError "No poolable physical disks found with friendly name '$PhysicalDiskFriendlyName'..."
+    }
+    $diskCount = $physicalDisks.Count
+    Write-ScriptLog "Found $diskCount poolable physical disk(s) with friendly name '$PhysicalDiskFriendlyName'..."
+
+    # Step 2: Create the storage pool
+    $storageSubSystem = Get-StorageSubSystem -FriendlyName "Windows Storage*"
+    Write-ScriptLog "Creating storage pool '$StoragePoolFriendlyName' from $diskCount physical disk(s)..."
+    New-StoragePool `
+        -FriendlyName $StoragePoolFriendlyName `
+        -StorageSubSystemUniqueId $storageSubSystem.UniqueId `
+        -PhysicalDisks $physicalDisks | Out-Null
+
+    # Step 3: Create the virtual disk (Simple = RAID-0 stripe)
+    Write-ScriptLog "Creating virtual disk '$VirtualDiskFriendlyName' (Simple, NumberOfColumns=$diskCount, Interleave=$InterleaveBytes)..."
+    $virtualDisk = New-VirtualDisk `
+        -StoragePoolFriendlyName $StoragePoolFriendlyName `
+        -FriendlyName $VirtualDiskFriendlyName `
+        -ResiliencySettingName Simple `
+        -NumberOfColumns $diskCount `
+        -Interleave $InterleaveBytes `
+        -UseMaximumSize
+
+    # Step 4: Initialize, partition, and format the virtual disk
+    $disk = Get-Disk -VirtualDisk $virtualDisk
+    Write-ScriptLog "Initializing virtual disk '$($disk.UniqueId)' as GPT..."
+    Initialize-Disk -InputObject $disk -PartitionStyle GPT -Confirm:$false | Out-Null
+
+    Write-ScriptLog "Creating partition on virtual disk with drive letter '$($DriveLetter):'..."
+    New-Partition -InputObject $disk -UseMaximumSize -DriveLetter $DriveLetter | Out-Null
+
+    Write-ScriptLog "Formatting volume '$($DriveLetter):' as NTFS, label '$FileSystemLabel', allocation unit size $AllocationUnitSize..."
+    Format-Volume `
+        -DriveLetter $DriveLetter `
+        -FileSystem NTFS `
+        -NewFileSystemLabel $FileSystemLabel `
+        -AllocationUnitSize $AllocationUnitSize `
+        -Confirm:$false `
+        -Force | Out-Null
+
+    Write-ScriptLog "Temp disk stripe '$($DriveLetter):' created across $diskCount disk(s)."
 }
 
 function Get-MatchingAzureDataDiskBySize {
@@ -376,18 +458,36 @@ function Write-ScriptLog {
 Write-ScriptLog "Running '$PSCommandPath'..."
 Write-InputParameter -Parameters $PSBoundParameters
 
-# Check for RAW disks to determine if the script has already been run
-$localRawDisksExpected = 3
-$localRawDisks = Get-LocalRawDisk -ExpectedCount $localRawDisksExpected
+# Identify local RAW disks by friendly name. Two disk classes are expected:
+#   1. NVMe temp disks (1..N depending on VM SKU) -> striped together as 'T:' via Storage Spaces
+#   2. Azure managed data disks (always 2: SQL data + SQL log)
+$tempDiskFriendlyName = "Microsoft NVMe Direct Disk v2"
+$dataDiskFriendlyName = "Virtual_Disk NVME Ultra"
+
+$localRawDisks = Get-LocalRawDisk -TempDiskFriendlyName $tempDiskFriendlyName -DataDiskFriendlyName $dataDiskFriendlyName
 
 if ($localRawDisks.Count -eq 0) {
-    Write-ScriptLog "No local raw disks found after '$TimeoutSeconds' seconds, exiting for idempotency)..."
+    Write-ScriptLog "No local raw disks found, exiting for idempotency..."
     Exit 0
 }
 
-if ($localRawDisks.Count -ne $localRawDisksExpected) {
-    Exit-WithError "Expected $localRawDisksExpected local raw disks, found '$($localRawDisks.Count)'..."
+$rawTempDisks = @($localRawDisks | Where-Object FriendlyName -eq $tempDiskFriendlyName)
+$rawDataDisks = @($localRawDisks | Where-Object FriendlyName -eq $dataDiskFriendlyName)
+$unknownDisks = @($localRawDisks | Where-Object { $_.FriendlyName -ne $tempDiskFriendlyName -and $_.FriendlyName -ne $dataDiskFriendlyName })
+
+if ($unknownDisks.Count -gt 0) {
+    Exit-WithError "Found $($unknownDisks.Count) RAW disk(s) with unrecognized friendly names: $($unknownDisks.FriendlyName -join ', ')..."
 }
+
+if ($rawTempDisks.Count -lt 1) {
+    Exit-WithError "Expected at least 1 RAW temporary disk with friendly name '$tempDiskFriendlyName', found '$($rawTempDisks.Count)'..."
+}
+
+if ($rawDataDisks.Count -ne 2) {
+    Exit-WithError "Expected exactly 2 RAW data disks with friendly name '$dataDiskFriendlyName', found '$($rawDataDisks.Count)'..."
+}
+
+Write-ScriptLog "Found $($rawTempDisks.Count) RAW NVMe temp disk(s) and $($rawDataDisks.Count) RAW data disk(s)."
 
 # Log into Azure
 Write-ScriptLog "Logging into Azure using managed identity..."
@@ -444,32 +544,28 @@ foreach ( $azureDataDisk in $azureDataDisks ) {
 }
 
 # Partition and format RAW disks
-foreach ($disk in $localRawDisks) {
+# NVMe temp disks: stripe all of them into a single 'T:' volume via Storage Spaces.
+Write-ScriptLog "$('=' * 80)"
+Write-ScriptLog "Creating temp disk stripe across $($rawTempDisks.Count) NVMe temp disk(s)..."
+New-TempDiskStripe `
+    -PhysicalDiskFriendlyName $tempDiskFriendlyName `
+    -DriveLetter "T" `
+    -FileSystemLabel "Temporary Storage"
+
+# Azure managed data disks: each gets its own drive letter derived from the Azure disk name.
+foreach ($disk in $rawDataDisks) {
     Write-ScriptLog "$('=' * 80)"
 
-    $tempDiskFriendlyName = "Microsoft NVMe Direct Disk v2"
-    $dataDiskFriendlyName = "Virtual_Disk NVME Ultra"
+    Write-ScriptLog "Disk '$($disk.UniqueId)' identified as Azure data disk based on friendly name '$dataDiskFriendlyName'..."
 
-    if ($disk.FriendlyName -eq $tempDiskFriendlyName) {
-        Write-ScriptLog "Disk '$($disk.UniqueId)' identified as local temporary disk based on friendly name '$tempDiskFriendlyName'..."
-        $fileSystemLabel = "Temporary Storage"
-        $driveLetter = "T"
-    }
-    elseif ($disk.FriendlyName -eq $dataDiskFriendlyName) {
-        Write-ScriptLog "Disk '$($disk.UniqueId)' identified as Azure data disk based on friendly name '$dataDiskFriendlyName'..."
+    $azureDataDisk = Get-MatchingAzureDataDiskBySize -Disk $disk -AzureDataDisks $azureDataDisks
 
-        $azureDataDisk = Get-MatchingAzureDataDiskBySize -Disk $disk -AzureDataDisks $azureDataDisks
+    $fileSystemLabel = $azureDataDisk.name.Split("-").Trim()[3]
+    $driveLetter = $fileSystemLabel.Substring($fileSystemLabel.Length - 1, 1)
 
-        $fileSystemLabel = $azureDataDisk.name.Split("-").Trim()[3]
-        $driveLetter = $fileSystemLabel.Substring($fileSystemLabel.Length - 1, 1)
-
-        $matchedAzureDiskResourceId = $azureDataDisk.managedDisk.id
-        $azureDataDisks = @($azureDataDisks | Where-Object { $_.managedDisk.id -ne $matchedAzureDiskResourceId })
-        Write-ScriptLog "Removed matched Azure data disk '$($azureDataDisk.name)' from future matching candidates..."
-    }
-    else {
-        Exit-WithError "Unable to identify RAW disk '$($disk.UniqueId)' with friendly name '$($disk.FriendlyName)' as either local temporary disk or Azure data disk..."
-    }
+    $matchedAzureDiskResourceId = $azureDataDisk.managedDisk.id
+    $azureDataDisks = @($azureDataDisks | Where-Object { $_.managedDisk.id -ne $matchedAzureDiskResourceId })
+    Write-ScriptLog "Removed matched Azure data disk '$($azureDataDisk.name)' from future matching candidates..."
 
     $partitionStyle = "GPT"
     Write-ScriptLog "Initializing disk '$($disk.UniqueId)' using partition style '$partitionStyle'..."
