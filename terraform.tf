@@ -1,5 +1,5 @@
 terraform {
-  required_version = "~> 1.15.2"
+  required_version = "~> 1.15.3"
 
   required_providers {
     azuread = {
@@ -14,32 +14,32 @@ terraform {
 
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 4.72.0"
+      version = "~> 4.73.0"
     }
 
     cloudinit = {
       source  = "hashicorp/cloudinit"
-      version = "~> 2.3.7"
+      version = "~> 2.4.0"
     }
 
     null = {
       source  = "hashicorp/null"
-      version = "~> 3.2.4"
+      version = "~> 3.3.0"
     }
 
     random = {
       source  = "hashicorp/random"
-      version = "~> 3.8.1"
+      version = "~> 3.9.0"
     }
 
     time = {
       source  = "hashicorp/time"
-      version = "~> 0.13.1"
+      version = "~> 0.14.0"
     }
 
     tls = {
       source  = "hashicorp/tls"
-      version = "~> 4.2.1"
+      version = "~> 4.3.0"
     }
   }
 }
