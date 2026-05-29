@@ -4,7 +4,7 @@ Terraform IaC project that provisions a modular Azure sandbox environment. Not f
 
 ## Tech stack
 
-- **Terraform** `~> 1.15.5` (pinned in `terraform.tf`)
+- **Terraform** (version pinned in `terraform.tf` — check there for the current required version)
 - **Providers**: `azurerm ~> 4.73`, `azapi ~> 2.9`, `azuread ~> 3.8`, plus `cloudinit`, `null`, `random`, `time`, `tls`
 - **Resource naming**: the `Azure/naming/azurerm` module (`module.naming`) — never hand-write resource names; use e.g. `module.naming.key_vault.name_unique`
 - **Scripts**: PowerShell 7.x (Az modules) and Bash (Azure CLI). VM-side config uses PowerShell + `azurerm_virtual_machine_run_command` (Windows) and `cloud-init` (Linux)
