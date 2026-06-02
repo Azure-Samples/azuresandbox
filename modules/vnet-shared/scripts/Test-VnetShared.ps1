@@ -126,27 +126,68 @@ else {
 #   MonAgentCore, MonAgentHost, MonAgentLauncher, MonAgentManager, AMAExtHealthMonitor
 # running from C:\Packages\Plugins\Microsoft.Azure.Monitor.AzureMonitorWindowsAgent\<ver>\.
 # We require MonAgentCore (the data-plane collector) at minimum.
+#
+# After a VM stop/deallocate+start the extension handler restarts AMA asynchronously and
+# does not block VM startup, so MonAgentCore can take up to ~2 min to (re)appear even when
+# AMAExtHealthMonitor (the launcher) is already running. Poll with a bounded wait so the
+# test is resilient to extension cold-start, and on timeout emit diagnostics that
+# distinguish a slow start from a real extension failure.
 try {
-    $amaProcs = Get-Process -ErrorAction SilentlyContinue |
-        Where-Object {
-            ($_.Name -match '^(MonAgent|AMAExt)') -and
-            ($_.Path -like 'C:\Packages\Plugins\Microsoft.Azure.Monitor.AzureMonitorWindowsAgent\*')
-        }
-
-    $core = $amaProcs | Where-Object { $_.Name -eq 'MonAgentCore' } | Select-Object -First 1
+    $amaRoot = 'C:\Packages\Plugins\Microsoft.Azure.Monitor.AzureMonitorWindowsAgent'
+    $maxWaitSec = 120
+    $sleepSec = 5
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $core = $null
+    $amaProcs = @()
+    do {
+        $amaProcs = Get-Process -ErrorAction SilentlyContinue |
+            Where-Object {
+                ($_.Name -match '^(MonAgent|AMAExt)') -and
+                ($_.Path -like "$amaRoot\*")
+            }
+        $core = $amaProcs | Where-Object { $_.Name -eq 'MonAgentCore' } | Select-Object -First 1
+        if ($core) { break }
+        if ($sw.Elapsed.TotalSeconds -ge $maxWaitSec) { break }
+        Start-Sleep -Seconds $sleepSec
+    } while ($true)
+    $sw.Stop()
+    $waited = [int]$sw.Elapsed.TotalSeconds
 
     if ($core) {
-        $amaDir = Get-ChildItem 'C:\Packages\Plugins\Microsoft.Azure.Monitor.AzureMonitorWindowsAgent' -Directory -ErrorAction SilentlyContinue |
+        $amaDir = Get-ChildItem $amaRoot -Directory -ErrorAction SilentlyContinue |
             Where-Object { $_.Name -match '^[0-9.]+$' } |
             Sort-Object Name -Descending |
             Select-Object -First 1
         $version = if ($amaDir) { $amaDir.Name } else { 'unknown' }
         $names = ($amaProcs | Select-Object -ExpandProperty Name -Unique) -join ', '
-        Write-TestResult $moduleName 'PASS' "AMA: Running (version $version, processes: $names)"
+        Write-TestResult $moduleName 'PASS' "AMA: Running (version $version, processes: $names, waited ${waited}s)"
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "AMA: MonAgentCore process not running (found: $(($amaProcs | Select-Object -ExpandProperty Name -Unique) -join ', '))"
+        $found = ($amaProcs | Select-Object -ExpandProperty Name -Unique) -join ', '
+        if ([string]::IsNullOrEmpty($found)) { $found = '<none>' }
+        $uptime = 'unknown'
+        try {
+            $boot = (Get-CimInstance Win32_OperatingSystem -ErrorAction Stop).LastBootUpTime
+            $uptime = '{0:N0}s' -f ((Get-Date) - $boot).TotalSeconds
+        } catch {}
+        $extStatus = 'no status file'
+        try {
+            $statusFile = Get-ChildItem $amaRoot -Directory -ErrorAction Stop |
+                Where-Object { $_.Name -match '^[0-9.]+$' } |
+                Sort-Object Name -Descending |
+                Select-Object -First 1 |
+                ForEach-Object { Get-ChildItem (Join-Path $_.FullName 'Status') -Filter '*.status' -ErrorAction SilentlyContinue } |
+                Sort-Object LastWriteTime -Descending |
+                Select-Object -First 1
+            if ($statusFile) {
+                $statusJson = Get-Content $statusFile.FullName -Raw | ConvertFrom-Json
+                $s = $statusJson.status.status
+                $m = $statusJson.status.formattedMessage.message
+                $extStatus = "status=$s message=$m"
+            }
+        } catch { $extStatus = "status file error: $_" }
+        Write-TestResult $moduleName 'FAIL' "AMA: MonAgentCore not running after ${waited}s (found: $found, vm_uptime=$uptime, extension: $extStatus)"
         $failed++
     }
 }
