@@ -24,23 +24,38 @@ tflint                   # uses .tflint.hcl (recommended + azurerm ruleset)
 
 The SPN password must come from the env var `TF_VAR_arm_client_secret` — never commit it.
 
-## Applying Terraform configurations (interactive — follow exactly)
+## Preflight checklist (run before any apply or test work — autopilot-compatible)
+
+This project runs in autopilot for long operations (`terraform apply` is 25–95 min; unit tests can be 10+ min). To avoid failing mid-run because of a missing secret, expired auth, or uncached sudo credentials, **collect every human-gated input up front** in a single preflight phase. Once preflight passes, the rest of the run should not require user intervention.
 
 **Hard rules — never violate:**
 
+- **Do not start `terraform apply`, `terraform plan`, or `Invoke-UnitTests.ps1` until every preflight item below is satisfied.** A failed apply 40 minutes in because a secret was missing is the worst outcome — fail fast at preflight instead.
 - Never run concurrent `terraform apply` operations against the same sandbox environment (state file). One apply at a time, full stop.
 - Never inspect Terraform state (`terraform state ...`, `terraform output`, `terraform show`, `terraform plan`, etc.) while a `terraform apply` is in flight — it will read/lock the same state file and cause errors or corruption.
+- Batch all `ask_user` prompts back-to-back at the start of the session. Do not interleave human prompts with long-running tool calls.
 
-Two scenarios. In **both**, before doing anything:
+**Preflight items — check each one and resolve before proceeding:**
 
-1. **Check `TF_VAR_arm_client_secret`** is set (`echo "${TF_VAR_arm_client_secret:+set}"`). If empty, prompt the user for the service principal password using the `ask_user` tool and export it yourself in the shell session before running Terraform.
-2. **Ensure `terraform.tfvars` exists** in the repo root. If it doesn't, run `./scripts/bootstrap.sh` to generate it.
-3. **Ask the user which modules to enable / disable** in `terraform.tfvars`. Default is: enable **all base modules** in `./modules` (set every `enable_module_*` flag to `true`); leave **all extra modules** in `./extras/modules` (`ai-foundry`, `avd`, `petstore`, `vnet-onprem`, etc.) **disabled**. Confirm "use defaults" vs. a custom subset before editing the file.
-4. Normal Terraform rules apply: run `terraform init` before `terraform apply`, `terraform validate` and `terraform plan` first.
+1. **Service principal secret (`TF_VAR_arm_client_secret`)** — check with `echo "${TF_VAR_arm_client_secret:+set}"`. If empty, use `ask_user` to prompt for the SPN password, then export it in the shell session before any Terraform command. Required for every `terraform plan` / `apply`.
+2. **Azure CLI auth (`az login`)** — verify with `az account show`. If it fails, use `ask_user` to instruct the user to run `az login` in their own terminal, and wait for confirmation before proceeding. Required for `terraform apply` and for `enable-public-access.sh`.
+3. **Azure PowerShell auth (`Connect-AzAccount`)** — verify with `pwsh -Command 'Get-AzContext'`. If empty, use `ask_user` to instruct the user to run `pwsh -Command 'Connect-AzAccount -UseDeviceAuthentication'` (credentials persist to `~/.Azure`). Required only when `Invoke-UnitTests.ps1` will be run.
+4. **Sudo credential cache (WSL Terraform execution environment)** — unit tests run from WSL invoke commands that require `sudo` at runtime. Sudo's credential cache (`timestamp_timeout`, default 15 min) will expire during a long autopilot run, causing tests to hang waiting for a password prompt the agent cannot answer. Required only when `Invoke-UnitTests.ps1` will be run. Procedure:
+   - Use `ask_user` to prompt for the sudo password (mark the question so the user knows it will be used to refresh the sudo timestamp).
+   - Cache it immediately: `printf '%s\n' "$SUDO_PASSWORD" | sudo -S -v` (validates and refreshes the timestamp; does not run any other command).
+   - Do **not** persist the password to disk, do not echo it, do not pass it as a CLI argument, and do not store it in the session database. Hold it only in the shell variable for the duration of the test run.
+   - For test runs expected to exceed ~10 minutes, re-run `printf '%s\n' "$SUDO_PASSWORD" | sudo -S -v` immediately before invoking `Invoke-UnitTests.ps1` to maximize the cached window. If a test run is long enough that the cache may expire mid-run, warn the user before starting and ask whether to proceed or split the run.
+   - If the user prefers not to share the password, instruct them to either (a) run `sudo -v` themselves in the same shell just before you launch the tests, or (b) configure a sudoers `NOPASSWD` entry for the specific commands the tests invoke.
+5. **`terraform.tfvars` exists** in the repo root. If missing, run `./scripts/bootstrap.sh` to generate it.
+6. **Module enablement confirmed** — use `ask_user` to ask which modules to enable / disable in `terraform.tfvars`. Default is: enable **all base modules** in `./modules` (every `enable_module_*` flag `true`); leave **all extra modules** in `./extras/modules` (`ai-foundry`, `avd`, `petstore`, `vnet-onprem`, etc.) **disabled**. Confirm "use defaults" vs. a custom subset before editing the file.
+
+After preflight passes, normal Terraform rules apply: `terraform init` before `terraform apply`; run `terraform validate` and `terraform plan` first.
+
+## Applying Terraform configurations
 
 ### Scenario 1 — Fresh sandbox from scratch
 
-No advance environment prep needed beyond the user being signed in via `az login` (verify with `az account show`). After steps 1–3 above, just run `terraform init && terraform plan && terraform apply`.
+After preflight passes, run `terraform init && terraform plan && terraform apply`.
 
 After a successful apply, ask the user whether to run unit tests for all installed modules:
 
@@ -66,10 +81,9 @@ pwsh -File ./scripts/Invoke-UnitTests.ps1 -Module <module_name> -Integration
 
 ### Tests (Pester-free, PowerShell-orchestrated)
 
-```bash
-# Auth once (persisted to ~/.Azure):
-pwsh -Command 'Connect-AzAccount -UseDeviceAuthentication'
+Preflight items 3 (Azure PowerShell auth) and 4 (sudo credential cache) must be satisfied before invoking any of these.
 
+```bash
 # All modules:
 pwsh -File ./scripts/Invoke-UnitTests.ps1
 
