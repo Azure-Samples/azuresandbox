@@ -9,7 +9,7 @@ terraform {
     
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 4.74.0"
+      version = "~> 4.75.0"
     }
 
     cloudinit = {
