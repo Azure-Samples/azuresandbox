@@ -55,7 +55,24 @@ After preflight passes, normal Terraform rules apply: `terraform init` before `t
 
 ### Scenario 1 — Fresh sandbox from scratch
 
-After preflight passes, run `terraform init && terraform plan && terraform apply`.
+When deploying a new sandbox environment while the working branch is `vnext` in the IDE, **assume this is vnext testing** and complete the following vnext-testing prep steps **after preflight passes but before `terraform init`**:
+
+1. **Update the WSL/Linux execution environment.** Refresh the cached sudo credential (preflight item 4), then run:
+   ```bash
+   printf '%s\n' "$SUDO_PASSWORD" | sudo -S apt update && sudo apt upgrade -y
+   ```
+2. **Check the Terraform CLI version against `terraform.tf`.** Compare `terraform --version` against the `required_version` in the root `terraform.tf`. If they differ, open a pull request against `vnext` that updates `required_version` in:
+   - the root `terraform.tf`, and
+   - every module's `terraform.tf` under `./modules/**` and `./extras/modules/**`.
+
+   Use `gh pr create --base vnext` for the PR. Do not proceed with the apply until the version mismatch is resolved (either by merging the PR or by switching the local Terraform CLI to match the pinned version).
+3. **Update the PowerShell 7.x Az module to the latest version** so unit tests run against current cmdlets:
+   ```bash
+   pwsh -Command 'Update-Module -Name Az -Force -Scope CurrentUser -AcceptLicense'
+   ```
+   Confirm with `pwsh -Command 'Get-InstalledModule -Name Az | Select-Object Version'`.
+
+After the vnext-testing prep steps complete (or for non-vnext branches, immediately after preflight), run `terraform init && terraform plan && terraform apply`.
 
 After a successful apply, ask the user whether to run unit tests for all installed modules:
 
