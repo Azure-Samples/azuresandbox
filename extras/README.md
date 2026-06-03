@@ -34,6 +34,13 @@ This section describes additional Terraform modules that can be added to Azure S
 * Retired modules:
   * [vm-devops-win](./modules/retired/vm-devops-win/) implements a collection of identical Windows developer VMs.
 
+## Scripts
+
+This section describes additional scripts associated with Azure Sandbox. These scripts are not required to use Azure Sandbox, but may be useful for learning or testing purposes.
+
+* [vm-mssql-win](./scripts/vm-mssql-win/) helper scripts associated with the SQL Server Virtual Machine Module (vm-mssql-win).
+  * [NVMEe](./scripts/vm-mssql-win/NVMe/) helper scripts for automatically provisions the NVMe storage and starts SQL Server on every boot.
+
 ## Demo videos
 
 This section contains an index of demo videos that were built using aspects of Azure Sandbox.
