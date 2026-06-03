@@ -15,6 +15,7 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 - [Code of Conduct](#code-of-conduct)
 - [Issues and Bugs](#found-an-issue)
 - [Feature Requests](#want-a-feature)
+- [Branching and Merge Policy](#branching-and-merge-policy)
 - [Submission Guidelines](#submission-guidelines)
 
 ## Code of Conduct
@@ -34,6 +35,31 @@ Repository. If you would like to *implement* a new feature, please submit an iss
 a proposal for your work first, to be sure that we can use it.
 
 - **Small Features** can be crafted and directly [submitted as a Pull Request](#submitting-a-pull-request-pr).
+
+## Branching and Merge Policy
+
+This repository uses a two-branch model to keep `main` stable and releasable at all times.
+
+| Branch | Purpose | Who can update it | How it is updated |
+| --- | --- | --- | --- |
+| `vnext` | Active development / integration branch. All day-to-day work lands here. | Any collaborator with write access | Pull requests (or direct pushes by maintainers) |
+| `main` | Stable, released code. | Repository owner **@doherty100** only | Pull request merging `vnext` → `main` |
+
+### Workflow
+
+1. **Target `vnext` for all contributions.** Open every pull request — features, bug fixes, and documentation — against the `vnext` branch. Do not open pull requests directly against `main`.
+2. **Integration happens on `vnext`.** Reviews, status checks (including the CLA bot), and testing occur here.
+3. **Promotion to `main` is restricted.** Only the repository owner (**@doherty100**) opens and merges the `vnext` → `main` pull request that promotes accumulated changes to the stable branch. No other collaborator can merge into `main`.
+
+### Enforcement
+
+The policy above is enforced by [branch protection](https://docs.github.com/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches) on `main`:
+
+- `main` can only be updated through a pull request (no direct contributor pushes).
+- Push/merge access to `main` is restricted to **@doherty100**, so only the owner can complete a `vnext` → `main` pull request.
+- Force pushes and branch deletion are disabled on `main`.
+
+Code ownership is declared in [`.github/CODEOWNERS`](.github/CODEOWNERS) (`* @doherty100`), which automatically requests the owner as a reviewer on pull requests.
 
 ## Submission Guidelines
 
@@ -64,17 +90,17 @@ Before you submit your Pull Request (PR) consider the following guidelines:
 - Search the repository [#AzureSandbox](https://github.com/Azure-Samples/azuresandbox/pulls) for an open or closed PR
   that relates to your submission. You don't want to duplicate effort.
 
-- Make your changes in a new git fork:
+- Make your changes in a new git branch or fork, based on `vnext`:
 
 - Commit your changes using a descriptive commit message
-- Push your fork to GitHub:
-- In GitHub, create a pull request
+- Push your branch or fork to GitHub:
+- In GitHub, create a pull request **with `vnext` as the base branch** (not `main`)
 - If we suggest changes then:
   - Make the required updates.
-  - Rebase your fork and force push to your GitHub repository (this will update your Pull Request):
+  - Rebase your branch and force push to your GitHub repository (this will update your Pull Request):
 
     ```shell
-    git rebase master -i
+    git rebase vnext -i
     git push -f
     ```
 
