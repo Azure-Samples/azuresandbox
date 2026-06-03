@@ -46,7 +46,7 @@ This project runs in autopilot for long operations (`terraform apply` is 25–95
    - Do **not** persist the password to disk, do not echo it, do not pass it as a CLI argument, and do not store it in the session database. Hold it only in the shell variable for the duration of the test run.
    - For test runs expected to exceed ~10 minutes, re-run `printf '%s\n' "$SUDO_PASSWORD" | sudo -S -v` immediately before invoking `Invoke-UnitTests.ps1` to maximize the cached window. If a test run is long enough that the cache may expire mid-run, warn the user before starting and ask whether to proceed or split the run.
    - If the user prefers not to share the password, instruct them to either (a) run `sudo -v` themselves in the same shell just before you launch the tests, or (b) configure a sudoers `NOPASSWD` entry for the specific commands the tests invoke.
-5. **`terraform.tfvars` exists** in the repo root. If missing, run `./scripts/bootstrap.sh` to generate it.
+5. **`terraform.tfvars` exists** in the repo root. If missing, run `./scripts/bootstrap.sh` (Linux Terraform execution environment) or `./scripts/bootstrap.ps1` (Windows). The two scripts are equivalent — pick the one matching the host OS.
 6. **Module enablement confirmed** — use `ask_user` to ask which modules to enable / disable in `terraform.tfvars`. Default is: enable **all base modules** in `./modules` (every `enable_module_*` flag `true`); leave **all extra modules** in `./extras/modules` (`ai-foundry`, `avd`, `petstore`, `vnet-onprem`, etc.) **disabled**. Confirm "use defaults" vs. a custom subset before editing the file.
 
 After preflight passes, normal Terraform rules apply: `terraform init` before `terraform apply`; run `terraform validate` and `terraform plan` first.
@@ -111,7 +111,11 @@ pwsh -File ./scripts/Invoke-UnitTests.ps1 -Module vnet_app
 pwsh -File ./scripts/Invoke-UnitTests.ps1 -Module vm_mssql_win -Integration
 ```
 
-Valid `-Module` values: `vnet_shared`, `vnet_app`, `vm_jumpbox_linux`, `vm_mssql_win`, `mssql`, `mysql`, `vwan`, `vnet_onprem`. Tests require an applied sandbox in the current Terraform state. Exit code is `0`/`1` for CI use.
+Valid `-Module` values: `vnet_shared`, `vnet_app`, `vm_jumpbox_linux`, `vm_mssql_win`, `mssql`, `mysql`, `vwan`, `vnet_onprem`, `avd`, `petstore` (note: `ai_foundry` is **not** currently supported by `Invoke-UnitTests.ps1`). Tests require an applied sandbox in the current Terraform state. Exit code is `0`/`1` for CI use.
+
+**WSL automation caveat — `vwan` blocks unattended runs.** When the Terraform execution environment is WSL, `Invoke-UnitTests.ps1` can only run fully autonomously if the `vwan` module is **not** enabled in the sandbox. The vwan integration tests invoke commands that require `sudo` at runtime and will prompt for a password the agent cannot answer (the cached sudo timestamp from preflight item 4 is insufficient — these specific commands re-prompt). For unattended/autopilot test runs in WSL, either disable `enable_module_vwan` in `terraform.tfvars` before applying, or skip the test phase when vwan is part of the deployment and ask the user to run `Invoke-UnitTests.ps1` interactively instead.
+
+`Invoke-UnitTests.ps1` is the orchestrator — it discovers what's deployed via `terraform output`, then per-module dispatches to `scripts/Test-Integration-*.ps1` (one script per integration scenario): `Test-Integration-SqlConnectivity.ps1`, `Test-Integration-AzSqlConnectivity.ps1`, `Test-Integration-AzMySqlConnectivity.ps1`, `Test-Integration-SshConnectivity.ps1`, `Test-Integration-VwanConnectivity.ps1`, `Test-Integration-CloudToOnpremDns.ps1`, `Test-Integration-OnpremToCloudDns.ps1`, `Test-Integration-Petstore.ps1`, `Test-Integration-AvdPersonal.ps1`, `Test-Integration-AvdRemoteapp.ps1`. Do not invoke these directly — go through the orchestrator so the right parameters (resource names, FQDNs) are populated from Terraform outputs.
 
 ## Architecture
 
@@ -169,3 +173,15 @@ Every module has a `README.md` with the same sections: Architecture (drawio SVG 
 - Day-to-day work happens on `vnext`; PRs target `vnext`.
 - A CLA bot runs on PRs (Microsoft Open Source CLA).
 - `.vscode/tasks.json` provides a one-shot task to squash-merge all open PRs into `vnext` (`gh pr list ... | xargs gh pr merge --squash`).
+
+## Standalone configurations under `extras/configurations/`
+
+`extras/configurations/rg-devops-iac/` is a **standalone** Terraform configuration (not a module of the root sandbox) that provisions a minimal Linux Terraform execution environment — VNet + NAT, storage account for remote state, Key Vault, and a reusable `vm-jumpbox-linux` child module configured with managed-identity-based azurerm provider auth. Use it as a starting point for DevOps/IaC pipelines, not as part of a sandbox apply. See `extras/configurations/rg-devops-iac/README.md` for its own preflight, apply, and teardown steps — it has independent state and lifecycle.
+
+## MCP servers configured for this workspace
+
+These MCP servers are wired up for Copilot sessions in this repo; prefer them over web search / memory for the topics they cover:
+
+- **Microsoft Learn** (`microsoft_docs_search`, `microsoft_docs_fetch`, `microsoft_code_sample_search`) — first stop for Azure service docs, ARM/AzAPI resource reference, and Microsoft SDK code samples. Use before falling back to general web search for any Azure/Microsoft topic.
+- **Azure Terraform** (`azure-terraform-*`, `azure-azureterraform`, `azure-azureterraformbestpractices`, `azure-bicepschema`) — `azurerm` / `azapi` / AVM provider documentation, resource schemas, Azure Terraform best-practice guidance, `aztfexport` command generation, and `conftest` policy validation. Use these to look up resource arguments/attributes before guessing or grepping provider source.
+- **GitHub** (`gh` CLI, plus `github-mcp-server-*` tools) — PR/issue/workflow/repo operations. Prefer the `gh` CLI for routine operations (per the gh-cli preference); the MCP tools are useful for cross-repo code search (`github-mcp-server-search_code`) and Copilot Spaces lookup.
