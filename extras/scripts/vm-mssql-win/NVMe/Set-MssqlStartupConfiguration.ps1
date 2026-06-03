@@ -193,10 +193,11 @@ try {
         }
         if ($null -eq $existingRule) {
             Write-Log "Granting FullControl on '$sqlTempPath' to '$identity'..."
+            $inheritance = [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor [System.Security.AccessControl.InheritanceFlags]::ObjectInherit
             $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
                 $identity,
                 [System.Security.AccessControl.FileSystemRights]::FullControl,
-                [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor [System.Security.AccessControl.InheritanceFlags]::ObjectInherit,
+                $inheritance,
                 [System.Security.AccessControl.PropagationFlags]::None,
                 [System.Security.AccessControl.AccessControlType]::Allow
             )
