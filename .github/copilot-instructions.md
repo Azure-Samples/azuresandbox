@@ -24,13 +24,19 @@ tflint                   # uses .tflint.hcl (recommended + azurerm ruleset)
 
 The SPN password must come from the env var `TF_VAR_arm_client_secret` — never commit it.
 
-## Preflight checklist (run before any apply or test work — autopilot-compatible)
+## Preflight checklist (run attended, before enabling autopilot for any apply or test work)
 
-This project runs in autopilot for long operations (`terraform apply` is 25–95 min; unit tests can be 10+ min). To avoid failing mid-run because of a missing secret, expired auth, or a missing sudo NOPASSWD drop-in, **collect every human-gated input up front** in a single preflight phase. Once preflight passes, the rest of the run should not require user intervention.
+This project runs in autopilot for long operations (`terraform apply` is 25–95 min; unit tests can be 10+ min). The preflight checklist itself, however, **must be completed with a human present — i.e. NOT in autopilot mode** — because every item may require an `ask_user` prompt (secrets, auth confirmations, sudo password, module selection), and `ask_user` cannot be answered during unattended execution. To avoid failing mid-run because of a missing secret, expired auth, or a missing sudo NOPASSWD drop-in, **collect every human-gated input up front** in a single attended preflight phase. Once preflight passes, the rest of the run should not require user intervention.
+
+The intended workflow is a clean two-phase handoff:
+
+1. **Attended preflight** — autopilot **off**. Work through every preflight item below, batching all `ask_user` prompts back-to-back while the user is present.
+2. **Unattended execution** — once (and only once) every preflight item is satisfied, **prompt the user to switch to autopilot mode by running `/allow-all`** so the long-running apply and tests can complete fully automated without further intervention. Do not begin `terraform apply`, `terraform plan`, or `Invoke-UnitTests.ps1` until the user has confirmed they have enabled autopilot.
 
 **Hard rules — never violate:**
 
-- **Do not start `terraform apply`, `terraform plan`, or `Invoke-UnitTests.ps1` until every preflight item below is satisfied.** A failed apply 40 minutes in because a secret was missing is the worst outcome — fail fast at preflight instead.
+- **Do not run the preflight checklist in autopilot mode.** Preflight requires human input via `ask_user`; complete it attended, then hand off to autopilot only after every item passes.
+- **Do not start `terraform apply`, `terraform plan`, or `Invoke-UnitTests.ps1` until every preflight item below is satisfied AND the user has switched to autopilot (`/allow-all`).** A failed apply 40 minutes in because a secret was missing is the worst outcome — fail fast at preflight instead.
 - Never run concurrent `terraform apply` operations against the same sandbox environment (state file). One apply at a time, full stop.
 - Never inspect Terraform state (`terraform state ...`, `terraform output`, `terraform show`, `terraform plan`, etc.) while a `terraform apply` is in flight — it will read/lock the same state file and cause errors or corruption.
 - Batch all `ask_user` prompts back-to-back at the start of the session. Do not interleave human prompts with long-running tool calls.
@@ -48,7 +54,7 @@ This project runs in autopilot for long operations (`terraform apply` is 25–95
 5. **`terraform.tfvars` exists** in the repo root. If missing, run `./scripts/bootstrap.sh` (Linux Terraform execution environment) or `./scripts/bootstrap.ps1` (Windows). The two scripts are equivalent — pick the one matching the host OS.
 6. **Module enablement confirmed** — use `ask_user` to ask whether **all base modules** in `./modules` should be deployed (every `enable_module_*` flag `true`). Extra modules in `./extras/modules` (`ai-foundry`, `avd`, `petstore`, `vnet-onprem`, etc.) are **always excluded** from this question and left **disabled**. If the answer is **no**, use `ask_user` again to have the user specify exactly which base modules to enable (e.g. `vnet_app` only); all other base modules stay disabled. Confirm the selection before editing `terraform.tfvars`.
 
-After preflight passes, normal Terraform rules apply: `terraform init` before `terraform apply`; run `terraform validate` and `terraform plan` first.
+After all preflight items pass, the remaining attended setup depends on the scenario: for a fresh vnext sandbox there are additional human-gated prep steps (see Scenario 1) that must also be completed attended. Once **all** attended setup (preflight plus any scenario-specific prep) is done and nothing further requires `ask_user`, **use `ask_user` to prompt the user to enable autopilot by running `/allow-all`**, and wait for their confirmation before proceeding. This is the handoff from the attended phase to fully automated execution. Once autopilot is enabled, normal Terraform rules apply: `terraform init` before `terraform apply`; run `terraform validate` and `terraform plan` first.
 
 ## Applying Terraform configurations
 
@@ -69,7 +75,7 @@ Do not resume the workflow until the user explicitly instructs you to. Never sil
 
 ### Scenario 1 — Fresh sandbox from scratch
 
-When deploying a new sandbox environment while the working branch is `vnext` in the IDE, **assume this is vnext testing** and complete the following vnext-testing prep steps **after preflight passes but before `terraform init`**:
+When deploying a new sandbox environment while the working branch is `vnext` in the IDE, **assume this is vnext testing** and complete the following vnext-testing prep steps **attended (autopilot still off), after preflight passes but before the autopilot handoff and `terraform init`** — these steps contain their own `ask_user` prompts (sudo password, PR decisions):
 
 1. **Update the WSL/Linux execution environment.** This needs a real sudo password (`apt` is **not** covered by the vwan NOPASSWD drop-in in preflight item 4). Prompt for the sudo password via `ask_user` (do not persist it), then run both commands under `sudo -S` in the same invocation:
    ```bash
@@ -86,7 +92,7 @@ When deploying a new sandbox environment while the working branch is `vnext` in 
    ```
    Confirm with `pwsh -Command 'Get-InstalledModule -Name Az | Select-Object Version'`.
 
-After the vnext-testing prep steps complete (or for non-vnext branches, immediately after preflight), run `terraform init && terraform plan && terraform apply`.
+After the vnext-testing prep steps complete (or for non-vnext branches, immediately after preflight), perform the autopilot handoff — prompt the user to run `/allow-all` and wait for confirmation — then run `terraform init && terraform plan && terraform apply`.
 
 After a successful apply, ask the user whether to run unit tests for all installed modules:
 
@@ -102,7 +108,7 @@ The barrier pattern leaves Key Vault and Storage Account with public access **di
 ./scripts/enable-public-access.sh
 ```
 
-Then proceed with `terraform init` (if providers changed) → `terraform plan` → `terraform apply`. The barrier resources will re-disable public access at the end of the apply.
+Then perform the autopilot handoff — prompt the user to run `/allow-all` and wait for confirmation — then proceed with `terraform init` (if providers changed) → `terraform plan` → `terraform apply`. The barrier resources will re-disable public access at the end of the apply.
 
 After a successful apply, if a module was **newly enabled**, ask the user whether to run that module's unit tests + integration tests:
 
