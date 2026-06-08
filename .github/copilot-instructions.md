@@ -26,7 +26,7 @@ The SPN password must come from the env var `TF_VAR_arm_client_secret` — never
 
 ## Preflight checklist (run before any apply or test work — autopilot-compatible)
 
-This project runs in autopilot for long operations (`terraform apply` is 25–95 min; unit tests can be 10+ min). To avoid failing mid-run because of a missing secret, expired auth, or uncached sudo credentials, **collect every human-gated input up front** in a single preflight phase. Once preflight passes, the rest of the run should not require user intervention.
+This project runs in autopilot for long operations (`terraform apply` is 25–95 min; unit tests can be 10+ min). To avoid failing mid-run because of a missing secret, expired auth, or a missing sudo NOPASSWD drop-in, **collect every human-gated input up front** in a single preflight phase. Once preflight passes, the rest of the run should not require user intervention.
 
 **Hard rules — never violate:**
 
@@ -40,12 +40,11 @@ This project runs in autopilot for long operations (`terraform apply` is 25–95
 1. **Service principal secret (`TF_VAR_arm_client_secret`)** — check with `echo "${TF_VAR_arm_client_secret:+set}"`. If empty, use `ask_user` to prompt for the SPN password, then export it in the shell session before any Terraform command. Required for every `terraform plan` / `apply`.
 2. **Azure CLI auth (`az login`)** — verify with `az account show`. If it fails, use `ask_user` to instruct the user to run `az login` in their own terminal, and wait for confirmation before proceeding. Required for `terraform apply` and for `enable-public-access.sh`.
 3. **Azure PowerShell auth (`Connect-AzAccount`)** — verify with `pwsh -Command 'Get-AzContext'`. If empty, use `ask_user` to instruct the user to run `pwsh -Command 'Connect-AzAccount -UseDeviceAuthentication'` (credentials persist to `~/.Azure`). Required only when `Invoke-UnitTests.ps1` will be run.
-4. **Sudo credential cache (WSL Terraform execution environment)** — unit tests run from WSL invoke commands that require `sudo` at runtime. Sudo's credential cache (`timestamp_timeout`, default 15 min) will expire during a long autopilot run, causing tests to hang waiting for a password prompt the agent cannot answer. Required only when `Invoke-UnitTests.ps1` will be run. Procedure:
-   - Use `ask_user` to prompt for the sudo password (mark the question so the user knows it will be used to refresh the sudo timestamp).
-   - Cache it immediately: `printf '%s\n' "$SUDO_PASSWORD" | sudo -S -v` (validates and refreshes the timestamp; does not run any other command).
-   - Do **not** persist the password to disk, do not echo it, do not pass it as a CLI argument, and do not store it in the session database. Hold it only in the shell variable for the duration of the test run.
-   - For test runs expected to exceed ~10 minutes, re-run `printf '%s\n' "$SUDO_PASSWORD" | sudo -S -v` immediately before invoking `Invoke-UnitTests.ps1` to maximize the cached window. If a test run is long enough that the cache may expire mid-run, warn the user before starting and ask whether to proceed or split the run.
-   - If the user prefers not to share the password, instruct them to either (a) run `sudo -v` themselves in the same shell just before you launch the tests, or (b) configure a sudoers `NOPASSWD` entry for the specific commands the tests invoke.
+4. **Sudo NOPASSWD drop-in for vwan tests (WSL/Linux Terraform execution environment)** — the `vwan` integration tests (`Test-Integration-VwanConnectivity.ps1`) invoke a handful of privileged commands at runtime (`openvpn`, `cat`, `tail`, `kill`, `pkill`). These are granted promptlessly by a persistent, command-scoped sudoers drop-in at `/etc/sudoers.d/azuresandbox-vwan`, so **no sudo password or timestamp-cache refresh is needed** — unattended/autopilot runs work without human intervention. Required only when `Invoke-UnitTests.ps1` will run the vwan integration tests. Procedure:
+   - Verify the drop-in is installed and the rules are active: `sudo -n cat /dev/null && echo ok` (the test scripts use this exact `sudo -n cat /dev/null` probe — not `sudo -n true`, which the command-scoped allowlist deliberately denies). If it prints `ok`, sudo is ready; do nothing further.
+   - If the probe fails (drop-in missing — e.g. a fresh execution environment), recreate it: write a file containing `<user> ALL=(root) NOPASSWD: /usr/sbin/openvpn, /usr/bin/cat, /bin/cat, /usr/bin/tail, /bin/tail, /usr/bin/kill, /bin/kill, /usr/bin/pkill`, validate it with `visudo -c -f <file>`, then install it as root with `install -m 0440 -o root -g root <file> /etc/sudoers.d/azuresandbox-vwan`. Installing it needs the sudo password **once** — prompt via `ask_user`, use it inline with `sudo -S`, and do **not** persist it to disk, echo it, pass it as a CLI argument, or store it in the session database.
+   - Because the allowlist is binary-scoped (not `NOPASSWD: ALL`), it permits only those specific commands with any arguments; `sudo` for anything else still requires a password. This is an intentional security/convenience tradeoff for the sandbox execution environment.
+   - Non-vwan modules' tests do not require sudo, so this item is irrelevant unless `vwan` is enabled and `-Integration` is requested.
 5. **`terraform.tfvars` exists** in the repo root. If missing, run `./scripts/bootstrap.sh` (Linux Terraform execution environment) or `./scripts/bootstrap.ps1` (Windows). The two scripts are equivalent — pick the one matching the host OS.
 6. **Module enablement confirmed** — use `ask_user` to ask which modules to enable / disable in `terraform.tfvars`. Default is: enable **all base modules** in `./modules` (every `enable_module_*` flag `true`); leave **all extra modules** in `./extras/modules` (`ai-foundry`, `avd`, `petstore`, `vnet-onprem`, etc.) **disabled**. Confirm "use defaults" vs. a custom subset before editing the file.
 
@@ -57,9 +56,9 @@ After preflight passes, normal Terraform rules apply: `terraform init` before `t
 
 When deploying a new sandbox environment while the working branch is `vnext` in the IDE, **assume this is vnext testing** and complete the following vnext-testing prep steps **after preflight passes but before `terraform init`**:
 
-1. **Update the WSL/Linux execution environment.** Refresh the cached sudo credential (preflight item 4), then run:
+1. **Update the WSL/Linux execution environment.** This needs a real sudo password (`apt` is **not** covered by the vwan NOPASSWD drop-in in preflight item 4). Prompt for the sudo password via `ask_user` (do not persist it), then run both commands under `sudo -S` in the same invocation:
    ```bash
-   printf '%s\n' "$SUDO_PASSWORD" | sudo -S apt update && sudo apt upgrade -y
+   printf '%s\n' "$SUDO_PASSWORD" | sudo -S apt update && printf '%s\n' "$SUDO_PASSWORD" | sudo -S apt upgrade -y
    ```
 2. **Check the Terraform CLI version against `terraform.tf`.** Compare `terraform --version` against the `required_version` in the root `terraform.tf`. If they differ, open a pull request against `vnext` that updates `required_version` in:
    - the root `terraform.tf`, and
@@ -98,7 +97,7 @@ pwsh -File ./scripts/Invoke-UnitTests.ps1 -Module <module_name> -Integration
 
 ### Tests (Pester-free, PowerShell-orchestrated)
 
-Preflight items 3 (Azure PowerShell auth) and 4 (sudo credential cache) must be satisfied before invoking any of these.
+Preflight items 3 (Azure PowerShell auth) and 4 (sudo NOPASSWD drop-in for vwan tests) must be satisfied before invoking any of these.
 
 ```bash
 # All modules:
@@ -113,7 +112,7 @@ pwsh -File ./scripts/Invoke-UnitTests.ps1 -Module vm_mssql_win -Integration
 
 Valid `-Module` values: `vnet_shared`, `vnet_app`, `vm_jumpbox_linux`, `vm_mssql_win`, `mssql`, `mysql`, `vwan`, `vnet_onprem`, `avd`, `petstore` (note: `ai_foundry` is **not** currently supported by `Invoke-UnitTests.ps1`). Tests require an applied sandbox in the current Terraform state. Exit code is `0`/`1` for CI use.
 
-**WSL automation caveat — `vwan` blocks unattended runs.** When the Terraform execution environment is WSL, `Invoke-UnitTests.ps1` can only run fully autonomously if the `vwan` module is **not** enabled in the sandbox. The vwan integration tests invoke commands that require `sudo` at runtime and will prompt for a password the agent cannot answer (the cached sudo timestamp from preflight item 4 is insufficient — these specific commands re-prompt). For unattended/autopilot test runs in WSL, either disable `enable_module_vwan` in `terraform.tfvars` before applying, or skip the test phase when vwan is part of the deployment and ask the user to run `Invoke-UnitTests.ps1` interactively instead.
+**WSL automation note — `vwan` now runs unattended via a sudoers drop-in.** The vwan integration tests invoke privileged commands (`openvpn`, `cat`, `tail`, `kill`, `pkill`) at runtime. These are granted promptlessly by the persistent command-scoped sudoers drop-in at `/etc/sudoers.d/azuresandbox-vwan` (preflight item 4), so `Invoke-UnitTests.ps1` runs fully autonomously in WSL **with `vwan` enabled** — no cached sudo timestamp and no mid-run password prompt. The test scripts probe sudo readiness with `sudo -n cat /dev/null` (an allowed command), not `sudo -n true`. If that drop-in is missing on a given execution environment, the vwan tests will instead prompt for a password the agent cannot answer — recreate the drop-in per preflight item 4, or skip the vwan test phase and ask the user to run `Invoke-UnitTests.ps1` interactively. Note: the openvpn launch in `Test-Integration-VwanConnectivity.ps1` runs `bash -c "sudo openvpn …"` (elevating only `openvpn`) rather than `sudo bash -c …`, which is what keeps the NOPASSWD allowlist scoped to specific binaries instead of all of `bash`.
 
 `Invoke-UnitTests.ps1` is the orchestrator — it discovers what's deployed via `terraform output`, then per-module dispatches to `scripts/Test-Integration-*.ps1` (one script per integration scenario): `Test-Integration-SqlConnectivity.ps1`, `Test-Integration-AzSqlConnectivity.ps1`, `Test-Integration-AzMySqlConnectivity.ps1`, `Test-Integration-SshConnectivity.ps1`, `Test-Integration-VwanConnectivity.ps1`, `Test-Integration-CloudToOnpremDns.ps1`, `Test-Integration-OnpremToCloudDns.ps1`, `Test-Integration-Petstore.ps1`, `Test-Integration-AvdPersonal.ps1`, `Test-Integration-AvdRemoteapp.ps1`. Do not invoke these directly — go through the orchestrator so the right parameters (resource names, FQDNs) are populated from Terraform outputs.
 
