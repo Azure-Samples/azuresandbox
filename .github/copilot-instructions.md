@@ -52,6 +52,21 @@ After preflight passes, normal Terraform rules apply: `terraform init` before `t
 
 ## Applying Terraform configurations
 
+### Error-handling policy (applies to all apply/deploy work — autopilot included)
+
+When deploying or modifying a sandbox environment, **do not attempt to automatically diagnose or fix any error you encounter — even in autopilot mode.** This applies to failures from `terraform init`, `terraform validate`, `terraform plan`, `terraform apply`, the vnext-testing prep steps, `enable-public-access.sh`, unit/integration tests, and any other step in these workflows.
+
+On the first error, stop the workflow immediately and instead:
+
+1. **Document the error.** Capture the exact failing command, the full error output, the step/scenario it occurred in, the enabled modules, and any other relevant context (branch, Terraform/provider versions). Do not retry, re-run, or alter configuration in an attempt to work around it.
+2. **Open a GitHub issue** against the repo describing the failure, using the documented details above:
+   ```bash
+   gh issue create --title "<concise error summary>" --body "<command, full error output, step, context>"
+   ```
+3. **Report back to the user** with a brief summary of the error and a link to the issue you opened.
+
+Do not resume the workflow until the user explicitly instructs you to. Never silently swallow, retry past, or self-patch a failure.
+
 ### Scenario 1 — Fresh sandbox from scratch
 
 When deploying a new sandbox environment while the working branch is `vnext` in the IDE, **assume this is vnext testing** and complete the following vnext-testing prep steps **after preflight passes but before `terraform init`**:
