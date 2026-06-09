@@ -59,6 +59,32 @@ After all preflight items pass, the remaining attended setup depends on the scen
 
 ## Applying Terraform configurations
 
+### Progress reporting for long-running operations (apply, tests — autopilot included)
+
+Long-running commands (`terraform apply` is 25–95 min; `terraform plan`, `terraform destroy`, and `Invoke-UnitTests.ps1` can each run 10+ min) must be run with the **bash tool in `mode="async"`** so they keep streaming output while you monitor them. **Emit a progress report to the user every two minutes** until the command completes. Each report should be short (1–2 sentences) and include:
+
+- Elapsed wall-clock time since the command started (e.g. "≈12 min elapsed").
+- The most recent meaningful line(s) of output — for `terraform apply`, the resources currently being created/modified and any `Still creating... [Xm Ys elapsed]` progress lines; for unit tests, the current module/test.
+- A one-line assessment of whether the operation is healthy, stalled, or hung (see detection logic below).
+
+Implementation guidance:
+
+- Start the command with `mode="async"` (use `detach: true` only for true background servers, not for apply/tests you are monitoring), then poll with `read_bash` on a roughly two-minute cadence to capture incremental output and drive each report.
+- Do **not** spam the user between reports. One concise update every ~2 minutes is the target — no per-tool-call narration in between.
+- Keep reporting until the process exits, then give a final completion (or failure) summary.
+
+#### Hung-process detection logic
+
+A long-running operation is **healthy as long as its output keeps advancing**, even when an individual resource takes a long time. Some Azure resources legitimately provision slowly — e.g. a **Point-to-Site (P2S) VPN Gateway, VPN/ExpressRoute gateway, AVD host pool, or AMPLS can take 30–45+ minutes** — but during that time `terraform apply` still prints a `Still creating... [Xm Ys elapsed]` heartbeat for the in-flight resource roughly **every 10 seconds to a minute**. That steady heartbeat means the run is **healthy, not hung**, regardless of total elapsed time.
+
+Classify the operation on each two-minute check:
+
+- **Healthy** — new output has appeared since the last check, or the `Still creating...` elapsed counter for the in-flight resource(s) is still incrementing. Report progress and keep waiting. **Never cancel a healthy run just because a single resource has been provisioning for >30 min** — that is expected for gateways and similar resources.
+- **Possibly stalled** — no new output for **two consecutive checks (~4 minutes)** and no advancing `Still creating...` heartbeat. Note this in the report, keep waiting one more interval, and look more closely (the process may simply be between heartbeats).
+- **Likely hung** — **no new output and no advancing heartbeat for ~10 minutes** (roughly five consecutive two-minute checks), or the underlying shell/process is no longer running while the command has not returned an exit status. Stop reporting "in progress", surface it to the user as a suspected hang with the elapsed time and last captured output, and ask how to proceed. Do **not** silently kill the process or self-diagnose — follow the error-handling policy below if the user decides to abort.
+
+When in doubt, prefer waiting over cancelling: the cost of a needlessly cancelled 40-minute apply is high, and a still-advancing heartbeat always means the run is fine.
+
 ### Error-handling policy (applies to all apply/deploy work — autopilot included)
 
 When deploying or modifying a sandbox environment, **do not attempt to automatically diagnose or fix any error you encounter — even in autopilot mode.** This applies to failures from `terraform init`, `terraform validate`, `terraform plan`, `terraform apply`, the vnext-testing prep steps, `enable-public-access.sh`, unit/integration tests, and any other step in these workflows.
