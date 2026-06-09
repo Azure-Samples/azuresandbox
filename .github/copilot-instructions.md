@@ -127,9 +127,10 @@ When deploying a new sandbox environment while the working branch is `vnext` in 
 
 After the vnext-testing prep steps complete (or for non-vnext branches, immediately after preflight), perform the autopilot handoff — prompt the user to run `/allow-all` and wait for confirmation — then run `terraform init && terraform plan && terraform apply`.
 
-After a successful apply, act on the unit-testing decision captured in preflight item 7. If it was **yes**, run unit tests for all installed modules (per the scope confirmed in preflight) without re-prompting; if it was **no**, skip this step:
+After a successful apply, act on the unit-testing decision captured in preflight item 7. If it was **yes**, run unit tests for all installed modules (per the scope confirmed in preflight) without re-prompting; if it was **no**, skip this step. **First satisfy the VM-start gate** (`./scripts/manage-vms.sh start`; see the Tests section) — a policy may have deallocated VMs since the apply:
 
 ```bash
+./scripts/manage-vms.sh start
 pwsh -File ./scripts/Invoke-UnitTests.ps1
 ```
 
@@ -143,9 +144,10 @@ The barrier pattern leaves Key Vault and Storage Account with public access **di
 
 Then perform the autopilot handoff — prompt the user to run `/allow-all` and wait for confirmation — then proceed with `terraform init` (if providers changed) → `terraform plan` → `terraform apply`. The barrier resources will re-disable public access at the end of the apply.
 
-After a successful apply, act on the unit-testing decision captured in preflight item 7. If it was **yes** and a module was **newly enabled**, run that module's unit tests + integration tests (per the scope confirmed in preflight) without re-prompting; if it was **no**, skip this step:
+After a successful apply, act on the unit-testing decision captured in preflight item 7. If it was **yes** and a module was **newly enabled**, run that module's unit tests + integration tests (per the scope confirmed in preflight) without re-prompting; if it was **no**, skip this step. **First satisfy the VM-start gate** (`./scripts/manage-vms.sh start`; see the Tests section) — a policy may have deallocated VMs since the apply:
 
 ```bash
+./scripts/manage-vms.sh start
 pwsh -File ./scripts/Invoke-UnitTests.ps1 -Module <module_name> -Integration
 ```
 
@@ -185,6 +187,15 @@ This is a specialization of Scenario 2 (it disables then re-enables a single mod
 ### Tests (Pester-free, PowerShell-orchestrated)
 
 Preflight items 3 (Azure PowerShell auth) and 4 (sudo NOPASSWD drop-in for vwan tests) must be satisfied before invoking any of these.
+
+**VM-start gate (mandatory — always run immediately before any unit/integration test invocation).** In some subscriptions an Azure policy can **arbitrarily stop/deallocate VMs** (e.g. cost-optimization auto-shutdown), which makes VM-side tests fail spuriously — a deallocated domain controller (`adds1`) breaks AD DNS, Kerberos, domain join, CIFS, and SQL auth (this is the root cause confirmed in issue #447). Therefore, **before every `Invoke-UnitTests.ps1` run — in Scenario 1, Scenario 2, the Scenario 3 repro, and any ad-hoc test run — first start all VMs and confirm they are running:**
+
+```bash
+./scripts/manage-vms.sh start
+az vm list -g <rg> -d --query "[].{Name:name, PowerState:powerState}" -o table   # confirm all 'VM running'
+```
+
+`manage-vms.sh start` starts `adds1` (domain controller) **first** and waits for it, then starts the rest. Do not begin testing until the relevant VMs report `VM running`. This gate is non-negotiable because the policy can deallocate VMs at any time, including after a successful `terraform apply` but before tests run.
 
 ```bash
 # All modules:
