@@ -172,8 +172,9 @@ $failed = 0
 # Verify sudo access (required for openvpn on Linux)
 if ($IsLinux -or $IsMacOS) {
     Write-Log 'Validating sudo access...'
-    # Check if passwordless sudo is available (CI/CD agents)
-    & sudo -n true 2>&1 | Out-Null
+    # Probe an allowed command (cat) rather than 'true': command-scoped NOPASSWD
+    # sudoers entries only permit the specific vwan binaries, so 'sudo -n true' would fail.
+    & sudo -n cat /dev/null 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0) {
         Write-Log 'Passwordless sudo available.'
     }
@@ -383,8 +384,14 @@ key $clientKeyPath
     $ovpnStderrPath = Join-Path $tempDir 'openvpn-stderr.log'
 
     if ($IsLinux -or $IsMacOS) {
-        # Run openvpn in background, capturing stderr separately for diagnostics
-        & sudo bash -c "openvpn --config '$ovpnConfigPath' --log '$ovpnLogPath' --writepid '$ovpnPidPath' 2>'$ovpnStderrPath' </dev/null &"
+        # Run openvpn in background, capturing stderr separately for diagnostics.
+        # The user shell (bash) handles backgrounding/redirection; only openvpn is elevated
+        # so a command-scoped NOPASSWD sudoers entry (not 'sudo bash') is sufficient.
+        # All three standard streams must be redirected: openvpn is a long-lived daemon,
+        # and if stdout stays attached to the pipe created by PowerShell's call operator (&),
+        # PowerShell blocks indefinitely waiting for EOF that never arrives. openvpn already
+        # writes its output to --log, so stdout is safely discarded here.
+        & bash -c "sudo openvpn --config '$ovpnConfigPath' --log '$ovpnLogPath' --writepid '$ovpnPidPath' 1>/dev/null 2>'$ovpnStderrPath' </dev/null &"
         $ovpnExitCode = $LASTEXITCODE
     }
     else {

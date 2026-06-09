@@ -357,7 +357,8 @@ $moduleIntegrationMap = @{
 $willRunVwanIntegration = ((-not $Module) -or ($Module -eq 'vwan' -and $Integration)) -and $resourceNames['virtual_wan'] -and $resourceNames['virtual_wan_hub']
 if ($willRunVwanIntegration -and ($IsLinux -or $IsMacOS)) {
     Write-Log "Pre-validating sudo access for vwan integration test..."
-    & sudo -n true 2>&1 | Out-Null
+    # Probe an allowed command (cat); command-scoped NOPASSWD won't permit 'true'.
+    & sudo -n cat /dev/null 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) {
         if ([System.Environment]::UserInteractive -or (Test-Path /dev/tty)) {
             & sudo -v
@@ -757,9 +758,10 @@ if ($runIntegration) {
             Write-Log "Integration: $($test.Name) | Local"
             Write-Log "========================================"
 
-            # Pre-validate sudo: prompt interactively if needed, or rely on passwordless in CI
+            # Pre-validate sudo: prompt interactively if needed, or rely on passwordless in CI.
+            # Probe an allowed command (cat); command-scoped NOPASSWD won't permit 'true'.
             if ($test.RequiresSudo -and ($IsLinux -or $IsMacOS)) {
-                & sudo -n true 2>&1 | Out-Null
+                & sudo -n cat /dev/null 2>&1 | Out-Null
                 if ($LASTEXITCODE -ne 0) {
                     if ([System.Environment]::UserInteractive -or (Test-Path /dev/tty)) {
                         & sudo -v
