@@ -113,9 +113,9 @@ When deploying a new sandbox environment while the working branch is `vnext` in 
    - every module's `terraform.tf` under `./modules/**` and `./extras/modules/**`.
 
    Use `gh pr create --base vnext` for the PR. Do not proceed with the apply until the version mismatch is resolved (either by merging the PR or by switching the local Terraform CLI to match the pinned version).
-3. **Update the PowerShell 7.x Az module to the latest version** so unit tests run against current cmdlets:
+3. **Update the PowerShell 7.x Az module to the latest version** so unit tests run against current cmdlets. First compare the installed version against the latest published version, and **skip the update if already on the latest**:
    ```bash
-   pwsh -Command 'Update-Module -Name Az -Force -Scope CurrentUser -AcceptLicense'
+   pwsh -Command '$installed = (Get-InstalledModule -Name Az -ErrorAction SilentlyContinue).Version; $latest = (Find-Module -Name Az).Version; if ($installed -ge $latest) { "Az $installed is already the latest ($latest) — skipping update." } else { "Updating Az from $installed to $latest..."; Update-Module -Name Az -Force -Scope CurrentUser -AcceptLicense }'
    ```
    Confirm with `pwsh -Command 'Get-InstalledModule -Name Az | Select-Object Version'`.
 
