@@ -149,6 +149,39 @@ After a successful apply, act on the unit-testing decision captured in preflight
 pwsh -File ./scripts/Invoke-UnitTests.ps1 -Module <module_name> -Integration
 ```
 
+### Scenario 3 — Reproducing a reported test failure for a VM-containing module (re-provision repro)
+
+**Applicability gate — VM modules only.** Use this repro **only** when the issue under investigation is a unit/integration **test failure for a module that provisions one or more VMs** (e.g. `vm_jumpbox_linux`, `vm_mssql_win`, `avd`, `vnet_onprem`, or the `adds1`/`jumpwin1` VMs in `vnet_shared`). The pattern works by tearing down and re-creating the module's VM(s) so cloud-init / run-command VM-side configuration re-runs against the current environment. **Do not use it for modules with no VM** (e.g. `mssql`, `mysql` flexible servers, `vnet_app` on its own) — there is no VM-side config to re-trigger, so the re-provision proves nothing; investigate those differently. If unsure whether the target module provisions a VM, confirm before using this scenario.
+
+**Why this works (root-cause class it targets).** Many VM-module test failures are environmental rather than code defects — most commonly a **dependency VM (especially the domain controller `adds1`) was stopped/deallocated** (e.g. by a cost-optimization auto-shutdown policy) when the original tests ran, breaking AD DNS resolution, Kerberos TGT acquisition, domain join, CIFS mounts, SQL auth, etc. Re-provisioning the failing module's VM **with every VM confirmed running** isolates that class: if the tests now **pass**, the failure was environmental (transient) → **close the issue**; if they still **fail**, it is a genuine, reproducible defect → **update the issue** with the evidence and leave it open.
+
+This is a specialization of Scenario 2 (it disables then re-enables a single module), so all Scenario 2 rules apply — most importantly running `./scripts/enable-public-access.sh` before **each** `terraform plan`/`apply`, and the autopilot handoff. It requires an already-applied sandbox in the current Terraform state.
+
+**Steps (this is exactly the repro plan validated against issue #447):**
+
+1. **Start all VMs** so no dependency (DC, SQL host, etc.) is deallocated during re-provision and testing:
+   ```bash
+   ./scripts/manage-vms.sh start
+   ```
+   The script starts `adds1` (domain controller) **first** and waits for it; verify with `az vm list -g <rg> -d --query "[].{Name:name, PowerState:powerState}" -o table` that the relevant VMs report `VM running` before continuing. The DC being up is the whole point — do not skip this.
+2. **Disable** the target module's `enable_module_<name>` flag in `terraform.tfvars`.
+3. `./scripts/enable-public-access.sh` (re-enable KV/Storage public access before the plan).
+4. `terraform apply` to **de-provision** the module's VM(s) (run `terraform init` first if needed; `terraform validate` + `terraform plan -out=...` then apply the saved plan).
+5. **Re-enable** the same `enable_module_<name>` flag in `terraform.tfvars`.
+6. `./scripts/enable-public-access.sh` again (the prior apply's barrier re-disabled public access).
+7. `terraform apply` to **re-provision** the module's VM(s); cloud-init / run-command VM-side config re-runs.
+8. Run the module's unit **and** integration tests:
+   ```bash
+   pwsh -File ./scripts/Invoke-UnitTests.ps1 -Module <module_name> -Integration
+   ```
+
+**Interpreting the result and acting on the issue:**
+
+- `RESULT: PASS` → **no repro**. Post a comment to the issue documenting the full steps, the passing summary (per-check `[PASS]` lines + overall `Passed=N Failed=0`), and the conclusion that the original failure was environmental (e.g. deallocated DC). **Close the issue** (`gh issue close <n> --reason "not planned"`).
+- `RESULT: FAIL` → **repro confirmed**. Post a comment with the failing `[FAIL]` lines and context, and **leave the issue open** for a fix. A reproduced test FAIL is the expected *outcome* of this scenario and is **not** itself a workflow error — do **not** open a second issue or invoke the error-handling policy for it. (The error-handling policy still applies to *infrastructure/command* failures — a `terraform apply` error, a script crash, etc. — which are distinct from a test reporting FAIL.)
+
+**Cleanup.** Always restore `terraform.tfvars` to its original module configuration (the target flag back to its starting value, normally `true`) and delete any temporary plan/log files created during the repro.
+
 ### Tests (Pester-free, PowerShell-orchestrated)
 
 Preflight items 3 (Azure PowerShell auth) and 4 (sudo NOPASSWD drop-in for vwan tests) must be satisfied before invoking any of these.
