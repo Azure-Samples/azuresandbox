@@ -387,7 +387,11 @@ key $clientKeyPath
         # Run openvpn in background, capturing stderr separately for diagnostics.
         # The user shell (bash) handles backgrounding/redirection; only openvpn is elevated
         # so a command-scoped NOPASSWD sudoers entry (not 'sudo bash') is sufficient.
-        & bash -c "sudo openvpn --config '$ovpnConfigPath' --log '$ovpnLogPath' --writepid '$ovpnPidPath' 2>'$ovpnStderrPath' </dev/null &"
+        # All three standard streams must be redirected: openvpn is a long-lived daemon,
+        # and if stdout stays attached to the pipe created by PowerShell's call operator (&),
+        # PowerShell blocks indefinitely waiting for EOF that never arrives. openvpn already
+        # writes its output to --log, so stdout is safely discarded here.
+        & bash -c "sudo openvpn --config '$ovpnConfigPath' --log '$ovpnLogPath' --writepid '$ovpnPidPath' 1>/dev/null 2>'$ovpnStderrPath' </dev/null &"
         $ovpnExitCode = $LASTEXITCODE
     }
     else {
