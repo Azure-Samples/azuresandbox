@@ -59,4 +59,9 @@ printf "Removing all files matching '*.log'...\n"
 find "$REPO_ROOT" -type f -name '*.log' 
 find "$REPO_ROOT" -type f -name '*.log' | xargs -r rm
 
+printf "Removing all files matching '*.tfplan'...\n"
+
+find "$REPO_ROOT" -type f -name '*.tfplan' 
+find "$REPO_ROOT" -type f -name '*.tfplan' | xargs -r rm
+
 exit 0
