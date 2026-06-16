@@ -84,5 +84,8 @@ sshkeytemp.pub
 *.pem
 *.pfx
 
+# Ignore Terraform plan files
+*.tfplan
+
 # Ignore log files
 *.log

@@ -131,7 +131,7 @@ try {
 
         # ── 2c: Create Storage Pool ──
         Write-Log "Creating Storage Pool '$StoragePoolName'..."
-        $pool = New-StoragePool `
+        $null = New-StoragePool `
             -FriendlyName $StoragePoolName `
             -StorageSubsystemFriendlyName "Windows Storage*" `
             -PhysicalDisks $nvmeDisks `

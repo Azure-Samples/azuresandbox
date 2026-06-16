@@ -53,9 +53,9 @@ variable "resource_group_name" {
 }
 
 variable "ssh_private_key_version" {
-  type = number
+  type        = number
   description = "Increment to create new ssh_private_key."
-  default = 1
+  default     = 1
 }
 
 variable "storage_account_id" {

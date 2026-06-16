@@ -1,0 +1,26 @@
+// markdownlint configuration for the Azure Sandbox repo.
+// Docs: https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+{
+  "default": true,
+
+  // Line length: prose and the generated variable/resource/output tables in
+  // module READMEs routinely exceed any fixed column width. Disabled.
+  "MD013": false,
+
+  // Inline HTML: READMEs embed <img>/<a>/<details> for diagrams and layout.
+  "MD033": false,
+
+  // First line in a file need not be a top-level heading (badges/comments).
+  "MD041": false,
+
+  // Allow duplicate heading text when nested under different parents
+  // (module READMEs repeat sections like "Overview", "Documentation").
+  "MD024": { "siblings_only": true },
+
+  // Ordered lists may use lazy "1." numbering.
+  "MD029": { "style": "one_or_ordered" },
+
+  // Table cell padding style (added in markdownlint v0.38). The repo's tables
+  // are not authored to the "compact" style; this is purely cosmetic.
+  "MD060": false
+}

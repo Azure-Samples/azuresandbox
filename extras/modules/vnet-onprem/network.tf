@@ -30,7 +30,7 @@ resource "azurerm_virtual_network_gateway" "this" {
   generation                 = "Generation1"
   private_ip_address_enabled = false
 
-  depends_on = [ azurerm_subnet.subnets ]
+  depends_on = [azurerm_subnet.subnets]
 
   ip_configuration {
     name                          = "Primary"
@@ -60,7 +60,7 @@ resource "azurerm_local_network_gateway" "this" {
   location            = var.location
   gateway_address     = tolist(azurerm_vpn_gateway.this.bgp_settings[0].instance_0_bgp_peering_address[0].tunnel_ips)[1]
 
-  depends_on = [ azurerm_subnet.subnets ]
+  depends_on = [azurerm_subnet.subnets]
 
   bgp_settings {
     asn                 = azurerm_vpn_gateway.this.bgp_settings[0].asn
@@ -79,7 +79,7 @@ resource "azurerm_virtual_network_gateway_connection" "this" {
   bgp_enabled                = true
   shared_key                 = var.admin_password
 
-  depends_on = [ azurerm_subnet.subnets ]
+  depends_on = [azurerm_subnet.subnets]
 }
 #endregion
 
