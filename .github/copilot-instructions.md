@@ -168,7 +168,7 @@ This is a specialization of Scenario 2 (it disables then re-enables a single mod
    The script starts `adds1` (domain controller) **first** and waits for it; verify with `az vm list -g <rg> -d --query "[].{Name:name, PowerState:powerState}" -o table` that the relevant VMs report `VM running` before continuing. The DC being up is the whole point — do not skip this.
 2. **Disable** the target module's `enable_module_<name>` flag in `terraform.tfvars`.
 3. `./scripts/enable-public-access.sh` (re-enable KV/Storage public access before the plan).
-4. `terraform apply` to **de-provision** the module's VM(s) (run `terraform init` first if needed; `terraform validate` + `terraform plan -out=...` then apply the saved plan).
+4. `terraform apply` to **de-provision** the module's VM(s) (run `terraform init` first if needed; `terraform validate` + `terraform plan -out=<name>.tfplan` then apply the saved plan).
 5. **Re-enable** the same `enable_module_<name>` flag in `terraform.tfvars`.
 6. `./scripts/enable-public-access.sh` again (the prior apply's barrier re-disabled public access).
 7. `terraform apply` to **re-provision** the module's VM(s); cloud-init / run-command VM-side config re-runs.
