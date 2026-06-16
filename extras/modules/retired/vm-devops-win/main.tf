@@ -4,8 +4,8 @@ data "azurerm_client_config" "current" {}
 
 #region resources
 
-resource "null_resource" "this" { 
-  provisioner "local-exec" { 
+resource "null_resource" "this" {
+  provisioner "local-exec" {
     command     = "$params = @{ ${join(" ", local.local_scripts["configure_automation"].parameters)}}; ./${path.module}/scripts/${local.local_scripts["configure_automation"].name} @params"
     interpreter = ["pwsh", "-Command"]
   }

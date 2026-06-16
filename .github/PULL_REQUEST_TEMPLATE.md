@@ -11,6 +11,7 @@
 ```
 
 ## Pull Request Type
+
 What kind of change does this Pull Request introduce?
 
 <!-- Please check the one that applies to this PR using "x". -->
@@ -25,11 +26,14 @@ What kind of change does this Pull Request introduce?
 ```
 
 ## How to Test
+
 * Provision a new sandbox environment
 * Run unit tests
 
 ## What to Check
+
 Verify that the following are valid
+
 * Unit tests should all pass.
 
 ## Other Information

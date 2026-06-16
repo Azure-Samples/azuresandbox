@@ -1,0 +1,48 @@
+# CI: documentation checks (markdownlint + lychee link checker).
+# Runs on every pull request targeting vnext and on pushes to vnext.
+name: ci-docs
+
+on:
+  pull_request:
+    branches: [vnext]
+  push:
+    branches: [vnext]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-docs-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  markdownlint:
+    name: markdownlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Pinned to match the version the repo's .markdownlint(-cli2).jsonc was
+      # validated against. Globs and ignores come from .markdownlint-cli2.jsonc;
+      # rule configuration comes from .markdownlint.jsonc.
+      - name: Run markdownlint-cli2
+        run: npx --yes markdownlint-cli2@0.22.1
+
+  lychee:
+    name: lychee (internal links)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Offline mode only validates local/relative links (file existence);
+      # external URLs are not requested, keeping the check fast and deterministic.
+      - name: Link check (offline)
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --offline --no-progress './**/*.md'
+          fail: true
