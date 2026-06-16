@@ -16,6 +16,7 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 - [Issues and Bugs](#found-an-issue)
 - [Feature Requests](#want-a-feature)
 - [Branching and Merge Policy](#branching-and-merge-policy)
+- [Continuous Integration](#continuous-integration)
 - [Submission Guidelines](#submission-guidelines)
 
 ## Code of Conduct
@@ -60,6 +61,33 @@ The policy above is enforced by [branch protection](https://docs.github.com/repo
 - Force pushes and branch deletion are disabled on `main`.
 
 Code ownership is declared in [`.github/CODEOWNERS`](.github/CODEOWNERS) (`* @doherty100`), which automatically requests the owner as a reviewer on pull requests.
+
+## Continuous Integration
+
+Pull requests targeting `vnext` (and pushes to `vnext`) automatically run lightweight static-analysis checks via GitHub Actions. These do **not** deploy anything to Azure and require no credentials. The workflows live in [`.github/workflows/`](.github/workflows):
+
+| Workflow | Checks | Configuration |
+| --- | --- | --- |
+| `ci-docs` | `markdownlint-cli2` (Markdown style) and `lychee` (internal/relative link checker, offline) | [`.markdownlint.jsonc`](.markdownlint.jsonc), [`.markdownlint-cli2.jsonc`](.markdownlint-cli2.jsonc) |
+| `ci-terraform` | `terraform fmt -check -recursive` and `tflint --recursive` | [`.tflint.hcl`](.tflint.hcl) |
+| `ci-powershell` | `PSScriptAnalyzer` over all PowerShell scripts | [`PSScriptAnalyzerSettings.psd1`](PSScriptAnalyzerSettings.psd1) |
+
+To reproduce the checks locally before opening a PR:
+
+```bash
+# Docs
+npx --yes markdownlint-cli2@0.22.1
+lychee --offline --no-progress './**/*.md'
+
+# Terraform
+terraform fmt -check -recursive -diff
+tflint --init && tflint --recursive
+
+# PowerShell (PowerShell 7.x with the PSScriptAnalyzer module)
+pwsh -NoProfile -Command "Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./PSScriptAnalyzerSettings.psd1 -Severity Error,Warning"
+```
+
+The PSScriptAnalyzer settings file excludes a small set of rules that conflict with intentional patterns in this deployment-automation codebase (for example, `Write-Host` console output, the project's own `Write-Log` helper, and plaintext-to-`SecureString` conversion required for unattended VM configuration). Each exclusion is documented inline in `PSScriptAnalyzerSettings.psd1`.
 
 ## Submission Guidelines
 

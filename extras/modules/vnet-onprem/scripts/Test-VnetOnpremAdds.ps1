@@ -50,7 +50,7 @@ catch {
 
 # Test 2: This machine is a domain controller
 try {
-    $dc = Get-ADDomainController -Identity $env:COMPUTERNAME -ErrorAction Stop
+    $null = Get-ADDomainController -Identity $env:COMPUTERNAME -ErrorAction Stop
     Write-TestResult $moduleName 'PASS' "AD DS: '$env:COMPUTERNAME' is a domain controller"
     $passed++
 }

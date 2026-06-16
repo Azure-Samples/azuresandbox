@@ -1,0 +1,61 @@
+# CI: Terraform checks (formatting + tflint static analysis).
+# Runs on every pull request targeting vnext and on pushes to vnext.
+name: ci-terraform
+
+on:
+  pull_request:
+    branches: [vnext]
+  push:
+    branches: [vnext]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-terraform-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fmt:
+    name: terraform fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          # Matches required_version (~> 1.15.6) in terraform.tf.
+          terraform_version: 1.15.6
+          terraform_wrapper: false
+
+      - name: Check formatting
+        run: terraform fmt -check -recursive -diff
+
+  tflint:
+    name: tflint
+    runs-on: ubuntu-latest
+    env:
+      # Used by `tflint --init` to download the azurerm ruleset plugin from
+      # GitHub releases without hitting unauthenticated rate limits.
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.63.1
+
+      # Each directory that contains a .tflint.hcl may pin a different plugin
+      # version, so initialize plugins for every config before linting
+      # recursively (`tflint --init` only initializes the current directory).
+      - name: Init tflint plugins
+        run: |
+          for dir in $(find . -name .tflint.hcl -printf '%h\n' | sort -u); do
+            echo "tflint --init in $dir"
+            tflint --init --chdir="$dir"
+          done
+
+      # Recursively lints the root module and every child module.
+      - name: Run tflint
+        run: tflint --recursive

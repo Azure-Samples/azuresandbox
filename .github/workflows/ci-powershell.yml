@@ -1,0 +1,54 @@
+# CI: PowerShell static analysis (PSScriptAnalyzer).
+# Runs on every pull request targeting vnext and on pushes to vnext.
+name: ci-powershell
+
+on:
+  pull_request:
+    branches: [vnext]
+  push:
+    branches: [vnext]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-powershell-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  psscriptanalyzer:
+    name: PSScriptAnalyzer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module PSScriptAnalyzer -RequiredVersion 1.24.0 -Scope CurrentUser -Force
+
+      # Rule configuration (including documented rule exclusions for this
+      # deployment-automation codebase) lives in PSScriptAnalyzerSettings.psd1.
+      # Fails the job on any Error- or Warning-severity finding.
+      - name: Run PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          $results = Invoke-ScriptAnalyzer -Path . -Recurse `
+            -Settings ./PSScriptAnalyzerSettings.psd1 `
+            -Severity @('Error', 'Warning')
+
+          if ($results) {
+            $results |
+              Sort-Object Severity, ScriptName, Line |
+              Format-Table -AutoSize Severity, RuleName,
+                @{ Name = 'File'; Expression = { Resolve-Path -Relative $_.ScriptName } },
+                Line, Message |
+              Out-String -Width 200 |
+              Write-Host
+            Write-Host "::error::PSScriptAnalyzer found $($results.Count) issue(s)."
+            exit 1
+          }
+
+          Write-Host 'PSScriptAnalyzer: no issues found.'
