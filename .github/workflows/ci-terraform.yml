@@ -46,9 +46,15 @@ jobs:
         with:
           tflint_version: v0.61.0
 
-      # Installs the plugins declared in .tflint.hcl (terraform + azurerm).
-      - name: Init tflint
-        run: tflint --init
+      # Each directory that contains a .tflint.hcl may pin a different plugin
+      # version, so initialize plugins for every config before linting
+      # recursively (`tflint --init` only initializes the current directory).
+      - name: Init tflint plugins
+        run: |
+          for dir in $(find . -name .tflint.hcl -printf '%h\n' | sort -u); do
+            echo "tflint --init in $dir"
+            tflint --init --chdir="$dir"
+          done
 
       # Recursively lints the root module and every child module.
       - name: Run tflint
