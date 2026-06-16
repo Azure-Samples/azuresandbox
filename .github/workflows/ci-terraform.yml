@@ -44,7 +44,7 @@ jobs:
 
       - uses: terraform-linters/setup-tflint@v4
         with:
-          tflint_version: v0.61.0
+          tflint_version: v0.63.1
 
       # Each directory that contains a .tflint.hcl may pin a different plugin
       # version, so initialize plugins for every config before linting
