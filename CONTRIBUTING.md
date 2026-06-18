@@ -16,6 +16,7 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 - [Issues and Bugs](#found-an-issue)
 - [Feature Requests](#want-a-feature)
 - [Branching and Merge Policy](#branching-and-merge-policy)
+- [Collaborator Access and Issue Assignment](#collaborator-access-and-issue-assignment)
 - [Continuous Integration](#continuous-integration)
 - [Submission Guidelines](#submission-guidelines)
 
@@ -61,6 +62,16 @@ The policy above is enforced by [branch protection](https://docs.github.com/repo
 - Force pushes and branch deletion are disabled on `main`.
 
 Code ownership is declared in [`.github/CODEOWNERS`](.github/CODEOWNERS) (`* @doherty100`), which automatically requests the owner as a reviewer on pull requests.
+
+## Collaborator Access and Issue Assignment
+
+**TL;DR — to assign someone an issue/PR, they need `triage` access (or higher); a past commit alone is not enough.**
+
+- Issues/PRs can only be assigned to users with **write, triage, or admin** access — or anyone who has commented on that item.
+- A prior commit / *Contributors* listing grants **no** permission; a `read`-only user won't appear in the assignee picker.
+- Use **`triage`** for reviewers/triagers: it allows issue/PR management and assignment but **no commits or merges to any branch** (including `main`).
+- Granting access (owner/admin only): invite the user at the `triage` level, then **verify the pending invitation's level** — an older unaccepted invitation at a higher level (e.g. `write`) is not auto-downgraded and must be patched down.
+- The user must **accept the invitation** before access takes effect and they become assignable.
 
 ## Continuous Integration
 
