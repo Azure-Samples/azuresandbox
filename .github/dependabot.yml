@@ -196,3 +196,17 @@ updates:
         patterns:
           - "*"
     versioning-strategy: increase
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    target-branch: "vnext"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:20"
+      timezone: "UTC"
+    groups:
+      actions-all:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 20
