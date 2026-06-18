@@ -53,6 +53,13 @@ This repository uses a two-branch model to keep `main` stable and releasable at 
 2. **Integration happens on `vnext`.** Reviews, status checks (including the CLA bot), and testing occur here.
 3. **Promotion to `main` is restricted.** Only the repository owner (**@doherty100**) opens and merges the `vnext` → `main` pull request that promotes accumulated changes to the stable branch. No other collaborator can merge into `main`.
 
+### Merge strategy
+
+**TL;DR:** Squash-merge topic/contributor PRs into `vnext`; use a regular merge commit (no squash) for the `vnext` → `main` release PR.
+
+- **Topic/contributor PRs → `vnext`:** **squash merge**, so each PR lands as one tidy commit on `vnext`.
+- **`vnext` → `main` (release promotion):** **regular merge commit (do not squash)**, so the individual `vnext` commits and the branch lineage are preserved on `main`. Squashing this promotion flattens all the work into a single commit and loses that history.
+
 ### Enforcement
 
 The policy above is enforced by [branch protection](https://docs.github.com/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches) on `main`:
