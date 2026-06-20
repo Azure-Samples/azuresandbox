@@ -1,0 +1,48 @@
+# CI: GitHub Actions workflow linting (actionlint).
+# Lints the workflow files themselves for syntax errors, bad expressions,
+# deprecated runners, and shell-script issues in `run:` steps.
+# Runs on every pull request targeting vnext and on pushes to vnext.
+name: ci-actions
+
+on:
+  pull_request:
+    branches: [vnext]
+  push:
+    branches: [vnext]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-actions-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    env:
+      # Pinned for deterministic, reproducible runs. Bump intentionally.
+      ACTIONLINT_VERSION: 1.7.12
+    steps:
+      - uses: actions/checkout@v4
+
+      # Download the pinned actionlint release directly and verify its checksum
+      # before use. shellcheck is preinstalled on ubuntu-latest, so actionlint
+      # automatically lints shell in `run:` steps too.
+      - name: Install actionlint
+        run: |
+          set -euo pipefail
+          base="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}"
+          tarball="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL "$base/$tarball" -o "$tarball"
+          curl -fsSL "$base/actionlint_${ACTIONLINT_VERSION}_checksums.txt" -o checksums.txt
+          grep " $tarball\$" checksums.txt | sha256sum -c -
+          tar -xzf "$tarball" actionlint
+          ./actionlint --version
+
+      # actionlint discovers .github/workflows/*.yml on its own; -color makes
+      # findings readable in the Actions log. Exits non-zero on any finding.
+      - name: Run actionlint
+        run: ./actionlint -color
