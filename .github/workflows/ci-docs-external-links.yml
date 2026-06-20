@@ -1,0 +1,66 @@
+# CI: external link checking (lychee, scheduled).
+# The PR-time ci-docs job runs lychee in --offline mode (internal/relative
+# links only) for determinism. This job additionally checks *external* URLs,
+# but only on a nightly schedule (and on demand) so flaky/slow external
+# requests never block pull requests. Broken external links are surfaced by
+# opening/updating a tracking issue.
+name: ci-docs-external-links
+
+on:
+  schedule:
+    # 07:00 UTC daily.
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # Needed to open/update the tracking issue when external links break.
+  issues: write
+
+concurrency:
+  group: ci-docs-external-links-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  lychee-external:
+    name: lychee (external links)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Checks every link, including external URLs (no --offline). Caching and
+      # retries reduce transient failures from rate-limited/slow hosts.
+      # fail: false keeps the step green so the issue-reporting step below can
+      # run; the broken-link signal is taken from the step's exit_code output.
+      - name: Link check (external)
+        id: lychee
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: >-
+            --no-progress
+            --cache
+            --max-cache-age 1d
+            --max-retries 3
+            './**/*.md'
+          output: ./lychee-report.md
+          format: markdown
+          fail: false
+
+      - name: Report broken links via tracking issue
+        if: steps.lychee.outputs.exit_code != 0
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "Broken external links detected by scheduled lychee run"
+        run: |
+          set -euo pipefail
+          body_file=lychee-report.md
+          [ -f "$body_file" ] || echo "lychee reported broken links (no report file produced)." > "$body_file"
+          existing=$(gh issue list --state open --search "$TITLE in:title" \
+            --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file "$body_file"
+            echo "Updated existing tracking issue #$existing."
+          else
+            gh issue create --title "$TITLE" --body-file "$body_file"
+            echo "Opened new tracking issue."
+          fi
