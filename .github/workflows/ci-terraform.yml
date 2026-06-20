@@ -59,3 +59,34 @@ jobs:
       # Recursively lints the root module and every child module.
       - name: Run tflint
         run: tflint --recursive
+
+  validate:
+    name: terraform validate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each entry is a root configuration (has its own provider blocks).
+        # Child modules under modules/ and extras/modules/ are validated
+        # transitively when the root configs that call them are validated.
+        dir:
+          - .
+          - extras/configurations/rg-devops-iac
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          # Matches required_version (~> 1.15.6) in terraform.tf.
+          terraform_version: 1.15.6
+          terraform_wrapper: false
+
+      # -backend=false downloads providers/initializes modules without
+      # configuring remote state, so validation needs no Azure credentials.
+      - name: terraform init (no backend)
+        run: terraform init -backend=false -input=false
+        working-directory: ${{ matrix.dir }}
+
+      - name: terraform validate
+        run: terraform validate -no-color
+        working-directory: ${{ matrix.dir }}
