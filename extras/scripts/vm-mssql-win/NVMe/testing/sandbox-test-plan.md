@@ -238,7 +238,7 @@ the 4-disk size from the resize matrix):
 So Pass B/C skip Pass A phases 1–7 (and 10's cleanup) entirely and run only the resize +
 re-validation below.
 
-**Resize procedure**
+### Resize procedure
 
 1. Pre-clear `C:\Scripts\Set-MssqlStartupConfiguration.log` (so the post-resize boot run is
    cleanly attributable). Confirm `adds1` is still running.
@@ -249,27 +249,27 @@ re-validation below.
 4. `az vm start -g <RG> -n mssqlwin1` (async + ~2-min reports). Boot fires the AtStartup extras
    task, which now finds the new disk count and stripes accordingly.
 
-**Re-validation at the new size (same checks as Pass A phases 8–9, plus disk-count assertions)**
+### Re-validation at the new size (same checks as Pass A phases 8–9, plus disk-count assertions)
 
-5. Confirm size changed: `az vm show ... --query hardwareProfile.vmSize` = target.
-6. Read `C:\Scripts\Set-MssqlStartupConfiguration.log` and assert it reports the **expected disk
+1. Confirm size changed: `az vm show ... --query hardwareProfile.vmSize` = target.
+2. Read `C:\Scripts\Set-MssqlStartupConfiguration.log` and assert it reports the **expected disk
    count**: "Found **N** poolable NVMe Direct Disk(s)" and "Creating Virtual Disk ... (Simple/
    Stripe, **N** columns)" where N = 2 (Pass B) or 4 (Pass C).
-7. Assert Storage Spaces stripe width: `(Get-VirtualDisk NVMeTempDisk).NumberOfColumns` = N, pool
+3. Assert Storage Spaces stripe width: `(Get-VirtualDisk NVMeTempDisk).NumberOfColumns` = N, pool
    `NVMeTempPool` Healthy, and `T:` aggregate size ≈ N × (per-disk GiB for the size) (NTFS, 64 KB AU).
-8. Assert only **local** disks were pooled — the remote `Virtual_Disk NVME Ultra/Premium` managed
+4. Assert only **local** disks were pooled — the remote `Virtual_Disk NVME Ultra/Premium` managed
    disks remain out of the pool (`CanPool` reflects this); only `*NVMe Direct Disk*` are consumed.
-9. `T:\SQLTEMP` present; tempdb 3 files **ONLINE on `T:\SQLTEMP`** (Tier-2, no re-move needed);
+5. `T:\SQLTEMP` present; tempdb 3 files **ONLINE on `T:\SQLTEMP`** (Tier-2, no re-move needed);
    `MSSQLSERVER` + `SQLSERVERAGENT` Running; task `LastTaskResult=0`.
-10. Smoke test (Tier-2): `SELECT @@VERSION`, tempdb writable (`#temp` create/insert/drop),
-    `DATABASEPROPERTYEX('tempdb','Status')=ONLINE`.
-11. Record PASS/FAIL for the size. On any infra/command error follow the Error-handling policy
-    (STOP + file issue). A legitimate test FAIL (e.g. extras mis-stripe N disks) is a real
-    finding to report, not a workflow error.
+6. Smoke test (Tier-2): `SELECT @@VERSION`, tempdb writable (`#temp` create/insert/drop),
+   `DATABASEPROPERTYEX('tempdb','Status')=ONLINE`.
+7. Record PASS/FAIL for the size. On any infra/command error follow the Error-handling policy
+   (STOP + file issue). A legitimate test FAIL (e.g. extras mis-stripe N disks) is a real
+   finding to report, not a workflow error.
 
 > **Note — resize already exercises a deallocate cycle.** The resize procedure itself is a
 > deallocate → (resize) → start, i.e. a genuine post-deallocate reprovision at the new disk
-> count, so steps 5–10 above ARE the "same validation" Pass A ran in phase 8. Optionally run one
+> count, so re-validation steps 1–6 above ARE the "same validation" Pass A ran in phase 8. Optionally run one
 > additional plain `deallocate`/`start` at the new size for steady-state confidence, but it is
 > not required to satisfy the matrix.
 
@@ -279,14 +279,15 @@ re-validation below.
 ## Error handling
 
 Per repo policy: on the **first** infrastructure/command error (az failure, run-command failure,
-injected-task failure, deallocate failure, SQL error), STOP, document exact command + full output
-+ phase + context, open a GitHub issue (`gh issue create`), and report back with the link. Do not
-auto-retry or self-patch. A test reporting a legitimate FAIL is an expected outcome, not a
+injected-task failure, deallocate failure, SQL error), STOP, document the exact command plus full
+output, phase, and context, open a GitHub issue (`gh issue create`), and report back with the link.
+Do not auto-retry or self-patch. A test reporting a legitimate FAIL is an expected outcome, not a
 workflow error.
 
 ## Pre-flight checklist
 
-**A. Tooling & auth**
+### A. Tooling & auth
+
 1. `az` logged in to the subscription hosting the sandbox (`az account show`).
 2. `gh` authenticated (for error filing).
 
@@ -417,25 +418,25 @@ Example outcome: all Pass-A phases completed and the run was **PASS**.
 
 ### Resize-pass learnings / expectations (Passes B & C — NEW, to be confirmed live)
 
-7. **Resize while deallocated.** `az vm resize` on a stopped VM lets Azure place it on any
+1. **Resize while deallocated.** `az vm resize` on a stopped VM lets Azure place it on any
    region/zone-compatible host; resizing a running VM is restricted to sizes the current host
    cluster offers (the local-NVMe sizes may not all be present there).
-8. **Local NVMe disks are ephemeral and wiped by resize.** Each resize+start is a genuine
+2. **Local NVMe disks are ephemeral and wiped by resize.** Each resize+start is a genuine
    post-deallocate reprovision at the new disk count — exactly the scenario the extras script
    targets — so it doubles as the validation cycle.
-9. **Stripe width must scale with disk count.** Expect
+3. **Stripe width must scale with disk count.** Expect
    `(Get-VirtualDisk NVMeTempDisk).NumberOfColumns` = N (2 for the 2-disk size, 4 for the 4-disk
    size), with `T:` ≈ N × per-disk GiB. The startup log should print "Found N poolable NVMe
    Direct Disk(s)".
-10. **Remote managed disks must stay excluded.** Only `*NVMe Direct Disk*` (local) disks are
-    pooled; the OS/data/log managed disks surface as `Virtual_Disk NVME Ultra/Premium` and must
-    NOT be absorbed into `NVMeTempPool` — a regression here would be a real FAIL to report.
-11. **tempdb path is size-invariant.** `T:\SQLTEMP` is stable across all three sizes; run
-    `Move-TempdbToEphemeral.sql` once in Pass A only — B/C just need tempdb back ONLINE at the
-    same path after the larger stripe is reprovisioned.
-12. **Resource identifiers are unique per deployment** — every sandbox has a different region, RG
-    suffix, KV name, and PE IP; discover all of them in the Pass A discover phase, never assume
-    values from any prior run.
+4. **Remote managed disks must stay excluded.** Only `*NVMe Direct Disk*` (local) disks are
+   pooled; the OS/data/log managed disks surface as `Virtual_Disk NVME Ultra/Premium` and must
+   NOT be absorbed into `NVMeTempPool` — a regression here would be a real FAIL to report.
+5. **tempdb path is size-invariant.** `T:\SQLTEMP` is stable across all three sizes; run
+   `Move-TempdbToEphemeral.sql` once in Pass A only — B/C just need tempdb back ONLINE at the
+   same path after the larger stripe is reprovisioned.
+6. **Resource identifiers are unique per deployment** — every sandbox has a different region, RG
+   suffix, KV name, and PE IP; discover all of them in the Pass A discover phase, never assume
+   values from any prior run.
 
 ### Intentional Terraform drift left on `mssqlwin1` (sandbox to be destroyed)
 
