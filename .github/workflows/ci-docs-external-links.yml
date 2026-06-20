@@ -1,15 +1,16 @@
 # CI: external link checking (lychee, scheduled).
 # The PR-time ci-docs job runs lychee in --offline mode (internal/relative
 # links only) for determinism. This job additionally checks *external* URLs,
-# but only on a nightly schedule (and on demand) so flaky/slow external
+# but only on a weekly schedule (and on demand) so flaky/slow external
 # requests never block pull requests. Broken external links are surfaced by
 # opening/updating a tracking issue.
 name: ci-docs-external-links
 
 on:
   schedule:
-    # 07:00 UTC daily.
-    - cron: "0 7 * * *"
+    # Weekly, Monday 08:00 UTC — matches the dependabot terraform update
+    # cadence (.github/dependabot.yml) so maintenance lands together.
+    - cron: "0 8 * * 1"
   workflow_dispatch:
 
 permissions:
