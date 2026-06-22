@@ -1,0 +1,62 @@
+# CI: bash static analysis (ShellCheck).
+# Lints every *.sh in the tree, failing on warning- and error-severity findings.
+# The bash analogue of ci-powershell.yml (PSScriptAnalyzer). Rule configuration
+# (per-rule excludes, external-sources) lives in the repo-root .shellcheckrc; the
+# warning+error gate is applied via the --severity flag below. Developers can run
+# the identical check locally with scripts/Invoke-ShellCheck.sh.
+# Runs on every pull request targeting vnext and on pushes to vnext.
+name: ci-bash
+
+on:
+  pull_request:
+    branches: [vnext]
+  push:
+    branches: [vnext]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-bash-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    env:
+      # Pinned for deterministic, reproducible scans. Bump intentionally.
+      SHELLCHECK_VERSION: 0.10.0
+      # SHA256 of shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz from the
+      # official koalaman/shellcheck release. Update when bumping the version.
+      SHELLCHECK_SHA256: 6c881ab0698e4e6ea235245f22832860544f17ba386442fe7e9d629f8cbedf87
+    steps:
+      - uses: actions/checkout@v4
+
+      # Download the pinned ShellCheck release directly (no Marketplace action) and
+      # verify its checksum before use, mirroring the gitleaks install in ci-secrets.yml.
+      - name: Install ShellCheck
+        run: |
+          set -euo pipefail
+          tarball="shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          url="https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/${tarball}"
+          curl -fsSL "$url" -o "$tarball"
+          echo "${SHELLCHECK_SHA256}  ${tarball}" | sha256sum -c -
+          tar -xJf "$tarball" "shellcheck-v${SHELLCHECK_VERSION}/shellcheck"
+          install -m 0755 "shellcheck-v${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck
+          shellcheck --version
+
+      # Lint every *.sh in the tree (excluding .git). Severity is set here; other
+      # rule config comes from the repo-root .shellcheckrc. ShellCheck exits
+      # non-zero when any finding at or above the threshold is reported.
+      - name: Run ShellCheck
+        run: |
+          set -euo pipefail
+          mapfile -d '' -t scripts < <(find . -name '*.sh' -not -path './.git/*' -print0)
+          printf 'Linting %d shell script(s)...\n' "${#scripts[@]}"
+          if ! shellcheck --severity=warning "${scripts[@]}"; then
+            echo "::error::ShellCheck found warning/error-severity issue(s)."
+            exit 1
+          fi
+          echo 'ShellCheck: no issues found.'

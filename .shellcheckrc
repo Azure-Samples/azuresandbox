@@ -1,0 +1,17 @@
+# ShellCheck configuration for this repository.
+#
+# Single source of truth for the bash linting gate: both the ci-bash GitHub
+# Actions workflow and the local scripts/Invoke-ShellCheck.sh wrapper read this
+# file, so local results match CI exactly. This is the bash analogue of
+# PSScriptAnalyzerSettings.psd1 for the PowerShell CI.
+#
+# NOTE on severity: ShellCheck does not honor a `severity=` directive in
+# .shellcheckrc (it is a CLI-only flag), so the warning+error gate is applied via
+# `--severity=warning` in both the workflow and Invoke-ShellCheck.sh. Keep that
+# value in sync if it ever changes. Per-rule `disable=`/`enable=` exclusions, when
+# needed, belong here so CI and local runs share them.
+
+# Do not follow `source`/`.` into other files during analysis. The scripts here
+# are standalone; following sourced files would require resolving paths that only
+# exist on the provisioned VMs/runners.
+external-sources=false
