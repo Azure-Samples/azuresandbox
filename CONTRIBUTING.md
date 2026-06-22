@@ -53,6 +53,13 @@ This repository uses a two-branch model to keep `main` stable and releasable at 
 2. **Integration happens on `vnext`.** Reviews, status checks (including the CLA bot), and testing occur here.
 3. **Promotion to `main` is restricted.** Only the repository owner (**@doherty100**) opens and merges the `vnext` → `main` pull request that promotes accumulated changes to the stable branch. No other collaborator can merge into `main`.
 
+### Merge strategy
+
+**TL;DR:** Squash-merge topic/contributor PRs into `vnext`; use a regular merge commit (no squash) for the `vnext` → `main` release PR.
+
+- **Topic/contributor PRs → `vnext`:** **squash merge**, so each PR lands as one tidy commit on `vnext`.
+- **`vnext` → `main` (release promotion):** **regular merge commit (do not squash)**, so the individual `vnext` commits and the branch lineage are preserved on `main`. Squashing this promotion flattens all the work into a single commit and loses that history.
+
 ### Enforcement
 
 The policy above is enforced by [branch protection](https://docs.github.com/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches) on `main`:
@@ -82,6 +89,7 @@ Pull requests targeting `vnext` (and pushes to `vnext`) automatically run lightw
 | `ci-docs` | `markdownlint-cli2` (Markdown style) and `lychee` (internal/relative link checker, offline) | [`.markdownlint.jsonc`](.markdownlint.jsonc), [`.markdownlint-cli2.jsonc`](.markdownlint-cli2.jsonc) |
 | `ci-terraform` | `terraform fmt -check -recursive` and `tflint --recursive` | [`.tflint.hcl`](.tflint.hcl) |
 | `ci-powershell` | `PSScriptAnalyzer` over all PowerShell scripts | [`PSScriptAnalyzerSettings.psd1`](PSScriptAnalyzerSettings.psd1) |
+| `ci-bash` | `ShellCheck` over all `*.sh` scripts (fails on warning + error severity) | [`.shellcheckrc`](.shellcheckrc) |
 
 To reproduce the checks locally before opening a PR:
 
@@ -96,9 +104,16 @@ tflint --init && tflint --recursive
 
 # PowerShell (PowerShell 7.x with the PSScriptAnalyzer module)
 pwsh -NoProfile -Command "Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./PSScriptAnalyzerSettings.psd1 -Severity Error,Warning"
+
+# Bash (requires ShellCheck on PATH:
+#   sudo apt-get install -y shellcheck  |  brew install shellcheck  |
+#   download a release from https://github.com/koalaman/shellcheck/releases)
+./scripts/Invoke-ShellCheck.sh
 ```
 
 The PSScriptAnalyzer settings file excludes a small set of rules that conflict with intentional patterns in this deployment-automation codebase (for example, `Write-Host` console output, the project's own `Write-Log` helper, and plaintext-to-`SecureString` conversion required for unattended VM configuration). Each exclusion is documented inline in `PSScriptAnalyzerSettings.psd1`.
+
+`ci-bash` runs ShellCheck at `--severity=warning` (the warning + error gate, mirroring the PowerShell CI). `scripts/Invoke-ShellCheck.sh` runs the identical command locally and shares the repo-root `.shellcheckrc`, so local results match CI exactly. A single documented `# shellcheck disable=SC2024` is applied in `modules/vm-jumpbox-linux/scripts/configure-vm-jumpbox-linux.sh`, where `sudo <cmd> >> $log_file` intentionally elevates only the command while appending to the user-owned log; the justification is recorded inline at the top of that script.
 
 ## Submission Guidelines
 

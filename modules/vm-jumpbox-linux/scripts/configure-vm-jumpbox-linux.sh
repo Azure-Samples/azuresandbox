@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# shellcheck disable=SC2024
+# SC2024 (sudo doesn't affect redirects) is intentionally disabled file-wide:
+# throughout this script 'sudo <cmd> >> $log_file' elevates only the command, while
+# the redirect appends to $log_file as the invoking user. That user already owns the
+# log (it is written without sudo elsewhere in this script), so the non-elevated
+# redirect is the desired behavior. Rewriting these as 'sudo tee' would wrongly
+# elevate the log write and change '&>>' stream-capture semantics.
+
 # Note: This code has been tested on Ubuntu 24.04 LTS (Noble Numbat) and will not work on other Linux distros
 
 # Initialize constants

@@ -26,7 +26,7 @@ The SPN password must come from the env var `TF_VAR_arm_client_secret` — never
 
 ## Preflight checklist (run attended, before enabling `/allow-all` mode for any apply or test work)
 
-This project runs in `/allow-all` mode (the CLI's auto-approve mode, where tool calls are executed without per-action confirmation) for long operations (`terraform apply` is 25–95 min; unit tests can be 10+ min). The preflight checklist itself, however, **must be completed with a human present — i.e. NOT in `/allow-all` mode** — because every item may require an `ask_user` prompt (secrets, auth confirmations, sudo password, module selection), and `ask_user` cannot be answered during unattended execution. To avoid failing mid-run because of a missing secret, expired auth, or a missing sudo NOPASSWD drop-in, **collect every human-gated input up front** in a single attended preflight phase. Once preflight passes, the rest of the run should not require user intervention.
+This project runs in `/allow-all` mode (the CLI's auto-approve mode, where tool calls are executed without per-action confirmation) for long operations (`terraform apply` is 25–95 min; unit tests can be 10+ min). The preflight checklist itself, however, **must be completed with a human present — i.e. NOT in `/allow-all` mode** — because every item may require an `ask_user` prompt (secrets, auth confirmations, module selection), and `ask_user` cannot be answered during unattended execution. To avoid failing mid-run because of a missing secret or expired auth, **collect every human-gated input up front** in a single attended preflight phase. Once preflight passes, the rest of the run should not require user intervention.
 
 The intended workflow is a clean two-phase handoff:
 
@@ -46,12 +46,7 @@ The intended workflow is a clean two-phase handoff:
 1. **Service principal secret (`TF_VAR_arm_client_secret`)** — check with `echo "${TF_VAR_arm_client_secret:+set}"`. If empty, use `ask_user` to prompt for the SPN password, then export it in the shell session before any Terraform command. Required for every `terraform plan` / `apply`.
 2. **Azure CLI auth (`az login`)** — verify with `az account show`. If it fails, use `ask_user` to instruct the user to run `az login` in their own terminal, and wait for confirmation before proceeding. Required for `terraform apply` and for `enable-public-access.sh`.
 3. **Azure PowerShell auth (`Connect-AzAccount`)** — verify with `pwsh -Command 'Get-AzContext'`. If empty, use `ask_user` to instruct the user to run `pwsh -Command 'Connect-AzAccount -UseDeviceAuthentication'` (credentials persist to `~/.Azure`). Required only when `Invoke-UnitTests.ps1` will be run — i.e. when the unit-testing decision in preflight item 7 is **yes**.
-4. **Sudo NOPASSWD drop-in for vwan tests (WSL/Linux Terraform execution environment)** — the `vwan` integration tests (`Test-Integration-VwanConnectivity.ps1`) invoke a handful of privileged commands at runtime (`openvpn`, `cat`, `tail`, `kill`, `pkill`). These are granted promptlessly by a persistent, command-scoped sudoers drop-in at `/etc/sudoers.d/azuresandbox-vwan`, so **no sudo password or timestamp-cache refresh is needed** — unattended/`/allow-all`-mode runs work without human intervention. Required only when `Invoke-UnitTests.ps1` will run the vwan integration tests — i.e. when the unit-testing decision in preflight item 7 is **yes**, `vwan` is enabled, and integration tests are requested. Procedure:
-   - Verify the drop-in is installed and the rules are active: `sudo -n cat /dev/null && echo ok` (the test scripts use this exact `sudo -n cat /dev/null` probe — not `sudo -n true`, which the command-scoped allowlist deliberately denies). If it prints `ok`, sudo is ready; do nothing further.
-   - If the probe fails (drop-in missing — e.g. a fresh execution environment), recreate it: write a file containing `<user> ALL=(root) NOPASSWD: /usr/sbin/openvpn, /usr/bin/cat, /bin/cat, /usr/bin/tail, /bin/tail, /usr/bin/kill, /bin/kill, /usr/bin/pkill`, validate it with `visudo -c -f <file>`, then install it as root with `install -m 0440 -o root -g root <file> /etc/sudoers.d/azuresandbox-vwan`. Installing it needs the sudo password **once** — prompt via `ask_user`, use it inline with `sudo -S`, and do **not** persist it to disk, echo it, pass it as a CLI argument, or store it in the session database.
-   - Because the allowlist is binary-scoped (not `NOPASSWD: ALL`), it permits only those specific commands with any arguments; `sudo` for anything else still requires a password. This is an intentional security/convenience tradeoff for the sandbox execution environment.
-   - Non-vwan modules' tests do not require sudo, so this item is irrelevant unless `vwan` is enabled and `-Integration` is requested.
-5. **`terraform.tfvars` exists** in the repo root. If missing, run `./scripts/bootstrap.sh` (Linux Terraform execution environment) or `./scripts/bootstrap.ps1` (Windows). The two scripts are equivalent — pick the one matching the host OS. **How `bootstrap.sh` works (so you don't have to re-read it each run):**
+4. **`terraform.tfvars` exists** in the repo root. If missing, run `./scripts/bootstrap.sh` (Linux Terraform execution environment) or `./scripts/bootstrap.ps1` (Windows). The two scripts are equivalent — pick the one matching the host OS. **How `bootstrap.sh` works (so you don't have to re-read it each run):**
    - **It is interactive** — it issues a series of `read -e` prompts and therefore must be run **attended (`/allow-all` mode off)**, batched with the other preflight prompts. It cannot complete unattended. Because all prompts except one are pre-filled with sane defaults, the only value you must actively collect from the user is `arm_client_id` (the service principal appId) — surface it via `ask_user`.
    - **Preconditions it enforces** (it exits with usage if any fail): `az` CLI installed, `python3` installed, the `PyJWT` python library importable (`python3 -c "import jwt"`), `TF_VAR_arm_client_secret` exported, and an active `az login` (it reads the default subscription from `az account list`). These overlap with preflight items 1–2, so satisfy those first.
    - **Prompts and their defaults** (default derived from the signed-in `az` context unless noted): `arm_client_id` (**no default — required input**), `aad_tenant_id` (current tenant), `user_name` (signed-in UPN), `user_object_id` (decoded from the access-token JWT `oid` claim via PyJWT), `subscription_id` (default subscription), `location` (`eastus2`), `environment` (`dev`), `costcenter` (`mycostcenter`), `project` (`sand`). It validates the SPN, subscription, and location against Azure before writing.
@@ -59,7 +54,7 @@ The intended workflow is a clean two-phase handoff:
    - **Output** — it (over)writes `./terraform.tfvars` in the repo root containing `aad_tenant_id`, `arm_client_id`, `location`, `subscription_id`, `user_name`, `user_object_id`, a `tags` map (`project`/`costcenter`/`environment`), and **all `enable_module_*` toggles commented out (every module disabled by default)**. Module enablement is therefore handled separately in preflight item 6 by editing `terraform.tfvars` afterward — `bootstrap.sh` never enables a module. Note it does **not** prompt for or write the SPN secret (that stays in `TF_VAR_arm_client_secret`).
    - **To drive it non-interactively** (e.g. when you already have every value), pipe the answers to stdin in prompt order — `arm_client_id`, `aad_tenant_id`, `user_name`, `user_object_id`, `subscription_id`, `location`, `environment`, `costcenter`, `project` — e.g. `printf '%s\n' "$appid" "" "" "" "" "" "" "" "" | ./scripts/bootstrap.sh` (empty lines accept the defaults). Prefer the attended interactive flow unless the user has supplied all inputs.
 6. **Module enablement confirmed** — use `ask_user` to ask whether **all base modules** in `./modules` should be deployed (every `enable_module_*` flag `true`). Extra modules in `./extras/modules` (`ai-foundry`, `avd`, `petstore`, `vnet-onprem`, etc.) are **always excluded** from this question and left **disabled**. If the answer is **no**, use `ask_user` again to have the user specify exactly which base modules to enable (e.g. `vnet_app` only); all other base modules stay disabled. Confirm the selection before editing `terraform.tfvars`.
-7. **Automated unit testing decision** — use `ask_user` to ask whether automated unit tests (`Invoke-UnitTests.ps1`) should be run after a successful `terraform apply`. Capture this decision now, batched with the other preflight prompts, because it determines whether preflight items 3 (Azure PowerShell auth) and 4 (sudo NOPASSWD drop-in for vwan tests) are required — those human-gated inputs must be collected up front, not after the `/allow-all`-mode handoff. If the answer is **yes**, also confirm scope: all installed modules (`Invoke-UnitTests.ps1`) versus a specific module and whether to include its integration tests (`-Module <name> [-Integration]`). If the answer is **no**, record it and skip items 3 and 4 (unless otherwise needed). The recorded decision drives the post-apply test step in Scenarios 1 and 2 — do not re-prompt for it after the apply.
+7. **Automated unit testing decision** — use `ask_user` to ask whether automated unit tests (`Invoke-UnitTests.ps1`) should be run after a successful `terraform apply`. Capture this decision now, batched with the other preflight prompts, because it determines whether preflight item 3 (Azure PowerShell auth) is required — that human-gated input must be collected up front, not after the `/allow-all`-mode handoff. If the answer is **yes**, also confirm scope: all installed modules (`Invoke-UnitTests.ps1`, which runs each installed module's unit **and** integration tests automatically) versus a single module's unit tests, optionally with its integration tests (`-Module <name> [-Integration]` — `-Integration` applies only to a single-module run). If the answer is **no**, record it and skip item 3 (unless otherwise needed). The recorded decision drives the post-apply test step in Scenarios 1 and 2 — do not re-prompt for it after the apply.
 
 After all preflight items pass, the remaining attended setup depends on the scenario: for a fresh vnext sandbox there are additional human-gated prep steps (see Scenario 1) that must also be completed attended. Once **all** attended setup (preflight plus any scenario-specific prep) is done and nothing further requires `ask_user`, **use `ask_user` to prompt the user to enable `/allow-all` mode by running `/allow-all`**, and wait for their confirmation before proceeding. This is the handoff from the attended phase to fully automated execution. Once `/allow-all` mode is enabled, normal Terraform rules apply: `terraform init` before `terraform apply`; run `terraform validate` and `terraform plan` first.
 
@@ -108,22 +103,7 @@ Do not resume the workflow until the user explicitly instructs you to. Never sil
 
 ### Scenario 1 — Fresh sandbox from scratch
 
-When deploying a new sandbox environment while the working branch is `vnext` in the IDE, **assume this is vnext testing** and complete the following vnext-testing prep steps **attended (`/allow-all` mode still off), after preflight passes but before the `/allow-all`-mode handoff and `terraform init`** — these steps contain their own `ask_user` prompts (sudo password, PR decisions):
-
-1. **Update the WSL/Linux execution environment.** This needs a real sudo password (`apt` is **not** covered by the vwan NOPASSWD drop-in in preflight item 4). Prompt for the sudo password via `ask_user` (do not persist it), then run both commands under `sudo -S` in the same invocation:
-   ```bash
-   printf '%s\n' "$SUDO_PASSWORD" | sudo -S apt update && printf '%s\n' "$SUDO_PASSWORD" | sudo -S apt upgrade -y
-   ```
-2. **Check the Terraform CLI version against `terraform.tf`.** Compare `terraform --version` against the `required_version` in the root `terraform.tf`. If they differ, open a pull request against `vnext` that updates `required_version` in:
-   - the root `terraform.tf`, and
-   - every module's `terraform.tf` under `./modules/**` and `./extras/modules/**`.
-
-   Use `gh pr create --base vnext` for the PR. Do not proceed with the apply until the version mismatch is resolved (either by merging the PR or by switching the local Terraform CLI to match the pinned version).
-3. **Update the PowerShell 7.x Az module to the latest version** so unit tests run against current cmdlets. First compare the installed version against the latest published version, and **skip the update if already on the latest**:
-   ```bash
-   pwsh -Command '$installed = (Get-InstalledModule -Name Az -ErrorAction SilentlyContinue).Version; $latest = (Find-Module -Name Az).Version; if ($installed -ge $latest) { "Az $installed is already the latest ($latest) — skipping update." } else { "Updating Az from $installed to $latest..."; Update-Module -Name Az -Force -Scope CurrentUser -AcceptLicense }'
-   ```
-   Confirm with `pwsh -Command 'Get-InstalledModule -Name Az | Select-Object Version'`.
+When deploying a new sandbox environment while the working branch is `vnext` in the IDE, **assume this is vnext testing** and complete the following vnext-testing prep steps **attended (`/allow-all` mode still off), after preflight passes but before the `/allow-all`-mode handoff and `terraform init`** — these steps contain their own `ask_user` prompts (PR decisions):
 
 After the vnext-testing prep steps complete (or for non-vnext branches, immediately after preflight), perform the `/allow-all`-mode handoff — prompt the user to run `/allow-all` and wait for confirmation — then run `terraform init && terraform plan && terraform apply`.
 
@@ -186,7 +166,7 @@ This is a specialization of Scenario 2 (it disables then re-enables a single mod
 
 ### Tests (Pester-free, PowerShell-orchestrated)
 
-Preflight items 3 (Azure PowerShell auth) and 4 (sudo NOPASSWD drop-in for vwan tests) must be satisfied before invoking any of these.
+Preflight item 3 (Azure PowerShell auth) must be satisfied before invoking any of these.
 
 **VM-start gate (mandatory — always run immediately before any unit/integration test invocation).** In some subscriptions an Azure policy can **arbitrarily stop/deallocate VMs** (e.g. cost-optimization auto-shutdown), which makes VM-side tests fail spuriously — a deallocated domain controller (`adds1`) breaks AD DNS, Kerberos, domain join, CIFS, and SQL auth (this is the root cause confirmed in issue #447). Therefore, **before every `Invoke-UnitTests.ps1` run — in Scenario 1, Scenario 2, the Scenario 3 repro, and any ad-hoc test run — first start all VMs and confirm they are running:**
 
@@ -197,22 +177,10 @@ az vm list -g <rg> -d --query "[].{Name:name, PowerState:powerState}" -o table  
 
 `manage-vms.sh start` starts `adds1` (domain controller) **first** and waits for it, then starts the rest. Do not begin testing until the relevant VMs report `VM running`. This gate is non-negotiable because the policy can deallocate VMs at any time, including after a successful `terraform apply` but before tests run.
 
-```bash
-# All modules:
-pwsh -File ./scripts/Invoke-UnitTests.ps1
+**For everything else about running tests — invocation syntax, the `-Module`/`-Integration` scope rules, valid module names, prerequisites, and how the orchestrator dispatches integration tests — read the header comments at the top of `scripts/Invoke-UnitTests.ps1`** (they are the source of truth; do not duplicate them here). The two rules that most often trip up automation:
 
-# Single module unit tests:
-pwsh -File ./scripts/Invoke-UnitTests.ps1 -Module vnet_app
-
-# Module unit + its integration tests:
-pwsh -File ./scripts/Invoke-UnitTests.ps1 -Module vm_mssql_win -Integration
-```
-
-Valid `-Module` values: `vnet_shared`, `vnet_app`, `vm_jumpbox_linux`, `vm_mssql_win`, `mssql`, `mysql`, `vwan`, `vnet_onprem`, `avd`, `petstore` (note: `ai_foundry` is **not** currently supported by `Invoke-UnitTests.ps1`). Tests require an applied sandbox in the current Terraform state. Exit code is `0`/`1` for CI use.
-
-**WSL automation note — `vwan` now runs unattended via a sudoers drop-in.** The vwan integration tests invoke privileged commands (`openvpn`, `cat`, `tail`, `kill`, `pkill`) at runtime. These are granted promptlessly by the persistent command-scoped sudoers drop-in at `/etc/sudoers.d/azuresandbox-vwan` (preflight item 4), so `Invoke-UnitTests.ps1` runs fully autonomously in WSL **with `vwan` enabled** — no cached sudo timestamp and no mid-run password prompt. The test scripts probe sudo readiness with `sudo -n cat /dev/null` (an allowed command), not `sudo -n true`. If that drop-in is missing on a given execution environment, the vwan tests will instead prompt for a password the agent cannot answer — recreate the drop-in per preflight item 4, or skip the vwan test phase and ask the user to run `Invoke-UnitTests.ps1` interactively. Note: the openvpn launch in `Test-Integration-VwanConnectivity.ps1` runs `bash -c "sudo openvpn …"` (elevating only `openvpn`) rather than `sudo bash -c …`, which is what keeps the NOPASSWD allowlist scoped to specific binaries instead of all of `bash`.
-
-`Invoke-UnitTests.ps1` is the orchestrator — it discovers what's deployed via `terraform output`, then per-module dispatches to `scripts/Test-Integration-*.ps1` (one script per integration scenario): `Test-Integration-SqlConnectivity.ps1`, `Test-Integration-AzSqlConnectivity.ps1`, `Test-Integration-AzMySqlConnectivity.ps1`, `Test-Integration-SshConnectivity.ps1`, `Test-Integration-VwanConnectivity.ps1`, `Test-Integration-CloudToOnpremDns.ps1`, `Test-Integration-OnpremToCloudDns.ps1`, `Test-Integration-Petstore.ps1`, `Test-Integration-AvdPersonal.ps1`, `Test-Integration-AvdRemoteapp.ps1`. Do not invoke these directly — go through the orchestrator so the right parameters (resource names, FQDNs) are populated from Terraform outputs.
+- Running **all** modules (no `-Module`) auto-discovers what's deployed and runs each module's unit **and** integration tests automatically. `-Integration` does **not** apply to an all-modules run and is ignored when `-Module` is omitted.
+- `-Integration` is meaningful **only** with `-Module` (a single-module run), e.g. `pwsh -File ./scripts/Invoke-UnitTests.ps1 -Module vm_mssql_win -Integration`.
 
 ## Architecture
 
@@ -270,6 +238,7 @@ Every module has a `README.md` with the same sections: Architecture (drawio SVG 
 - Day-to-day work happens on `vnext`; PRs target `vnext`.
 - A CLA bot runs on PRs (Microsoft Open Source CLA).
 - `.vscode/tasks.json` provides a one-shot task to squash-merge all open PRs into `vnext` (`gh pr list ... | xargs gh pr merge --squash`).
+- **Merge strategy:** squash-merge topic/contributor PRs → `vnext`; use a **regular merge commit (no squash)** for the `vnext` → `main` release PR so individual commits and branch lineage are preserved on `main`. See CONTRIBUTING.md "Merge strategy".
 
 ## Standalone configurations under `extras/configurations/`
 

@@ -1,12 +1,28 @@
 #requires -Version 7.0
 #requires -Modules Az.Accounts, Az.Compute, Az.Resources, Az.Sql, Az.Network, Az.PrivateDns, Az.MySql, Az.DesktopVirtualization
 
+# Overview:
+#   This script is the unit/integration test orchestrator for the sandbox. It auto-discovers
+#   which modules are actually deployed (via `terraform output`) and runs the appropriate unit
+#   tests for each. Integration tests are dispatched per-module to the scripts/Test-Integration-*.ps1
+#   helpers; do not invoke those helpers directly (the orchestrator populates their parameters —
+#   resource names, FQDNs — from Terraform outputs). Exit code is 0 (pass) / 1 (fail) for CI use;
+#   tests require an applied sandbox in the current Terraform state.
+#
+# Test scope rules (important):
+#   - No -Module  -> runs unit tests for ALL installed modules. Integration tests for those
+#                    modules are run AUTOMATICALLY. The -Integration switch does NOT apply here
+#                    and is ignored when -Module is omitted.
+#   - -Module X   -> runs only module X's unit tests.
+#   - -Module X -Integration -> runs module X's unit tests AND its integration tests.
+#   In short: -Integration is meaningful ONLY together with -Module (a single-module run).
+#
 # Usage:
 #   Step 1: Authenticate to Azure (one-time, persisted to ~/.Azure/)
 #     From bash:       pwsh -Command 'Connect-AzAccount -UseDeviceAuthentication'
 #     From PowerShell: Connect-AzAccount -UseDeviceAuthentication
 #
-#   Step 2: Run unit tests (all installed modules)
+#   Step 2: Run unit tests for all installed modules (integration tests run automatically)
 #     From bash:       pwsh -File ./scripts/Invoke-UnitTests.ps1
 #     From PowerShell: .\scripts\Invoke-UnitTests.ps1
 #
@@ -14,16 +30,20 @@
 #     From bash:       pwsh -File ./scripts/Invoke-UnitTests.ps1 -Module vnet_shared
 #     From PowerShell: .\scripts\Invoke-UnitTests.ps1 -Module vnet_app
 #
-#   Step 2 (alt): Run unit tests for a module and its associated integration tests
+#   Step 2 (alt): Run a single module's unit tests AND its integration tests
 #     From bash:       pwsh -File ./scripts/Invoke-UnitTests.ps1 -Module vnet_app -Integration
 #     From PowerShell: .\scripts\Invoke-UnitTests.ps1 -Module vm_mssql_win -Integration
 #
-#   Valid module names: vnet_shared, vnet_app, vm_jumpbox_linux, vm_mssql_win, mssql, mysql, vwan, vnet_onprem
+#   Valid module names: vnet_shared, vnet_app, vm_jumpbox_linux, vm_mssql_win, mssql, mysql,
+#                       vwan, vnet_onprem, avd, petstore (ai_foundry is not currently supported)
 #
 # Prerequisites:
 #   - PowerShell 7.x (pwsh) with Az.Accounts, Az.Compute, and Az.Resources modules installed
 #   - Authenticated Azure session (see Step 1 above)
 #   - Terraform CLI in PATH with initialized state in the repo root
+#   - All VMs started before running (a policy may deallocate them); a deallocated domain
+#     controller (adds1) breaks AD DNS, Kerberos, domain join, CIFS, and SQL auth. Start with
+#     ./scripts/manage-vms.sh start and confirm all report 'VM running' before testing.
 
 param(
     [Parameter(Mandatory = $false)]
