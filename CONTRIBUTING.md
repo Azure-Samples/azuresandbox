@@ -89,6 +89,7 @@ Pull requests targeting `vnext` (and pushes to `vnext`) automatically run lightw
 | `ci-docs` | `markdownlint-cli2` (Markdown style) and `lychee` (internal/relative link checker, offline) | [`.markdownlint.jsonc`](.markdownlint.jsonc), [`.markdownlint-cli2.jsonc`](.markdownlint-cli2.jsonc) |
 | `ci-terraform` | `terraform fmt -check -recursive` and `tflint --recursive` | [`.tflint.hcl`](.tflint.hcl) |
 | `ci-powershell` | `PSScriptAnalyzer` over all PowerShell scripts | [`PSScriptAnalyzerSettings.psd1`](PSScriptAnalyzerSettings.psd1) |
+| `ci-bash` | `ShellCheck` over all `*.sh` scripts (fails on warning + error severity) | [`.shellcheckrc`](.shellcheckrc) |
 
 To reproduce the checks locally before opening a PR:
 
@@ -103,9 +104,16 @@ tflint --init && tflint --recursive
 
 # PowerShell (PowerShell 7.x with the PSScriptAnalyzer module)
 pwsh -NoProfile -Command "Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./PSScriptAnalyzerSettings.psd1 -Severity Error,Warning"
+
+# Bash (requires ShellCheck on PATH:
+#   sudo apt-get install -y shellcheck  |  brew install shellcheck  |
+#   download a release from https://github.com/koalaman/shellcheck/releases)
+./scripts/Invoke-ShellCheck.sh
 ```
 
 The PSScriptAnalyzer settings file excludes a small set of rules that conflict with intentional patterns in this deployment-automation codebase (for example, `Write-Host` console output, the project's own `Write-Log` helper, and plaintext-to-`SecureString` conversion required for unattended VM configuration). Each exclusion is documented inline in `PSScriptAnalyzerSettings.psd1`.
+
+`ci-bash` runs ShellCheck at `--severity=warning` (the warning + error gate, mirroring the PowerShell CI). `scripts/Invoke-ShellCheck.sh` runs the identical command locally and shares the repo-root `.shellcheckrc`, so local results match CI exactly. A single documented `# shellcheck disable=SC2024` is applied in `modules/vm-jumpbox-linux/scripts/configure-vm-jumpbox-linux.sh`, where `sudo <cmd> >> $log_file` intentionally elevates only the command while appending to the user-owned log; the justification is recorded inline at the top of that script.
 
 ## Submission Guidelines
 
