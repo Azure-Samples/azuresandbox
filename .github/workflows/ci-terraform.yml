@@ -25,8 +25,8 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
         with:
-          # Matches required_version (~> 1.15.6) in terraform.tf.
-          terraform_version: 1.15.6
+          # Matches required_version (~> 1.15.7) in terraform.tf.
+          terraform_version: 1.15.7
           terraform_wrapper: false
 
       - name: Check formatting
@@ -77,8 +77,8 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
         with:
-          # Matches required_version (~> 1.15.6) in terraform.tf.
-          terraform_version: 1.15.6
+          # Matches required_version (~> 1.15.7) in terraform.tf.
+          terraform_version: 1.15.7
           terraform_wrapper: false
 
       # -backend=false downloads providers/initializes modules without
