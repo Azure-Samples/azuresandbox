@@ -60,6 +60,30 @@ This repository uses a two-branch model to keep `main` stable and releasable at 
 - **Topic/contributor PRs → `vnext`:** **squash merge**, so each PR lands as one tidy commit on `vnext`.
 - **`vnext` → `main` (release promotion):** **regular merge commit (do not squash)**, so the individual `vnext` commits and the branch lineage are preserved on `main`. Squashing this promotion flattens all the work into a single commit and loses that history.
 
+### Merging into `vnext` (merge queue)
+
+`vnext` uses a **merge queue**, so you no longer use the "Squash and merge" button or merge a PR directly — you queue it and the queue squash-merges it for you once it is up to date and green. Simple workflow, starting from edits in your working tree:
+
+```bash
+# 1. Put your edits on a branch (uncommitted changes come with you).
+git checkout -b feature/my-change
+git add -A
+git commit -m "describe my change"
+git push -u origin feature/my-change
+
+# 2. Open the PR against vnext.
+gh pr create --base vnext --fill
+
+# 3. After checks pass and the PR has 1 approval, queue it:
+gh pr merge --squash --auto
+
+# 4. The queue updates your branch, re-runs checks, and squash-merges it.
+#    Then sync your local vnext:
+git checkout vnext && git pull
+```
+
+You do **not** need to manually click "Update branch" when your PR falls behind — the merge queue rebases it on the latest `vnext` automatically. Expect a short delay (rather than an instant merge) while the queue builds and tests your PR.
+
 ### Enforcement
 
 The policy above is enforced by [branch protection](https://docs.github.com/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches) on `main`:
