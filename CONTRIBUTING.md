@@ -44,7 +44,7 @@ This repository uses a two-branch model to keep `main` stable and releasable at 
 
 | Branch | Purpose | Who can update it | How it is updated |
 | --- | --- | --- | --- |
-| `vnext` | Active development / integration branch. All day-to-day work lands here. | Any collaborator with write access | Pull requests (or direct pushes by maintainers) |
+| `vnext` | Active development / integration branch. All day-to-day work lands here. | Any collaborator with write access | Pull requests only (direct pushes are blocked) |
 | `main` | Stable, released code. | Repository owner **@doherty100** only | Pull request merging `vnext` → `main` |
 
 ### Workflow
