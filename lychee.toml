@@ -1,0 +1,12 @@
+# Configuration for the lychee link checker.
+# Auto-detected by lychee (and lycheeverse/lychee-action) in the repo root, so
+# it applies to both the PR-time offline check (ci-docs.yml) and the scheduled
+# external link check (ci-docs-external-links.yml).
+
+# Hosts that reject automated requests (bot protection) and therefore produce
+# false-positive failures even though the links are valid in a browser.
+exclude = [
+  # The Microsoft Entra admin center returns 403 Forbidden to non-browser
+  # user agents (see issue #516). The URL is valid for human visitors.
+  "^https://entra\\.microsoft\\.com",
+]
