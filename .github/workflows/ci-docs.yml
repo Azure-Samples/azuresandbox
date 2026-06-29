@@ -11,15 +11,46 @@ on:
 
 permissions:
   contents: read
+  # Required by the `changes` job's paths-filter to read changed files via the
+  # PR API on pull_request events.
+  pull-requests: read
 
 concurrency:
   group: ci-docs-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # Detect whether this push/PR touches documentation. The real jobs below are
+  # gated on this so they only run when relevant files change. They `needs` this
+  # job and are *skipped* (not absent) when nothing matches: a skipped required
+  # job satisfies branch protection, whereas a path-filtered workflow that never
+  # runs would leave a required check pending forever. Do NOT convert this to a
+  # trigger-level `paths:` filter while these checks are required on vnext.
+  changes:
+    name: detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      docs: ${{ steps.filter.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            docs:
+              - '**/*.md'
+              - '.markdownlint.jsonc'
+              - '.markdownlint-cli2.jsonc'
+              - '.github/workflows/ci-docs.yml'
+
   markdownlint:
     name: markdownlint
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.docs == 'true' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -36,6 +67,8 @@ jobs:
   lychee:
     name: lychee (internal links)
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.docs == 'true' }}
     steps:
       - uses: actions/checkout@v4
 
