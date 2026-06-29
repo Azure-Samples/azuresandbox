@@ -11,15 +11,48 @@ on:
 
 permissions:
   contents: read
+  # Required by the `changes` job's paths-filter to read changed files via the
+  # PR API on pull_request events.
+  pull-requests: read
 
 concurrency:
   group: ci-terraform-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # Detect whether this push/PR touches Terraform. The real jobs below are gated
+  # on this so they only run when relevant files change. They are *skipped* (not
+  # absent) when nothing matches: a skipped required job satisfies branch
+  # protection, whereas a path-filtered workflow that never runs would leave a
+  # required check pending forever. Do NOT convert this to a trigger-level
+  # `paths:` filter while these checks are required on vnext.
+  # Note: .terraform.lock.hcl is intentionally omitted — it is gitignored in this
+  # repo and never committed.
+  changes:
+    name: detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      terraform: ${{ steps.filter.outputs.terraform }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            terraform:
+              - '**/*.tf'
+              - '**/*.tf.json'
+              - '**/.tflint.hcl'
+              - '.github/workflows/ci-terraform.yml'
+
   fmt:
     name: terraform fmt
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.terraform == 'true' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -35,6 +68,8 @@ jobs:
   tflint:
     name: tflint
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.terraform == 'true' }}
     env:
       # Used by `tflint --init` to download the azurerm ruleset plugin from
       # GitHub releases without hitting unauthenticated rate limits.
@@ -63,6 +98,8 @@ jobs:
   validate:
     name: terraform validate
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.terraform == 'true' }}
     strategy:
       fail-fast: false
       matrix:
