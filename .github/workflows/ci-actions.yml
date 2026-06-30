@@ -13,15 +13,42 @@ on:
 
 permissions:
   contents: read
+  # Required by the `changes` job's paths-filter to read changed files via the
+  # PR API on pull_request events.
+  pull-requests: read
 
 concurrency:
   group: ci-actions-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # Detect whether this push/PR touches workflow files. The real job is gated on
+  # this so it only runs when workflows change. A skipped required job satisfies
+  # branch protection, whereas a path-filtered workflow that never runs would
+  # leave a required check pending forever. Do NOT convert this to a trigger-level
+  # `paths:` filter while actionlint is a required check on vnext.
+  changes:
+    name: detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      actions: ${{ steps.filter.outputs.actions }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            actions:
+              - '.github/workflows/**'
+
   actionlint:
     name: actionlint
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.actions == 'true' }}
     env:
       # Pinned for deterministic, reproducible runs. Bump intentionally.
       ACTIONLINT_VERSION: 1.7.12

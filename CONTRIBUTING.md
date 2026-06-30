@@ -44,7 +44,7 @@ This repository uses a two-branch model to keep `main` stable and releasable at 
 
 | Branch | Purpose | Who can update it | How it is updated |
 | --- | --- | --- | --- |
-| `vnext` | Active development / integration branch. All day-to-day work lands here. | Any collaborator with write access | Pull requests (or direct pushes by maintainers) |
+| `vnext` | Active development / integration branch. All day-to-day work lands here. | Any collaborator with write access | Pull requests only (direct pushes are blocked) |
 | `main` | Stable, released code. | Repository owner **@doherty100** only | Pull request merging `vnext` → `main` |
 
 ### Workflow
@@ -59,6 +59,49 @@ This repository uses a two-branch model to keep `main` stable and releasable at 
 
 - **Topic/contributor PRs → `vnext`:** **squash merge**, so each PR lands as one tidy commit on `vnext`.
 - **`vnext` → `main` (release promotion):** **regular merge commit (do not squash)**, so the individual `vnext` commits and the branch lineage are preserved on `main`. Squashing this promotion flattens all the work into a single commit and loses that history.
+
+### Merging into `vnext`
+
+How a PR lands on `vnext` depends on who you are. Both paths start the same way — push a branch and open a PR against `vnext`:
+
+```bash
+# Put your edits on a branch (uncommitted changes come with you).
+git checkout -b feature/my-change
+git add -A
+git commit -m "describe my change"
+git push -u origin feature/my-change
+
+# Open the PR against vnext.
+gh pr create --base vnext --fill
+```
+
+#### Path 1 — Contributors (merge queue + review)
+
+All contributors **except** members of the `azuresandbox-vnext-bypass` team merge through a **merge queue** and need **one approval**. You do not use the "Squash and merge" button or merge directly — you queue the PR and the queue squash-merges it once it is up to date and green:
+
+```bash
+# After required checks pass and the PR has 1 approval, queue it:
+gh pr merge --squash --auto
+
+# The queue rebases your branch on the latest vnext, re-runs checks, and
+# squash-merges it. Then sync your local vnext:
+git checkout vnext && git pull
+```
+
+You do **not** need to manually click "Update branch" when your PR falls behind — the merge queue rebases it on the latest `vnext` automatically. Expect a short delay (rather than an instant merge) while the queue builds and tests your PR. The required approval comes from the repository owner (declared in [`.github/CODEOWNERS`](.github/CODEOWNERS)).
+
+#### Path 2 — Maintainers in the `azuresandbox-vnext-bypass` team
+
+Members of the **`azuresandbox-vnext-bypass`** team (currently the repository owner) can **self-merge without an approval** and may **bypass the merge queue**, merging directly once required checks are green:
+
+```bash
+# Direct squash merge, bypassing both the review requirement and the queue:
+gh pr merge <pr-number> --squash --admin
+```
+
+In the GitHub UI this appears as a **"Bypass rules and merge"** option in the merge box. (You still cannot "Approve" your own PR — GitHub never allows self-approval — but as a bypass-team member you do not need an approval to merge.) Contributor PRs that are not yours still require your review before they can merge via Path 1.
+
+Either path produces a single squashed commit on `vnext`, consistent with the [merge strategy](#merge-strategy) above.
 
 ### Enforcement
 

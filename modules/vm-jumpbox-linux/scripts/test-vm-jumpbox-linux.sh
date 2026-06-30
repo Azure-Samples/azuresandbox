@@ -225,16 +225,45 @@ fi
 # AMA - Azure Monitor Agent systemd service is active.
 # Unlike the Windows agent, AMA on Linux registers a systemd unit (azuremonitoragent.service)
 # and the canonical health check is systemctl is-active.
+#
+# After a VM stop/deallocate+start (e.g. Invoke-UnitTests.ps1 cycling a VM, or a cost-
+# optimization auto-shutdown policy) the extension handler restarts the agent asynchronously
+# and does not block VM startup, so the service can take up to ~2 min to become 'active'.
+# Poll with a bounded wait so the test is resilient to extension cold-start, and on timeout
+# emit diagnostics (service state, VM uptime, latest extension handler status) that
+# distinguish a slow start from a real extension failure. Mirrors the Windows AMA fix (#424).
+ama_max_wait_sec=120
+ama_sleep_sec=5
+ama_waited=0
 ama_status=$(systemctl is-active azuremonitoragent 2>/dev/null)
+while [ "$ama_status" != "active" ] && [ "$ama_waited" -lt "$ama_max_wait_sec" ]; do
+    sleep "$ama_sleep_sec"
+    ama_waited=$((ama_waited + ama_sleep_sec))
+    ama_status=$(systemctl is-active azuremonitoragent 2>/dev/null)
+done
+
 if [ "$ama_status" = "active" ]; then
     ama_version=$(dpkg-query -W -f='${Version}' azuremonitoragent 2>/dev/null)
     if [ -z "$ama_version" ]; then
         ama_version='unknown'
     fi
-    write_test_result 'PASS' "AMA: azuremonitoragent.service is active (version $ama_version)"
+    write_test_result 'PASS' "AMA: azuremonitoragent.service is active (version $ama_version, waited ${ama_waited}s)"
     passed=$((passed + 1))
 else
-    write_test_result 'FAIL' "AMA: azuremonitoragent.service is '$ama_status' (expected 'active')"
+    # Distinguish a slow extension cold-start from a real extension failure: report VM uptime
+    # and the latest AMA extension handler status written by the Azure guest agent (waagent).
+    ama_uptime=$(awk '{print int($1)}' /proc/uptime 2>/dev/null)
+    [ -z "$ama_uptime" ] && ama_uptime='unknown'
+    ama_ext_status='no status file'
+    ama_ext_dir=$(find /var/lib/waagent -maxdepth 1 -type d -name 'Microsoft.Azure.Monitor.AzureMonitorLinuxAgent-*' 2>/dev/null | sort -V | tail -1)
+    if [ -n "$ama_ext_dir" ]; then
+        ama_status_file=$(find "$ama_ext_dir/status" -maxdepth 1 -name '*.status' -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-)
+        if [ -n "$ama_status_file" ]; then
+            ama_ext_status=$(python3 -c "import json,sys; s=json.load(open(sys.argv[1]))[0]['status']; print('status=%s message=%s' % (s.get('status'), s.get('formattedMessage',{}).get('message','')))" "$ama_status_file" 2>/dev/null)
+            [ -z "$ama_ext_status" ] && ama_ext_status="see $ama_status_file"
+        fi
+    fi
+    write_test_result 'FAIL' "AMA: azuremonitoragent.service is '$ama_status' after ${ama_waited}s (expected 'active'; vm_uptime=${ama_uptime}s, ext: $ama_ext_status)"
     failed=$((failed + 1))
 fi
 

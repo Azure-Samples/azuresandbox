@@ -11,22 +11,58 @@ on:
 
 permissions:
   contents: read
+  # Required by the `changes` job's paths-filter to read changed files via the
+  # PR API on pull_request events.
+  pull-requests: read
 
 concurrency:
   group: ci-terraform-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # Detect whether this push/PR touches Terraform. The real jobs below are gated
+  # on this so they only do work when relevant files change. Single-job checks
+  # (fmt, tflint) are *skipped* (not absent) when nothing matches: a skipped
+  # required job whose check name matches the required context satisfies branch
+  # protection, whereas a path-filtered workflow that never runs would leave a
+  # required check pending forever. Do NOT convert this to a trigger-level
+  # `paths:` filter while these checks are required on vnext.
+  # NOTE: the `validate` job is a *matrix* job and is handled differently — see
+  # the comment on that job for why it must always run rather than be skipped.
+  # Note: .terraform.lock.hcl is intentionally omitted — it is gitignored in this
+  # repo and never committed.
+  changes:
+    name: detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      terraform: ${{ steps.filter.outputs.terraform }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            terraform:
+              - '**/*.tf'
+              - '**/*.tf.json'
+              - '**/.tflint.hcl'
+              - '.github/workflows/ci-terraform.yml'
+
   fmt:
     name: terraform fmt
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.terraform == 'true' }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: hashicorp/setup-terraform@v3
         with:
-          # Matches required_version (~> 1.15.6) in terraform.tf.
-          terraform_version: 1.15.6
+          # Matches required_version (~> 1.15.7) in terraform.tf.
+          terraform_version: 1.15.7
           terraform_wrapper: false
 
       - name: Check formatting
@@ -35,6 +71,8 @@ jobs:
   tflint:
     name: tflint
     runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.terraform == 'true' }}
     env:
       # Used by `tflint --init` to download the azurerm ruleset plugin from
       # GitHub releases without hitting unauthenticated rate limits.
@@ -63,6 +101,18 @@ jobs:
   validate:
     name: terraform validate
     runs-on: ubuntu-latest
+    needs: changes
+    # Unlike the single-job checks above, this is a *matrix* job, so its
+    # branch-protection contexts are the matrix-expanded names
+    # `terraform validate (.)` and
+    # `terraform validate (extras/configurations/rg-devops-iac)`.
+    # A job-level `if` skip would collapse the matrix into a single skipped
+    # `terraform validate` check, so those two required contexts would NEVER be
+    # reported and a non-Terraform PR would wait on them forever ("Expected —
+    # Waiting for status to be reported"). Therefore this job must ALWAYS run so
+    # the matrix expands and both contexts report; the per-step `if` below
+    # no-ops the actual work when Terraform is unchanged. Do NOT reintroduce a
+    # job-level `if` here.
     strategy:
       fail-fast: false
       matrix:
@@ -74,19 +124,23 @@ jobs:
           - extras/configurations/rg-devops-iac
     steps:
       - uses: actions/checkout@v4
+        if: ${{ needs.changes.outputs.terraform == 'true' }}
 
       - uses: hashicorp/setup-terraform@v3
+        if: ${{ needs.changes.outputs.terraform == 'true' }}
         with:
-          # Matches required_version (~> 1.15.6) in terraform.tf.
-          terraform_version: 1.15.6
+          # Matches required_version (~> 1.15.7) in terraform.tf.
+          terraform_version: 1.15.7
           terraform_wrapper: false
 
       # -backend=false downloads providers/initializes modules without
       # configuring remote state, so validation needs no Azure credentials.
       - name: terraform init (no backend)
+        if: ${{ needs.changes.outputs.terraform == 'true' }}
         run: terraform init -backend=false -input=false
         working-directory: ${{ matrix.dir }}
 
       - name: terraform validate
+        if: ${{ needs.changes.outputs.terraform == 'true' }}
         run: terraform validate -no-color
         working-directory: ${{ matrix.dir }}
