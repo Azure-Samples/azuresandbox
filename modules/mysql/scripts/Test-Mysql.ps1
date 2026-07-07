@@ -68,7 +68,7 @@ catch {
 
 # Test 2: Database exists
 try {
-    $db = Get-AzMySqlFlexibleServerDatabase -ResourceGroupName $ResourceGroupName -ServerName $MysqlServerName -Name $MysqlDatabaseName -ErrorAction Stop
+    $null = Get-AzMySqlFlexibleServerDatabase -ResourceGroupName $ResourceGroupName -ServerName $MysqlServerName -Name $MysqlDatabaseName -ErrorAction Stop
     Write-TestResult $moduleName 'PASS' ("Database '$MysqlDatabaseName' exists on server '$MysqlServerName'")
     $passed++
 }

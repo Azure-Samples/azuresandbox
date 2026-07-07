@@ -57,7 +57,7 @@ function Show-JWTtoken {
 # Initialize constants
 $defaultCostCenter = "mycostcenter"
 $defaultEnvironment = "dev"
-$defaultLocation = "eastus2"
+$defaultLocation = "centralus"
 $defaultProject = "sand"
 #endregion
 

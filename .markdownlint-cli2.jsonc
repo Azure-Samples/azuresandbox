@@ -1,0 +1,14 @@
+// markdownlint-cli2 runner configuration.
+// Rule settings live in .markdownlint.jsonc (also honored by editor extensions)
+// and are merged automatically. This file only controls which files are linted.
+// Docs: https://github.com/DavidAnson/markdownlint-cli2
+{
+  "globs": ["**/*.md"],
+  "ignores": [
+    "node_modules",
+    // Frozen/retired module — excluded from maintenance tooling (see dependabot.yml).
+    "extras/modules/retired",
+    // Agent tooling configuration, not project documentation.
+    ".github/copilot-instructions.md"
+  ]
+}

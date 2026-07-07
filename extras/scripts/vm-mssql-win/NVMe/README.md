@@ -39,7 +39,7 @@ This is also a problem when tempdb is still on `C:\` (the OS disk) and needs to 
 
 Copy the automation files to `C:\Scripts\` on the Azure VM:
 
-```
+```text
 C:\Scripts\
 ├── Set-MssqlStartupConfiguration.ps1
 ├── Register-MssqlStartupTask.cmd
@@ -56,12 +56,14 @@ C:\Scripts\Register-MssqlStartupTask.cmd
 ```
 
 This will:
+
 1. Set `MSSQLSERVER` and `SQLSERVERAGENT` services to **Manual** startup
 2. Register a Windows Scheduled Task named **"SQL Server Startup - Ephemeral Storage"** that runs at every boot as `NT AUTHORITY\SYSTEM`
 3. Lock down `C:\Scripts` so only Administrators and SYSTEM have access (prevents privilege escalation)
 
 You should see:
-```
+
+```text
 === Setting SQL Server services to Manual startup ===
 [SC] ChangeServiceConfig SUCCESS
 [SC] ChangeServiceConfig SUCCESS
@@ -152,6 +154,7 @@ If the volume already exists (soft reboot, no deallocation), it skips provisioni
 | Script path | `-File` argument in Register .ps1 | `C:\Scripts\Set-MssqlStartupConfiguration.ps1` |
 
 For a **named instance**, change:
+
 ```powershell
 $SQLServiceName = "MSSQL$MYINSTANCE"
 $SQLAgentName   = "SQLAgent$MYINSTANCE"
@@ -163,9 +166,9 @@ $SQLAgentName   = "SQLAgent$MYINSTANCE"
 |---------|-------|
 | SQL Server not starting after dealloc | Review `C:\Scripts\Set-MssqlStartupConfiguration.log` |
 | Task not running | Task Scheduler → check "SQL Server Startup - Ephemeral Storage" last run result |
-| NVMe disks not detected | Run `Get-PhysicalDisk | where FriendlyName -like '*NVMe Direct*'` |
+| NVMe disks not detected | Run `Get-PhysicalDisk \| where FriendlyName -like '*NVMe Direct*'` |
 | Drive letter conflict | Ensure no other disk/DVD uses T: |
-| Permission denied on SQLTEMP | Check ACL: `Get-Acl T:\SQLTEMP | Format-List` |
+| Permission denied on SQLTEMP | Check ACL: `Get-Acl T:\SQLTEMP \| Format-List` |
 | tempdb still on C:\ after restart | Re-run `Move-TempdbToEphemeral.sql` and verify with `SELECT physical_name FROM sys.master_files WHERE database_id = 2` |
 | T:\ drive doesn't exist before moving tempdb | Run `Set-MssqlStartupConfiguration.ps1` manually first, or stop/start the VM to trigger the scheduled task |
 

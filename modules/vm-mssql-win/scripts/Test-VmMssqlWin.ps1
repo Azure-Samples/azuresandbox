@@ -93,7 +93,7 @@ try {
 }
 catch {
     Write-Log "WARNING: Failed to retrieve admin credentials from Key Vault '$KeyVaultName': $_"
-    try { Disconnect-AzAccount -ErrorAction SilentlyContinue | Out-Null } catch {}
+    try { Disconnect-AzAccount -ErrorAction SilentlyContinue | Out-Null } catch { Write-Verbose "Disconnect-AzAccount failed: $_" }
 }
 
 # Startup validation gate: verify Set-MssqlStartupConfiguration.ps1 postconditions.
@@ -104,7 +104,7 @@ $startupOk = $true
 
 # Startup Check 1: Scheduled task last run succeeded
 try {
-    $stTask = Get-ScheduledTask -TaskName 'Set-MssqlStartupConfiguration' -ErrorAction Stop
+    $null = Get-ScheduledTask -TaskName 'Set-MssqlStartupConfiguration' -ErrorAction Stop
     $stTaskInfo = Get-ScheduledTaskInfo -TaskName 'Set-MssqlStartupConfiguration' -ErrorAction Stop
 
     if ($stTaskInfo.LastTaskResult -eq 0) {
@@ -726,7 +726,7 @@ try {
         try {
             $boot = (Get-CimInstance Win32_OperatingSystem -ErrorAction Stop).LastBootUpTime
             $uptime = '{0:N0}s' -f ((Get-Date) - $boot).TotalSeconds
-        } catch {}
+        } catch { Write-Verbose "Uptime probe failed: $_" }
         $extStatus = 'no status file'
         try {
             $statusFile = Get-ChildItem $amaRoot -Directory -ErrorAction Stop |

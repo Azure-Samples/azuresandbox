@@ -50,7 +50,7 @@ catch {
 
 # Test 2: This machine is a domain controller
 try {
-    $dc = Get-ADDomainController -Identity $env:COMPUTERNAME -ErrorAction Stop
+    $null = Get-ADDomainController -Identity $env:COMPUTERNAME -ErrorAction Stop
     Write-TestResult $moduleName 'PASS' "AD DS: '$env:COMPUTERNAME' is a domain controller"
     $passed++
 }
@@ -170,7 +170,7 @@ try {
         try {
             $boot = (Get-CimInstance Win32_OperatingSystem -ErrorAction Stop).LastBootUpTime
             $uptime = '{0:N0}s' -f ((Get-Date) - $boot).TotalSeconds
-        } catch {}
+        } catch { Write-Verbose "Uptime probe failed: $_" }
         $extStatus = 'no status file'
         try {
             $statusFile = Get-ChildItem $amaRoot -Directory -ErrorAction Stop |
@@ -253,7 +253,8 @@ catch {
 # Test 9: TCP/443 reachability to the AMPLS private endpoint (via the DCE ingestion FQDN).
 # Any AMPLS-fronted endpoint works; we use the global control endpoint resolved in Test 8.
 try {
-    $tnc = Test-NetConnection -ComputerName 'global.handler.control.monitor.azure.com' -Port 443 -WarningAction SilentlyContinue -ErrorAction Stop
+    $amplsProbeHost = 'global.handler.control.monitor.azure.com'
+    $tnc = Test-NetConnection -ComputerName $amplsProbeHost -Port 443 -WarningAction SilentlyContinue -ErrorAction Stop
     if ($tnc.TcpTestSucceeded) {
         Write-TestResult $moduleName 'PASS' "AMPLS: TCP/443 to '$($tnc.ComputerName)' ($($tnc.RemoteAddress)) succeeded"
         $passed++

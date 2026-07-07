@@ -9,6 +9,14 @@
 #     or 'sudo yum install -y bind-utils' (RHEL/CentOS). Used for DNS resolution against
 #     the sandbox DNS server. On Windows, Resolve-DnsName is used instead.
 
+# **WSL automation note
+#   `vwan` now runs unattended via a sudoers drop-in.** The vwan integration tests invoke privileged commands (`openvpn`, `cat`, `tail`, `kill`, `pkill`) at runtime.
+#   These are granted promptlessly by the persistent command-scoped sudoers drop-in at `/etc/sudoers.d/azuresandbox-vwan`.
+#   `Invoke-UnitTests.ps1` runs fully autonomously in WSL **with `vwan` enabled** — no cached sudo timestamp and no mid-run password prompt.
+#   The test scripts probe sudo readiness with `sudo -n cat /dev/null` (an allowed command), not `sudo -n true`.
+#   If that drop-in is missing on a given execution environment, the vwan tests will instead prompt for a password the agent cannot answer.
+#   Note: the openvpn launch runs `bash -c "sudo openvpn …"` (elevating only `openvpn`) rather than `sudo bash -c …`, which is what keeps the NOPASSWD allowlist scoped to specific binaries instead of all of `bash`.
+
 param(
     [Parameter(Mandatory = $true)]
     [string]$ResourceGroupName,
@@ -172,8 +180,9 @@ $failed = 0
 # Verify sudo access (required for openvpn on Linux)
 if ($IsLinux -or $IsMacOS) {
     Write-Log 'Validating sudo access...'
-    # Check if passwordless sudo is available (CI/CD agents)
-    & sudo -n true 2>&1 | Out-Null
+    # Probe an allowed command (cat) rather than 'true': command-scoped NOPASSWD
+    # sudoers entries only permit the specific vwan binaries, so 'sudo -n true' would fail.
+    & sudo -n cat /dev/null 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0) {
         Write-Log 'Passwordless sudo available.'
     }
@@ -383,8 +392,14 @@ key $clientKeyPath
     $ovpnStderrPath = Join-Path $tempDir 'openvpn-stderr.log'
 
     if ($IsLinux -or $IsMacOS) {
-        # Run openvpn in background, capturing stderr separately for diagnostics
-        & sudo bash -c "openvpn --config '$ovpnConfigPath' --log '$ovpnLogPath' --writepid '$ovpnPidPath' 2>'$ovpnStderrPath' </dev/null &"
+        # Run openvpn in background, capturing stderr separately for diagnostics.
+        # The user shell (bash) handles backgrounding/redirection; only openvpn is elevated
+        # so a command-scoped NOPASSWD sudoers entry (not 'sudo bash') is sufficient.
+        # All three standard streams must be redirected: openvpn is a long-lived daemon,
+        # and if stdout stays attached to the pipe created by PowerShell's call operator (&),
+        # PowerShell blocks indefinitely waiting for EOF that never arrives. openvpn already
+        # writes its output to --log, so stdout is safely discarded here.
+        & bash -c "sudo openvpn --config '$ovpnConfigPath' --log '$ovpnLogPath' --writepid '$ovpnPidPath' 1>/dev/null 2>'$ovpnStderrPath' </dev/null &"
         $ovpnExitCode = $LASTEXITCODE
     }
     else {

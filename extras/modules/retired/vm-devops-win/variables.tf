@@ -40,6 +40,7 @@ variable "automation_account_name" {
   }
 }
 
+# tflint-ignore: terraform_unused_declarations # Retired/frozen module; variable retained for interface compatibility.
 variable "key_vault_id" {
   type        = string
   description = "The existing key vault where secrets are stored"

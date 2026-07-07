@@ -206,7 +206,7 @@ else {
 
 # Disconnect Azure context
 if ($azConnected) {
-    try { Disconnect-AzAccount -ErrorAction SilentlyContinue | Out-Null } catch {}
+    try { Disconnect-AzAccount -ErrorAction SilentlyContinue | Out-Null } catch { Write-Verbose "Disconnect-AzAccount failed: $_" }
 }
 
 # Test 8: Windows Features - RSAT features installed
@@ -442,7 +442,7 @@ try {
         try {
             $boot = (Get-CimInstance Win32_OperatingSystem -ErrorAction Stop).LastBootUpTime
             $uptime = '{0:N0}s' -f ((Get-Date) - $boot).TotalSeconds
-        } catch {}
+        } catch { Write-Verbose "Uptime probe failed: $_" }
         $extStatus = 'no status file'
         try {
             $statusFile = Get-ChildItem $amaRoot -Directory -ErrorAction Stop |

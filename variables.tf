@@ -165,6 +165,7 @@ variable "tags" {
   }
 }
 
+# tflint-ignore: terraform_unused_declarations # Public input consumed by bootstrap tooling and validated here; not referenced by a resource.
 variable "user_name" {
   type        = string
   description = "The user name of the user in Microsoft Entra ID."

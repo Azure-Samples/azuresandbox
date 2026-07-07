@@ -16,6 +16,8 @@ contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additio
 - [Issues and Bugs](#found-an-issue)
 - [Feature Requests](#want-a-feature)
 - [Branching and Merge Policy](#branching-and-merge-policy)
+- [Collaborator Access and Issue Assignment](#collaborator-access-and-issue-assignment)
+- [Continuous Integration](#continuous-integration)
 - [Submission Guidelines](#submission-guidelines)
 
 ## Code of Conduct
@@ -42,7 +44,7 @@ This repository uses a two-branch model to keep `main` stable and releasable at 
 
 | Branch | Purpose | Who can update it | How it is updated |
 | --- | --- | --- | --- |
-| `vnext` | Active development / integration branch. All day-to-day work lands here. | Any collaborator with write access | Pull requests (or direct pushes by maintainers) |
+| `vnext` | Active development / integration branch. All day-to-day work lands here. | Any collaborator with write access | Pull requests only (direct pushes are blocked) |
 | `main` | Stable, released code. | Repository owner **@doherty100** only | Pull request merging `vnext` → `main` |
 
 ### Workflow
@@ -50,6 +52,56 @@ This repository uses a two-branch model to keep `main` stable and releasable at 
 1. **Target `vnext` for all contributions.** Open every pull request — features, bug fixes, and documentation — against the `vnext` branch. Do not open pull requests directly against `main`.
 2. **Integration happens on `vnext`.** Reviews, status checks (including the CLA bot), and testing occur here.
 3. **Promotion to `main` is restricted.** Only the repository owner (**@doherty100**) opens and merges the `vnext` → `main` pull request that promotes accumulated changes to the stable branch. No other collaborator can merge into `main`.
+
+### Merge strategy
+
+**TL;DR:** Squash-merge topic/contributor PRs into `vnext`; use a regular merge commit (no squash) for the `vnext` → `main` release PR.
+
+- **Topic/contributor PRs → `vnext`:** **squash merge**, so each PR lands as one tidy commit on `vnext`.
+- **`vnext` → `main` (release promotion):** **regular merge commit (do not squash)**, so the individual `vnext` commits and the branch lineage are preserved on `main`. Squashing this promotion flattens all the work into a single commit and loses that history.
+
+### Merging into `vnext`
+
+How a PR lands on `vnext` depends on who you are. Both paths start the same way — push a branch and open a PR against `vnext`:
+
+```bash
+# Put your edits on a branch (uncommitted changes come with you).
+git checkout -b feature/my-change
+git add -A
+git commit -m "describe my change"
+git push -u origin feature/my-change
+
+# Open the PR against vnext.
+gh pr create --base vnext --fill
+```
+
+#### Path 1 — Contributors (merge queue + review)
+
+All contributors **except** members of the `azuresandbox-vnext-bypass` team merge through a **merge queue** and need **one approval**. You do not use the "Squash and merge" button or merge directly — you queue the PR and the queue squash-merges it once it is up to date and green:
+
+```bash
+# After required checks pass and the PR has 1 approval, queue it:
+gh pr merge --squash --auto
+
+# The queue rebases your branch on the latest vnext, re-runs checks, and
+# squash-merges it. Then sync your local vnext:
+git checkout vnext && git pull
+```
+
+You do **not** need to manually click "Update branch" when your PR falls behind — the merge queue rebases it on the latest `vnext` automatically. Expect a short delay (rather than an instant merge) while the queue builds and tests your PR. The required approval comes from the repository owner (declared in [`.github/CODEOWNERS`](.github/CODEOWNERS)).
+
+#### Path 2 — Maintainers in the `azuresandbox-vnext-bypass` team
+
+Members of the **`azuresandbox-vnext-bypass`** team (currently the repository owner) can **self-merge without an approval** and may **bypass the merge queue**, merging directly once required checks are green:
+
+```bash
+# Direct squash merge, bypassing both the review requirement and the queue:
+gh pr merge <pr-number> --squash --admin
+```
+
+In the GitHub UI this appears as a **"Bypass rules and merge"** option in the merge box. (You still cannot "Approve" your own PR — GitHub never allows self-approval — but as a bypass-team member you do not need an approval to merge.) Contributor PRs that are not yours still require your review before they can merge via Path 1.
+
+Either path produces a single squashed commit on `vnext`, consistent with the [merge strategy](#merge-strategy) above.
 
 ### Enforcement
 
@@ -60,6 +112,51 @@ The policy above is enforced by [branch protection](https://docs.github.com/repo
 - Force pushes and branch deletion are disabled on `main`.
 
 Code ownership is declared in [`.github/CODEOWNERS`](.github/CODEOWNERS) (`* @doherty100`), which automatically requests the owner as a reviewer on pull requests.
+
+## Collaborator Access and Issue Assignment
+
+**TL;DR — to assign someone an issue/PR, they need `triage` access (or higher); a past commit alone is not enough.**
+
+- Issues/PRs can only be assigned to users with **write, triage, or admin** access — or anyone who has commented on that item.
+- A prior commit / *Contributors* listing grants **no** permission; a `read`-only user won't appear in the assignee picker.
+- Use **`triage`** for reviewers/triagers: it allows issue/PR management and assignment but **no commits or merges to any branch** (including `main`).
+- Granting access (owner/admin only): invite the user at the `triage` level, then **verify the pending invitation's level** — an older unaccepted invitation at a higher level (e.g. `write`) is not auto-downgraded and must be patched down.
+- The user must **accept the invitation** before access takes effect and they become assignable.
+
+## Continuous Integration
+
+Pull requests targeting `vnext` (and pushes to `vnext`) automatically run lightweight static-analysis checks via GitHub Actions. These do **not** deploy anything to Azure and require no credentials. The workflows live in [`.github/workflows/`](.github/workflows):
+
+| Workflow | Checks | Configuration |
+| --- | --- | --- |
+| `ci-docs` | `markdownlint-cli2` (Markdown style) and `lychee` (internal/relative link checker, offline) | [`.markdownlint.jsonc`](.markdownlint.jsonc), [`.markdownlint-cli2.jsonc`](.markdownlint-cli2.jsonc) |
+| `ci-terraform` | `terraform fmt -check -recursive` and `tflint --recursive` | [`.tflint.hcl`](.tflint.hcl) |
+| `ci-powershell` | `PSScriptAnalyzer` over all PowerShell scripts | [`PSScriptAnalyzerSettings.psd1`](PSScriptAnalyzerSettings.psd1) |
+| `ci-bash` | `ShellCheck` over all `*.sh` scripts (fails on warning + error severity) | [`.shellcheckrc`](.shellcheckrc) |
+
+To reproduce the checks locally before opening a PR:
+
+```bash
+# Docs
+npx --yes markdownlint-cli2@0.22.1
+lychee --offline --no-progress './**/*.md'
+
+# Terraform
+terraform fmt -check -recursive -diff
+tflint --init && tflint --recursive
+
+# PowerShell (PowerShell 7.x with the PSScriptAnalyzer module)
+pwsh -NoProfile -Command "Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./PSScriptAnalyzerSettings.psd1 -Severity Error,Warning"
+
+# Bash (requires ShellCheck on PATH:
+#   sudo apt-get install -y shellcheck  |  brew install shellcheck  |
+#   download a release from https://github.com/koalaman/shellcheck/releases)
+./scripts/Invoke-ShellCheck.sh
+```
+
+The PSScriptAnalyzer settings file excludes a small set of rules that conflict with intentional patterns in this deployment-automation codebase (for example, `Write-Host` console output, the project's own `Write-Log` helper, and plaintext-to-`SecureString` conversion required for unattended VM configuration). Each exclusion is documented inline in `PSScriptAnalyzerSettings.psd1`.
+
+`ci-bash` runs ShellCheck at `--severity=warning` (the warning + error gate, mirroring the PowerShell CI). `scripts/Invoke-ShellCheck.sh` runs the identical command locally and shares the repo-root `.shellcheckrc`, so local results match CI exactly. A single documented `# shellcheck disable=SC2024` is applied in `modules/vm-jumpbox-linux/scripts/configure-vm-jumpbox-linux.sh`, where `sudo <cmd> >> $log_file` intentionally elevates only the command while appending to the user-owned log; the justification is recorded inline at the top of that script.
 
 ## Submission Guidelines
 
