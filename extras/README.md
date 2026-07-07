@@ -30,7 +30,7 @@ This section describes additional Terraform modules that can be added to Azure S
   * [petstore](./modules/petstore/) deploys a sample RESTful API application using Azure Container Apps.
   * [vnet-onprem](./modules/vnet-onprem/) simulates connectivity to an on-premises network using a site-to-site VPN connection and Azure DNS private resolver.
 * Retired modules:
-  * [ai-foundry](./modules/ai-foundry/) enables the use of an [Azure AI Foundry hub](https://learn.microsoft.com/en-us/azure/ai-foundry/concepts/ai-resources) in a sandbox environment.
+  * [ai-foundry](./modules/retired/ai-foundry/) enables the use of an [Azure AI Foundry hub](https://learn.microsoft.com/en-us/azure/ai-foundry/concepts/ai-resources) in a sandbox environment.
   * [vm-devops-win](./modules/retired/vm-devops-win/) implements a collection of identical Windows developer VMs.
 
 ## Scripts

@@ -3,6 +3,13 @@
 # it applies to both the PR-time offline check (ci-docs.yml) and the scheduled
 # external link check (ci-docs-external-links.yml).
 
+# Retired modules are a boneyard: kept for reference but no longer maintained,
+# so their markdown is excluded from link checking to avoid CI failures from
+# stale links (see extras/modules/retired, .../retired within modules, etc.).
+exclude_path = [
+  "retired",
+]
+
 # Hosts that reject automated requests (bot protection) and therefore produce
 # false-positive failures even though the links are valid in a browser.
 exclude = [
