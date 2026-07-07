@@ -232,20 +232,21 @@ function Get-MatchingAzureDataDiskBySize {
 function Grant-SqlFullControl {
     param ( [string]$FolderPath )
 
-    Write-ScriptLog "Getting SQL Server Service account..."
+    # Grant FullControl to the SQL Server Database Engine per-service SID rather
+    # than the account returned by querying the service's logon name. The
+    # per-service SID (NT SERVICE\MSSQLSERVER) is always present in the service
+    # process token regardless of the configured logon account, survives service
+    # account changes, and matches the permissions the SQL Server installer
+    # applies to its data directories. The default instance name is MSSQLSERVER,
+    # consistent with the rest of this script.
+    # Reference: https://learn.microsoft.com/sql/database-engine/configure-windows/configure-file-system-permissions-for-database-engine-access
+    $sqlServiceSid = 'NT SERVICE\MSSQLSERVER'
 
-    try {
-        $serviceAccount = Get-CimInstance -ClassName Win32_Service -Filter "Name='MSSQLSERVER'" | Select-Object -ExpandProperty StartName
-    }
-    catch {
-        Exit-WithError $_
-    }
-
-    Write-ScriptLog "Updating ACL for folder '$FolderPath' to allow 'FullControl' for '$serviceAccount'..."
+    Write-ScriptLog "Updating ACL for folder '$FolderPath' to allow 'FullControl' for '$sqlServiceSid'..."
 
     try {
         $folderAcl = Get-ACL $FolderPath
-        $fileSystemAccessRule = New-Object -TypeName System.Security.AccessControl.FileSystemAccessRule( $serviceAccount, "FullControl", 3, 0, "Allow" )
+        $fileSystemAccessRule = New-Object -TypeName System.Security.AccessControl.FileSystemAccessRule( $sqlServiceSid, "FullControl", 3, 0, "Allow" )
         $folderAcl.SetAccessRule( $fileSystemAccessRule )
         Set-Acl -Path $FolderPath -AclObject $folderAcl
     }
