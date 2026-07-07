@@ -142,20 +142,6 @@ updates:
     versioning-strategy: increase
 
   - package-ecosystem: terraform
-    directory: "/extras/modules/ai-foundry"
-    target-branch: "vnext"
-    schedule:
-      interval: weekly
-      day: monday
-      time: "08:14"
-      timezone: "UTC"
-    groups:
-      terraform-all:
-        patterns:
-          - "*"
-    versioning-strategy: increase
-
-  - package-ecosystem: terraform
     directory: "/extras/modules/avd"
     target-branch: "vnext"
     schedule:

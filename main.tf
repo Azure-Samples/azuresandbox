@@ -422,7 +422,7 @@ module "vnet_onprem" {
 # ai-foundry is currently unavailable due to dependencies on retired features. It will be re-enabled in a future update with a redesigned implementation.
 
 # module "ai_foundry" {
-#   source = "./extras/modules/ai-foundry"
+#   source = "./extras/modules/retired/ai-foundry"
 
 #   count = var.enable_module_ai_foundry ? 1 : 0
 
