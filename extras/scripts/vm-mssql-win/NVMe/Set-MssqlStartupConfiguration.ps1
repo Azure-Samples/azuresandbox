@@ -181,36 +181,62 @@ try {
         New-Item -ItemType Directory -Path $sqlTempPath -Force | Out-Null
     }
 
-    # Grant the SQL Server service account full control on the tempdb folder
-    $sqlServiceAccount = (Get-CimInstance -ClassName Win32_Service -Filter "Name='$SQLServiceName'" -ErrorAction SilentlyContinue).StartName
-    if ($null -ne $sqlServiceAccount -and $sqlServiceAccount -ne "") {
-        $acl = Get-Acl -Path $sqlTempPath
-        $identity = $sqlServiceAccount
-        # Check if the ACE already exists
-        $existingRule = $acl.Access | Where-Object {
-            $_.IdentityReference.Value -eq $identity -and
-            $_.FileSystemRights -band [System.Security.AccessControl.FileSystemRights]::FullControl
-        }
-        if ($null -eq $existingRule) {
-            Write-Log "Granting FullControl on '$sqlTempPath' to '$identity'..."
-            $inheritance = [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor [System.Security.AccessControl.InheritanceFlags]::ObjectInherit
-            $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
-                $identity,
-                [System.Security.AccessControl.FileSystemRights]::FullControl,
-                $inheritance,
-                [System.Security.AccessControl.PropagationFlags]::None,
-                [System.Security.AccessControl.AccessControlType]::Allow
-            )
-            $acl.AddAccessRule($rule)
-            Set-Acl -Path $sqlTempPath -AclObject $acl
-            Write-Log "Permissions applied."
-        }
-        else {
-            Write-Log "SQL service account '$identity' already has FullControl on '$sqlTempPath'."
-        }
+    # Set explicit ACLs on SQLTEMP folder — disable inheritance and grant only
+    # the required principals, matching SQL Server installer defaults.
+    # Uses the per-service SID (NT SERVICE\<ServiceName>) which survives service
+    # account changes. Reference:
+    # https://learn.microsoft.com/sql/database-engine/configure-windows/configure-file-system-permissions-for-database-engine-access
+    $sqlServiceSID = "NT SERVICE\$SQLServiceName"
+    $acl = Get-Acl -Path $sqlTempPath
+    $inheritance = [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor [System.Security.AccessControl.InheritanceFlags]::ObjectInherit
+
+    # Check if we already applied explicit ACLs (idempotent check)
+    $existingRule = $acl.Access | Where-Object {
+        $_.IdentityReference.Value -eq $sqlServiceSID -and
+        $_.FileSystemRights -band [System.Security.AccessControl.FileSystemRights]::FullControl
+    }
+
+    if ($null -eq $existingRule) {
+        Write-Log "Securing '$sqlTempPath' — disabling inheritance, setting explicit ACLs..."
+
+        # Disable inheritance and remove all inherited ACEs
+        $acl.SetAccessRuleProtection($true, $false)
+
+        # Remove all existing ACEs (clean slate)
+        $acl.Access | ForEach-Object { $acl.RemoveAccessRule($_) } | Out-Null
+
+        # SYSTEM — FullControl
+        $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule(
+            "NT AUTHORITY\SYSTEM",
+            [System.Security.AccessControl.FileSystemRights]::FullControl,
+            $inheritance,
+            [System.Security.AccessControl.PropagationFlags]::None,
+            [System.Security.AccessControl.AccessControlType]::Allow
+        )))
+
+        # Administrators — FullControl
+        $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule(
+            "BUILTIN\Administrators",
+            [System.Security.AccessControl.FileSystemRights]::FullControl,
+            $inheritance,
+            [System.Security.AccessControl.PropagationFlags]::None,
+            [System.Security.AccessControl.AccessControlType]::Allow
+        )))
+
+        # SQL Server per-service SID — FullControl
+        $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule(
+            $sqlServiceSID,
+            [System.Security.AccessControl.FileSystemRights]::FullControl,
+            $inheritance,
+            [System.Security.AccessControl.PropagationFlags]::None,
+            [System.Security.AccessControl.AccessControlType]::Allow
+        )))
+
+        Set-Acl -Path $sqlTempPath -AclObject $acl
+        Write-Log "Permissions applied: SYSTEM, Administrators, $sqlServiceSID (FullControl). Inheritance disabled."
     }
     else {
-        Write-Log "WARNING: Could not determine SQL Server service account. Verify permissions manually."
+        Write-Log "ACLs on '$sqlTempPath' already configured (per-service SID '$sqlServiceSID' present)."
     }
 
     # Data-loss warning file

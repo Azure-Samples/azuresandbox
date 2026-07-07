@@ -58,6 +58,7 @@ C:\Scripts\Register-MssqlStartupTask.cmd
 This will:
 1. Set `MSSQLSERVER` and `SQLSERVERAGENT` services to **Manual** startup
 2. Register a Windows Scheduled Task named **"SQL Server Startup - Ephemeral Storage"** that runs at every boot as `NT AUTHORITY\SYSTEM`
+3. Lock down `C:\Scripts` so only Administrators and SYSTEM have access (prevents privilege escalation)
 
 You should see:
 ```
@@ -67,6 +68,7 @@ You should see:
 
 === Registering scheduled task: SQL Server Startup - Ephemeral Storage ===
 === SUCCESS: Scheduled task registered. ===
+Secured 'C:\Scripts' — access restricted to Administrators and SYSTEM only.
 ```
 
 ### Step 3: Move tempdb to the ephemeral drive (once)
@@ -134,7 +136,7 @@ On every VM start, the scheduled task executes `Set-MssqlStartupConfiguration.ps
 
 1. **Detects the temp drive** — checks for existing D: (v5) or T: (v6)
 2. **If volume is missing** — finds RAW NVMe Direct Disks, pools them via Storage Spaces (Simple/RAID-0), formats NTFS with 64KB allocation unit, assigns drive letter T:
-3. **Creates SQLTEMP folder** — with correct ACLs for the SQL Server service account
+3. **Creates SQLTEMP folder** — disables ACL inheritance and grants explicit FullControl to SYSTEM, Administrators, and the SQL Server per-service SID (`NT SERVICE\MSSQLSERVER`)
 4. **Starts SQL Server** — then starts SQL Agent
 
 If the volume already exists (soft reboot, no deallocation), it skips provisioning and just ensures the folder and services are ready.
