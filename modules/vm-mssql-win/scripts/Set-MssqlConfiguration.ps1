@@ -846,18 +846,25 @@ $taskAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-Exec
 $taskTrigger = New-ScheduledTaskTrigger -AtStartup
 $taskSettings = New-ScheduledTaskSettingsSet -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
 
-Write-ScriptLog "Registering scheduled task to execute '$sqlStartupScriptPath' under user '$DomainAdminUser'..."
+Write-ScriptLog "Registering scheduled task to execute '$sqlStartupScriptPath' as 'NT AUTHORITY\SYSTEM'..."
+
+# The startup task performs only local operations (rebuild the ephemeral temp disk stripe,
+# recreate tempdb folders, fix the pagefile, start SQL Server) and never opens a SQL
+# connection, so it does not require the domain admin / SQL sysadmin identity. Run it as
+# LocalSystem: a boot-time (AtStartup) batch logon with a stored domain password is
+# unreliable (it races the domain controller secure channel at boot) and is blocked by
+# Credential Guard (default-on in Windows Server 2025). SYSTEM is a local principal with
+# no stored password and no domain controller dependency, so the task launches reliably.
+$taskPrincipal = New-ScheduledTaskPrincipal -UserId 'NT AUTHORITY\SYSTEM' -LogonType ServiceAccount -RunLevel 'Highest'
 
 try {
     Register-ScheduledTask `
         -Force `
-        -Password $adminPwd `
-        -User $DomainAdminUser `
+        -Principal $taskPrincipal `
         -TaskName $taskName `
         -Action $taskAction `
         -Trigger $taskTrigger `
         -Settings $taskSettings `
-        -RunLevel 'Highest' `
         -Description "Prepare temp drive folders for tempdb and start SQL Server."
 }
 catch {

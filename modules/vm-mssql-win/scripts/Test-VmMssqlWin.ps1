@@ -102,14 +102,27 @@ catch {
 # fail the remaining tests are meaningless, so we report and exit early.
 $startupOk = $true
 
-# Startup Check 1: Scheduled task last run succeeded
+# Startup Check 1: Scheduled task last run succeeded AND actually ran on this boot
 try {
     $null = Get-ScheduledTask -TaskName 'Set-MssqlStartupConfiguration' -ErrorAction Stop
     $stTaskInfo = Get-ScheduledTaskInfo -TaskName 'Set-MssqlStartupConfiguration' -ErrorAction Stop
 
-    if ($stTaskInfo.LastTaskResult -eq 0) {
-        Write-TestResult $moduleName 'PASS' "Startup: Scheduled task 'Set-MssqlStartupConfiguration' last run succeeded (result: 0, last run: $($stTaskInfo.LastRunTime))"
+    # LastTaskResult alone is not sufficient: when an AtStartup task FAILS TO LAUNCH (e.g. a
+    # domain-logon failure or Credential Guard blocking a stored-password logon), the task body
+    # never runs and LastTaskResult/LastRunTime remain frozen at the PREVIOUS successful boot,
+    # producing a false PASS (this was the root cause of issue #544). Also require that the task
+    # actually ran on the current boot by asserting LastRunTime is after the last OS boot time.
+    $lastBootTime = (Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop).LastBootUpTime
+    $ranThisBoot = ($null -ne $stTaskInfo.LastRunTime) -and ($stTaskInfo.LastRunTime -gt $lastBootTime)
+
+    if ($stTaskInfo.LastTaskResult -eq 0 -and $ranThisBoot) {
+        Write-TestResult $moduleName 'PASS' "Startup: Scheduled task 'Set-MssqlStartupConfiguration' ran this boot and succeeded (result: 0, last run: $($stTaskInfo.LastRunTime), last boot: $lastBootTime)"
         $passed++
+    }
+    elseif ($stTaskInfo.LastTaskResult -eq 0 -and -not $ranThisBoot) {
+        Write-TestResult $moduleName 'FAIL' "Startup: Scheduled task 'Set-MssqlStartupConfiguration' did not run on the current boot (last run: $($stTaskInfo.LastRunTime) is not after last boot: $lastBootTime). The task likely failed to launch (e.g. domain-logon failure / Credential Guard); its stale success result is a false PASS."
+        $failed++
+        $startupOk = $false
     }
     else {
         Write-TestResult $moduleName 'FAIL' "Startup: Scheduled task 'Set-MssqlStartupConfiguration' last run failed (result: $($stTaskInfo.LastTaskResult), last run: $($stTaskInfo.LastRunTime))"

@@ -78,9 +78,9 @@ The module is organized as follows:
 ├── scripts/
 |   ├── Configure-FirewallRules.ps1       # Configures Windows firewall rules for SQL Server
 |   ├── Configure-SqlLogin.ps1            # Creates SQL Server login for domain admin and adds it to sysadmin server role
-|   ├── Invoke-MssqlConfiguration.ps1     # Runs Set-MssqlConfiguration.ps1 as domain admin and reboots the VM
-|   ├── Set-MssqlConfiguration.ps1        # Prepares data and log disks and configures SQL Server instance
-|   ├── Set-MssqlStartupConfiguration.ps1 # Re-configures SQL Server tempdb folder after VM stop/deallocate event
+|   ├── Invoke-MssqlConfiguration.ps1     # Runs Set-MssqlConfiguration.ps1 as domain admin, then reboots the VM via a one-time task run as NT AUTHORITY\SYSTEM
+|   ├── Set-MssqlConfiguration.ps1        # Prepares data and log disks and configures SQL Server instance (runs as domain admin); registers the AtStartup task below to run as NT AUTHORITY\SYSTEM
+|   ├── Set-MssqlStartupConfiguration.ps1 # Re-configures the SQL Server tempdb folder after a VM stop/deallocate event; runs as NT AUTHORITY\SYSTEM (local-only work, reliable at boot)
 |   └── Test-VmMssqlWin.ps1               # Unit test script
 ├── compute.tf                            # Compute resource configurations
 ├── locals.tf                             # Local variables

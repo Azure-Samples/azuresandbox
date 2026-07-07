@@ -145,6 +145,14 @@ if ( -not (Test-Path $scriptPath) ) {
     Exit-WithError "Unable to locate '$scriptPath'..."
 }
 
+# The 'Set-MssqlConfiguration' task runs as the domain admin ON PURPOSE and must stay that way:
+# it performs first-boot SQL configuration that moves the system databases and tempdb using
+# trusted-authentication (Integrated Security) SQL connections, and the domain admin is the
+# SQL sysadmin created earlier by 'Configure-SqlLogin.ps1'. Unlike the AtStartup temp-disk
+# task, this task is started ON-DEMAND during provisioning (Start-ScheduledTask below), so it
+# does not race the domain controller secure channel at boot and is not exposed to the
+# AtStartup domain-logon / Credential Guard failure class. Do NOT switch this task to SYSTEM:
+# SYSTEM is deliberately not a SQL sysadmin, so it could not perform the trusted-auth work.
 Write-ScriptLog "Registering scheduled task '$TaskName' to run '$scriptPath' as '$domainAdminUser'..."
 
 $commandParamParts = @(
@@ -230,8 +238,11 @@ catch {
 }
 
 # Register one-time reboot task to run one minute from now.
+# This task only runs 'Restart-Computer -Force' (a purely local operation), so it runs as
+# 'NT AUTHORITY\SYSTEM' rather than the domain admin. That avoids storing a domain password
+# in the task and avoids any dependence on a domain logon succeeding.
 $rebootTaskRunAt = (Get-Date).AddMinutes(1)
-Write-ScriptLog "Registering one-time reboot scheduled task '$RebootTaskName' to run at '$rebootTaskRunAt' as '$domainAdminUser'..."
+Write-ScriptLog "Registering one-time reboot scheduled task '$RebootTaskName' to run at '$rebootTaskRunAt' as 'NT AUTHORITY\SYSTEM'..."
 
 $rebootTaskAction = New-ScheduledTaskAction `
     -Execute 'powershell.exe' `
@@ -239,15 +250,15 @@ $rebootTaskAction = New-ScheduledTaskAction `
 
 $rebootTaskTrigger = New-ScheduledTaskTrigger -Once -At $rebootTaskRunAt
 
+$rebootTaskPrincipal = New-ScheduledTaskPrincipal -UserId 'NT AUTHORITY\SYSTEM' -LogonType ServiceAccount -RunLevel 'Highest'
+
 try {
     Register-ScheduledTask `
         -Force `
-        -Password $adminPwd `
-        -User $domainAdminUser `
+        -Principal $rebootTaskPrincipal `
         -TaskName $RebootTaskName `
         -Action $rebootTaskAction `
         -Trigger $rebootTaskTrigger `
-        -RunLevel 'Highest' `
         -Description "Force reboot after SQL configuration completes." `
         -ErrorAction Stop
 }

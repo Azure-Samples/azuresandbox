@@ -10,7 +10,14 @@
 # - MicrosoftSQLServer platform image sql2025-ws2025 entdev-gen2
 # - VM must be pre-configured at first boot using 'Set-MssqlConfiguration.ps1' VM extension script
 # - Default SQL Server instance is configured for manual startup
-# - Runs as domain administrator on the machine being configured
+# - Runs as 'NT AUTHORITY\SYSTEM' (LocalSystem) on the machine being configured. This task
+#   performs only local operations (rebuild the temp-disk stripe, recreate tempdb folders,
+#   fix the pagefile, start the SQL Server services) and never opens a SQL connection, so it
+#   does not require the domain admin / SQL sysadmin identity. It intentionally does NOT run
+#   as a domain account: an AtStartup batch logon with a stored domain password is unreliable
+#   (it races the domain controller secure channel at boot) and is blocked by Credential Guard
+#   (default-on in Windows Server 2025). LocalSystem is a local principal with no stored
+#   password and no domain controller dependency, so the task launches reliably on every boot.
 
 #region constants
 $dataLossWarningReadmeContent = @"
