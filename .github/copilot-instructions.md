@@ -237,7 +237,7 @@ Every module has a `README.md` with the same sections: Architecture (drawio SVG 
 
 - Day-to-day work happens on `vnext`; PRs target `vnext`.
 - A CLA bot runs on PRs (Microsoft Open Source CLA).
-- `.vscode/tasks.json` provides a one-shot task to squash-merge all open PRs into `vnext` (`gh pr list ... | xargs gh pr merge --squash`).
+- `.vscode/tasks.json` provides a one-shot task to squash-merge **only Dependabot-generated** open PRs into `vnext` — it filters on `--author "app/dependabot"` (`gh pr list --author "app/dependabot" ... | xargs gh pr merge --squash --admin`). It is **not** a general "merge all open PRs" task; human/contributor PRs are unaffected and must be merged individually per the merge strategy below.
 - **Merge strategy:** squash-merge topic/contributor PRs → `vnext`; use a **regular merge commit (no squash)** for the `vnext` → `main` release PR so individual commits and branch lineage are preserved on `main`. See CONTRIBUTING.md "Merge strategy".
 
 ## Standalone configurations under `extras/configurations/`
