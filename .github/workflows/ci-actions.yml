@@ -1,7 +1,9 @@
 # CI: GitHub Actions workflow linting (actionlint).
 # Lints the workflow files themselves for syntax errors, bad expressions,
 # deprecated runners, and shell-script issues in `run:` steps.
-# Runs on every pull request targeting vnext and on pushes to vnext.
+# Runs on every pull request targeting vnext, on pushes to vnext, and on
+# merge_group events so the required "actionlint" context reports on the merge
+# queue's temporary branch (the vnext-merge-queue ruleset requires it).
 name: ci-actions
 
 on:
@@ -9,6 +11,8 @@ on:
     branches: [vnext]
   push:
     branches: [vnext]
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 
 permissions:
@@ -37,8 +41,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      # On merge_group events there is no PR to diff against; the queue branch
+      # already contains the merged result, so skip the filter and let the real
+      # check run below (see the job `if`). Runs normally on pull_request/push.
       - uses: dorny/paths-filter@v3
         id: filter
+        if: ${{ github.event_name != 'merge_group' }}
         with:
           filters: |
             actions:
@@ -48,7 +56,9 @@ jobs:
     name: actionlint
     runs-on: ubuntu-latest
     needs: changes
-    if: ${{ needs.changes.outputs.actions == 'true' }}
+    # Always run in the merge queue (validate the merged result); on PR/push,
+    # run only when workflow files changed.
+    if: ${{ needs.changes.outputs.actions == 'true' || github.event_name == 'merge_group' }}
     env:
       # Pinned for deterministic, reproducible runs. Bump intentionally.
       ACTIONLINT_VERSION: 1.7.12

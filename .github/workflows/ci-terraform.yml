@@ -1,5 +1,8 @@
 # CI: Terraform checks (formatting + tflint static analysis).
-# Runs on every pull request targeting vnext and on pushes to vnext.
+# Runs on every pull request targeting vnext, on pushes to vnext, and on
+# merge_group events so the required "terraform fmt", "tflint" and
+# "terraform validate (...)" contexts report on the merge queue's temporary
+# branch (the vnext-merge-queue ruleset requires them).
 name: ci-terraform
 
 on:
@@ -7,6 +10,8 @@ on:
     branches: [vnext]
   push:
     branches: [vnext]
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 
 permissions:
@@ -41,8 +46,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      # On merge_group events there is no PR to diff against; the queue branch
+      # already contains the merged result, so skip the filter and let the real
+      # checks run (the `fmt`/`tflint` job `if`s and the `validate` per-step
+      # `if`s all also fire on merge_group). Runs normally on pull_request/push.
       - uses: dorny/paths-filter@v3
         id: filter
+        if: ${{ github.event_name != 'merge_group' }}
         with:
           filters: |
             terraform:
@@ -55,7 +65,7 @@ jobs:
     name: terraform fmt
     runs-on: ubuntu-latest
     needs: changes
-    if: ${{ needs.changes.outputs.terraform == 'true' }}
+    if: ${{ needs.changes.outputs.terraform == 'true' || github.event_name == 'merge_group' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -72,7 +82,7 @@ jobs:
     name: tflint
     runs-on: ubuntu-latest
     needs: changes
-    if: ${{ needs.changes.outputs.terraform == 'true' }}
+    if: ${{ needs.changes.outputs.terraform == 'true' || github.event_name == 'merge_group' }}
     env:
       # Used by `tflint --init` to download the azurerm ruleset plugin from
       # GitHub releases without hitting unauthenticated rate limits.
@@ -113,6 +123,8 @@ jobs:
     # the matrix expands and both contexts report; the per-step `if` below
     # no-ops the actual work when Terraform is unchanged. Do NOT reintroduce a
     # job-level `if` here.
+    # On merge_group events the per-step `if`s also fire (the queue branch is the
+    # merged result), so validation actually runs there rather than no-opping.
     strategy:
       fail-fast: false
       matrix:
@@ -124,10 +136,10 @@ jobs:
           - extras/configurations/rg-devops-iac
     steps:
       - uses: actions/checkout@v4
-        if: ${{ needs.changes.outputs.terraform == 'true' }}
+        if: ${{ needs.changes.outputs.terraform == 'true' || github.event_name == 'merge_group' }}
 
       - uses: hashicorp/setup-terraform@v3
-        if: ${{ needs.changes.outputs.terraform == 'true' }}
+        if: ${{ needs.changes.outputs.terraform == 'true' || github.event_name == 'merge_group' }}
         with:
           # Matches required_version (~> 1.15.7) in terraform.tf.
           terraform_version: 1.15.7
@@ -136,11 +148,11 @@ jobs:
       # -backend=false downloads providers/initializes modules without
       # configuring remote state, so validation needs no Azure credentials.
       - name: terraform init (no backend)
-        if: ${{ needs.changes.outputs.terraform == 'true' }}
+        if: ${{ needs.changes.outputs.terraform == 'true' || github.event_name == 'merge_group' }}
         run: terraform init -backend=false -input=false
         working-directory: ${{ matrix.dir }}
 
       - name: terraform validate
-        if: ${{ needs.changes.outputs.terraform == 'true' }}
+        if: ${{ needs.changes.outputs.terraform == 'true' || github.event_name == 'merge_group' }}
         run: terraform validate -no-color
         working-directory: ${{ matrix.dir }}

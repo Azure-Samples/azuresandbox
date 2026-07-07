@@ -1,5 +1,8 @@
 # CI: documentation checks (markdownlint + lychee link checker).
-# Runs on every pull request targeting vnext and on pushes to vnext.
+# Runs on every pull request targeting vnext, on pushes to vnext, and on
+# merge_group events so the required "markdownlint" and "lychee (internal links)"
+# contexts report on the merge queue's temporary branch (the vnext-merge-queue
+# ruleset requires them).
 name: ci-docs
 
 on:
@@ -7,6 +10,8 @@ on:
     branches: [vnext]
   push:
     branches: [vnext]
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 
 permissions:
@@ -36,8 +41,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      # On merge_group events there is no PR to diff against; the queue branch
+      # already contains the merged result, so skip the filter and let the real
+      # checks run below (see the job `if`s). Runs normally on pull_request/push.
       - uses: dorny/paths-filter@v3
         id: filter
+        if: ${{ github.event_name != 'merge_group' }}
         with:
           filters: |
             docs:
@@ -50,7 +59,9 @@ jobs:
     name: markdownlint
     runs-on: ubuntu-latest
     needs: changes
-    if: ${{ needs.changes.outputs.docs == 'true' }}
+    # Always run in the merge queue (validate the merged result); on PR/push,
+    # run only when docs changed.
+    if: ${{ needs.changes.outputs.docs == 'true' || github.event_name == 'merge_group' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -68,7 +79,9 @@ jobs:
     name: lychee (internal links)
     runs-on: ubuntu-latest
     needs: changes
-    if: ${{ needs.changes.outputs.docs == 'true' }}
+    # Always run in the merge queue (validate the merged result); on PR/push,
+    # run only when docs changed.
+    if: ${{ needs.changes.outputs.docs == 'true' || github.event_name == 'merge_group' }}
     steps:
       - uses: actions/checkout@v4
 
