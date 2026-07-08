@@ -110,7 +110,7 @@ key_vault_name | | The name of the key vault defined in the root module.
 location | | The name of the Azure Region where resources will be provisioned.
 resource_group_name | | The name of the resource group defined in the root module.
 storage_account_id | | The ID of the storage account defined in the vnet-app module.
-storage_account_name | | The name of the storage account defined in the vnet-app module.
+storage_container_id | | The ID of the storage container defined in the vnet-app module.
 storage_container_name | scripts | The name of the storage container defined in the vnet-app module.
 storage_blob_endpoint | | The blob endpoint for the storage account defined in the vnet-app module.
 subnet_id | | The subnet ID defined in the vnet-app module.

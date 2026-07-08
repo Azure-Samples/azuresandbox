@@ -120,13 +120,13 @@ variable "storage_account_id" {
 
 }
 
-variable "storage_account_name" {
+variable "storage_container_id" {
   type        = string
-  description = "The name of the shared storage account."
+  description = "The ID of the storage container where the remote scripts are stored."
 
   validation {
-    condition     = can(regex("^[a-z0-9]{3,24}$", var.storage_account_name))
-    error_message = "Must conform to Azure storage account naming requirements: it can only contain lowercase letters and numbers, and must be between 3 and 24 characters long."
+    condition     = can(regex("^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[a-zA-Z0-9-_()]+/providers/Microsoft.Storage/storageAccounts/[a-zA-Z0-9]{3,24}/blobServices/default/containers/[a-z0-9]{3,63}$", var.storage_container_id))
+    error_message = "Must be a valid Azure Resource ID for a storage container. It should follow the format '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Storage/storageAccounts/{storageAccountName}/blobServices/default/containers/{containerName}'."
   }
 }
 

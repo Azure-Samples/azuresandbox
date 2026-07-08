@@ -43,11 +43,10 @@ resource "azurerm_storage_container" "this" {
 resource "azurerm_storage_blob" "remote_scripts" {
   for_each = local.remote_scripts
 
-  name                   = each.value.name
-  storage_account_name   = azurerm_storage_account.this.name
-  storage_container_name = azurerm_storage_container.this.name
-  type                   = "Block"
-  source                 = "./${path.module}/scripts/${each.value.name}"
+  name                 = each.value.name
+  storage_container_id = azurerm_storage_container.this.id
+  type                 = "Block"
+  source               = "./${path.module}/scripts/${each.value.name}"
 
   depends_on = [time_sleep.wait_for_roles]
 }

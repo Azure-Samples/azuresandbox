@@ -286,8 +286,8 @@ module "vm_mssql_win" {
   location                        = azurerm_resource_group.this.location
   resource_group_name             = azurerm_resource_group.this.name
   storage_account_id              = module.vnet_app[0].resource_ids["storage_account"]
-  storage_account_name            = module.vnet_app[0].resource_names["storage_account"]
   storage_blob_endpoint           = module.vnet_app[0].storage_endpoints["blob"]
+  storage_container_id            = module.vnet_app[0].resource_ids["storage_container"]
   storage_container_name          = module.vnet_app[0].storage_container_name
   subnet_id                       = module.vnet_app[0].subnets["snet-db-01"].id
   tags                            = var.tags
