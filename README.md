@@ -514,8 +514,10 @@ Follow these steps to validate and apply the configuration:
   In some environments, you may need to apply additional tags at the resource group level in order to comply with organizational policies. If you have such a requirement, you can pass your additional tags from the command line like this:
 
   ```bash
-  terraform apply -var='additional_tags={onwer="rob",ticket="AB-123"}'
+  terraform apply -var='additional_tags={owner="rob",ticket="AB-123"}'
   ```
+
+  * **WARNING:** Tags on the resource group are managed authoritatively by Terraform (`tags = merge(var.tags, var.additional_tags)` with no `ignore_changes`). This means any tag passed via `additional_tags` is **only** present as long as you keep passing it. If you run a subsequent `terraform plan` or `terraform apply` (or `terraform destroy`) *without* the same `-var='additional_tags=...'`, Terraform will reconcile the resource group back to the base tags and **remove** the previously applied tags. If your organization relies on one of these tags for policy compliance (for example, an MCAPS tenant that requires `SecurityControl=Ignore` to permit public network access on the key vault and storage account), you **must include the same `additional_tags` value on every subsequent operation**. Omitting it can silently strip the tag and cause later operations to fail — for example, `enable-public-access.sh` will appear to succeed but the policy will revert public access, and the next plan/apply will fail with a `403 ForbiddenByConnection` error.
 
 * Monitor the progress of the apply operation in the console. If errors occur, that may not be reflected in the console immediately. Terraform will try to apply as much of the plan as possible first, then will show the errors when it is done. It can take up to 90 minutes to provision a sandbox depending upon which modules you choose to enable. If everything goes well you should see a message like this:
 
