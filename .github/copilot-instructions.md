@@ -101,7 +101,7 @@ When deploying or modifying a sandbox environment, **do not attempt to automatic
 
 On the first error, stop the workflow immediately and instead:
 
-1. **Document the error.** Capture the exact failing command, the full error output, the step/scenario it occurred in, the enabled modules, and any other relevant context (branch, Terraform/provider versions). Do not retry, re-run, or alter configuration in an attempt to work around it.
+1. **Document the error.** Capture the exact failing command, the full error output, the step/scenario it occurred in, the enabled modules, and any other relevant context (branch, Terraform/provider versions). Do not retry, re-run, or alter configuration in an attempt to work around it. **Sanitize before posting** — Azure error text frequently embeds internal policy names, `aka.ms` wiki links, and subscription/tenant/management-group IDs; genericize them per the [Sanitizing public GitHub content](#sanitizing-public-github-content) rules below.
 2. **Open a GitHub issue** against the repo describing the failure, using the documented details above:
    ```bash
    gh issue create --title "<concise error summary>" --body "<command, full error output, step, context>"
@@ -249,6 +249,20 @@ Modules expose two map outputs used heavily by the root and other modules: `reso
 ## Documentation expectations
 
 Every module has a `README.md` with the same sections: Architecture (drawio SVG in `images/`), Overview, Smoke testing, Documentation (variables / resources / outputs tables). When adding or changing inputs, resources, or outputs, update both the module README and the root README's relevant table.
+
+## Sanitizing public GitHub content
+
+**This is a public repository.** Anything written to a GitHub issue, pull request, comment, review, or commit message is world-readable. Before creating or editing any of these, **strip internal and environment-specific details** — do not make it easy for an outside reader to discover an organization's internal security controls, identities, or topology. This applies to every `gh issue`/`gh pr` create/edit/comment, the auto-filed error-handling issues above, and commit messages.
+
+**Never write these to GitHub; replace each with a generic description:**
+
+- **Specific Azure Policy identifiers** — policy definition names, `policyDefinitionReferenceId`s, assignment names, and initiative names (e.g. a real `*_Modify` policy name or a management-group assignment name). Say "a `modify`-effect Azure Policy" / "an organizational management-group policy assignment" instead.
+- **Internal program / initiative names and internal links** — e.g. an internal security-initiative acronym, or `aka.ms`/internal-wiki URLs echoed back in Azure error text. Remove or generalize them.
+- **Identity and directory GUIDs** — subscription IDs, tenant IDs, management-group IDs, service principal `appId`/`objectId`, user object IDs. Redact to `<subscription>`, `<tenant>`, `<service principal>`, etc.
+- **Per-deployment resource names and host details** — auto-generated sandbox names (`rg-sand-dev-*`, `kv-sand-dev-*`, `st…`), execution-host identifiers (Cloud PC/dev-box VM names), and private IP ranges. Use placeholders like `<resource group>`, `<key vault>`, `<storage account>`.
+- **The concrete exemption tag key/value** — the specific `SecurityControl=Ignore` tag may appear **only** in this `copilot-instructions.md` file (bare-minimum exposure). In issues/PRs/comments/commit messages refer to it generically as "an organization-specific exemption tag" or "the sanctioned allow tag".
+
+**Keep** the genuinely useful, non-identifying technical content: Terraform/module/resource-type names, file paths and line numbers, public Azure resource-provider schema (e.g. `Microsoft.KeyVault/vaults/publicNetworkAccess`), `learn.microsoft.com` doc links, error codes (`ForbiddenByConnection`, HTTP 403), and the generalized root-cause analysis. When in doubt, generalize.
 
 ## Branch / PR notes
 
