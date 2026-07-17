@@ -34,6 +34,11 @@ resource "azurerm_key_vault_secret" "this" {
   value_wo         = tls_private_key.client_cert_key.private_key_pem
   value_wo_version = var.private_key_secret_version
   key_vault_id     = var.key_vault_id
+  expiration_date  = timeadd(timestamp(), "8760h")
+
+  lifecycle {
+    ignore_changes = [expiration_date]
+  }
 }
 
 # Generate a client certificate signed by the root certificate
