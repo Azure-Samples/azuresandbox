@@ -514,8 +514,10 @@ Follow these steps to validate and apply the configuration:
   In some environments, you may need to apply additional tags at the resource group level in order to comply with organizational policies. If you have such a requirement, you can pass your additional tags from the command line like this:
 
   ```bash
-  terraform apply -var='additional_tags={onwer="rob",ticket="AB-123"}'
+  terraform apply -var='additional_tags={owner="rob",ticket="AB-123"}'
   ```
+
+  * **WARNING:** Pass the same `-var='additional_tags=...'` on every `terraform apply`. Omitting it removes any tags you previously added this way.
 
 * Monitor the progress of the apply operation in the console. If errors occur, that may not be reflected in the console immediately. Terraform will try to apply as much of the plan as possible first, then will show the errors when it is done. It can take up to 90 minutes to provision a sandbox depending upon which modules you choose to enable. If everything goes well you should see a message like this:
 

@@ -101,7 +101,7 @@ When deploying or modifying a sandbox environment, **do not attempt to automatic
 
 On the first error, stop the workflow immediately and instead:
 
-1. **Document the error.** Capture the exact failing command, the full error output, the step/scenario it occurred in, the enabled modules, and any other relevant context (branch, Terraform/provider versions). Do not retry, re-run, or alter configuration in an attempt to work around it.
+1. **Document the error.** Capture the exact failing command, the full error output, the step/scenario it occurred in, the enabled modules, and any other relevant context (branch, Terraform/provider versions). Do not retry, re-run, or alter configuration in an attempt to work around it. **Sanitize before posting** — Azure error text frequently embeds internal policy names, `aka.ms` wiki links, and subscription/tenant/management-group IDs; genericize them per the [Sanitizing public GitHub content](#sanitizing-public-github-content) rules below.
 2. **Open a GitHub issue** against the repo describing the failure, using the documented details above:
    ```bash
    gh issue create --title "<concise error summary>" --body "<command, full error output, step, context>"
@@ -130,6 +130,14 @@ The barrier pattern leaves Key Vault and Storage Account with public access **di
 ```bash
 ./scripts/enable-public-access.sh
 ```
+
+**MCAPS precheck — verify the `SecurityControl=Ignore` tag on the resource group first (required before `enable-public-access.sh` can work on MCAPS tenants).** On MCAPS tenants a `modify`-effect Azure Policy rewrites Key Vault (and similarly Storage) update requests to force `publicNetworkAccess=Disabled`. The `SecurityControl=Ignore` tag on the resource group (evaluated at RG **or** resource level) exempts resources from this policy. If that tag is **missing** from the RG — e.g. a prior `apply`/`destroy` ran without `-var='additional_tags={SecurityControl="Ignore"}'` and stripped it — then `enable-public-access.sh` will report success but the change is **silently reverted to `Disabled`**, and the next `terraform plan`/`apply` fails with `403 ForbiddenByConnection` on Key Vault data-plane reads/writes. Therefore, **before running `enable-public-access.sh`, confirm the tag exists on the RG**:
+
+```bash
+az group show --name <rg> --query "tags.SecurityControl" -o tsv   # must print: Ignore
+```
+
+If it prints empty/`None`, restore the tag before proceeding (either `az tag update --resource-id <rg id> --operation Merge --tags SecurityControl=Ignore`, or a `terraform apply` with the `additional_tags` var). Only once the tag is present will `enable-public-access.sh` persist and the barrier workflow succeed. Follow the error-handling policy if the tag cannot be restored.
 
 Then perform the `/allow-all`-mode handoff — prompt the user to run `/allow-all` and wait for confirmation — then proceed with `terraform init` (if providers changed) → `terraform plan` → `terraform apply`. The barrier resources will re-disable public access at the end of the apply.
 
@@ -241,6 +249,10 @@ Modules expose two map outputs used heavily by the root and other modules: `reso
 ## Documentation expectations
 
 Every module has a `README.md` with the same sections: Architecture (drawio SVG in `images/`), Overview, Smoke testing, Documentation (variables / resources / outputs tables). When adding or changing inputs, resources, or outputs, update both the module README and the root README's relevant table.
+
+## Sanitizing public GitHub content
+
+This is a **public repo** — issues, PRs, comments, and commit messages are world-readable. Before writing any (including auto-filed error issues), replace internal/environment specifics with generic wording: Azure Policy definition/assignment/initiative names → "a `modify`-effect Azure Policy"; internal program acronyms and `aka.ms`/wiki links → omit; subscription/tenant/management-group IDs, SPN `appId`/`objectId`, user object IDs → `<subscription>`, `<tenant>`, etc.; per-deployment resource names, execution-host names, private IPs → placeholders. The literal `SecurityControl=Ignore` tag may appear **only** in this file — elsewhere call it "an organization-specific exemption tag." Keep non-identifying technical content (resource types, file paths, public ARM schema, `learn.microsoft.com` links, error codes).
 
 ## Branch / PR notes
 
