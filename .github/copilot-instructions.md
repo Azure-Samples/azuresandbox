@@ -131,6 +131,14 @@ The barrier pattern leaves Key Vault and Storage Account with public access **di
 ./scripts/enable-public-access.sh
 ```
 
+**MCAPS precheck — verify the `SecurityControl=Ignore` tag on the resource group first (required before `enable-public-access.sh` can work on MCAPS tenants).** On MCAPS tenants a `modify`-effect Azure Policy rewrites Key Vault (and similarly Storage) update requests to force `publicNetworkAccess=Disabled`. The `SecurityControl=Ignore` tag on the resource group (evaluated at RG **or** resource level) exempts resources from this policy. If that tag is **missing** from the RG — e.g. a prior `apply`/`destroy` ran without `-var='additional_tags={SecurityControl="Ignore"}'` and stripped it — then `enable-public-access.sh` will report success but the change is **silently reverted to `Disabled`**, and the next `terraform plan`/`apply` fails with `403 ForbiddenByConnection` on Key Vault data-plane reads/writes. Therefore, **before running `enable-public-access.sh`, confirm the tag exists on the RG**:
+
+```bash
+az group show --name <rg> --query "tags.SecurityControl" -o tsv   # must print: Ignore
+```
+
+If it prints empty/`None`, restore the tag before proceeding (either `az tag update --resource-id <rg id> --operation Merge --tags SecurityControl=Ignore`, or a `terraform apply` with the `additional_tags` var). Only once the tag is present will `enable-public-access.sh` persist and the barrier workflow succeed. Follow the error-handling policy if the tag cannot be restored.
+
 Then perform the `/allow-all`-mode handoff — prompt the user to run `/allow-all` and wait for confirmation — then proceed with `terraform init` (if providers changed) → `terraform plan` → `terraform apply`. The barrier resources will re-disable public access at the end of the apply.
 
 After a successful apply, act on the unit-testing decision captured in preflight item 7. If it was **yes** and a module was **newly enabled**, run that module's unit tests + integration tests (per the scope confirmed in preflight) without re-prompting; if it was **no**, skip this step. **First satisfy the VM-start gate** (`./scripts/manage-vms.sh start`; see the Tests section) — a policy may have deallocated VMs since the apply:
