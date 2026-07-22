@@ -45,6 +45,10 @@ crash.log
 #
 *.tfvars
 
+# Ignore backend.tf - remote state backend configuration is environment-specific
+# (e.g. differs between a WSL client and the rg-devops-iac jumplinux2 environment)
+backend.tf
+
 # Trace files
 terraform.log
 
