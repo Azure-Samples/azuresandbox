@@ -308,6 +308,14 @@ You now have a fully provisioned DevOps IaC environment! You can use it as a Ter
 
 Don't forget to delete your DevOps IaC environment when you're done. You don't want to have to explain to your boss why you left an unused resources laying around that costs your company money. The quickest way to clean up is to delete the DevOps IaC resource group. Do this with care because data loss will occur, including any Terraform state files in the Azure Blob Storage container.
 
+If you only need to remove Terraform state file(s) from the Azure Blob Storage container without deleting the whole environment, use `scripts/delete-tfstate.sh`. It authenticates with Azure CLI / Microsoft Entra ID only (the storage account has shared access keys disabled) and relies on the built-in RBAC role assignments granted to the caller (e.g. jumplinux2's managed identity) to delete blobs over the storage account's private endpoint — it does not enable public network access, so it must be run from a host with private network connectivity to the storage account, such as jumplinux2. Run it with no arguments to list and select blob(s) interactively, or pass a blob name (e.g. `azuresandbox.tfstate`) to delete it directly:
+
+```bash
+./scripts/delete-tfstate.sh                       # list and select interactively
+./scripts/delete-tfstate.sh azuresandbox.tfstate  # delete a specific blob
+./scripts/delete-tfstate.sh --yes azuresandbox.tfstate  # skip confirmation prompt
+```
+
 ## Documentation
 
 This section provides documentation regarding the overall structure of the root module for this configuration. See the README.md files in each module directory for more information about that module.
@@ -330,7 +338,10 @@ This configuration is organized into the following structure:
 │   └── vm-jumpbox-linux/                 # Linux jumpbox virtual machine module
 ├── scripts/                              # 
 │   ├── bootstrap.sh                      # Bash helper script for generating terraform.tfvars
-│   └── bootstrap.ps1                     # PowerShell helper script for generating terraform.tfvars
+│   ├── bootstrap.ps1                     # PowerShell helper script for generating terraform.tfvars
+│   ├── cleanterraformtemp.sh             # Bash helper script for removing Terraform temp/local files
+│   ├── enable-public-access.sh           # Bash helper script for re-enabling public access on key vault/storage account
+│   └── delete-tfstate.sh                 # Bash helper script for deleting Terraform state blob(s) from the storage backend
 ├── locals.tf                             # Local variables 
 ├── main.tf                               # Resource configurations
 ├── network.tf                            # Network resource blocks
