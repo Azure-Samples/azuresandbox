@@ -12,7 +12,7 @@ Terraform IaC project that provisions a modular Azure sandbox environment. Not f
 
 ## Build / validate / test
 
-Run from repo root. Terraform state lives locally by default (sensitive — see README about adding `backend.tf`).
+Run from repo root. Terraform state lives locally by default (sensitive — see README about adding `backend.tf`, and the "Terraform execution environments" section below for the jumplinux2/rg-devops-iac remote-backend case).
 
 ```bash
 terraform init
@@ -31,6 +31,40 @@ The SPN password must come from the env var `TF_VAR_arm_client_secret` — never
 ```
 
 For example: `terraform apply -var='additional_tags={SecurityControl="Ignore"}'`. To add more MCAPS tags, include them in the same map, e.g. `-var='additional_tags={SecurityControl="Ignore",owner="rob"}'`. Keys in `additional_tags` win on collisions with the base `tags` map.
+
+## Terraform execution environments
+
+Two Terraform execution environments are in active use for this repo — identify which one a session is running in before touching Terraform state:
+
+- **WSL / local client** (default): Terraform state is local (`terraform.tfstate` in the repo root, git-ignored). No `backend.tf`. All auth (`azurerm`/`azuread`/`azapi` providers in `providers.tf`) is SPN-based via `TF_VAR_arm_client_secret`. The generic `backend.tf` example in the root README applies here if a user opts into a remote backend manually.
+- **`jumplinux2`** — the VM deployed by `extras/configurations/rg-devops-iac`, reached via VS Code Remote-SSH. Detect it with `hostname` (`jumplinux2`) or `echo $ARM_USE_MSI` (pre-set `true` by cloud-init, along with `$ARM_TENANT_ID`). Provider auth in `providers.tf` stays SPN-based and unchanged — only the Terraform **state backend** differs: it uses the `azurerm` backend with Azure AD / managed-identity auth against the rg-devops-iac storage account (`tfstate` container), which grants jumplinux2's managed identity `Storage Blob Data Contributor`.
+
+  If `backend.tf` doesn't already exist in the repo root, create it — never overwrite one that's already there. Look up the current values live (they vary per rg-devops-iac deployment, so never hardcode them in docs or configs): prefer the **Azure MCP server** tools available in this session — `azure-subscription_list` for the subscription id, `azure-group_list` / `azure-group_resource_list` to find the rg-devops-iac resource group and its lone storage account, `azure-storage` to confirm the storage account name — falling back to Azure CLI only if the MCP server isn't wired up:
+
+  ```bash
+  SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+  RG=$(az group list --query "[?starts_with(name, 'rg-devops-')].name" -o tsv | head -1)
+  STORAGE_ACCOUNT=$(az storage account list -g "$RG" --query "[0].name" -o tsv)
+  ```
+
+  Then write:
+
+  ```hcl
+  # backend.tf
+  terraform {
+    backend "azurerm" {
+      use_azuread_auth     = true
+      use_msi              = true
+      tenant_id            = "<$ARM_TENANT_ID>"
+      subscription_id      = "<$SUBSCRIPTION_ID>"
+      storage_account_name = "<$STORAGE_ACCOUNT>"
+      container_name       = "tfstate"
+      key                  = "azuresandbox.tfstate"
+    }
+  }
+  ```
+
+  `backend.tf` is git-ignored (values are environment-specific). Run `terraform init` (add `-reconfigure` if migrating from local state) after creating/changing it.
 
 ## Preflight checklist (run attended, before enabling `/allow-all` mode for any apply or test work)
 
@@ -61,6 +95,7 @@ The intended workflow is a clean two-phase handoff:
    - **Known gotcha — empty `user_name`:** the script derives the `user_name` default from `az ad user show --id <user_object_id> --query userPrincipalName` (where `user_object_id` is the JWT `oid` claim). When the signed-in identity lacks Microsoft Entra directory read permission (common for guest accounts and many service-principal-style admin logins), that lookup returns **empty**, so the prompt has no default and a non-interactive run (piping an empty line) writes `user_name = ""` to `terraform.tfvars`. This **fails the `user_name` UPN-format validation in `variables.tf`** at `terraform plan`/`apply`. After running `bootstrap.sh`, **always verify `user_name` is a non-empty valid UPN** (`grep '^user_name' terraform.tfvars`); if it is blank, set it explicitly — get the UPN from `az ad signed-in-user show --query userPrincipalName -o tsv` (or `az account show --query user.name -o tsv` as a fallback) and edit `terraform.tfvars`. When driving the script non-interactively, prefer supplying the UPN explicitly for the `user_name` prompt rather than relying on the (possibly empty) default.
    - **Output** — it (over)writes `./terraform.tfvars` in the repo root containing `aad_tenant_id`, `arm_client_id`, `location`, `subscription_id`, `user_name`, `user_object_id`, a `tags` map (`project`/`costcenter`/`environment`), and **all `enable_module_*` toggles commented out (every module disabled by default)**. Module enablement is therefore handled separately in preflight item 6 by editing `terraform.tfvars` afterward — `bootstrap.sh` never enables a module. Note it does **not** prompt for or write the SPN secret (that stays in `TF_VAR_arm_client_secret`).
    - **To drive it non-interactively** (e.g. when you already have every value), pipe the answers to stdin in prompt order — `arm_client_id`, `aad_tenant_id`, `user_name`, `user_object_id`, `subscription_id`, `location`, `environment`, `costcenter`, `project` — e.g. `printf '%s\n' "$appid" "" "" "" "" "" "" "" "" | ./scripts/bootstrap.sh` (empty lines accept the defaults). Prefer the attended interactive flow unless the user has supplied all inputs.
+5. **Terraform execution environment identified** — determine whether this session is on **WSL / local client** or **`jumplinux2`** (rg-devops-iac), per the "Terraform execution environments" section above. On jumplinux2 with no `backend.tf` yet, look up the backend values and create it before `terraform init`; leave an existing `backend.tf` untouched. On WSL, no action needed (local state is the default).
 6. **Module enablement confirmed** — use `ask_user` to ask whether **all base modules** in `./modules` should be deployed (every `enable_module_*` flag `true`). Extra modules in `./extras/modules` (`ai-foundry`, `avd`, `petstore`, `vnet-onprem`, etc.) are **always excluded** from this question and left **disabled**. If the answer is **no**, use `ask_user` again to have the user specify exactly which base modules to enable (e.g. `vnet_app` only); all other base modules stay disabled. Confirm the selection before editing `terraform.tfvars`.
 7. **Automated unit testing decision** — use `ask_user` to ask whether automated unit tests (`Invoke-UnitTests.ps1`) should be run after a successful `terraform apply`. Capture this decision now, batched with the other preflight prompts, because it determines whether preflight item 3 (Azure PowerShell auth) is required — that human-gated input must be collected up front, not after the `/allow-all`-mode handoff. If the answer is **yes**, also confirm scope: all installed modules (`Invoke-UnitTests.ps1`, which runs each installed module's unit **and** integration tests automatically) versus a single module's unit tests, optionally with its integration tests (`-Module <name> [-Integration]` — `-Integration` applies only to a single-module run). If the answer is **no**, record it and skip item 3 (unless otherwise needed). The recorded decision drives the post-apply test step in Scenarios 1 and 2 — do not re-prompt for it after the apply.
 8. **MCAPS tenant tagging** — confirm whether the target subscription is on an **MCAPS tenant** (the default assumption for this environment; the tenant in use here is MCAPS). If yes, **every** `terraform plan` and `terraform apply` command in every scenario below must include `-var='additional_tags={SecurityControl="Ignore"}'` so the `SecurityControl=Ignore` tag is merged over the base `tags` map and Azure Policy does not deny the apply. Record this decision now so the flag is applied consistently across the run without re-prompting. Do not edit `terraform.tfvars` for this — pass it on the command line.
