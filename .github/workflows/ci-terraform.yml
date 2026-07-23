@@ -37,11 +37,11 @@ jobs:
     outputs:
       terraform: ${{ steps.filter.outputs.terraform }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
@@ -57,9 +57,9 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.terraform == 'true' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         with:
           # Matches required_version (~> 1.15.8) in terraform.tf.
           terraform_version: 1.15.8
@@ -78,9 +78,9 @@ jobs:
       # GitHub releases without hitting unauthenticated rate limits.
       GITHUB_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: terraform-linters/setup-tflint@v4
+      - uses: terraform-linters/setup-tflint@v6
         with:
           tflint_version: v0.63.1
 
@@ -123,10 +123,10 @@ jobs:
           - .
           - extras/configurations/rg-devops-iac
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: ${{ needs.changes.outputs.terraform == 'true' }}
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         if: ${{ needs.changes.outputs.terraform == 'true' }}
         with:
           # Matches required_version (~> 1.15.8) in terraform.tf.

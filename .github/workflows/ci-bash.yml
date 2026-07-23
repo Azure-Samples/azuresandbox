@@ -36,11 +36,11 @@ jobs:
     outputs:
       bash: ${{ steps.filter.outputs.bash }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
@@ -61,7 +61,7 @@ jobs:
       # official koalaman/shellcheck release. Update when bumping the version.
       SHELLCHECK_SHA256: 6c881ab0698e4e6ea235245f22832860544f17ba386442fe7e9d629f8cbedf87
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Download the pinned ShellCheck release directly (no Marketplace action) and
       # verify its checksum before use, mirroring the gitleaks install in ci-secrets.yml.

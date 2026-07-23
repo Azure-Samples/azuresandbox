@@ -12,7 +12,7 @@ Terraform IaC project that provisions a modular Azure sandbox environment. Not f
 
 ## Build / validate / test
 
-Run from repo root. Terraform state lives locally by default (sensitive — see README about adding `backend.tf`).
+Run from repo root. Terraform state lives locally by default (sensitive — see README about adding `backend.tf`, and the "Terraform execution environments" section below for the jumplinux2/rg-devops-iac remote-backend case).
 
 ```bash
 terraform init
@@ -31,6 +31,40 @@ The SPN password must come from the env var `TF_VAR_arm_client_secret` — never
 ```
 
 For example: `terraform apply -var='additional_tags={SecurityControl="Ignore"}'`. To add more MCAPS tags, include them in the same map, e.g. `-var='additional_tags={SecurityControl="Ignore",owner="rob"}'`. Keys in `additional_tags` win on collisions with the base `tags` map.
+
+## Terraform execution environments
+
+Two Terraform execution environments are in active use for this repo — identify which one a session is running in before touching Terraform state:
+
+- **WSL / local client** (default): Terraform state is local (`terraform.tfstate` in the repo root, git-ignored). No `backend.tf`. All auth (`azurerm`/`azuread`/`azapi` providers in `providers.tf`) is SPN-based via `TF_VAR_arm_client_secret`. The generic `backend.tf` example in the root README applies here if a user opts into a remote backend manually.
+- **`jumplinux2`** — the VM deployed by `extras/configurations/rg-devops-iac`, reached via VS Code Remote-SSH. Detect it with `hostname` (`jumplinux2`) or `echo $ARM_USE_MSI` (pre-set `true` by cloud-init, along with `$ARM_TENANT_ID`). Provider auth in `providers.tf` stays SPN-based and unchanged — only the Terraform **state backend** differs: it uses the `azurerm` backend with Azure AD / managed-identity auth against the rg-devops-iac storage account (`tfstate` container), which grants jumplinux2's managed identity `Storage Blob Data Contributor`.
+
+  If `backend.tf` doesn't already exist in the repo root, create it — never overwrite one that's already there. Look up the current values live (they vary per rg-devops-iac deployment, so never hardcode them in docs or configs): prefer the **Azure MCP server** tools available in this session — `azure-subscription_list` for the subscription id, `azure-group_list` / `azure-group_resource_list` to find the rg-devops-iac resource group and its lone storage account, `azure-storage` to confirm the storage account name — falling back to Azure CLI only if the MCP server isn't wired up:
+
+  ```bash
+  SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+  RG=$(az group list --query "[?starts_with(name, 'rg-devops-')].name" -o tsv | head -1)
+  STORAGE_ACCOUNT=$(az storage account list -g "$RG" --query "[0].name" -o tsv)
+  ```
+
+  Then write:
+
+  ```hcl
+  # backend.tf
+  terraform {
+    backend "azurerm" {
+      use_azuread_auth     = true
+      use_msi              = true
+      tenant_id            = "<$ARM_TENANT_ID>"
+      subscription_id      = "<$SUBSCRIPTION_ID>"
+      storage_account_name = "<$STORAGE_ACCOUNT>"
+      container_name       = "tfstate"
+      key                  = "azuresandbox.tfstate"
+    }
+  }
+  ```
+
+  `backend.tf` is git-ignored (values are environment-specific). Run `terraform init` (add `-reconfigure` if migrating from local state) after creating/changing it.
 
 ## Preflight checklist (run attended, before enabling `/allow-all` mode for any apply or test work)
 
@@ -61,6 +95,7 @@ The intended workflow is a clean two-phase handoff:
    - **Known gotcha — empty `user_name`:** the script derives the `user_name` default from `az ad user show --id <user_object_id> --query userPrincipalName` (where `user_object_id` is the JWT `oid` claim). When the signed-in identity lacks Microsoft Entra directory read permission (common for guest accounts and many service-principal-style admin logins), that lookup returns **empty**, so the prompt has no default and a non-interactive run (piping an empty line) writes `user_name = ""` to `terraform.tfvars`. This **fails the `user_name` UPN-format validation in `variables.tf`** at `terraform plan`/`apply`. After running `bootstrap.sh`, **always verify `user_name` is a non-empty valid UPN** (`grep '^user_name' terraform.tfvars`); if it is blank, set it explicitly — get the UPN from `az ad signed-in-user show --query userPrincipalName -o tsv` (or `az account show --query user.name -o tsv` as a fallback) and edit `terraform.tfvars`. When driving the script non-interactively, prefer supplying the UPN explicitly for the `user_name` prompt rather than relying on the (possibly empty) default.
    - **Output** — it (over)writes `./terraform.tfvars` in the repo root containing `aad_tenant_id`, `arm_client_id`, `location`, `subscription_id`, `user_name`, `user_object_id`, a `tags` map (`project`/`costcenter`/`environment`), and **all `enable_module_*` toggles commented out (every module disabled by default)**. Module enablement is therefore handled separately in preflight item 6 by editing `terraform.tfvars` afterward — `bootstrap.sh` never enables a module. Note it does **not** prompt for or write the SPN secret (that stays in `TF_VAR_arm_client_secret`).
    - **To drive it non-interactively** (e.g. when you already have every value), pipe the answers to stdin in prompt order — `arm_client_id`, `aad_tenant_id`, `user_name`, `user_object_id`, `subscription_id`, `location`, `environment`, `costcenter`, `project` — e.g. `printf '%s\n' "$appid" "" "" "" "" "" "" "" "" | ./scripts/bootstrap.sh` (empty lines accept the defaults). Prefer the attended interactive flow unless the user has supplied all inputs.
+5. **Terraform execution environment identified** — determine whether this session is on **WSL / local client** or **`jumplinux2`** (rg-devops-iac), per the "Terraform execution environments" section above. On jumplinux2 with no `backend.tf` yet, look up the backend values and create it before `terraform init`; leave an existing `backend.tf` untouched. On WSL, no action needed (local state is the default).
 6. **Module enablement confirmed** — use `ask_user` to ask whether **all base modules** in `./modules` should be deployed (every `enable_module_*` flag `true`). Extra modules in `./extras/modules` (`ai-foundry`, `avd`, `petstore`, `vnet-onprem`, etc.) are **always excluded** from this question and left **disabled**. If the answer is **no**, use `ask_user` again to have the user specify exactly which base modules to enable (e.g. `vnet_app` only); all other base modules stay disabled. Confirm the selection before editing `terraform.tfvars`.
 7. **Automated unit testing decision** — use `ask_user` to ask whether automated unit tests (`Invoke-UnitTests.ps1`) should be run after a successful `terraform apply`. Capture this decision now, batched with the other preflight prompts, because it determines whether preflight item 3 (Azure PowerShell auth) is required — that human-gated input must be collected up front, not after the `/allow-all`-mode handoff. If the answer is **yes**, also confirm scope: all installed modules (`Invoke-UnitTests.ps1`, which runs each installed module's unit **and** integration tests automatically) versus a single module's unit tests, optionally with its integration tests (`-Module <name> [-Integration]` — `-Integration` applies only to a single-module run). If the answer is **no**, record it and skip item 3 (unless otherwise needed). The recorded decision drives the post-apply test step in Scenarios 1 and 2 — do not re-prompt for it after the apply.
 8. **MCAPS tenant tagging** — confirm whether the target subscription is on an **MCAPS tenant** (the default assumption for this environment; the tenant in use here is MCAPS). If yes, **every** `terraform plan` and `terraform apply` command in every scenario below must include `-var='additional_tags={SecurityControl="Ignore"}'` so the `SecurityControl=Ignore` tag is merged over the base `tags` map and Azure Policy does not deny the apply. Record this decision now so the flag is applied consistently across the run without re-prompting. Do not edit `terraform.tfvars` for this — pass it on the command line.
@@ -101,7 +136,7 @@ When deploying or modifying a sandbox environment, **do not attempt to automatic
 
 On the first error, stop the workflow immediately and instead:
 
-1. **Document the error.** Capture the exact failing command, the full error output, the step/scenario it occurred in, the enabled modules, and any other relevant context (branch, Terraform/provider versions). Do not retry, re-run, or alter configuration in an attempt to work around it.
+1. **Document the error.** Capture the exact failing command, the full error output, the step/scenario it occurred in, the enabled modules, and any other relevant context (branch, Terraform/provider versions). Do not retry, re-run, or alter configuration in an attempt to work around it. **Sanitize before posting** — Azure error text frequently embeds internal policy names, `aka.ms` wiki links, and subscription/tenant/management-group IDs; genericize them per the [Sanitizing public GitHub content](#sanitizing-public-github-content) rules below.
 2. **Open a GitHub issue** against the repo describing the failure, using the documented details above:
    ```bash
    gh issue create --title "<concise error summary>" --body "<command, full error output, step, context>"
@@ -130,6 +165,14 @@ The barrier pattern leaves Key Vault and Storage Account with public access **di
 ```bash
 ./scripts/enable-public-access.sh
 ```
+
+**MCAPS precheck — verify the `SecurityControl=Ignore` tag on the resource group first (required before `enable-public-access.sh` can work on MCAPS tenants).** On MCAPS tenants a `modify`-effect Azure Policy rewrites Key Vault (and similarly Storage) update requests to force `publicNetworkAccess=Disabled`. The `SecurityControl=Ignore` tag on the resource group (evaluated at RG **or** resource level) exempts resources from this policy. If that tag is **missing** from the RG — e.g. a prior `apply`/`destroy` ran without `-var='additional_tags={SecurityControl="Ignore"}'` and stripped it — then `enable-public-access.sh` will report success but the change is **silently reverted to `Disabled`**, and the next `terraform plan`/`apply` fails with `403 ForbiddenByConnection` on Key Vault data-plane reads/writes. Therefore, **before running `enable-public-access.sh`, confirm the tag exists on the RG**:
+
+```bash
+az group show --name <rg> --query "tags.SecurityControl" -o tsv   # must print: Ignore
+```
+
+If it prints empty/`None`, restore the tag before proceeding (either `az tag update --resource-id <rg id> --operation Merge --tags SecurityControl=Ignore`, or a `terraform apply` with the `additional_tags` var). Only once the tag is present will `enable-public-access.sh` persist and the barrier workflow succeed. Follow the error-handling policy if the tag cannot be restored.
 
 Then perform the `/allow-all`-mode handoff — prompt the user to run `/allow-all` and wait for confirmation — then proceed with `terraform init` (if providers changed) → `terraform plan` → `terraform apply`. The barrier resources will re-disable public access at the end of the apply.
 
@@ -241,6 +284,10 @@ Modules expose two map outputs used heavily by the root and other modules: `reso
 ## Documentation expectations
 
 Every module has a `README.md` with the same sections: Architecture (drawio SVG in `images/`), Overview, Smoke testing, Documentation (variables / resources / outputs tables). When adding or changing inputs, resources, or outputs, update both the module README and the root README's relevant table.
+
+## Sanitizing public GitHub content
+
+This is a **public repo** — issues, PRs, comments, and commit messages are world-readable. Before writing any (including auto-filed error issues), replace internal/environment specifics with generic wording: Azure Policy definition/assignment/initiative names → "a `modify`-effect Azure Policy"; internal program acronyms and `aka.ms`/wiki links → omit; subscription/tenant/management-group IDs, SPN `appId`/`objectId`, user object IDs → `<subscription>`, `<tenant>`, etc.; per-deployment resource names, execution-host names, private IPs → placeholders. The literal `SecurityControl=Ignore` tag may appear **only** in this file — elsewhere call it "an organization-specific exemption tag." Keep non-identifying technical content (resource types, file paths, public ARM schema, `learn.microsoft.com` links, error codes).
 
 ## Branch / PR notes
 

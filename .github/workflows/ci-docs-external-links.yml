@@ -27,7 +27,7 @@ jobs:
     name: lychee (external links)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Checks every link, including external URLs (no --offline). Caching and
       # retries reduce transient failures from rate-limited/slow hosts.

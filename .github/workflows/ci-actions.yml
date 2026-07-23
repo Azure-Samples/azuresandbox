@@ -33,11 +33,11 @@ jobs:
     outputs:
       actions: ${{ steps.filter.outputs.actions }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
@@ -53,7 +53,7 @@ jobs:
       # Pinned for deterministic, reproducible runs. Bump intentionally.
       ACTIONLINT_VERSION: 1.7.12
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Download the pinned actionlint release directly and verify its checksum
       # before use. shellcheck is preinstalled on ubuntu-latest, so actionlint
