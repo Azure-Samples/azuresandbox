@@ -1,4 +1,4 @@
-#!/bin/bash
+/all#!/bin/bash
 
 # Deletes Terraform state blob(s) from the tfstate container in the
 # rg-devops-iac storage account, used as a remote state backend for other
@@ -143,9 +143,39 @@ confirm() {
   [[ "${REPLY}" =~ ^[Yy]$ ]]
 }
 
+# Breaks any active lease on the blob before deletion. Terraform uses a blob
+# lease to lock remote state; an interrupted 'terraform apply' can leave the
+# lease held, which causes 'az storage blob delete' to fail with a lease
+# conflict (HTTP 412). A break with '--lease-break-period 0' releases the
+# lease immediately so the blob can be deleted (force delete).
+break_lease_if_present() {
+  local blob="$1"
+
+  local lease_status
+  lease_status=$(az storage blob show \
+    --account-name "${STORAGE_ACCOUNT}" \
+    --container-name "${CONTAINER_NAME}" \
+    --name "${blob}" \
+    --auth-mode login \
+    --query "properties.lease.status" -o tsv 2>/dev/null || echo "")
+
+  if [[ "${lease_status}" == "locked" ]]; then
+    echo "  Blob '${blob}' has an active lease; breaking it (force delete)..."
+    az storage blob lease break \
+      --account-name "${STORAGE_ACCOUNT}" \
+      --container-name "${CONTAINER_NAME}" \
+      --blob-name "${blob}" \
+      --lease-break-period 0 \
+      --auth-mode login \
+      --output none
+    echo "  Lease broken."
+  fi
+}
+
 delete_blob() {
   local blob="$1"
   echo "Deleting blob '${blob}' from container '${CONTAINER_NAME}'..."
+  break_lease_if_present "${blob}"
   az storage blob delete \
     --account-name "${STORAGE_ACCOUNT}" \
     --container-name "${CONTAINER_NAME}" \
