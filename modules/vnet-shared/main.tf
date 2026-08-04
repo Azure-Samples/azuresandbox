@@ -72,25 +72,21 @@ resource "azurerm_monitor_diagnostic_setting" "this" {
   enabled_log {
     category_group = "audit"
   }
-
-  lifecycle {
-    ignore_changes = [metric]
-  }
 }
 #endregion
 
 #region azure-monitor
 resource "azurerm_log_analytics_workspace" "this" {
-  name                       = module.naming.log_analytics_workspace.name_unique
-  location                   = var.location
-  resource_group_name        = var.resource_group_name
-  sku                        = "PerGB2018"
-  retention_in_days          = var.log_analytics_workspace_retention_days
-  internet_ingestion_enabled = true # Starts enabled; root main.tf barrier disables after all modules complete
-  internet_query_enabled     = true # Starts enabled; root main.tf barrier disables after all modules complete
+  name                           = module.naming.log_analytics_workspace.name_unique
+  location                       = var.location
+  resource_group_name            = var.resource_group_name
+  sku                            = "PerGB2018"
+  retention_in_days              = var.log_analytics_workspace_retention_days
+  internet_ingestion_access_type = "Enabled" # Starts enabled; root main.tf barrier disables after all modules complete
+  internet_query_access_type     = "Enabled" # Starts enabled; root main.tf barrier disables after all modules complete
 
   lifecycle {
-    ignore_changes = [internet_ingestion_enabled, internet_query_enabled]
+    ignore_changes = [internet_ingestion_access_type, internet_query_access_type]
   }
 }
 
