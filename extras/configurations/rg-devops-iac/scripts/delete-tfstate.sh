@@ -1,4 +1,4 @@
-/all#!/bin/bash
+#!/bin/bash
 
 # Deletes Terraform state blob(s) from the tfstate container in the
 # rg-devops-iac storage account, used as a remote state backend for other
