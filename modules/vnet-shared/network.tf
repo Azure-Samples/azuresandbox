@@ -178,10 +178,9 @@ resource "azurerm_private_dns_zone" "key_vault" {
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "key_vault" {
-  name                  = "link-${azurerm_private_dns_zone.key_vault.name}-${azurerm_virtual_network.this.name}"
-  resource_group_name   = var.resource_group_name
-  private_dns_zone_name = azurerm_private_dns_zone.key_vault.name
-  virtual_network_id    = azurerm_virtual_network.this.id
+  name                = "link-${azurerm_private_dns_zone.key_vault.name}-${azurerm_virtual_network.this.name}"
+  private_dns_zone_id = azurerm_private_dns_zone.key_vault.id
+  virtual_network_id  = azurerm_virtual_network.this.id
 }
 
 resource "azurerm_private_endpoint" "key_vault" {
@@ -218,10 +217,9 @@ resource "azurerm_private_dns_zone" "ampls" {
 resource "azurerm_private_dns_zone_virtual_network_link" "ampls" {
   for_each = azurerm_private_dns_zone.ampls
 
-  name                  = "link-${each.value.name}-${azurerm_virtual_network.this.name}"
-  resource_group_name   = var.resource_group_name
-  private_dns_zone_name = each.value.name
-  virtual_network_id    = azurerm_virtual_network.this.id
+  name                = "link-${each.value.name}-${azurerm_virtual_network.this.name}"
+  private_dns_zone_id = each.value.id
+  virtual_network_id  = azurerm_virtual_network.this.id
 }
 
 resource "azurerm_private_endpoint" "ampls" {

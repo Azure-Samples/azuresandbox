@@ -35,7 +35,6 @@ resource "azurerm_container_registry" "this" {
   public_network_access_enabled = false
   quarantine_policy_enabled     = false
   retention_policy_in_days      = 7
-  trust_policy_enabled          = false
   zone_redundancy_enabled       = false
 
   lifecycle {
