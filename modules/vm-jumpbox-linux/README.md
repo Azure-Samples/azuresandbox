@@ -45,6 +45,9 @@ This configuration implements a Linux virtual machine for use as a jumpbox. The 
 
 The estimated provisioning time for this module is 3 minutes.
 
+> [!IMPORTANT]
+> **OS disk type change (Standard HDD retirement).** The default for `vm_jumpbox_linux_storage_account_type` is now `StandardSSD_LRS` and Standard HDD (`Standard_LRS`) is no longer permitted, because [Azure is retiring Standard HDD OS disks on September 8, 2028](https://learn.microsoft.com/en-us/azure/virtual-machines/disks-hdd-os-retirement). Fresh deployments are unaffected. For an **existing** deployment created with `Standard_LRS`, changing `os_disk.storage_account_type` forces Terraform to **replace the VM** (destroy and recreate), which causes downtime; the jumpbox is stateless and re-provisioned by cloud-init, so the recommended path is to let Terraform recreate it during a maintenance window. To avoid replacement, deallocate the VM and change its OS disk SKU in place (Azure portal/CLI) *before* applying, then set the variable to the new SKU so Terraform detects no change.
+
 ## Smoke Testing
 
 This section describes how to test the module after deployment.
@@ -232,7 +235,7 @@ vm_jumpbox_linux_image_sku | `server` | The SKU of the virtual machine image use
 vm_jumpbox_linux_image_version | `Latest` | The version of the virtual machine image used to create the VM.
 vm_jumpbox_linux_name | jumplinux1 | The name of the VM.
 vm_jumpbox_linux_size | `Standard_B2ls_v2` | The size of the virtual machine.
-vm_jumpbox_linux_storage_account_type | `Standard_LRS` | The storage type to be used for the VM's OS and data disks.
+vm_jumpbox_linux_storage_account_type | `StandardSSD_LRS` | The storage type to be used for the VM's OS disk. Standard HDD (`Standard_LRS`) is not permitted because Azure is retiring Standard HDD OS disks on September 8, 2028.
 
 ### Module Resources
 

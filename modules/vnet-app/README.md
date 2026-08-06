@@ -31,6 +31,9 @@ This configuration implements a virtual network for applications including:
 
 The estimated provisioning time for this module is 31 minutes.
 
+> [!IMPORTANT]
+> **OS disk type change (Standard HDD retirement).** The default for `vm_jumpbox_win_storage_account_type` is now `StandardSSD_LRS` and Standard HDD (`Standard_LRS`) is no longer permitted, because [Azure is retiring Standard HDD OS disks on September 8, 2028](https://learn.microsoft.com/en-us/azure/virtual-machines/disks-hdd-os-retirement). Fresh deployments are unaffected. For an **existing** deployment created with `Standard_LRS`, changing `os_disk.storage_account_type` forces Terraform to **replace the VM** (destroy and recreate), which causes downtime; the Windows jumpbox is domain-joined and re-provisioned by its run-command configuration, so the recommended path is to let Terraform recreate it during a maintenance window. To avoid replacement, deallocate the VM and change its OS disk SKU in place (Azure portal/CLI) *before* applying, then set the variable to the new SKU so Terraform detects no change.
+
 ## Smoke testing
 
 The steps in this section verify that the Windows jumpbox VM (jumpwin1) is configured correctly.
@@ -162,7 +165,7 @@ vm_jumpbox_win_image_sku | `2025-datacenter-azure-edition` | The SKU for the vir
 vm_jumpbox_win_image_version | `Latest` | The version of the virtual machine image used to create the VM.
 vm_jumpbox_win_name | jumpwin1 | The name of the VM.
 vm_jumpbox_win_size | `Standard_B2ls_v2` | The size of the VM.
-vm_jumpbox_win_storage_account_type | `Standard_LRS` | The storage account type used for the managed disks attached to the VM.
+vm_jumpbox_win_storage_account_type | `StandardSSD_LRS` | The storage type to be used for the VM's OS disk. Standard HDD (`Standard_LRS`) is not permitted because Azure is retiring Standard HDD OS disks on September 8, 2028.
 vnet_address_space | 10.2.0.0/16 | The address space for the application virtual network.
 vnet_name | app | The name of the application virtual network.
 
