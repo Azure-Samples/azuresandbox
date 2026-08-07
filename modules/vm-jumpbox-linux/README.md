@@ -16,7 +16,7 @@
 This configuration implements a Linux virtual machine for use as a jumpbox. The VM is configured using cloud-init and offers the following capabilities:
 
 * Secure SSH access via Bastion using a private SSH key stored in Azure Key Vault.
-* Automatic swapfile provisioning sized to the VM's physical memory (VMs with 8 GiB RAM or more get no swap; smaller VMs get enough swap to reach roughly 12 GiB of RAM plus swap total, with `vm.swappiness=10`).
+* Automatic swapfile provisioning sized to the VM's memory (larger VMs get no swap).
 * Domain joined to the *mysandbox.local* Active Directory domain using winbind.
 * Remote-ssh development capabilities using Visual Studio Code on *jumpwin1*.
 * Secure AD integrated access to Azure Files SMB/cifs share automatically mounted by the VM.

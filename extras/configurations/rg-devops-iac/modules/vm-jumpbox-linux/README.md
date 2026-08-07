@@ -16,7 +16,7 @@
 This module implements a stand-alone Linux virtual machine for use as a jumpbox or DevOps agent. The VM is configured using cloud-init and offers the following capabilities:
 
 * Secure SSH access using a private SSH key stored in Azure Key Vault.
-* Automatic swapfile provisioning sized to the VM's physical memory (VMs with 8 GiB RAM or more get no swap; smaller VMs get enough swap to reach roughly 12 GiB of RAM plus swap total, with `vm.swappiness=10`).
+* Automatic swapfile provisioning sized to the VM's memory (larger VMs get no swap).
 * Remote-ssh development capabilities using Visual Studio Code.
 * Pre-installed software packages, including:
   * azure-cli
