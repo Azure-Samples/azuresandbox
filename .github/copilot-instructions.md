@@ -32,6 +32,26 @@ The SPN password must come from the env var `TF_VAR_arm_client_secret` — never
 
 For example: `terraform apply -var='additional_tags={SecurityControl="Ignore"}'`. To add more MCAPS tags, include them in the same map, e.g. `-var='additional_tags={SecurityControl="Ignore",owner="rob"}'`. Keys in `additional_tags` win on collisions with the base `tags` map.
 
+## Run CI checks locally before pushing a PR
+
+PR-time CI gates (workflows under `.github/workflows/`) are reproduced locally by the umbrella runner **`./scripts/Invoke-CIChecks.sh`**, which avoids the push → CI-fail → fix → re-push loop:
+
+```bash
+./scripts/Invoke-CIChecks.sh                 # all applicable checks
+./scripts/Invoke-CIChecks.sh bash terraform  # only the named checks
+```
+
+**Agent obligation (mandatory — do this without being asked):** before **every** action that GitHub CI would trigger on — i.e. **opening/creating a PR** targeting `vnext`, and **every `git push`** that adds commits to a PR branch (or pushes to `vnext`) — you MUST first run `./scripts/Invoke-CIChecks.sh` and it MUST report no failures. This mirrors CI, which runs on `pull_request` and on each subsequent `push` to the branch. Rules:
+
+- Run it **after** staging/committing the change but **before** the `gh pr create` / `git push`. If it reports `FAILED`, do **not** push or open the PR — fix the findings, re-run until clean, then proceed.
+- Pass only the checks relevant to the files in the push (CI is path-filtered), e.g. `./scripts/Invoke-CIChecks.sh markdown links` for docs-only changes, `bash` for `*.sh`, `terraform` for `*.tf`. When in doubt, run the full suite.
+- `SKIPPED` (a tool isn't installed locally) is not a failure and does not block the push, but note it so the user knows that gate was verified only by CI. `FAILED` always blocks.
+- This is not optional or advisory — treat a clean local run as a precondition for the push/PR, the same way CI is a required check.
+
+It dispatches each static-analysis gate — `bash` (ShellCheck, via `Invoke-ShellCheck.sh`), `powershell` (PSScriptAnalyzer), `markdown` (markdownlint-cli2), `links` (lychee, offline/internal), `actions` (actionlint), `secrets` (gitleaks), and `terraform` (`terraform fmt` + `tflint`) — reading the same shared config files as CI and matching CI's pinned tool versions. Missing tools are reported as SKIPPED (with an install hint), not failures. Since CI jobs are path-filtered, pass only the checks relevant to the files you touched. See the script header for the full check list and version pins.
+
+`terraform init` / `terraform validate` are **not** part of this runner — they are already covered by the sandbox deployment workflow (`terraform init` before `apply`). The external-links lychee job (`ci-docs-external-links.yml`) is scheduled and non-blocking (`fail: false`), so it is not run here either.
+
 ## Terraform execution environments
 
 Two Terraform execution environments are in active use for this repo — identify which one a session is running in before touching Terraform state:
