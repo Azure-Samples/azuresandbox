@@ -26,9 +26,6 @@ This module implements a stand-alone Linux virtual machine for use as a jumpbox 
   * terraform
 * Pre-configured environment variables for using Azure Blob Storage as a Terraform state backend.
 
-> [!IMPORTANT]
-> **OS disk type change (Standard HDD retirement).** The default for `vm_jumpbox_linux_storage_account_type` is now `StandardSSD_LRS` and Standard HDD (`Standard_LRS`) is no longer permitted, because [Azure is retiring Standard HDD OS disks on September 8, 2028](https://learn.microsoft.com/en-us/azure/virtual-machines/disks-hdd-os-retirement). Fresh deployments are unaffected. For an **existing** deployment created with `Standard_LRS`, changing `os_disk.storage_account_type` forces Terraform to **replace the VM** (destroy and recreate), which causes downtime; the VM is re-provisioned by cloud-init, so the recommended path is to let Terraform recreate it during a maintenance window. To avoid replacement, deallocate the VM and change its OS disk SKU in place (Azure portal/CLI) *before* applying, then set the variable to the new SKU so Terraform detects no change.
-
 ## Smoke Testing
 
 This section describes how to test the module after deployment.
