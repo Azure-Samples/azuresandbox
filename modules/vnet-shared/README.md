@@ -24,6 +24,9 @@ This module implements a virtual network with shared services used by all the co
 
 The estimated provisioning time for this module is 23 minutes.
 
+> [!IMPORTANT]
+> **OS disk type change (Standard HDD retirement).** The default for `vm_adds_storage_account_type` is now `StandardSSD_LRS` and Standard HDD (`Standard_LRS`) is no longer permitted, because [Azure is retiring Standard HDD OS disks on September 8, 2028](https://learn.microsoft.com/en-us/azure/virtual-machines/disks-hdd-os-retirement). Fresh deployments are unaffected. For an **existing** deployment created with `Standard_LRS`, changing `os_disk.storage_account_type` forces Terraform to **replace the VM** (destroy and recreate). This VM is the Active Directory domain controller and DNS server that other modules depend on, so its replacement causes an AD/DNS outage that will disrupt domain-joined VMs and dependent modules until it re-provisions. To avoid replacement and downtime, deallocate the VM and change its OS disk SKU in place (Azure portal/CLI) *before* applying, then set the variable to the new SKU so Terraform detects no change. If you allow a replacement instead, schedule a maintenance window and expect dependent VMs to require domain re-join/re-provisioning.
+
 ## Smoke testing
 
 * Explore your newly provisioned resources in the Azure portal:
@@ -104,7 +107,7 @@ vm_adds_image_sku | 2025-datacenter-azure-edition-core | The SKU of the virtual 
 vm_adds_image_version | Latest | The version of the virtual machine image used to create the VM.
 vm_adds_name | adds1 | The name of the VM.
 vm_adds_size | Standard_B2ls_v2 | The size of the virtual machine.
-vm_adds_storage_account_type | Standard_LRS | The storage type to be used for the VM's managed disks.
+vm_adds_storage_account_type | `StandardSSD_LRS` | The storage type to be used for the VM's OS disk. Standard HDD (`Standard_LRS`) is not permitted because Azure is retiring Standard HDD OS disks on September 8, 2028.
 vnet_address_space | 10.1.0.0/16 | The address range for the virtual network.
 vnet_name | shared | The name of the new virtual network.
 
