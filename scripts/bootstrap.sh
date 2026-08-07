@@ -72,7 +72,7 @@ default_user_name=$(az ad user show --id $default_user_object_id --query userPri
 default_aad_tenant_id=$(az account show --query tenantId --output tsv)
 
 # Get user input
-read -e                             -p "Service principal appId (arm_client_id) -----------------: " arm_client_id
+read -e -i "$TF_VAR_arm_client_id"  -p "Service principal appId (arm_client_id) -----------------: " arm_client_id
 read -e -i $default_aad_tenant_id   -p "Microsoft Entra tenant id (aad_tenant_id) ---------------: " aad_tenant_id
 read -e -i $default_user_name       -p "User name for Azure CLI signed in user (user_name) ------: " user_name
 read -e -i $default_user_object_id  -p "Object id for Azure CLI signed in user (user_object_id) -: " user_object_id
