@@ -207,11 +207,11 @@ variable "vm_jumpbox_linux_size" {
 
 variable "vm_jumpbox_linux_storage_account_type" {
   type        = string
-  description = "The storage type to be used for the VMs OS and data disks"
-  default     = "Standard_LRS"
+  description = "The storage type to be used for the VM's OS disk. Standard HDD (Standard_LRS) is not permitted because Azure is retiring Standard HDD OS disks on September 8, 2028."
+  default     = "StandardSSD_LRS"
 
   validation {
-    condition     = contains(["Standard_LRS", "Premium_LRS", "StandardSSD_LRS", "Premium_ZRS", "StandardSSD_ZRS"], var.vm_jumpbox_linux_storage_account_type)
-    error_message = "The 'vm_adds_storage_account_type' must be one of the valid Azure storage SKUs for managed disks: 'Standard_LRS', 'Premium_LRS', 'StandardSSD_LRS', 'Premium_ZRS', or 'StandardSSD_ZRS'."
+    condition     = contains(["Premium_LRS", "StandardSSD_LRS", "Premium_ZRS", "StandardSSD_ZRS"], var.vm_jumpbox_linux_storage_account_type)
+    error_message = "The 'vm_jumpbox_linux_storage_account_type' must be one of the valid Azure storage SKUs for OS disks: 'Premium_LRS', 'StandardSSD_LRS', 'Premium_ZRS', or 'StandardSSD_ZRS'. Standard HDD (Standard_LRS) is not permitted for OS disks."
   }
 }

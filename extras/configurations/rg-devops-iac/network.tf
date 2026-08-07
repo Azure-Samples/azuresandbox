@@ -68,20 +68,18 @@ resource "azurerm_private_dns_zone" "storage_blob" {
 }
 
 resource "azurerm_private_dns_zone_virtual_network_link" "key_vault" {
-  name                  = "link-${azurerm_private_dns_zone.key_vault.name}-${azurerm_virtual_network.this.name}"
-  resource_group_name   = azurerm_resource_group.this.name
-  private_dns_zone_name = azurerm_private_dns_zone.key_vault.name
-  virtual_network_id    = azurerm_virtual_network.this.id
-  resolution_policy     = "NxDomainRedirect"
+  name                = "link-${azurerm_private_dns_zone.key_vault.name}-${azurerm_virtual_network.this.name}"
+  private_dns_zone_id = azurerm_private_dns_zone.key_vault.id
+  virtual_network_id  = azurerm_virtual_network.this.id
+  resolution_policy   = "NxDomainRedirect"
 }
 
 
 resource "azurerm_private_dns_zone_virtual_network_link" "storage_blob" {
-  name                  = "link-${azurerm_private_dns_zone.storage_blob.name}-${azurerm_virtual_network.this.name}"
-  resource_group_name   = azurerm_resource_group.this.name
-  private_dns_zone_name = azurerm_private_dns_zone.storage_blob.name
-  virtual_network_id    = azurerm_virtual_network.this.id
-  resolution_policy     = "NxDomainRedirect"
+  name                = "link-${azurerm_private_dns_zone.storage_blob.name}-${azurerm_virtual_network.this.name}"
+  private_dns_zone_id = azurerm_private_dns_zone.storage_blob.id
+  virtual_network_id  = azurerm_virtual_network.this.id
+  resolution_policy   = "NxDomainRedirect"
 }
 #endregion
 

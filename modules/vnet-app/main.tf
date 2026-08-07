@@ -35,7 +35,6 @@ resource "azurerm_container_registry" "this" {
   public_network_access_enabled = false
   quarantine_policy_enabled     = false
   retention_policy_in_days      = 7
-  trust_policy_enabled          = false
   zone_redundancy_enabled       = false
 
   lifecycle {
@@ -62,14 +61,14 @@ resource "azurerm_monitor_diagnostic_setting" "container_registry" {
 # start enabled and are flipped to Disabled by the root azapi_update_resource after the
 # AMPLS access barrier signals end-to-end wiring is complete (see root main.tf).
 resource "azurerm_application_insights" "this" {
-  name                          = module.naming.application_insights.name_unique
-  location                      = var.location
-  resource_group_name           = var.resource_group_name
-  application_type              = "web"
-  workspace_id                  = var.log_analytics_workspace_id
-  local_authentication_disabled = true
-  internet_ingestion_enabled    = true
-  internet_query_enabled        = true
+  name                         = module.naming.application_insights.name_unique
+  location                     = var.location
+  resource_group_name          = var.resource_group_name
+  application_type             = "web"
+  workspace_id                 = var.log_analytics_workspace_id
+  local_authentication_enabled = false
+  internet_ingestion_enabled   = true
+  internet_query_enabled       = true
 
   lifecycle {
     ignore_changes = [internet_ingestion_enabled, internet_query_enabled]

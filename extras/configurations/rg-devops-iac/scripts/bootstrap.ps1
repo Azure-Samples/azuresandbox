@@ -96,8 +96,16 @@ $defaultUserObjectId = (Show-JWTtoken -token (Get-AzAccessToken -AsSecureString)
 # Set default Microsoft Entra tenant id from currently logged in Azure PowerShell session
 $defaultAadTenantId = (Get-AzContext).Tenant.Id
 
+# Set default service principal appId from TF_VAR_arm_client_id environment variable
+$defaultArmClientId = $env:TF_VAR_arm_client_id
+
 # Get user input
-$armClientId = Read-Host "Service principal appId (arm_client_id)"
+$armClientId = Read-Host "Service principal appId (arm_client_id) default '$defaultArmClientId'"
+
+if (-not $armClientId) {
+    $armClientId = $defaultArmClientId
+}
+
 $aadTenantId = Read-Host "Microsoft Entra tenant id (aad_tenant_id) default '$defaultAadTenantId'"
 
 if (-not $aadTenantId) {

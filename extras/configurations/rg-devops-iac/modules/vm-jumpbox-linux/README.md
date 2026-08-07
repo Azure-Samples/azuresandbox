@@ -16,6 +16,7 @@
 This module implements a stand-alone Linux virtual machine for use as a jumpbox or DevOps agent. The VM is configured using cloud-init and offers the following capabilities:
 
 * Secure SSH access using a private SSH key stored in Azure Key Vault.
+* Automatic swapfile provisioning sized to the VM's memory (larger VMs get no swap).
 * Remote-ssh development capabilities using Visual Studio Code.
 * Pre-installed software packages, including:
   * azure-cli
@@ -203,7 +204,7 @@ vm_jumpbox_linux_image_sku | `server` | The SKU of the virtual machine image use
 vm_jumpbox_linux_image_version | `Latest` | The version of the virtual machine image used to create the VM.
 vm_jumpbox_linux_name | jumplinux2 | The name of the VM.
 vm_jumpbox_linux_size | `Standard_B2ls_v2` | The size of the virtual machine.
-vm_jumpbox_linux_storage_account_type | `Standard_LRS` | The storage type to be used for the VM's OS and data disks.
+vm_jumpbox_linux_storage_account_type | `StandardSSD_LRS` | The storage type to be used for the VM's OS disk. Standard HDD (`Standard_LRS`) is not permitted because Azure is retiring Standard HDD OS disks on September 8, 2028.
 
 ### Module Resources
 
