@@ -32,6 +32,19 @@ The SPN password must come from the env var `TF_VAR_arm_client_secret` — never
 
 For example: `terraform apply -var='additional_tags={SecurityControl="Ignore"}'`. To add more MCAPS tags, include them in the same map, e.g. `-var='additional_tags={SecurityControl="Ignore",owner="rob"}'`. Keys in `additional_tags` win on collisions with the base `tags` map.
 
+## Run CI checks locally before pushing a PR
+
+PR-time CI gates (workflows under `.github/workflows/`) are reproduced locally by the umbrella runner **`./scripts/Invoke-CIChecks.sh`**. Run it before pushing to avoid the push → CI-fail → fix → re-push loop:
+
+```bash
+./scripts/Invoke-CIChecks.sh                 # all applicable checks
+./scripts/Invoke-CIChecks.sh bash terraform  # only the named checks
+```
+
+It dispatches each static-analysis gate — `bash` (ShellCheck, via `Invoke-ShellCheck.sh`), `powershell` (PSScriptAnalyzer), `markdown` (markdownlint-cli2), `links` (lychee, offline/internal), `actions` (actionlint), `secrets` (gitleaks), and `terraform` (`terraform fmt` + `tflint`) — reading the same shared config files as CI and matching CI's pinned tool versions. Missing tools are reported as SKIPPED (with an install hint), not failures. Since CI jobs are path-filtered, pass only the checks relevant to the files you touched. See the script header for the full check list and version pins.
+
+`terraform init` / `terraform validate` are **not** part of this runner — they are already covered by the sandbox deployment workflow (`terraform init` before `apply`). The external-links lychee job (`ci-docs-external-links.yml`) is scheduled and non-blocking (`fail: false`), so it is not run here either.
+
 ## Terraform execution environments
 
 Two Terraform execution environments are in active use for this repo — identify which one a session is running in before touching Terraform state:
