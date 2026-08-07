@@ -5,6 +5,7 @@
 cloud_config_modules:
   - apt_configure
   - package_update_upgrade_install
+  - runcmd
 
 bootcmd:
   - test -d /etc/apt/keyrings || install -m 0755 -d /etc/apt/keyrings
