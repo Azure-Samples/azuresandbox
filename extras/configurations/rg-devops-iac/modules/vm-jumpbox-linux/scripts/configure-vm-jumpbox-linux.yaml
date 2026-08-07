@@ -5,6 +5,7 @@
 cloud_config_modules:
   - apt_configure
   - package_update_upgrade_install
+  - runcmd
 
 bootcmd:
   - test -d /etc/apt/keyrings || install -m 0755 -d /etc/apt/keyrings
@@ -44,3 +45,51 @@ write_files:
       ARM_USE_MSI=true
       ARM_TENANT_ID=${aad_tenant_id}
     append: true
+  - path: /usr/local/sbin/configure-swap.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      # Provision a swapfile sized dynamically from physical RAM to give the kernel
+      # reclaim headroom during long-running, memory-intensive operations (e.g. a full
+      # terraform apply) instead of thrashing page cache and dropping SSH. Swap size
+      # scales with VM size: larger VMs (>= ~8 GiB RAM) skip swap entirely, smaller VMs
+      # get enough swap to reach ~12 GiB of RAM + swap total. Idempotent and boot-safe.
+      set -euo pipefail
+
+      swapfile=/swapfile
+      target_total_mib=12288   # target RAM + swap headroom (~12 GiB)
+      skip_threshold_mib=7000  # skip swap when physical RAM >= ~8 GiB
+
+      if [ -n "$(swapon --show --noheadings)" ]; then
+        echo "swap already active; skipping swapfile provisioning"
+        exit 0
+      fi
+
+      ram_mib=$(( $(awk '/^MemTotal/ {print $2}' /proc/meminfo) / 1024 ))
+
+      if [ "$ram_mib" -ge "$skip_threshold_mib" ]; then
+        echo "physical RAM $${ram_mib} MiB >= $${skip_threshold_mib} MiB; no swapfile needed"
+        exit 0
+      fi
+
+      swap_mib=$(( target_total_mib - ram_mib ))
+      swap_mib=$(( ( (swap_mib + 1023) / 1024 ) * 1024 ))  # round up to whole GiB
+      if [ "$swap_mib" -lt 2048 ]; then
+        swap_mib=2048
+      fi
+
+      echo "physical RAM $${ram_mib} MiB; creating $${swap_mib} MiB swapfile at $${swapfile}"
+      fallocate -l "$${swap_mib}M" "$swapfile" || dd if=/dev/zero of="$swapfile" bs=1M count="$swap_mib"
+      chmod 600 "$swapfile"
+      mkswap "$swapfile"
+      swapon "$swapfile"
+
+      if ! grep -q '^/swapfile ' /etc/fstab; then
+        echo "$swapfile none swap sw 0 0" >> /etc/fstab
+      fi
+
+      echo 'vm.swappiness=10' > /etc/sysctl.d/99-swappiness.conf
+      sysctl -w vm.swappiness=10
+
+runcmd:
+  - /usr/local/sbin/configure-swap.sh
