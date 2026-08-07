@@ -16,7 +16,7 @@
 This configuration implements a Linux virtual machine for use as a jumpbox. The VM is configured using cloud-init and offers the following capabilities:
 
 * Secure SSH access via Bastion using a private SSH key stored in Azure Key Vault.
-* Automatic swap provisioning sized to the VM's memory (see note below).
+* Automatic swapfile provisioning sized to the VM's physical memory (VMs with 8 GiB RAM or more get no swap; smaller VMs get enough swap to reach roughly 12 GiB of RAM plus swap total, with `vm.swappiness=10`).
 * Domain joined to the *mysandbox.local* Active Directory domain using winbind.
 * Remote-ssh development capabilities using Visual Studio Code on *jumpwin1*.
 * Secure AD integrated access to Azure Files SMB/cifs share automatically mounted by the VM.
@@ -45,11 +45,6 @@ This configuration implements a Linux virtual machine for use as a jumpbox. The 
   * winbind
 
 The estimated provisioning time for this module is 3 minutes.
-
-> [!NOTE]
-> **Automatic swap provisioning.** cloud-init provisions a swapfile (`/swapfile`) sized dynamically from the VM's physical memory so that long, memory-intensive operations (such as a full `terraform apply`) have kernel reclaim headroom instead of thrashing page cache and dropping SSH. The size scales with the VM SKU: VMs with **≥ 8 GiB RAM skip swap entirely** (they don't need it), while smaller VMs (e.g. the default `Standard_B2ls_v2` with 4 GiB) get enough swap to reach roughly **12 GiB of RAM + swap total** (~8–9 GiB). The swapfile is persisted in `/etc/fstab` and `vm.swappiness` is set to `10` so RAM stays preferred and swap acts as a pressure-relief safety net. The logic is idempotent and skips provisioning if swap is already active.
-
-<!-- markdownlint separator between adjacent blockquotes -->
 
 > [!IMPORTANT]
 > **OS disk type change (Standard HDD retirement).** The default for `vm_jumpbox_linux_storage_account_type` is now `StandardSSD_LRS` and Standard HDD (`Standard_LRS`) is no longer permitted, because [Azure is retiring Standard HDD OS disks on September 8, 2028](https://learn.microsoft.com/en-us/azure/virtual-machines/disks-hdd-os-retirement). Fresh deployments are unaffected. For an **existing** deployment created with `Standard_LRS`, changing `os_disk.storage_account_type` forces Terraform to **replace the VM** (destroy and recreate), which causes downtime; the jumpbox is stateless and re-provisioned by cloud-init, so the recommended path is to let Terraform recreate it during a maintenance window. To avoid replacement, deallocate the VM and change its OS disk SKU in place (Azure portal/CLI) *before* applying, then set the variable to the new SKU so Terraform detects no change.
