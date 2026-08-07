@@ -24,7 +24,7 @@ Azure Sandbox is not intended for production use but serves as a powerful tool f
 > [!TIP]
 > **Looking for a different sandbox solution?**
 >
-> [**Azure Container Apps Sandboxes**](https://sandboxes.azure.com/) delivers production-grade isolation as a native Azure service — with default-deny egress control, sub-second provisioning, snapshots and more. [**Learn more →**](https://sandboxes.azure.com/)
+> [**Azure Container Apps Sandboxes**](https://sandboxes.azure.com/) delivers production-grade isolation as a native Azure service — with default-deny egress control, sub-second provisioning, snapshots and more.
 
 ## Features
 
