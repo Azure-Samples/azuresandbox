@@ -21,6 +21,11 @@ This project is ideal for developers, IT professionals, and organizations lookin
 
 Azure Sandbox is not intended for production use but serves as a powerful tool for learning and experimentation in Azure.
 
+> [!TIP]
+> **Looking for a different sandbox solution?**
+>
+> [**Azure Container Apps Sandboxes**](https://sandboxes.azure.com/) delivers production-grade isolation as a native Azure service — with default-deny egress control, sub-second provisioning, snapshots and more.
+
 ## Features
 
 Azure Sandbox provides a comprehensive set of features to simplify the deployment and management of sandbox environments in Microsoft Azure.
