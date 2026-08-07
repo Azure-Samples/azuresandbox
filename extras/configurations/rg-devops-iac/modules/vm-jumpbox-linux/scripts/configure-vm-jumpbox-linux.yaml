@@ -67,7 +67,7 @@ write_files:
       ram_mib=$(( $(awk '/^MemTotal/ {print $2}' /proc/meminfo) / 1024 ))
 
       if [ "$ram_mib" -ge "$skip_threshold_mib" ]; then
-        echo "physical RAM ${ram_mib} MiB >= ${skip_threshold_mib} MiB; no swapfile needed"
+        echo "physical RAM $${ram_mib} MiB >= $${skip_threshold_mib} MiB; no swapfile needed"
         exit 0
       fi
 
@@ -77,8 +77,8 @@ write_files:
         swap_mib=2048
       fi
 
-      echo "physical RAM ${ram_mib} MiB; creating ${swap_mib} MiB swapfile at ${swapfile}"
-      fallocate -l "${swap_mib}M" "$swapfile" || dd if=/dev/zero of="$swapfile" bs=1M count="$swap_mib"
+      echo "physical RAM $${ram_mib} MiB; creating $${swap_mib} MiB swapfile at $${swapfile}"
+      fallocate -l "$${swap_mib}M" "$swapfile" || dd if=/dev/zero of="$swapfile" bs=1M count="$swap_mib"
       chmod 600 "$swapfile"
       mkswap "$swapfile"
       swapon "$swapfile"
