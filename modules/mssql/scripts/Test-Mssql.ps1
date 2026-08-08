@@ -175,7 +175,10 @@ try {
     #     This is the canonical VA2061 remediation.
     $auditServer = Get-AzSqlServer -ResourceGroupName $ResourceGroupName -ServerName $MssqlServerName -ErrorAction Stop
     $masterResourceId = "$($auditServer.ResourceId)/databases/master"
-    $diagSettings = Get-AzDiagnosticSetting -ResourceId $masterResourceId -ErrorAction Stop
+    # -WarningAction SilentlyContinue suppresses the Az.Monitor breaking-change advisory
+    # for the Log/Metric output properties (they become List types in Az.Monitor 7.0.0).
+    # The category lookup below already works for both the current and future shapes.
+    $diagSettings = Get-AzDiagnosticSetting -ResourceId $masterResourceId -WarningAction SilentlyContinue -ErrorAction Stop
 
     $auditDiag = $diagSettings | Where-Object {
         $logs = $_.Log
