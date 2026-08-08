@@ -164,32 +164,19 @@ catch {
 try {
     $auditIssues = @()
 
-    # 6a: The extended auditing policy is enabled (Azure Monitor / Log Analytics target).
+    # Get-AzSqlServerAudit is the Azure SQL-native auditing cmdlet: LogAnalyticsTargetState
+    # and WorkspaceResourceId together reflect the master-database diagnostic setting that
+    # streams the SQLSecurityAuditEvents category to a Log Analytics workspace (the canonical
+    # VA2061 remediation). Using it avoids Get-AzDiagnosticSetting, whose Log/Metric output
+    # properties are being changed to List types in Az.Monitor 7.0.0.
     $audit = Get-AzSqlServerAudit -ResourceGroupName $ResourceGroupName -ServerName $MssqlServerName -ErrorAction Stop
+
     if (-not $audit -or $audit.LogAnalyticsTargetState -ne 'Enabled') {
         $auditIssues += "LogAnalyticsTargetState='$($audit.LogAnalyticsTargetState)' (expected 'Enabled')"
     }
 
-    # 6b: A diagnostic setting on the server's master database enables the
-    #     SQLSecurityAuditEvents category and targets a Log Analytics workspace.
-    #     This is the canonical VA2061 remediation.
-    $auditServer = Get-AzSqlServer -ResourceGroupName $ResourceGroupName -ServerName $MssqlServerName -ErrorAction Stop
-    $masterResourceId = "$($auditServer.ResourceId)/databases/master"
-    # -WarningAction SilentlyContinue suppresses the Az.Monitor breaking-change advisory
-    # for the Log/Metric output properties (they become List types in Az.Monitor 7.0.0).
-    # The category lookup below already works for both the current and future shapes.
-    $diagSettings = Get-AzDiagnosticSetting -ResourceId $masterResourceId -WarningAction SilentlyContinue -ErrorAction Stop
-
-    $auditDiag = $diagSettings | Where-Object {
-        $logs = $_.Log
-        $logs -and ($logs | Where-Object { $_.Category -eq 'SQLSecurityAuditEvents' -and $_.Enabled })
-    } | Select-Object -First 1
-
-    if (-not $auditDiag) {
-        $auditIssues += "no diagnostic setting on master database enables the 'SQLSecurityAuditEvents' log category"
-    }
-    elseif (-not $auditDiag.WorkspaceId) {
-        $auditIssues += "diagnostic setting '$($auditDiag.Name)' is not targeting a Log Analytics workspace"
+    if (-not $audit.WorkspaceResourceId) {
+        $auditIssues += 'auditing is not targeting a Log Analytics workspace (WorkspaceResourceId is empty)'
     }
 
     if ($auditIssues.Count -eq 0) {
