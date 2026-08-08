@@ -91,6 +91,7 @@ Multiple SQL database options are provided to suit various use cases and require
 * **Azure SQL Database (PaaS)**:
   * Deploys a fully managed Azure SQL Database instance.
   * Network isolated endpoints for secure access.
+  * Enables server-level auditing with audit logs routed to the shared Log Analytics workspace.
   * Simplifies database management by handling backups, scaling, and high availability.
   * Suitable for applications requiring a scalable and cost-effective relational database solution.
 
