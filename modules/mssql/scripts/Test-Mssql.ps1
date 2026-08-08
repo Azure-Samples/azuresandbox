@@ -160,6 +160,50 @@ catch {
     $failed++
 }
 
+# Test 6: Server-level auditing is enabled and audit events stream to Log Analytics (remediates VA2061)
+try {
+    $auditIssues = @()
+
+    # 6a: The extended auditing policy is enabled (Azure Monitor / Log Analytics target).
+    $audit = Get-AzSqlServerAudit -ResourceGroupName $ResourceGroupName -ServerName $MssqlServerName -ErrorAction Stop
+    if (-not $audit -or $audit.LogAnalyticsTargetState -ne 'Enabled') {
+        $auditIssues += "LogAnalyticsTargetState='$($audit.LogAnalyticsTargetState)' (expected 'Enabled')"
+    }
+
+    # 6b: A diagnostic setting on the server's master database enables the
+    #     SQLSecurityAuditEvents category and targets a Log Analytics workspace.
+    #     This is the canonical VA2061 remediation.
+    $auditServer = Get-AzSqlServer -ResourceGroupName $ResourceGroupName -ServerName $MssqlServerName -ErrorAction Stop
+    $masterResourceId = "$($auditServer.ResourceId)/databases/master"
+    $diagSettings = Get-AzDiagnosticSetting -ResourceId $masterResourceId -ErrorAction Stop
+
+    $auditDiag = $diagSettings | Where-Object {
+        $logs = $_.Log
+        $logs -and ($logs | Where-Object { $_.Category -eq 'SQLSecurityAuditEvents' -and $_.Enabled })
+    } | Select-Object -First 1
+
+    if (-not $auditDiag) {
+        $auditIssues += "no diagnostic setting on master database enables the 'SQLSecurityAuditEvents' log category"
+    }
+    elseif (-not $auditDiag.WorkspaceId) {
+        $auditIssues += "diagnostic setting '$($auditDiag.Name)' is not targeting a Log Analytics workspace"
+    }
+
+    if ($auditIssues.Count -eq 0) {
+        Write-TestResult $moduleName 'PASS' ("Server-level auditing is enabled and streaming 'SQLSecurityAuditEvents' to Log Analytics (remediates VA2061)")
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' ("Server-level auditing issues: " + ($auditIssues -join '; '))
+        $failed++
+    }
+}
+catch {
+    Write-TestResult $moduleName 'FAIL' "Failed to verify server-level auditing for SQL server '$MssqlServerName'"
+    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    $failed++
+}
+
 # Summary
 $total = $passed + $failed
 Write-TestResult $moduleName 'SUMMARY' ("Passed: $passed Failed: $failed Total: $total")
