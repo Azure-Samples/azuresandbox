@@ -16,6 +16,54 @@ resource "azurerm_mysql_flexible_database" "this" {
   charset             = "utf8"
   collation           = "utf8_unicode_ci"
 }
+
+# Server parameters that must be enabled for the diagnostic categories below to produce data.
+resource "azurerm_mysql_flexible_server_configuration" "slow_query_log" {
+  name                = "slow_query_log"
+  resource_group_name = var.resource_group_name
+  server_name         = azurerm_mysql_flexible_server.this.name
+  value               = "ON"
+}
+
+resource "azurerm_mysql_flexible_server_configuration" "audit_log_enabled" {
+  name                = "audit_log_enabled"
+  resource_group_name = var.resource_group_name
+  server_name         = azurerm_mysql_flexible_server.this.name
+  value               = "ON"
+}
+
+resource "azurerm_mysql_flexible_server_configuration" "audit_log_events" {
+  name                = "audit_log_events"
+  resource_group_name = var.resource_group_name
+  server_name         = azurerm_mysql_flexible_server.this.name
+  value               = "CONNECTION,DML,DDL,DCL"
+}
+
+# Routes MySQL slow/audit logs and metrics to the shared Log Analytics workspace owned by
+# the vnet-shared module. Depends on the server parameters above so the categories emit data.
+resource "azurerm_monitor_diagnostic_setting" "this" {
+  name                       = "Diagnostic Logs"
+  target_resource_id         = azurerm_mysql_flexible_server.this.id
+  log_analytics_workspace_id = var.log_analytics_workspace_id
+
+  enabled_log {
+    category = "MySqlSlowLogs"
+  }
+
+  enabled_log {
+    category = "MySqlAuditLogs"
+  }
+
+  enabled_metric {
+    category = "AllMetrics"
+  }
+
+  depends_on = [
+    azurerm_mysql_flexible_server_configuration.slow_query_log,
+    azurerm_mysql_flexible_server_configuration.audit_log_enabled,
+    azurerm_mysql_flexible_server_configuration.audit_log_events
+  ]
+}
 #endregion
 
 #region modules

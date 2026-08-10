@@ -98,6 +98,7 @@ Multiple SQL database options are provided to suit various use cases and require
 * **Azure Database for MySQL (PaaS)**:
   * Deploys a fully managed MySQL database instance.
   * Network isolated endpoints for secure access.
+  * Enables slow query and audit logging with logs and metrics routed to the shared Log Analytics workspace.
   * Provides high availability, automated backups, and scaling options.
   * Ideal for applications built on open-source technologies requiring MySQL as the backend database.
 

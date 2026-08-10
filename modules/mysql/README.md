@@ -83,6 +83,7 @@ Variable | Default | Description
 admin_password |  | A strong password used for admin accounts. Defined in the vnet-shared module.
 admin_username | bootstrapadmin | The user name used for admin accounts. Defined in the vnet-shared module.
 location | | The name of the Azure Region where resources will be provisioned. Defined in the root module.
+log_analytics_workspace_id | | The ID of the Log Analytics workspace where MySQL diagnostic logs and metrics will be sent. Defined in the vnet-shared module.
 mysql_database_name | testdb | The name of the Azure MySQL Database to be provisioned.
 mysql_sku_name | B_Standard_B1ms | The SKU name for the Azure MySQL Flexible Server.
 private_dns_zone_id | | The ID of the private DNS zone for Azure Database for MySQL. Defined in the vnet-app module.
@@ -99,6 +100,10 @@ Address | Name | Notes
 --- | --- | ---
 module.mysql[0].azurerm_mysql_flexible_database.this | testdb | The Azure MySQL Database.
 module.mysql[0].azurerm_mysql_flexible_server.this | mysql&#8209;sand&#8209;dev&#8209;xxxxxxxx | The Azure MySQL flexible server.
+module.mysql[0].azurerm_mysql_flexible_server_configuration.slow_query_log | slow_query_log | Enables slow query logging so the *MySqlSlowLogs* diagnostic category produces data.
+module.mysql[0].azurerm_mysql_flexible_server_configuration.audit_log_enabled | audit_log_enabled | Enables audit logging so the *MySqlAuditLogs* diagnostic category produces data.
+module.mysql[0].azurerm_mysql_flexible_server_configuration.audit_log_events | audit_log_events | Selects the audit event classes (CONNECTION, DML, DDL, DCL) to be logged.
+module.mysql[0].azurerm_monitor_diagnostic_setting.this | Diagnostic Logs | The diagnostic setting that sends MySQL slow/audit logs and metrics to the Log Analytics workspace.
 module.mysql[0].azurerm_private_endpoint.this | pe&#8209;sand&#8209;dev&#8209;mysql&#8209;server | The private endpoint for the Azure MySQL flexible server.
 
 ### Output Variables
