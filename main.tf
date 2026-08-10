@@ -317,14 +317,15 @@ module "mysql" {
 
   count = var.enable_module_mysql ? 1 : 0
 
-  admin_password      = module.vnet_shared.admin_password
-  admin_username      = module.vnet_shared.admin_username
-  location            = azurerm_resource_group.this.location
-  private_dns_zone_id = module.vnet_app[0].private_dns_zones["privatelink.mysql.database.azure.com"].id
-  resource_group_name = azurerm_resource_group.this.name
-  subnet_id           = module.vnet_app[0].subnets["snet-privatelink-01"].id
-  tags                = local.tags
-  unique_seed         = module.naming.unique-seed
+  admin_password             = module.vnet_shared.admin_password
+  admin_username             = module.vnet_shared.admin_username
+  location                   = azurerm_resource_group.this.location
+  log_analytics_workspace_id = module.vnet_shared.resource_ids["log_analytics_workspace"]
+  private_dns_zone_id        = module.vnet_app[0].private_dns_zones["privatelink.mysql.database.azure.com"].id
+  resource_group_name        = azurerm_resource_group.this.name
+  subnet_id                  = module.vnet_app[0].subnets["snet-privatelink-01"].id
+  tags                       = local.tags
+  unique_seed                = module.naming.unique-seed
 
   depends_on = [module.vnet_app[0].configure_azure_files_id] # Ensures that Azure Files is configured
 }
