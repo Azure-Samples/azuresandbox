@@ -619,7 +619,7 @@ if ($armToken) {
             }
             else {
                 $enabledLogs = @($laSetting.properties.logs | Where-Object { $_.enabled } | ForEach-Object { $_.category })
-                foreach ($category in @('StorageRead', 'StorageWrite', 'StorageDelete')) {
+                foreach ($category in @('StorageWrite', 'StorageDelete')) {
                     if ($enabledLogs -notcontains $category) { $issues += "log category '$category' is not enabled" }
                 }
                 $metricsEnabled = @($laSetting.properties.metrics | Where-Object { $_.enabled -and $_.category -eq 'Transaction' })
@@ -627,7 +627,7 @@ if ($armToken) {
             }
 
             if ($issues.Count -eq 0) {
-                Write-TestResult $moduleName 'PASS' ("Storage diagnostics ($($svc.Label)): '$($laSetting.name)' streams 'StorageRead', 'StorageWrite', 'StorageDelete', and 'Transaction' to Log Analytics")
+                Write-TestResult $moduleName 'PASS' ("Storage diagnostics ($($svc.Label)): '$($laSetting.name)' streams 'StorageWrite', 'StorageDelete', and 'Transaction' to Log Analytics")
                 $passed++
             }
             else {

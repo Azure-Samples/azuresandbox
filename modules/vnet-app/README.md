@@ -180,8 +180,8 @@ module.vnet_app[0].azurerm_container_registry.this | crsandboxdevxxxxxxxx | Shar
 module.vnet_app[0].azurerm_monitor_data_collection_rule_association.jumpwin1_dce | | Data collection endpoint association for jumpwin1.
 module.vnet_app[0].azurerm_monitor_data_collection_rule_association.jumpwin1_dcr | | Data collection rule association for jumpwin1.
 module.vnet_app[0].azurerm_monitor_diagnostic_setting.container_registry | | Diagnostic settings for container registry.
-module.vnet_app[0].azurerm_monitor_diagnostic_setting.storage_blob | Diagnostic Logs | Diagnostic settings streaming blob service StorageRead/StorageWrite/StorageDelete logs and Transaction metrics to the shared Log Analytics workspace.
-module.vnet_app[0].azurerm_monitor_diagnostic_setting.storage_file | Diagnostic Logs | Diagnostic settings streaming file service StorageRead/StorageWrite/StorageDelete logs and Transaction metrics to the shared Log Analytics workspace.
+module.vnet_app[0].azurerm_monitor_diagnostic_setting.storage_blob | Diagnostic Logs | Diagnostic settings streaming blob service StorageWrite/StorageDelete logs and Transaction metrics to the shared Log Analytics workspace. StorageRead is omitted by default to control ingestion cost on high-volume accounts.
+module.vnet_app[0].azurerm_monitor_diagnostic_setting.storage_file | Diagnostic Logs | Diagnostic settings streaming file service StorageWrite/StorageDelete logs and Transaction metrics to the shared Log Analytics workspace. StorageRead is omitted by default to control ingestion cost on high-volume accounts.
 module.vnet_app[0].azurerm_monitor_private_link_scoped_service.app_insights | | Adds app insights to the AMPLS scoped services.
 module.vnet_app[0].azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;jumpwin1 | Network interface for the VM.
 module.vnet_app[0].azurerm_network_security_group.groups[*] | | NSGs for each subnet.
