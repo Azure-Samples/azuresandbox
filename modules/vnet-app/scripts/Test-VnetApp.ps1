@@ -610,7 +610,7 @@ if ($armToken) {
     foreach ($svc in $subServices) {
         try {
             $diagUri = "https://management.azure.com/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.Storage/storageAccounts/$StorageAccountName/$($svc.Path)/providers/Microsoft.Insights/diagnosticSettings?api-version=2021-05-01-preview"
-            $diag = Invoke-RestMethod -Uri $diagUri -Headers @{ Authorization = "******" } -ErrorAction Stop
+            $diag = Invoke-RestMethod -Uri $diagUri -Headers @{ Authorization = "Bearer $armToken" } -ErrorAction Stop
             $laSetting = $diag.value | Where-Object { $_.properties.workspaceId } | Select-Object -First 1
 
             $issues = @()
