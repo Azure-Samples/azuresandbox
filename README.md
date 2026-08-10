@@ -76,8 +76,8 @@ A variety of Windows and Linux virtual machines are include and are fully config
 
 Two storage options are included and are fully configured for use in the sandbox.
 
-* **Azure Blob Storage**: Container for startup configuration scripts with network isolated endpoints for secure access.
-* **Azure Files**:  Azure Files share configured for integrated Active Directory Domain Services (AD DS) authentication and network isolated endpoints for secure file sharing.
+* **Azure Blob Storage**: Container for startup configuration scripts with network isolated endpoints for secure access. Storage read/write/delete logs and transaction metrics are routed to the shared Log Analytics workspace.
+* **Azure Files**:  Azure Files share configured for integrated Active Directory Domain Services (AD DS) authentication and network isolated endpoints for secure file sharing. Storage read/write/delete logs and transaction metrics are routed to the shared Log Analytics workspace.
 
 ### Pre-configured SQL Database Options
 

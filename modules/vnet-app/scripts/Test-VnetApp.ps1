@@ -510,7 +510,7 @@ catch {
     $failed++
 }
 
-# Acquire managed identity token from IMDS for ARM access (used by Tests 17-18).
+# Acquire managed identity token from IMDS for ARM access (used by Tests 17-19).
 $armToken = $null
 try {
     $tokenUri = 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fmanagement.azure.com%2F'
@@ -595,6 +595,55 @@ if ($armToken) {
 }
 else {
     Write-TestResult $moduleName 'FAIL' "AMPLS scoped service: Skipped - no ARM token"
+    $failed++
+}
+
+# Test 19: Storage diagnostics - blob and file services stream storage logs and transaction
+# metrics to the shared Log Analytics workspace. Confirms the vnet-app storage account is
+# integrated with the observability framework (issue #608). Diagnostic settings live at the
+# blob/file sub-service scope, so query each sub-resource's diagnosticSettings via ARM.
+if ($armToken) {
+    $subServices = @(
+        @{ Label = 'blob'; Path = 'blobServices/default' },
+        @{ Label = 'file'; Path = 'fileServices/default' }
+    )
+    foreach ($svc in $subServices) {
+        try {
+            $diagUri = "https://management.azure.com/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.Storage/storageAccounts/$StorageAccountName/$($svc.Path)/providers/Microsoft.Insights/diagnosticSettings?api-version=2021-05-01-preview"
+            $diag = Invoke-RestMethod -Uri $diagUri -Headers @{ Authorization = "******" } -ErrorAction Stop
+            $laSetting = $diag.value | Where-Object { $_.properties.workspaceId } | Select-Object -First 1
+
+            $issues = @()
+            if (-not $laSetting) {
+                $issues += 'no diagnostic setting targeting a Log Analytics workspace found'
+            }
+            else {
+                $enabledLogs = @($laSetting.properties.logs | Where-Object { $_.enabled } | ForEach-Object { $_.category })
+                foreach ($category in @('StorageRead', 'StorageWrite', 'StorageDelete')) {
+                    if ($enabledLogs -notcontains $category) { $issues += "log category '$category' is not enabled" }
+                }
+                $metricsEnabled = @($laSetting.properties.metrics | Where-Object { $_.enabled -and $_.category -eq 'Transaction' })
+                if ($metricsEnabled.Count -eq 0) { $issues += "metric category 'Transaction' is not enabled" }
+            }
+
+            if ($issues.Count -eq 0) {
+                Write-TestResult $moduleName 'PASS' ("Storage diagnostics ($($svc.Label)): '$($laSetting.name)' streams 'StorageRead', 'StorageWrite', 'StorageDelete', and 'Transaction' to Log Analytics")
+                $passed++
+            }
+            else {
+                Write-TestResult $moduleName 'FAIL' ("Storage diagnostics ($($svc.Label)): " + ($issues -join '; '))
+                $failed++
+            }
+        }
+        catch {
+            Write-TestResult $moduleName 'FAIL' "Storage diagnostics ($($svc.Label)): ARM GET failed for '$StorageAccountName' $($svc.Path)"
+            Write-TestResult $moduleName 'FAIL' "Exception: $_"
+            $failed++
+        }
+    }
+}
+else {
+    Write-TestResult $moduleName 'FAIL' "Storage diagnostics: Skipped - no ARM token"
     $failed++
 }
 

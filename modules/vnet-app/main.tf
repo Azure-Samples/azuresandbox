@@ -15,8 +15,10 @@ resource "terraform_data" "log_analytics_operations_complete" {
 
 resource "terraform_data" "storage_operations_complete" {
   input = {
-    share = azurerm_storage_share.this.id
-    blobs = values(azurerm_storage_blob.remote_scripts)[*].id
+    share            = azurerm_storage_share.this.id
+    blobs            = values(azurerm_storage_blob.remote_scripts)[*].id
+    blob_diagnostics = azurerm_monitor_diagnostic_setting.storage_blob.id
+    file_diagnostics = azurerm_monitor_diagnostic_setting.storage_file.id
   }
 }
 #endregion
