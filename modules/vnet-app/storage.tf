@@ -29,6 +29,55 @@ resource "azurerm_role_assignment" "assignments_storage" {
   role_definition_name = each.value.role_definition_name
   scope                = azurerm_storage_account.this.id
 }
+
+# Routes storage write/delete logs and transaction metrics for the blob and file services
+# to the shared Log Analytics workspace owned by the vnet-shared module, mirroring the
+# observability wiring used by the container registry (see main.tf). The blob and file
+# sub-services are targeted (StorageWrite/StorageDelete logs live at the sub-service scope,
+# not the account scope); the account only uses blob and file, so queue and table services
+# are intentionally omitted.
+#
+# StorageRead is intentionally NOT enabled: most storage accounts serve high-volume
+# workloads where read logging (every GetBlob/list/property/metadata read) dominates Log
+# Analytics ingestion cost while adding little security value beyond the Transaction metric.
+# Mutations (writes/deletes) are the security-relevant events and are low volume by
+# comparison. To audit data access on a low-volume account where read logging is a defined
+# requirement, add an `enabled_log { category = "StorageRead" }` block to each setting below.
+resource "azurerm_monitor_diagnostic_setting" "storage_blob" {
+  name                       = "Diagnostic Logs"
+  target_resource_id         = "${azurerm_storage_account.this.id}/blobServices/default"
+  log_analytics_workspace_id = var.log_analytics_workspace_id
+
+  enabled_log {
+    category = "StorageWrite"
+  }
+
+  enabled_log {
+    category = "StorageDelete"
+  }
+
+  enabled_metric {
+    category = "Transaction"
+  }
+}
+
+resource "azurerm_monitor_diagnostic_setting" "storage_file" {
+  name                       = "Diagnostic Logs"
+  target_resource_id         = "${azurerm_storage_account.this.id}/fileServices/default"
+  log_analytics_workspace_id = var.log_analytics_workspace_id
+
+  enabled_log {
+    category = "StorageWrite"
+  }
+
+  enabled_log {
+    category = "StorageDelete"
+  }
+
+  enabled_metric {
+    category = "Transaction"
+  }
+}
 #endregion
 
 #region storage-container
