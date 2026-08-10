@@ -393,7 +393,11 @@ $testConfigs = [ordered]@{
         ModuleName = 'vnet_shared'
         ScriptPath = Join-Path $repoRoot 'modules' 'vnet-shared' 'scripts' 'Test-VnetShared.ps1'
         CommandId  = 'RunPowerShellScript'
-        Parameters = @{}
+        Parameters = @{
+            SubscriptionId    = $context.Subscription.Id
+            ResourceGroupName = $resourceGroupName
+            FirewallName      = $resourceNames['firewall']
+        }
     }
     'virtual_machine_jumpwin1' = @{
         Module     = 'vnet-app'

@@ -60,7 +60,7 @@ Enable only the modules you need for your specific sandbox environment. Disable 
 * **Private DNS Server**: Pre-configured  private DNS server for name resolution within the sandbox environment, ensuring secure and isolated DNS queries.
 * **Private DNS Zones**: Pre-configured private DNS zones for popular Azure services.
 * **Private Endpoints**: Pre-configured network isolated endpoints for PaaS services.
-* **Azure Firewall**: Pre-configured firewall for secure outbound internet access and threat intelligence.
+* **Azure Firewall**: Pre-configured firewall for secure outbound internet access and threat intelligence. Structured (resource-specific) application-rule, network-rule, NAT-rule, threat-intel, and DNS-query logs plus metrics are routed to the shared Log Analytics workspace (high-volume aggregation/flow-trace and Premium-only IDPS categories are omitted by default to control ingestion cost).
 * **Azure Bastion**: Pre-configured Bastion for secure and seamless RDP/SSH access to virtual machines without exposing them to the public internet.
 * **Point-to-site VPN Gateway**: Pre-configured point-to-site VPN gateway for secure remote access to your sandbox environment.
 
@@ -742,7 +742,7 @@ Bi-directional virtual network peering is enabled between the virtual networks i
 
 #### **Routing and Security**
 
-* **Azure Firewall**: Configured in the dedicated *AzureFirewallSubnet* of *vnet-shared* to provide secure outbound internet access and threat intelligence.
+* **Azure Firewall**: Configured in the dedicated *AzureFirewallSubnet* of *vnet-shared* to provide secure outbound internet access and threat intelligence. Structured firewall logs and metrics are routed to the shared Log Analytics workspace for observability.
 * **Route Tables**: A custom route table is used to direct traffic through the Azure Firewall for secure internet access. The route table sets the next hop for the default route to go to Azure Firewall for all sandbox subnets except those used for the Firewall itself and for Azure Bastion.
 * **Network Security Groups (NSGs)**: Associated with each subnet to control inbound and outbound traffic based on security rules.
 
