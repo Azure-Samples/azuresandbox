@@ -69,12 +69,42 @@ resource "azurerm_bastion_host" "this" {
   name                = module.naming.bastion_host.name
   location            = var.location
   resource_group_name = var.resource_group_name
-  depends_on          = [azurerm_subnet.subnets]
+
+  # The Standard SKU is required to emit BastionAuditLogs via a diagnostic setting; the
+  # default Basic SKU does not support resource logs. Standard also requires an
+  # AzureBastionSubnet of /26 or larger (see subnet_AzureBastionSubnet_address_prefix).
+  sku = "Standard"
+
+  depends_on = [azurerm_subnet.subnets]
 
   ip_configuration {
     name                 = "Primary"
     subnet_id            = azurerm_subnet.subnets["AzureBastionSubnet"].id
     public_ip_address_id = azurerm_public_ip.bastion.id
+  }
+}
+
+# Routes Azure Bastion resource-specific (structured) audit logs and metrics to the shared
+# Log Analytics workspace owned by this module, mirroring the Azure Firewall and Key Vault
+# diagnostic wiring. log_analytics_destination_type = "Dedicated" writes to the
+# resource-specific MicrosoftAzureBastionAuditLogs table rather than the legacy
+# AzureDiagnostics table.
+#
+# BastionAuditLogs track which users connected to which workloads, when, and from where.
+# This category requires the Standard (or Premium) SKU configured on the Bastion host above;
+# it emits no data on the Basic SKU.
+resource "azurerm_monitor_diagnostic_setting" "bastion" {
+  name                           = "Diagnostic Logs"
+  target_resource_id             = azurerm_bastion_host.this.id
+  log_analytics_workspace_id     = azurerm_log_analytics_workspace.this.id
+  log_analytics_destination_type = "Dedicated"
+
+  enabled_log {
+    category = "BastionAuditLogs"
+  }
+
+  enabled_metric {
+    category = "AllMetrics"
   }
 }
 
