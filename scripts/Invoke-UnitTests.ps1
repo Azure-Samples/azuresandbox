@@ -393,11 +393,7 @@ $testConfigs = [ordered]@{
         ModuleName = 'vnet_shared'
         ScriptPath = Join-Path $repoRoot 'modules' 'vnet-shared' 'scripts' 'Test-VnetShared.ps1'
         CommandId  = 'RunPowerShellScript'
-        Parameters = @{
-            SubscriptionId    = $context.Subscription.Id
-            ResourceGroupName = $resourceGroupName
-            FirewallName      = $resourceNames['firewall']
-        }
+        Parameters = @{}
     }
     'virtual_machine_jumpwin1' = @{
         Module     = 'vnet-app'
@@ -452,6 +448,20 @@ $testConfigs = [ordered]@{
             ResourceGroupName = $resourceGroupName
             MysqlServerName   = $resourceNames['mysql_server']
             MysqlDatabaseName = $resourceNames['mysql_db']
+        }
+    }
+    # Control-plane checks for the always-on vnet_shared module that do not need to run
+    # VM-side on the domain controller (e.g. the Azure Firewall diagnostic setting). Running
+    # these in the orchestrator's authenticated Az session avoids granting adds1 a standing
+    # Monitoring Reader role. VM-side vnet_shared checks remain in Test-VnetShared.ps1.
+    '$local_vnet_shared' = @{
+        Module     = 'vnet-shared'
+        ModuleName = 'vnet_shared'
+        RunLocal   = $true
+        ScriptPath = Join-Path $repoRoot 'modules' 'vnet-shared' 'scripts' 'Test-VnetSharedLocal.ps1'
+        Parameters = @{
+            ResourceGroupName = $resourceGroupName
+            FirewallName      = $resourceNames['firewall']
         }
     }
     '$local_petstore' = @{

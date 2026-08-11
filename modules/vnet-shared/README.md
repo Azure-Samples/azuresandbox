@@ -148,7 +148,6 @@ module.vnet_shared.azurerm_private_endpoint.ampls | pe&#8209;sand&#8209;dev&#820
 module.vnet_shared.azurerm_private_endpoint.key_vault | pe&#8209;sand&#8209;dev&#8209;key&#8209;vault | The private endpoint for the key vault.
 module.vnet_shared.azurerm_public_ip.bastion | pip&#8209;sand&#8209;dev&#8209;bastion | Public IP for Azure Bastion.
 module.vnet_shared.azurerm_public_ip.firewall | pip&#8209;sand&#8209;dev&#8209;firewall | Public IP for Azure Firewall.
-module.vnet_shared.azurerm_role_assignment.adds1_monitoring_reader | | Assigns the `Monitoring Reader` role to the *adds1* VM managed identity (scoped to the resource group) so unit tests can read Azure Monitor diagnostic settings (e.g. the firewall diagnostic setting) via ARM.
 module.vnet_shared.azurerm_role_assignment.roles[*] | | Assigns `Key Vault Secrets Officer` role to the service principal and user for managing key vault secrets.
 module.vnet_shared.azurerm_route_table.this | route&#8209;sand&#8209;dev | Configures next hop for default route to go to Azure Firewall for all sandbox subnets.
 module.vnet_shared.azurerm_subnet.subnets["AzureBastionSubnet"] | | Dedicated subnet Azure Bastion.

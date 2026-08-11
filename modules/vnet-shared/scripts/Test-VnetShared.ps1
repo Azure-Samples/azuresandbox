@@ -1,14 +1,3 @@
-param(
-    [Parameter(Mandatory = $true)]
-    [string]$SubscriptionId,
-
-    [Parameter(Mandatory = $true)]
-    [string]$ResourceGroupName,
-
-    [Parameter(Mandatory = $true)]
-    [string]$FirewallName
-)
-
 #region functions
 function Write-Log {
     param([string]$msg)
@@ -279,63 +268,6 @@ catch {
     Write-TestResult $moduleName 'FAIL' "AMPLS: TCP connectivity test raised an exception"
     Write-TestResult $moduleName 'FAIL' "Exception: $_"
     $failed++
-}
-
-# Test 10: Azure Firewall diagnostic setting streams structured logs and metrics to Log Analytics.
-# Confirms the firewall is integrated with the observability framework (issue #610). The adds1
-# VM managed identity holds Monitoring Reader on the resource group, so we acquire an IMDS token
-# and query the firewall's diagnosticSettings via ARM. We assert the resource-specific
-# (Dedicated) log categories and the AllMetrics metric category are enabled.
-$armToken = $null
-try {
-    $tokenUri = 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fmanagement.azure.com%2F'
-    $tokenResponse = Invoke-RestMethod -Uri $tokenUri -Headers @{ Metadata = 'true' } -ErrorAction Stop
-    $armToken = $tokenResponse.access_token
-    Write-Log "Acquired managed identity token for ARM (expires: $($tokenResponse.expires_on))"
-}
-catch {
-    Write-TestResult $moduleName 'FAIL' "Firewall diagnostics: Failed to acquire managed identity token from IMDS"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
-    $failed++
-}
-
-if ($armToken) {
-    try {
-        $fwId = "/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.Network/azureFirewalls/$FirewallName"
-        $diagUri = "https://management.azure.com$fwId/providers/Microsoft.Insights/diagnosticSettings?api-version=2021-05-01-preview"
-        $diag = Invoke-RestMethod -Uri $diagUri -Headers @{ Authorization = "Bearer $armToken" } -ErrorAction Stop
-        $laSetting = $diag.value | Where-Object { $_.properties.workspaceId } | Select-Object -First 1
-
-        $issues = @()
-        if (-not $laSetting) {
-            $issues += 'no diagnostic setting targeting a Log Analytics workspace found'
-        }
-        else {
-            $enabledLogs = @($laSetting.properties.logs | Where-Object { $_.enabled } | ForEach-Object { $_.category })
-            foreach ($category in @('AZFWApplicationRule', 'AZFWNetworkRule', 'AZFWNatRule', 'AZFWThreatIntel', 'AZFWDnsQuery')) {
-                if ($enabledLogs -notcontains $category) { $issues += "log category '$category' is not enabled" }
-            }
-            $metricsEnabled = @($laSetting.properties.metrics | Where-Object { $_.enabled -and $_.category -eq 'AllMetrics' })
-            if ($metricsEnabled.Count -eq 0) { $issues += "metric category 'AllMetrics' is not enabled" }
-            if ($laSetting.properties.logAnalyticsDestinationType -ne 'Dedicated') {
-                $issues += "logAnalyticsDestinationType is '$($laSetting.properties.logAnalyticsDestinationType)', expected 'Dedicated'"
-            }
-        }
-
-        if ($issues.Count -eq 0) {
-            Write-TestResult $moduleName 'PASS' ("Firewall diagnostics: '$($laSetting.name)' streams structured AZFW* logs and 'AllMetrics' to Log Analytics (Dedicated tables)")
-            $passed++
-        }
-        else {
-            Write-TestResult $moduleName 'FAIL' ("Firewall diagnostics: " + ($issues -join '; '))
-            $failed++
-        }
-    }
-    catch {
-        Write-TestResult $moduleName 'FAIL' "Firewall diagnostics: ARM GET failed for firewall '$FirewallName'"
-        Write-TestResult $moduleName 'FAIL' "Exception: $_"
-        $failed++
-    }
 }
 
 # Summary

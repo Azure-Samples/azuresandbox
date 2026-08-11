@@ -28,17 +28,6 @@ resource "azurerm_windows_virtual_machine" "this" {
   }
 }
 
-# Grants the adds1 VM managed identity read access to Azure Monitor resources
-# (Microsoft.Insights/diagnosticSettings/read) so Test-VnetShared.ps1 can verify the
-# firewall diagnostic setting via an ARM GET from the VM. Scoped to the resource group so
-# the same grant covers any future Monitor-resource read paths consumed by the unit tests.
-resource "azurerm_role_assignment" "adds1_monitoring_reader" {
-  principal_id         = azurerm_windows_virtual_machine.this.identity[0].principal_id
-  principal_type       = "ServicePrincipal"
-  role_definition_name = "Monitoring Reader"
-  scope                = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/resourceGroups/${var.resource_group_name}"
-}
-
 #region vm-configuration
 resource "azurerm_virtual_machine_run_command" "configure_adds" {
   name               = "ConfigureAdds"
