@@ -134,6 +134,54 @@ resource "azurerm_firewall_policy_rule_collection_group" "this" {
   }
 }
 
+# Routes Azure Firewall resource-specific (structured) logs and metrics to the shared Log
+# Analytics workspace owned by this module, mirroring the Key Vault diagnostic wiring in
+# main.tf. log_analytics_destination_type = "Dedicated" writes to the resource-specific
+# AZFW* tables (structured logs) rather than the legacy AzureDiagnostics table.
+#
+# The enabled categories are the high-value security/traffic logs that carry data on the
+# Standard SKU firewall provisioned here. Intentionally omitted to balance coverage against
+# Log Analytics ingestion cost:
+#   * AZFWIdpsSignature        - IDPS is a Premium-SKU feature; emits no data on Standard.
+#   * AZFWApplicationRuleAggregation / AZFWNetworkRuleAggregation / AZFWNatRuleAggregation
+#                              - Policy Analytics aggregation streams; high volume, low
+#                                incremental value over the per-rule logs above.
+#   * AZFWFlowTrace / AZFWDnsFlowTrace / AZFWFatFlow
+#                              - require extra firewall feature flags and are very high
+#                                volume (per-flow / per-packet), dominating ingestion cost.
+# To capture any of these on a Premium SKU or for deeper forensics, add an
+# `enabled_log { category = "<name>" }` block below.
+resource "azurerm_monitor_diagnostic_setting" "firewall" {
+  name                           = "Diagnostic Logs"
+  target_resource_id             = azurerm_firewall.this.id
+  log_analytics_workspace_id     = azurerm_log_analytics_workspace.this.id
+  log_analytics_destination_type = "Dedicated"
+
+  enabled_log {
+    category = "AZFWApplicationRule"
+  }
+
+  enabled_log {
+    category = "AZFWNetworkRule"
+  }
+
+  enabled_log {
+    category = "AZFWNatRule"
+  }
+
+  enabled_log {
+    category = "AZFWThreatIntel"
+  }
+
+  enabled_log {
+    category = "AZFWDnsQuery"
+  }
+
+  enabled_metric {
+    category = "AllMetrics"
+  }
+}
+
 resource "azurerm_route_table" "this" {
   name                = module.naming.route_table.name
   resource_group_name = var.resource_group_name

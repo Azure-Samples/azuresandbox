@@ -129,6 +129,7 @@ module.vnet_shared.azurerm_monitor_data_collection_rule.linux | dcr&#8209;sand&#
 module.vnet_shared.azurerm_monitor_data_collection_rule.windows | dcr&#8209;sand&#8209;dev&#8209;windows | The data collection rules (DCR) for Windows VMs.
 module.vnet_shared.azurerm_monitor_data_collection_rule_association.adds1_dce | configurationAccessEndpoint | Associates the DCE with adds1.
 module.vnet_shared.azurerm_monitor_data_collection_rule_association.adds1_dcr | dcr&#8209;sand&#8209;dev&#8209;adds1&#8209;association | Associates the DCR with adds1.
+module.vnet_shared.azurerm_monitor_diagnostic_setting.firewall | Diagnostic Logs | The Azure Monitor diagnostic setting that streams Azure Firewall structured (resource-specific) logs (`AZFWApplicationRule`, `AZFWNetworkRule`, `AZFWNatRule`, `AZFWThreatIntel`, `AZFWDnsQuery`) and `AllMetrics` to the Log Analytics workspace. Uses `Dedicated` destination tables. High-volume aggregation/flow-trace categories and Premium-only IDPS logs are intentionally omitted to control ingestion cost.
 module.vnet_shared.azurerm_monitor_diagnostic_setting.this | Audit Logs | The Azure Monitor diagnostic setting used to send key vault logs and metrics to the Log Analytics workspace.
 module.vnet_shared.azurerm_monitor_private_link_scope.this | ampls&#8209;sand&#8209;dev | The Azure Monitor Private Link Scope (AMPLS) resource.
 module.vnet_shared.azurerm_monitor_private_link_scoped_service.dce | ampls&#8209;scope&#8209;dce | Associates the AMPLS with the DCE.
