@@ -82,6 +82,16 @@ resource "azurerm_bastion_host" "this" {
     subnet_id            = azurerm_subnet.subnets["AzureBastionSubnet"].id
     public_ip_address_id = azurerm_public_ip.bastion.id
   }
+
+  # Standard SKU Bastion provisioning routinely exceeds the azurerm provider's default 30m
+  # create timeout (observed ~30m+ in testing), which aborts the apply with
+  # "context deadline exceeded" even though Azure finishes creating the host. Extend the
+  # create/update/delete timeouts to accommodate it.
+  timeouts {
+    create = "60m"
+    update = "60m"
+    delete = "60m"
+  }
 }
 
 # Routes Azure Bastion resource-specific audit logs and metrics to the shared Log Analytics
