@@ -462,6 +462,7 @@ $testConfigs = [ordered]@{
         Parameters = @{
             ResourceGroupName = $resourceGroupName
             FirewallName      = $resourceNames['firewall']
+            BastionName       = $resourceNames['bastion_host']
         }
     }
     '$local_petstore' = @{

@@ -61,7 +61,7 @@ Enable only the modules you need for your specific sandbox environment. Disable 
 * **Private DNS Zones**: Pre-configured private DNS zones for popular Azure services.
 * **Private Endpoints**: Pre-configured network isolated endpoints for PaaS services.
 * **Azure Firewall**: Pre-configured firewall for secure outbound internet access and threat intelligence. Structured (resource-specific) application-rule, network-rule, NAT-rule, threat-intel, and DNS-query logs plus metrics are routed to the shared Log Analytics workspace (high-volume aggregation/flow-trace and Premium-only IDPS categories are omitted by default to control ingestion cost).
-* **Azure Bastion**: Pre-configured Bastion for secure and seamless RDP/SSH access to virtual machines without exposing them to the public internet.
+* **Azure Bastion**: Pre-configured Bastion (Standard SKU) for secure and seamless RDP/SSH access to virtual machines without exposing them to the public internet. Bastion audit logs (`BastionAuditLogs`) and metrics are routed to the shared Log Analytics workspace for observability.
 * **Point-to-site VPN Gateway**: Pre-configured point-to-site VPN gateway for secure remote access to your sandbox environment.
 
 ### Pre-configured Virtual Machines
@@ -693,7 +693,7 @@ The following subnets are configured in *vnet-shared*:
 
 Subnet Name | Default CIDR | Min prefix length | NSG | UDR | Purpose
 --- | --- | --- | --- | --- | ---
-AzureBastionSubnet | `10.1.0.0/27` | `/27` | Yes | No | Reserved for Azure Bastion to provide secure RDP/SSH access to virtual machines.
+AzureBastionSubnet | `10.1.0.0/26` | `/26` | Yes | No | Reserved for Azure Bastion to provide secure RDP/SSH access to virtual machines. `/26` is the minimum size required for the Bastion Standard SKU.
 snet-adds-01 | `10.1.1.0/24` | `/27` | Yes | Yes | Hosts the Active Directory Domain Services (AD DS) domain controller and DNS server.
 snet-misc-01 | `10.1.2.0/24` | `/27` | Yes | Yes | Reserved for optional configurations requiring connectivity in the shared virtual network.
 snet-misc-02 | `10.1.3.0/24` | `/27` | Yes | Yes | Reserved for optional configurations requiring connectivity in the shared virtual network.

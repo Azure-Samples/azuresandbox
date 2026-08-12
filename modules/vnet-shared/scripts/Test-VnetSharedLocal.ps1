@@ -3,7 +3,10 @@ param(
     [string]$ResourceGroupName,
 
     [Parameter(Mandatory = $true)]
-    [string]$FirewallName
+    [string]$FirewallName,
+
+    [Parameter(Mandatory = $true)]
+    [string]$BastionName
 )
 
 #region functions
@@ -33,7 +36,7 @@ $ProgressPreference = 'SilentlyContinue'
 $moduleName = 'vnet-shared'
 
 Write-Log "Starting local (control-plane) unit tests for module '$moduleName'..."
-Write-Log ("Parameters: ResourceGroupName='$ResourceGroupName' FirewallName='$FirewallName'")
+Write-Log ("Parameters: ResourceGroupName='$ResourceGroupName' FirewallName='$FirewallName' BastionName='$BastionName'")
 
 $passed = 0
 $failed = 0
@@ -86,6 +89,55 @@ try {
 }
 catch {
     Write-TestResult $moduleName 'FAIL' "Failed to verify diagnostic setting for Azure Firewall '$FirewallName'"
+    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    $failed++
+}
+
+# Test 2: Azure Bastion diagnostic setting streams audit logs and metrics to Log Analytics.
+# Confirms the Bastion host is integrated with the observability framework (issue #611). We
+# assert the BastionAuditLogs log category and the AllMetrics metric category are enabled.
+# BastionAuditLogs requires the Standard (or Premium) SKU. Unlike the firewall test we do NOT
+# assert logAnalyticsDestinationType: BastionAuditLogs only writes to the resource-specific
+# MicrosoftAzureBastionAuditLogs table, so Azure ignores/clears the destination-type toggle.
+try {
+    $bastion = Get-AzResource -ResourceGroupName $ResourceGroupName -ResourceType 'Microsoft.Network/bastionHosts' -Name $BastionName -ErrorAction Stop
+
+    # Get-AzDiagnosticSetting Log/Metric output properties are changing to List types in
+    # Az.Monitor 7.0.0; query the diagnostic settings via the REST API to stay version-agnostic.
+    $uri = "$($bastion.ResourceId)/providers/Microsoft.Insights/diagnosticSettings?api-version=2021-05-01-preview"
+    $response = Invoke-AzRestMethod -Method GET -Path $uri -ErrorAction Stop
+    $settings = ($response.Content | ConvertFrom-Json).value
+
+    $diagIssues = @()
+
+    $laSetting = $settings | Where-Object { $_.properties.workspaceId } | Select-Object -First 1
+
+    if (-not $laSetting) {
+        $diagIssues += 'no diagnostic setting targeting a Log Analytics workspace found'
+    }
+    else {
+        $enabledLogs = @($laSetting.properties.logs | Where-Object { $_.enabled } | ForEach-Object { $_.category })
+        if ($enabledLogs -notcontains 'BastionAuditLogs') {
+            $diagIssues += "log category 'BastionAuditLogs' is not enabled"
+        }
+
+        $metricsEnabled = @($laSetting.properties.metrics | Where-Object { $_.enabled -and $_.category -eq 'AllMetrics' })
+        if ($metricsEnabled.Count -eq 0) {
+            $diagIssues += "metric category 'AllMetrics' is not enabled"
+        }
+    }
+
+    if ($diagIssues.Count -eq 0) {
+        Write-TestResult $moduleName 'PASS' ("Bastion diagnostics: '$($laSetting.name)' streams 'BastionAuditLogs' and 'AllMetrics' to Log Analytics")
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' ("Bastion diagnostics: " + ($diagIssues -join '; '))
+        $failed++
+    }
+}
+catch {
+    Write-TestResult $moduleName 'FAIL' "Failed to verify diagnostic setting for Azure Bastion '$BastionName'"
     Write-TestResult $moduleName 'FAIL' "Exception: $_"
     $failed++
 }

@@ -69,12 +69,55 @@ resource "azurerm_bastion_host" "this" {
   name                = module.naming.bastion_host.name
   location            = var.location
   resource_group_name = var.resource_group_name
-  depends_on          = [azurerm_subnet.subnets]
+
+  # The Standard SKU is required to emit BastionAuditLogs via a diagnostic setting; the
+  # default Basic SKU does not support resource logs. Standard also requires an
+  # AzureBastionSubnet of /26 or larger (see subnet_AzureBastionSubnet_address_prefix).
+  sku = "Standard"
+
+  depends_on = [azurerm_subnet.subnets]
 
   ip_configuration {
     name                 = "Primary"
     subnet_id            = azurerm_subnet.subnets["AzureBastionSubnet"].id
     public_ip_address_id = azurerm_public_ip.bastion.id
+  }
+
+  # Standard SKU Bastion provisioning routinely exceeds the azurerm provider's default 30m
+  # create timeout (observed ~30m+ in testing), which aborts the apply with
+  # "context deadline exceeded" even though Azure finishes creating the host. Extend the
+  # create/update/delete timeouts to accommodate it.
+  timeouts {
+    create = "60m"
+    update = "60m"
+    delete = "60m"
+  }
+}
+
+# Routes Azure Bastion resource-specific audit logs and metrics to the shared Log Analytics
+# workspace owned by this module, mirroring the Azure Firewall and Key Vault diagnostic
+# wiring.
+#
+# BastionAuditLogs track which users connected to which workloads, when, and from where.
+# This category requires the Standard (or Premium) SKU configured on the Bastion host above;
+# it emits no data on the Basic SKU.
+#
+# Unlike the firewall diagnostic setting, log_analytics_destination_type is intentionally NOT
+# set here. BastionAuditLogs only ever writes to the resource-specific
+# MicrosoftAzureBastionAuditLogs table (there is no legacy AzureDiagnostics equivalent), so
+# Azure ignores the destination-type toggle and normalizes it back to null. Setting it to
+# "Dedicated" would therefore produce a perpetual in-place diff on every plan.
+resource "azurerm_monitor_diagnostic_setting" "bastion" {
+  name                       = "Diagnostic Logs"
+  target_resource_id         = azurerm_bastion_host.this.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
+
+  enabled_log {
+    category = "BastionAuditLogs"
+  }
+
+  enabled_metric {
+    category = "AllMetrics"
   }
 }
 

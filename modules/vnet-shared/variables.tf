@@ -109,7 +109,7 @@ variable "subnet_adds_address_prefix" {
 variable "subnet_AzureBastionSubnet_address_prefix" {
   type        = string
   description = "The address prefix for the AzureBastionSubnet subnet."
-  default     = "10.1.0.0/27" # TODO: eliminate this variable and calculate with a function
+  default     = "10.1.0.0/26" # TODO: eliminate this variable and calculate with a function. /26 is the minimum AzureBastionSubnet size required for the Standard SKU (host scaling).
 
   validation {
     condition     = can(cidrhost(var.subnet_AzureBastionSubnet_address_prefix, 0))
