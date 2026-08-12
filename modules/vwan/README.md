@@ -366,6 +366,7 @@ client_address_pool | `10.4.0.0/16` | The address range used for point-to-site V
 dns_server | `10.1.1.4` | The IP address of the DNS server used for the virtual network. Defined in the vnet-shared module.
 key_vault_id | | The ID of the key vault defined in the root module.
 location | | The Azure region defined in the root module.
+log_analytics_workspace_id | | The ID of the Log Analytics workspace where point-to-site VPN gateway diagnostic logs and metrics will be sent. Defined in the vnet-shared module.
 private_key_secret_version | 1 | Increment to create a new private key secret.
 resource_group_name | | The name of the resource group defined in the root module.
 tags | | The tags defined in the root module.
@@ -379,6 +380,7 @@ This section lists the resources included in this configuration.
 Address | Name | Notes
 --- | --- | ---
 module.vwan[0].azurerm_key_vault_secret.this | p2svpn&#8209;client&#8209;private&#8209;key&#8209;pem | Key vault secret used to secure the private key for the client certificate.
+module.vwan[0].azurerm_monitor_diagnostic_setting.this | Diagnostic Logs | The diagnostic setting that sends point-to-site VPN gateway *GatewayDiagnosticLog*, *IKEDiagnosticLog*, *P2SDiagnosticLog* logs and *AllMetrics* to the shared Log Analytics workspace.
 module.vwan[0].azurerm_point_to_site_vpn_gateway.this | vpngw&#8209;sand&#8209;dev | The Azure Virtual WAN point-to-site VPN gateway.
 module.vwan[0].azurerm_virtual_hub.this | vwan&#8209;sand&#8209;dev&#8209;hub | The Azure Virtual WAN hub.
 module.vwan[0].azurerm_virtual_hub_connection.connections[*] | | The Azure Virtual WAN hub connections to the virtual networks.

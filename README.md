@@ -62,7 +62,7 @@ Enable only the modules you need for your specific sandbox environment. Disable 
 * **Private Endpoints**: Pre-configured network isolated endpoints for PaaS services.
 * **Azure Firewall**: Pre-configured firewall for secure outbound internet access and threat intelligence. Structured (resource-specific) application-rule, network-rule, NAT-rule, threat-intel, and DNS-query logs plus metrics are routed to the shared Log Analytics workspace (high-volume aggregation/flow-trace and Premium-only IDPS categories are omitted by default to control ingestion cost).
 * **Azure Bastion**: Pre-configured Bastion (Standard SKU) for secure and seamless RDP/SSH access to virtual machines without exposing them to the public internet. Bastion audit logs (`BastionAuditLogs`) and metrics are routed to the shared Log Analytics workspace for observability.
-* **Point-to-site VPN Gateway**: Pre-configured point-to-site VPN gateway for secure remote access to your sandbox environment.
+* **Point-to-site VPN Gateway**: Pre-configured point-to-site VPN gateway for secure remote access to your sandbox environment. Gateway, IKE, and P2S diagnostic logs (`GatewayDiagnosticLog`, `IKEDiagnosticLog`, `P2SDiagnosticLog`) and metrics are routed to the shared Log Analytics workspace for observability.
 
 ### Pre-configured Virtual Machines
 
@@ -748,7 +748,7 @@ Bi-directional virtual network peering is enabled between the virtual networks i
 
 #### **Secure VPN Access**
 
-The optional *vwan* module implements an Azure Virtual WAN point-to-site VPN gateway for secure remote connectivity to your sandbox environment from a remote computer. This is ideal for scenarios where access via Bastion is not sufficient, for example if you need to transfer data into your sandbox environment or use tools that are only available on a remote computer. A self-signed certificate is used for authentication. The virtual WAN hub is connected to both the *vnet-shared* and *vnet-app* virtual networks, allowing secure VPN access to resources in your sandbox environment.
+The optional *vwan* module implements an Azure Virtual WAN point-to-site VPN gateway for secure remote connectivity to your sandbox environment from a remote computer. This is ideal for scenarios where access via Bastion is not sufficient, for example if you need to transfer data into your sandbox environment or use tools that are only available on a remote computer. A self-signed certificate is used for authentication. The virtual WAN hub is connected to both the *vnet-shared* and *vnet-app* virtual networks, allowing secure VPN access to resources in your sandbox environment. Gateway, IKE, and point-to-site diagnostic logs and metrics from the VPN gateway are routed to the shared Log Analytics workspace for observability.
 
 The following address ranges are used for the point-to-site VPN gateway:
 
