@@ -95,8 +95,10 @@ catch {
 
 # Test 2: Azure Bastion diagnostic setting streams audit logs and metrics to Log Analytics.
 # Confirms the Bastion host is integrated with the observability framework (issue #611). We
-# assert the resource-specific (Dedicated) BastionAuditLogs log category and the AllMetrics
-# metric category are enabled. BastionAuditLogs requires the Standard (or Premium) SKU.
+# assert the BastionAuditLogs log category and the AllMetrics metric category are enabled.
+# BastionAuditLogs requires the Standard (or Premium) SKU. Unlike the firewall test we do NOT
+# assert logAnalyticsDestinationType: BastionAuditLogs only writes to the resource-specific
+# MicrosoftAzureBastionAuditLogs table, so Azure ignores/clears the destination-type toggle.
 try {
     $bastion = Get-AzResource -ResourceGroupName $ResourceGroupName -ResourceType 'Microsoft.Network/bastionHosts' -Name $BastionName -ErrorAction Stop
 
@@ -123,14 +125,10 @@ try {
         if ($metricsEnabled.Count -eq 0) {
             $diagIssues += "metric category 'AllMetrics' is not enabled"
         }
-
-        if ($laSetting.properties.logAnalyticsDestinationType -ne 'Dedicated') {
-            $diagIssues += "logAnalyticsDestinationType is '$($laSetting.properties.logAnalyticsDestinationType)', expected 'Dedicated'"
-        }
     }
 
     if ($diagIssues.Count -eq 0) {
-        Write-TestResult $moduleName 'PASS' ("Bastion diagnostics: '$($laSetting.name)' streams 'BastionAuditLogs' and 'AllMetrics' to Log Analytics (Dedicated tables)")
+        Write-TestResult $moduleName 'PASS' ("Bastion diagnostics: '$($laSetting.name)' streams 'BastionAuditLogs' and 'AllMetrics' to Log Analytics")
         $passed++
     }
     else {

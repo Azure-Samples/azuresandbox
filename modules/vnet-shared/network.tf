@@ -84,20 +84,23 @@ resource "azurerm_bastion_host" "this" {
   }
 }
 
-# Routes Azure Bastion resource-specific (structured) audit logs and metrics to the shared
-# Log Analytics workspace owned by this module, mirroring the Azure Firewall and Key Vault
-# diagnostic wiring. log_analytics_destination_type = "Dedicated" writes to the
-# resource-specific MicrosoftAzureBastionAuditLogs table rather than the legacy
-# AzureDiagnostics table.
+# Routes Azure Bastion resource-specific audit logs and metrics to the shared Log Analytics
+# workspace owned by this module, mirroring the Azure Firewall and Key Vault diagnostic
+# wiring.
 #
 # BastionAuditLogs track which users connected to which workloads, when, and from where.
 # This category requires the Standard (or Premium) SKU configured on the Bastion host above;
 # it emits no data on the Basic SKU.
+#
+# Unlike the firewall diagnostic setting, log_analytics_destination_type is intentionally NOT
+# set here. BastionAuditLogs only ever writes to the resource-specific
+# MicrosoftAzureBastionAuditLogs table (there is no legacy AzureDiagnostics equivalent), so
+# Azure ignores the destination-type toggle and normalizes it back to null. Setting it to
+# "Dedicated" would therefore produce a perpetual in-place diff on every plan.
 resource "azurerm_monitor_diagnostic_setting" "bastion" {
-  name                           = "Diagnostic Logs"
-  target_resource_id             = azurerm_bastion_host.this.id
-  log_analytics_workspace_id     = azurerm_log_analytics_workspace.this.id
-  log_analytics_destination_type = "Dedicated"
+  name                       = "Diagnostic Logs"
+  target_resource_id         = azurerm_bastion_host.this.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
 
   enabled_log {
     category = "BastionAuditLogs"
