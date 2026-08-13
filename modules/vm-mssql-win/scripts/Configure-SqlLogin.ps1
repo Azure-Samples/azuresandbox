@@ -18,6 +18,15 @@ function Exit-WithError {
     Exit 2
 }
 
+# Application name the single-user-mode instance is restricted to (via the -m"<app>" startup option) and
+# that this script's connections identify themselves with. When SQL Server is started in single-user mode
+# without an application-name restriction, ANY process (SQL Agent, the Azure Monitor Agent, anti-malware,
+# etc.) can grab the single reserved connection first. If that happens, this script's connection either
+# fails to open or opens without sysadmin rights, producing the "User does not have permission to perform
+# this action" error seen on CREATE LOGIN. Restricting single-user mode to this application name reserves
+# the connection for this script. The value is case-sensitive and must match the -m"<app>" argument.
+$SingleUserAppName = 'ConfigureSqlLogin'
+
 function Invoke-Sql {
     param (
         [Parameter(Mandatory = $true)]
@@ -30,40 +39,43 @@ function Invoke-Sql {
     $cxnstring."Integrated Security" = $true
     $cxnstring."Encrypt" = $true
     $cxnstring."TrustServerCertificate" = $true
-
-    $cxn = New-Object System.Data.SqlClient.SqlConnection($cxnstring.ConnectionString)
+    $cxnstring."Application Name" = $SingleUserAppName
 
     $maxRetries = 10
     $retryCount = 0
     $retryDelay = 30
 
-    while ($retryCount -lt $maxRetries) {
+    # The retry loop wraps the ENTIRE connect + execute cycle (with a fresh connection each attempt), not
+    # just Open(). The single-user-mode race can also surface as a permission error on ExecuteNonQuery (the
+    # connection opens but isn't the privileged single-user session yet), so retrying only the open is not
+    # enough - the whole operation must be retried until it succeeds or the attempts are exhausted.
+    while ($true) {
+        $retryCount++
+        $cxn = New-Object System.Data.SqlClient.SqlConnection($cxnstring.ConnectionString)
+
         try {
             $cxn.Open()
-            break
+            $cmd = $cxn.CreateCommand()
+            $cmd.CommandText = $SqlCommand
+            $cmd.ExecuteNonQuery() | Out-Null
+            return
         }
         catch {
-            $retryCount++
-            Write-ScriptLog "Invoke-Sql: Attempt $retryCount failed to connect. Retrying in $retryDelay seconds..."
+            if ($retryCount -ge $maxRetries) {
+                Exit-WithError "Invoke-Sql: Failed to execute SQL command after $maxRetries attempts. Last error: $($_.Exception.Message)"
+            }
+
+            Write-ScriptLog "Invoke-Sql: Attempt $retryCount failed ($($_.Exception.Message)). Retrying in $retryDelay seconds..."
             Start-Sleep -Seconds $retryDelay
         }
-    }
+        finally {
+            if ($cxn.State -ne [System.Data.ConnectionState]::Closed) {
+                $cxn.Close()
+            }
 
-    if ($retryCount -eq $maxRetries) {
-        Exit-WithError "Invoke-Sql: Failed to open SQL connection after $maxRetries attempts."
+            $cxn.Dispose()
+        }
     }
-
-    $cmd = $cxn.CreateCommand()
-    $cmd.CommandText = $SqlCommand
-
-    try {
-        $cmd.ExecuteNonQuery() | Out-Null
-    }
-    catch {
-        Exit-WithError $_
-    }
-
-    $cxn.Close() | Out-Null
 }
 #endregion
 
@@ -87,8 +99,8 @@ Write-ScriptLog "SQL Server service stopped."
 # Sysadmin privileges are required to create logins and assign server roles
 # Starting SQL Server in single-user mode allows the first connection to have sysadmin privileges
 
-Write-ScriptLog "Starting SQL Server in single-user mode..."
-net start $sqlServiceName /m | Out-Null
+Write-ScriptLog "Starting SQL Server in single-user mode (restricted to application '$SingleUserAppName')..."
+net start $sqlServiceName "/m$SingleUserAppName" | Out-Null
 
 $svcStatus = (Get-Service -Name $sqlServiceName).Status
 
@@ -101,7 +113,7 @@ Write-ScriptLog "SQL Server started in single-user mode."
 try {
     # Configure SQL Server login and sysadmin role for domain admin
     Write-ScriptLog "Creating SQL Server login for '$DomainAdminUser'..."
-    Invoke-Sql "CREATE LOGIN [$DomainAdminUser] FROM WINDOWS;"
+    Invoke-Sql "IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = '$DomainAdminUser') CREATE LOGIN [$DomainAdminUser] FROM WINDOWS;"
 
     Write-ScriptLog "Adding '$DomainAdminUser' to sysadmin role..."
     Invoke-Sql "ALTER SERVER ROLE [sysadmin] ADD MEMBER [$DomainAdminUser];"
