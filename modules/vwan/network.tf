@@ -38,6 +38,31 @@ resource "azurerm_point_to_site_vpn_gateway" "this" {
   }
 }
 
+# Routes point-to-site VPN gateway diagnostic logs and metrics to the shared Log Analytics
+# workspace owned by the vnet-shared module. Only the p2svpngateways resource type emits
+# resource logs in this module; the virtual WAN and hub expose platform metrics only.
+resource "azurerm_monitor_diagnostic_setting" "this" {
+  name                       = "Diagnostic Logs"
+  target_resource_id         = azurerm_point_to_site_vpn_gateway.this.id
+  log_analytics_workspace_id = var.log_analytics_workspace_id
+
+  enabled_log {
+    category = "GatewayDiagnosticLog"
+  }
+
+  enabled_log {
+    category = "IKEDiagnosticLog"
+  }
+
+  enabled_log {
+    category = "P2SDiagnosticLog"
+  }
+
+  enabled_metric {
+    category = "AllMetrics"
+  }
+}
+
 resource "azurerm_vpn_server_configuration" "this" {
   name                     = "${module.naming.point_to_site_vpn_gateway.name}-server-config"
   resource_group_name      = var.resource_group_name

@@ -335,11 +335,12 @@ module "vwan" {
 
   count = var.enable_module_vwan ? 1 : 0
 
-  dns_server          = module.vnet_shared.dns_server
-  key_vault_id        = module.vnet_shared.resource_ids["key_vault"]
-  location            = azurerm_resource_group.this.location
-  resource_group_name = azurerm_resource_group.this.name
-  tags                = local.tags
+  dns_server                 = module.vnet_shared.dns_server
+  key_vault_id               = module.vnet_shared.resource_ids["key_vault"]
+  location                   = azurerm_resource_group.this.location
+  log_analytics_workspace_id = module.vnet_shared.resource_ids["log_analytics_workspace"]
+  resource_group_name        = azurerm_resource_group.this.name
+  tags                       = local.tags
 
   virtual_networks = {
     virtual_network_shared = module.vnet_shared.resource_ids["virtual_network_shared"]
