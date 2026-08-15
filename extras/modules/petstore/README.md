@@ -38,6 +38,8 @@ Follow these steps after deployment to validate functionality.
      --analytics-query "AppRequests | where TimeGenerated > ago(30m) | summarize count() by ResultCode"
    ```
 
+   > This telemetry-ingestion check is also automated: `Test-Integration-Petstore.ps1` (run via `Invoke-UnitTests.ps1 -Module petstore -Integration`) queries the Log Analytics workspace from *jumpwin1* and asserts that `AppRequests` with `AppRoleName='petstore'` have been ingested, confirming the end-to-end Entra ID telemetry path.
+
 ## Documentation
 
 Additional information about this module.
