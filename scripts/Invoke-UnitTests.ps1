@@ -475,6 +475,7 @@ $testConfigs = [ordered]@{
             ContainerAppEnvironmentName  = $resourceNames['container_app_environment']
             ContainerAppName             = 'petstore'
             ContainerRegistryName        = $resourceNames['container_registry']
+            ApplicationInsightsName      = $resourceNames['application_insights']
         }
     }
     '$local_vwan' = @{

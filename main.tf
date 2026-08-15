@@ -357,16 +357,19 @@ module "petstore" {
 
   count = var.enable_module_petstore ? 1 : 0
 
-  arm_client_secret          = var.arm_client_secret
-  container_apps_subnet_id   = module.vnet_app[0].subnets["snet-containerapps-01"].id
-  container_registry_id      = module.vnet_app[0].resource_ids["container_registry"]
-  location                   = azurerm_resource_group.this.location
-  log_analytics_workspace_id = module.vnet_shared.resource_ids["log_analytics_workspace"]
-  private_dns_zone_id        = module.vnet_app[0].private_dns_zones["privatelink.${var.location}.azurecontainerapps.io"].id
-  private_endpoint_subnet_id = module.vnet_app[0].subnets["snet-privatelink-01"].id
-  resource_group_name        = azurerm_resource_group.this.name
-  tags                       = local.tags
-  unique_seed                = module.naming.unique-seed
+  app_insights_connection_string = module.vnet_app[0].app_insights_connection_string
+  app_insights_id                = module.vnet_app[0].resource_ids["application_insights"]
+  container_apps_subnet_id       = module.vnet_app[0].subnets["snet-containerapps-01"].id
+  container_registry_id          = module.vnet_app[0].resource_ids["container_registry"]
+  jumplinux1_principal_id        = module.vm_jumpbox_linux[0].virtual_machine_jumplinux1_identity.principal_id
+  jumplinux1_vm_id               = module.vm_jumpbox_linux[0].resource_ids["virtual_machine_jumplinux1"]
+  location                       = azurerm_resource_group.this.location
+  log_analytics_workspace_id     = module.vnet_shared.resource_ids["log_analytics_workspace"]
+  private_dns_zone_id            = module.vnet_app[0].private_dns_zones["privatelink.${var.location}.azurecontainerapps.io"].id
+  private_endpoint_subnet_id     = module.vnet_app[0].subnets["snet-privatelink-01"].id
+  resource_group_name            = azurerm_resource_group.this.name
+  tags                           = local.tags
+  unique_seed                    = module.naming.unique-seed
 
   depends_on = [module.vnet_app[0].azure_files_config_vm_extension_id] # Ensure that Azure Files is configured
 }

@@ -1,7 +1,3 @@
-#region data
-data "azurerm_client_config" "current" {}
-#endregion
-
 #region resources
 resource "azurerm_container_app" "this" {
   name                         = "petstore"
@@ -10,18 +6,41 @@ resource "azurerm_container_app" "this" {
   revision_mode                = "Single"
   workload_profile_name        = "Consumption"
 
+  identity {
+    type = "SystemAssigned"
+  }
+
   depends_on = [
-    null_resource.this,
-    azurerm_role_assignment.this,
+    azurerm_virtual_machine_run_command.build_image,
+    azurerm_role_assignment.acr_pull,
     azurerm_private_endpoint.this
   ]
 
   template {
     container {
-      name   = local.image_name
-      image  = "${local.login_server}/${local.image_name}:latest"
+      name   = "petstore"
+      image  = local.image_reference
       cpu    = "1"
       memory = "2Gi"
+
+      # Application Insights connection string (endpoint/resource pointer). Local
+      # (instrumentation key) authentication is disabled on the shared Application
+      # Insights resource, so the Java agent authenticates with Microsoft Entra ID
+      # using the container app's system-assigned managed identity.
+      env {
+        name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+        value = var.app_insights_connection_string
+      }
+
+      env {
+        name  = "APPLICATIONINSIGHTS_AUTHENTICATION_STRING"
+        value = "Authorization=AAD"
+      }
+
+      env {
+        name  = "APPLICATIONINSIGHTS_ROLE_NAME"
+        value = var.appinsights_role_name
+      }
     }
 
     min_replicas = 0
@@ -65,20 +84,50 @@ resource "azurerm_container_app_environment" "this" {
   }
 }
 
-resource "azurerm_role_assignment" "this" {
+#region role-assignments
+# The container app environment pulls the instrumented image from the private registry.
+resource "azurerm_role_assignment" "acr_pull" {
   scope                = var.container_registry_id
   role_definition_name = "AcrPull"
   principal_id         = azurerm_container_app_environment.this.identity[0].principal_id
   principal_type       = "ServicePrincipal"
 }
+
+# jumplinux1 builds and pushes the instrumented image to the private registry.
+resource "azurerm_role_assignment" "acr_push" {
+  scope                = var.container_registry_id
+  role_definition_name = "AcrPush"
+  principal_id         = var.jumplinux1_principal_id
+  principal_type       = "ServicePrincipal"
+}
+
+# The container app publishes telemetry to the shared Application Insights resource
+# using Microsoft Entra ID authentication (local auth is disabled).
+resource "azurerm_role_assignment" "app_insights_publisher" {
+  scope                = var.app_insights_id
+  role_definition_name = "Monitoring Metrics Publisher"
+  principal_id         = azurerm_container_app.this.identity[0].principal_id
+  principal_type       = "ServicePrincipal"
+}
+#endregion
 #endregion
 
 #region utility-resources
-resource "null_resource" "this" {
-  provisioner "local-exec" {
-    command     = "$params = @{ ${join(" ", local.local_scripts["configure_registry"].parameters)}}; ./${path.module}/scripts/${local.local_scripts["configure_registry"].name} @params"
-    interpreter = ["pwsh", "-Command"]
+# Build the Application Insights-instrumented image on jumplinux1 (in-VNet Docker
+# host) and push it to the network-isolated registry. Running the build inside the
+# virtual network keeps the registry private. The run command re-executes whenever
+# the generated script changes (e.g. a new agent version); the script itself is
+# idempotent and skips the build when the tag already exists in the registry.
+resource "azurerm_virtual_machine_run_command" "build_image" {
+  name               = "BuildPetstoreImage"
+  location           = var.location
+  virtual_machine_id = var.jumplinux1_vm_id
+
+  source {
+    script = local.build_image_script
   }
+
+  depends_on = [azurerm_role_assignment.acr_push]
 }
 #endregion
 
