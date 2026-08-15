@@ -40,6 +40,14 @@ Follow these steps after deployment to validate functionality.
 
    > This telemetry-ingestion check is also automated: `Test-Integration-Petstore.ps1` (run via `Invoke-UnitTests.ps1 -Module petstore -Integration`) queries the Log Analytics workspace from *jumpwin1* and asserts that `AppRequests` with `AppRoleName='petstore'` have been ingested, confirming the end-to-end Entra ID telemetry path.
 
+5. *(Optional, for Application Insights demos)* Generate a richer, sustained mix of successful and failing traffic to populate the Application Insights **Performance**, **Requests**, **Failures**, and **Smart Detection** blades. Because the Container App is network isolated, run the demo load generator from *jumpwin1*:
+
+   ```powershell
+   ./scripts/Invoke-PetstoreLoad.ps1 -PetstoreFqdn '<petstore-fqdn>' -DurationSeconds 300 -FailureRate 0.3
+   ```
+
+   It sends a weighted blend of valid operations (HTTP 200) and deliberate failures (HTTP 4xx) against the real `/api/v31/pet` endpoints for the requested duration, then prints a status-code breakdown. Review the resulting telemetry from *jumpwin1* using the Application Insights portal blades. This script is an on-demand demo utility and is not part of `terraform apply`.
+
 ## Documentation
 
 Additional information about this module.
@@ -66,6 +74,7 @@ This module depends upon resources provisioned in the following modules:
 |   └── petstore-diagram.drawio.svg     # Architecture diagram for module
 ├── scripts/
 |   ├── build-petstore-image.sh         # Builds/pushes the instrumented image on jumplinux1
+|   ├── Invoke-PetstoreLoad.ps1         # On-demand demo load/failure generator (run from jumpwin1)
 |   └── Test-Petstore.ps1               # Unit test script
 ├── Dockerfile                          # Adds the Application Insights Java agent to the stock image
 ├── locals.tf                           # Local values (derived names, build script)
