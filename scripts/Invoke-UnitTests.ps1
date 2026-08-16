@@ -475,6 +475,7 @@ $testConfigs = [ordered]@{
             ContainerAppEnvironmentName  = $resourceNames['container_app_environment']
             ContainerAppName             = 'petstore'
             ContainerRegistryName        = $resourceNames['container_registry']
+            ApplicationInsightsName      = $resourceNames['application_insights']
         }
     }
     '$local_vwan' = @{
@@ -668,7 +669,9 @@ if ($runIntegration) {
             ScriptPath   = Join-Path $repoRoot 'scripts' 'Test-Integration-Petstore.ps1'
             CommandId    = 'RunPowerShellScript'
             Parameters   = @{
-                PetstoreFqdn = $fqdns['petstore']
+                PetstoreFqdn                    = $fqdns['petstore']
+                LogAnalyticsWorkspaceResourceId = "/subscriptions/$($context.Subscription.Id)/resourceGroups/$resourceGroupName/providers/Microsoft.OperationalInsights/workspaces/$($resourceNames['log_analytics_workspace'])"
+                ExpectedRoleName                = 'petstore'
             }
         }
         @{
