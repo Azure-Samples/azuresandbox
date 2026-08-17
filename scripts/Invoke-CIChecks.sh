@@ -17,8 +17,8 @@
 #   ./scripts/Invoke-CIChecks.sh bash terraform  # run only the named checks
 #
 # Available checks (map 1:1 to a CI workflow):
-#   bash        ShellCheck                  (ci-bash.yml)        pin 0.10.0
-#   powershell  PSScriptAnalyzer            (ci-powershell.yml)  pin 1.24.0
+#   bash        ShellCheck                  (ci-bash.yml)        pin 0.11.0
+#   powershell  PSScriptAnalyzer            (ci-powershell.yml)  pin 1.25.0
 #   markdown    markdownlint-cli2           (ci-docs.yml)        pin 0.23.2
 #   links       lychee (offline/internal)   (ci-docs.yml)
 #   actions     actionlint                  (ci-actions.yml)     pin 1.7.12
@@ -70,7 +70,7 @@ skip() {
 }
 
 check_bash() {
-    have shellcheck || { skip bash "install shellcheck 0.10.0 (https://github.com/koalaman/shellcheck/releases)"; return; }
+    have shellcheck || { skip bash "install shellcheck 0.11.0 (https://github.com/koalaman/shellcheck/releases)"; return; }
     run_check bash "$repo_root/scripts/Invoke-ShellCheck.sh"
 }
 
@@ -78,7 +78,7 @@ check_powershell() {
     have pwsh || { skip powershell "install PowerShell 7.x (pwsh)"; return; }
     run_check powershell pwsh -NoProfile -Command '
         if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
-            Write-Host "SKIPPED: install PSScriptAnalyzer 1.24.0 (Install-Module PSScriptAnalyzer -RequiredVersion 1.24.0)"; exit 0
+            Write-Host "SKIPPED: install PSScriptAnalyzer 1.25.0 (Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0)"; exit 0
         }
         $r = Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./PSScriptAnalyzerSettings.psd1 -Severity @("Error","Warning")
         if ($r) { $r | Format-Table -AutoSize Severity, RuleName, ScriptName, Line, Message | Out-String -Width 200 | Write-Host; exit 1 }
