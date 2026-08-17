@@ -28,6 +28,11 @@
 # A missing tool is reported as SKIPPED (with an install hint) and does not fail
 # the run, but the final summary flags it so you know the gate was not verified.
 # Exit code: 0 when nothing FAILED, non-zero otherwise (CI-friendly).
+#
+# The tool version pins above are mirrored from the CI workflows and are NOT
+# tracked by Dependabot. The scheduled ci-tool-versions.yml workflow (and its
+# scripts/Check-ToolVersionDrift.sh helper) watches for upstream drift and files
+# a tracking issue when any pin here or in a workflow falls behind latest.
 
 set -uo pipefail
 

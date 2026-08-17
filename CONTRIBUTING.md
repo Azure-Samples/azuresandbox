@@ -138,7 +138,7 @@ To reproduce the checks locally before opening a PR:
 
 ```bash
 # Docs
-npx --yes markdownlint-cli2@0.22.1
+npx --yes markdownlint-cli2@0.23.2
 lychee --offline --no-progress './**/*.md'
 
 # Terraform
@@ -157,6 +157,10 @@ pwsh -NoProfile -Command "Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./PSS
 The PSScriptAnalyzer settings file excludes a small set of rules that conflict with intentional patterns in this deployment-automation codebase (for example, `Write-Host` console output, the project's own `Write-Log` helper, and plaintext-to-`SecureString` conversion required for unattended VM configuration). Each exclusion is documented inline in `PSScriptAnalyzerSettings.psd1`.
 
 `ci-bash` runs ShellCheck at `--severity=warning` (the warning + error gate, mirroring the PowerShell CI). `scripts/Invoke-ShellCheck.sh` runs the identical command locally and shares the repo-root `.shellcheckrc`, so local results match CI exactly. A single documented `# shellcheck disable=SC2024` is applied in `modules/vm-jumpbox-linux/scripts/configure-vm-jumpbox-linux.sh`, where `sudo <cmd> >> $log_file` intentionally elevates only the command while appending to the user-owned log; the justification is recorded inline at the top of that script.
+
+### Automated CI tool-version drift detection
+
+Each CI linter/scanner is pinned to a specific tool version — ShellCheck, actionlint, and gitleaks as direct binary downloads (env-var version + SHA256), PSScriptAnalyzer via `Install-Module -RequiredVersion`, markdownlint-cli2 via `npx …@<ver>`, and Terraform CLI / tflint / the tflint `azurerm` ruleset via setup-action inputs and `.tflint.hcl`. Dependabot only tracks the `terraform` and `github-actions` ecosystems (see [`.github/dependabot.yml`](.github/dependabot.yml)), so it cannot see any of these pins. The scheduled [`ci-tool-versions`](.github/workflows/ci-tool-versions.yml) workflow fills that gap: weekly it runs [`scripts/Check-ToolVersionDrift.sh`](scripts/Check-ToolVersionDrift.sh), which compares every pin against its upstream latest stable release and, when anything is behind, opens (or updates) a **single** tracking issue — labelled `tool-version-drift` — listing each drifted tool's current pin, latest version, and every file that must be updated (the workflow, the mirrored copy in `scripts/Invoke-CIChecks.sh`, plus `.tflint.hcl` for the ruleset and `terraform.tf` for the Terraform CLI). The issue is closed automatically once all pins are back in sync. Run the detector locally at any time with `./scripts/Check-ToolVersionDrift.sh`. When bumping a tool, update every file the report lists and re-run `./scripts/Invoke-CIChecks.sh` before pushing so the pins stay consistent.
 
 ## Submission Guidelines
 
