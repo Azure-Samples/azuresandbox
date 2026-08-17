@@ -6,6 +6,8 @@
   "globs": ["**/*.md"],
   "ignores": [
     "node_modules",
+    // Downloaded provider/module cache (git-ignored); not present in CI's fresh checkout.
+    "**/.terraform",
     // Frozen/retired module — excluded from maintenance tooling (see dependabot.yml).
     "extras/modules/retired",
     // Agent tooling configuration, not project documentation.

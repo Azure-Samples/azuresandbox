@@ -19,7 +19,7 @@
 # Available checks (map 1:1 to a CI workflow):
 #   bash        ShellCheck                  (ci-bash.yml)        pin 0.10.0
 #   powershell  PSScriptAnalyzer            (ci-powershell.yml)  pin 1.24.0
-#   markdown    markdownlint-cli2           (ci-docs.yml)        pin 0.22.1
+#   markdown    markdownlint-cli2           (ci-docs.yml)        pin 0.23.2
 #   links       lychee (offline/internal)   (ci-docs.yml)
 #   actions     actionlint                  (ci-actions.yml)     pin 1.7.12
 #   secrets     gitleaks                    (ci-secrets.yml)     pin 8.30.1
@@ -82,7 +82,7 @@ check_powershell() {
 
 check_markdown() {
     have npx || { skip markdown "install Node.js/npm (provides npx)"; return; }
-    run_check markdown npx --yes markdownlint-cli2@0.22.1
+    run_check markdown npx --yes markdownlint-cli2@0.23.2
 }
 
 check_links() {
