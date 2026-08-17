@@ -16,9 +16,6 @@ param (
     [String]$SubscriptionId,
 
     [Parameter(Mandatory = $true)]
-    [String]$AppId,
-
-    [Parameter(Mandatory = $true)]
     [String]$ResourceGroupName,
 
     [Parameter(Mandatory = $true)]

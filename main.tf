@@ -205,7 +205,6 @@ module "naming" {
 module "vnet_shared" {
   source = "./modules/vnet-shared"
 
-  arm_client_secret   = var.arm_client_secret
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
   tags                = local.tags
