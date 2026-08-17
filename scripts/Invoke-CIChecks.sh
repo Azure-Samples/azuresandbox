@@ -23,7 +23,7 @@
 #   links       lychee (offline/internal)   (ci-docs.yml)
 #   actions     actionlint                  (ci-actions.yml)     pin 1.7.12
 #   secrets     gitleaks                    (ci-secrets.yml)     pin 8.30.1
-#   terraform   terraform fmt + tflint      (ci-terraform.yml)   tflint pin v0.63.1
+#   terraform   terraform fmt + tflint      (ci-terraform.yml)   tflint pin v0.64.0
 #
 # A missing tool is reported as SKIPPED (with an install hint) and does not fail
 # the run, but the final summary flags it so you know the gate was not verified.
@@ -113,7 +113,7 @@ check_terraform() {
         done < <(find . -name .tflint.hcl -printf '%h\n' | sort -u)
         run_check tflint tflint --recursive
     else
-        skip tflint "install tflint v0.63.1 (https://github.com/terraform-linters/tflint)"
+        skip tflint "install tflint v0.64.0 (https://github.com/terraform-linters/tflint)"
     fi
 }
 
