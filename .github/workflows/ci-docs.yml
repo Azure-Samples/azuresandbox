@@ -62,7 +62,7 @@ jobs:
       # validated against. Globs and ignores come from .markdownlint-cli2.jsonc;
       # rule configuration comes from .markdownlint.jsonc.
       - name: Run markdownlint-cli2
-        run: npx --yes markdownlint-cli2@0.22.1
+        run: npx --yes markdownlint-cli2@0.23.2
 
   lychee:
     name: lychee (internal links)
