@@ -1,11 +1,43 @@
-variable "arm_client_secret" {
+variable "app_insights_connection_string" {
   type        = string
-  description = "The password for the service principal used for authenticating with Azure. Set interactively or using an environment variable 'TF_VAR_arm_client_secret'."
+  description = "The connection string of the shared Application Insights resource. Local (instrumentation key) authentication is disabled, so this is only an endpoint/resource pointer; telemetry is authenticated with Microsoft Entra ID."
   sensitive   = true
 
   validation {
-    condition     = length(var.arm_client_secret) >= 8
-    error_message = "Must be at least 8 characters long."
+    condition     = can(regex("InstrumentationKey=", var.app_insights_connection_string))
+    error_message = "Must be a valid Application Insights connection string containing 'InstrumentationKey='."
+  }
+}
+
+variable "app_insights_id" {
+  type        = string
+  description = "The resource ID of the shared Application Insights resource that the container app publishes telemetry to."
+
+  validation {
+    condition     = can(regex("^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[a-zA-Z0-9._()-]+/providers/Microsoft.Insights/components/[a-zA-Z0-9._-]+$", var.app_insights_id))
+    error_message = "Must be a valid Application Insights (Microsoft.Insights/components) resource ID."
+  }
+}
+
+variable "appinsights_agent_version" {
+  type        = string
+  description = "The version of the Application Insights Java agent to install in the image. Also used as the image tag."
+  default     = "3.7.9"
+
+  validation {
+    condition     = can(regex("^[0-9]+\\.[0-9]+\\.[0-9]+$", var.appinsights_agent_version))
+    error_message = "Must be a valid semantic version (e.g. '3.7.9')."
+  }
+}
+
+variable "appinsights_role_name" {
+  type        = string
+  description = "The cloud role name reported to Application Insights (AppRoleName). Defaults to 'petstore'."
+  default     = "petstore"
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9._-]{1,255}$", var.appinsights_role_name))
+    error_message = "Must be 1-255 characters and consist of alphanumeric characters, periods (.), underscores (_), or hyphens (-)."
   }
 }
 
@@ -26,6 +58,26 @@ variable "container_registry_id" {
   validation {
     condition     = can(regex("^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[a-zA-Z0-9._()-]+/providers/Microsoft.ContainerRegistry/registries/[a-zA-Z0-9-]+$", var.container_registry_id))
     error_message = "Must be a valid Azure Container Registry resource ID in the format '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.ContainerRegistry/registries/{registryName}'."
+  }
+}
+
+variable "jumplinux1_principal_id" {
+  type        = string
+  description = "The principal ID of the jumplinux1 system-assigned managed identity, granted AcrPush to build and push the instrumented image."
+
+  validation {
+    condition     = can(regex("^[0-9a-fA-F-]{36}$", var.jumplinux1_principal_id))
+    error_message = "Must be a valid GUID."
+  }
+}
+
+variable "jumplinux1_vm_id" {
+  type        = string
+  description = "The resource ID of the jumplinux1 virtual machine (from the vm-jumpbox-linux module) used to build and push the instrumented image."
+
+  validation {
+    condition     = can(regex("^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[a-zA-Z0-9._()-]+/providers/Microsoft.Compute/virtualMachines/[a-zA-Z0-9._-]+$", var.jumplinux1_vm_id))
+    error_message = "Must be a valid Azure virtual machine resource ID."
   }
 }
 
@@ -81,23 +133,12 @@ variable "resource_group_name" {
 
 variable "source_container_image" {
   type        = string
-  description = "The name of the container image to import."
+  description = "The stock container image used as the base image for the instrumented build."
   default     = "swaggerapi/petstore31:latest"
 
   validation {
     condition     = can(regex("^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+:[a-zA-Z0-9._-]+$", var.source_container_image))
     error_message = "Must be a valid Docker image name in the format 'repository/image:tag'."
-  }
-}
-
-variable "source_container_registry" {
-  type        = string
-  description = "The name of the source container registry."
-  default     = "docker.io"
-
-  validation {
-    condition     = can(regex("^([a-zA-Z0-9-]+\\.)*[a-zA-Z0-9-]+\\.[a-zA-Z]{2,}$", var.source_container_registry))
-    error_message = "Must be a valid domain name (e.g., 'docker.io', 'registry.example.com')."
   }
 }
 

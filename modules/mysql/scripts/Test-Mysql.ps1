@@ -150,6 +150,52 @@ catch {
     $failed++
 }
 
+# Test 6: Diagnostic setting streams MySQL logs and metrics to Log Analytics
+try {
+    $server = Get-AzResource -ResourceGroupName $ResourceGroupName -ResourceType 'Microsoft.DBforMySQL/flexibleServers' -Name $MysqlServerName -ErrorAction Stop
+
+    # Get-AzDiagnosticSetting Log/Metric output properties are changing to List types in
+    # Az.Monitor 7.0.0; query the diagnostic settings via the REST API to stay version-agnostic.
+    $uri = "$($server.ResourceId)/providers/Microsoft.Insights/diagnosticSettings?api-version=2021-05-01-preview"
+    $response = Invoke-AzRestMethod -Method GET -Path $uri -ErrorAction Stop
+    $settings = ($response.Content | ConvertFrom-Json).value
+
+    $diagIssues = @()
+
+    $laSetting = $settings | Where-Object { $_.properties.workspaceId } | Select-Object -First 1
+
+    if (-not $laSetting) {
+        $diagIssues += 'no diagnostic setting targeting a Log Analytics workspace found'
+    }
+    else {
+        $enabledLogs = @($laSetting.properties.logs | Where-Object { $_.enabled } | ForEach-Object { $_.category })
+        foreach ($category in @('MySqlSlowLogs', 'MySqlAuditLogs')) {
+            if ($enabledLogs -notcontains $category) {
+                $diagIssues += "log category '$category' is not enabled"
+            }
+        }
+
+        $metricsEnabled = @($laSetting.properties.metrics | Where-Object { $_.enabled -and $_.category -eq 'AllMetrics' })
+        if ($metricsEnabled.Count -eq 0) {
+            $diagIssues += "metric category 'AllMetrics' is not enabled"
+        }
+    }
+
+    if ($diagIssues.Count -eq 0) {
+        Write-TestResult $moduleName 'PASS' ("Diagnostic setting '$($laSetting.name)' streams 'MySqlSlowLogs', 'MySqlAuditLogs', and 'AllMetrics' to Log Analytics")
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' ("Diagnostic setting issues: " + ($diagIssues -join '; '))
+        $failed++
+    }
+}
+catch {
+    Write-TestResult $moduleName 'FAIL' "Failed to verify diagnostic setting for MySQL Flexible Server '$MysqlServerName'"
+    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    $failed++
+}
+
 # Summary
 $total = $passed + $failed
 Write-TestResult $moduleName 'SUMMARY' ("Passed: $passed Failed: $failed Total: $total")

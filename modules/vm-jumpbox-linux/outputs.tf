@@ -19,3 +19,10 @@ output "log_analytics_operations_complete" {
   value       = terraform_data.log_analytics_operations_complete.id
   description = "Dependency signal: AMA install and DCR/DCE associations on jumplinux1 are complete. Consumed by the root ampls_access_barrier."
 }
+
+output "virtual_machine_jumplinux1_identity" {
+  value = {
+    principal_id = azurerm_linux_virtual_machine.this.identity[0].principal_id
+  }
+  description = "The system-assigned managed identity of jumplinux1. Consumed by the petstore module to grant AcrPush for building and pushing the instrumented image."
+}

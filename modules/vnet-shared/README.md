@@ -88,12 +88,11 @@ admin_password_secret | adminpassword | The name of the key vault secret contain
 admin_password_secret_version | 1 | Increment to create a new admin password secret.
 admin_username | bootstrapadmin | The default admin username used when configuring services.
 admin_username_secret | adminuser | The name of the key vault secret containing the admin username.
-arm_client_secret | | The password for the service principal used for authenticating with Azure. Set interactively or using an environment variable 'TF_VAR_arm_client_secret'.
 location | | The Azure region defined in the root module.
 log_analytics_workspace_retention_days | 30 | The retention period for the new log analytics workspace.
 resource_group_name | | The resource group defined in the root module.
 subnet_adds_address_prefix | 10.1.1.0/24 | The address prefix for the AD Domain Services subnet.
-subnet_AzureBastionSubnet_address_prefix | 10.1.0.0/27 | The address prefix for the AzureBastionSubnet subnet.
+subnet_AzureBastionSubnet_address_prefix | 10.1.0.0/26 | The address prefix for the AzureBastionSubnet subnet. `/26` is the minimum size required for the Bastion Standard SKU (host scaling).
 subnet_AzureFirewallSubnet_address_prefix | 10.1.4.0/26 | The address prefix for the AzureFirewallSubnet subnet.
 subnet_misc_address_prefix | 10.1.2.0/24 | The address prefix for the miscellaneous subnet.
 subnet_misc_02_address_prefix | 10.1.3.0/24 | The address prefix for the miscellaneous 2 subnet.
@@ -115,20 +114,21 @@ vnet_name | shared | The name of the new virtual network.
 
 Address | Name | Notes
 --- | --- | ---
-module.vnet_shared.azurerm_bastion_host.this | snap&#8209;sand&#8209;dev | The Azure Bastion used for secure RDP/SSH access to sandbox VMs.
+module.vnet_shared.azurerm_bastion_host.this | snap&#8209;sand&#8209;dev | The Azure Bastion used for secure RDP/SSH access to sandbox VMs. Uses the `Standard` SKU, which is required to emit `BastionAuditLogs` via a diagnostic setting.
 module.vnet_shared.azurerm_firewall.this | fw&#8209;sand&#8209;dev | The Azure Firewall used for network security.
 module.vnet_shared.azurerm_firewall_policy.this | awfp&#8209;sand&#8209;dev | The firewall policy. Threat intelligence mode is set to `Deny`.
 module.vnet_shared.azurerm_firewall_policy_rule_collection_group.this | fwprcg&#8209;sand&#8209;dev | The firewall rules. Allows all outbound traffic for ports `80`, `443` and `1688` (Windows Activation).
 module.vnet_shared.azurerm_key_vault.this | kv&#8209;sand&#8209;dev | The Azure Key Vault used to store secrets.
 module.vnet_shared.azurerm_key_vault_secret.adminpassword | adminpassword | Randomly generated admin password used for sandbox VMs and services.
 module.vnet_shared.azurerm_key_vault_secret.adminusername | adminuser | Admin username used for sandbox VMs and services, default is *bootstrapadmin*.
-module.vnet_shared.azurerm_key_vault_secret.spn_password | | The password for the service principal used for authenticating with Azure. The secret name is the same as the AppID / object id.
 module.vnet_shared.azurerm_log_analytics_workspace.this | log&#8209;sand&#8209;dev&#8209;xxx | The Log Analytics workspace used to collect logs and metrics from Azure resources.
 module.vnet_shared.azurerm_monitor_data_collection_endpoint.this | dce&#8209;sand&#8209;dev&#8209;xxx | The data collection endpoint (DCE) for Azure Monitor.
 module.vnet_shared.azurerm_monitor_data_collection_rule.linux | dcr&#8209;sand&#8209;dev&#8209;linux | The data collection rules (DCR) for Linux VMs.
 module.vnet_shared.azurerm_monitor_data_collection_rule.windows | dcr&#8209;sand&#8209;dev&#8209;windows | The data collection rules (DCR) for Windows VMs.
 module.vnet_shared.azurerm_monitor_data_collection_rule_association.adds1_dce | configurationAccessEndpoint | Associates the DCE with adds1.
 module.vnet_shared.azurerm_monitor_data_collection_rule_association.adds1_dcr | dcr&#8209;sand&#8209;dev&#8209;adds1&#8209;association | Associates the DCR with adds1.
+module.vnet_shared.azurerm_monitor_diagnostic_setting.bastion | Diagnostic Logs | The Azure Monitor diagnostic setting that streams Azure Bastion audit logs (`BastionAuditLogs`) and `AllMetrics` to the Log Analytics workspace. `BastionAuditLogs` only ever writes to the resource-specific `MicrosoftAzureBastionAuditLogs` table and requires the Bastion `Standard` SKU.
+module.vnet_shared.azurerm_monitor_diagnostic_setting.firewall | Diagnostic Logs | The Azure Monitor diagnostic setting that streams Azure Firewall structured (resource-specific) logs (`AZFWApplicationRule`, `AZFWNetworkRule`, `AZFWNatRule`, `AZFWThreatIntel`, `AZFWDnsQuery`) and `AllMetrics` to the Log Analytics workspace. Uses `Dedicated` destination tables. High-volume aggregation/flow-trace categories and Premium-only IDPS logs are intentionally omitted to control ingestion cost.
 module.vnet_shared.azurerm_monitor_diagnostic_setting.this | Audit Logs | The Azure Monitor diagnostic setting used to send key vault logs and metrics to the Log Analytics workspace.
 module.vnet_shared.azurerm_monitor_private_link_scope.this | ampls&#8209;sand&#8209;dev | The Azure Monitor Private Link Scope (AMPLS) resource.
 module.vnet_shared.azurerm_monitor_private_link_scoped_service.dce | ampls&#8209;scope&#8209;dce | Associates the AMPLS with the DCE.

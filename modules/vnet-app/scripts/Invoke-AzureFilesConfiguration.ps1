@@ -1,13 +1,7 @@
 #region parameters
 param (
     [Parameter(Mandatory = $true)]
-    [String]$TenantId,
-
-    [Parameter(Mandatory = $true)]
     [String]$SubscriptionId,
-
-    [Parameter(Mandatory = $true)]
-    [String]$AppId,
 
     [Parameter(Mandatory = $true)]
     [String]$ResourceGroupName,
@@ -140,11 +134,8 @@ Write-ScriptLog "Registering scheduled task '$TaskName' to run '$scriptPath' as 
 
 $commandParamParts = @(
     '$params = @{',
-    "TenantId = '$TenantId'; ", 
     "SubscriptionId = '$SubscriptionId'; ", 
-    "AppId = '$AppId'; ",
     "ResourceGroupName = '$ResourceGroupName'; ",
-    "KeyVaultName = '$KeyVaultName'; ",
     "StorageAccountName = '$StorageAccountName'; ",
     "Domain = '$Domain'",
     '}'

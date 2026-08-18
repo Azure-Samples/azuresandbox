@@ -9,7 +9,10 @@ param(
     [string]$ContainerAppName,
 
     [Parameter(Mandatory = $true)]
-    [string]$ContainerRegistryName
+    [string]$ContainerRegistryName,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ApplicationInsightsName
 )
 
 #region functions
@@ -35,7 +38,7 @@ $ProgressPreference = 'SilentlyContinue'
 $moduleName = 'petstore'
 
 Write-Log "Starting unit tests for module '$moduleName'..."
-Write-Log ("Parameters: ResourceGroupName='$ResourceGroupName' ContainerAppEnvironmentName='$ContainerAppEnvironmentName' ContainerAppName='$ContainerAppName' ContainerRegistryName='$ContainerRegistryName'")
+Write-Log ("Parameters: ResourceGroupName='$ResourceGroupName' ContainerAppEnvironmentName='$ContainerAppEnvironmentName' ContainerAppName='$ContainerAppName' ContainerRegistryName='$ContainerRegistryName' ApplicationInsightsName='$ApplicationInsightsName'")
 
 $passed = 0
 $failed = 0
@@ -101,8 +104,8 @@ try {
     }
 
     $container = $app.TemplateContainer | Select-Object -First 1
-    if ($container -and $container.Image -notmatch 'petstore') {
-        $issues += "Container image='$($container.Image)' (expected to contain 'petstore')"
+    if ($container -and $container.Image -notmatch 'petstore-appinsights') {
+        $issues += "Container image='$($container.Image)' (expected to contain 'petstore-appinsights')"
     }
 
     if ($app.Configuration.IngressTargetPort -ne 8080) {
@@ -233,6 +236,108 @@ try {
 }
 catch {
     Write-TestResult $moduleName 'FAIL' "Failed to query private DNS zone for Container App Environment"
+    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    $failed++
+}
+
+# Test 8: Container App has a system-assigned managed identity
+try {
+    $app = Get-AzContainerApp -ResourceGroupName $ResourceGroupName -Name $ContainerAppName -ErrorAction Stop
+
+    if ($app.IdentityType -match 'SystemAssigned' -and $app.IdentityPrincipalId) {
+        Write-TestResult $moduleName 'PASS' ("Container App '$ContainerAppName' has a system-assigned managed identity (PrincipalId: $($app.IdentityPrincipalId))")
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' ("Container App '$ContainerAppName' identity type is '$($app.IdentityType)' (expected 'SystemAssigned')")
+        $failed++
+    }
+}
+catch {
+    Write-TestResult $moduleName 'FAIL' "Failed to query identity for Container App '$ContainerAppName'"
+    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    $failed++
+}
+
+# Test 9: Container App has the Application Insights environment variables wired for Entra ID auth
+try {
+    $app = Get-AzContainerApp -ResourceGroupName $ResourceGroupName -Name $ContainerAppName -ErrorAction Stop
+    $container = $app.TemplateContainer | Select-Object -First 1
+    $envVars = @{}
+    foreach ($e in $container.Env) { $envVars[$e.Name] = $e.Value }
+
+    $issues = @()
+
+    if ([string]::IsNullOrEmpty($envVars['APPLICATIONINSIGHTS_CONNECTION_STRING'])) {
+        $issues += 'APPLICATIONINSIGHTS_CONNECTION_STRING is not set'
+    }
+
+    if ($envVars['APPLICATIONINSIGHTS_AUTHENTICATION_STRING'] -ne 'Authorization=AAD') {
+        $issues += "APPLICATIONINSIGHTS_AUTHENTICATION_STRING='$($envVars['APPLICATIONINSIGHTS_AUTHENTICATION_STRING'])' (expected 'Authorization=AAD')"
+    }
+
+    if ([string]::IsNullOrEmpty($envVars['APPLICATIONINSIGHTS_ROLE_NAME'])) {
+        $issues += 'APPLICATIONINSIGHTS_ROLE_NAME is not set'
+    }
+
+    if ($issues.Count -eq 0) {
+        Write-TestResult $moduleName 'PASS' ("Container App '$ContainerAppName' has Application Insights env vars wired for Entra ID auth (connection string set, Authorization=AAD, role name '$($envVars['APPLICATIONINSIGHTS_ROLE_NAME'])')")
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' ("Container App '$ContainerAppName' Application Insights env var issues: " + ($issues -join '; '))
+        $failed++
+    }
+}
+catch {
+    Write-TestResult $moduleName 'FAIL' "Failed to query environment variables for Container App '$ContainerAppName'"
+    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    $failed++
+}
+
+# Test 10: Container App identity has Monitoring Metrics Publisher on Application Insights
+try {
+    $app = Get-AzContainerApp -ResourceGroupName $ResourceGroupName -Name $ContainerAppName -ErrorAction Stop
+    $principalId = $app.IdentityPrincipalId
+
+    $appInsights = Get-AzApplicationInsights -ResourceGroupName $ResourceGroupName -Name $ApplicationInsightsName -ErrorAction Stop
+
+    $roleAssignments = Get-AzRoleAssignment -ObjectId $principalId -Scope $appInsights.Id -ErrorAction Stop |
+        Where-Object { $_.RoleDefinitionName -eq 'Monitoring Metrics Publisher' }
+
+    if ($roleAssignments) {
+        Write-TestResult $moduleName 'PASS' ("Monitoring Metrics Publisher role assignment exists for container app identity (PrincipalId: $principalId) on Application Insights '$ApplicationInsightsName'")
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' ("No Monitoring Metrics Publisher role assignment found for container app identity (PrincipalId: $principalId) on Application Insights '$ApplicationInsightsName'")
+        $failed++
+    }
+}
+catch {
+    Write-TestResult $moduleName 'FAIL' "Failed to query Monitoring Metrics Publisher role assignment for the container app identity"
+    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    $failed++
+}
+
+# Test 11: An AcrPush role assignment exists on the registry (jumplinux1 build identity)
+try {
+    $registry = Get-AzContainerRegistry -ResourceGroupName $ResourceGroupName -Name $ContainerRegistryName -ErrorAction Stop
+
+    $roleAssignments = Get-AzRoleAssignment -Scope $registry.Id -RoleDefinitionName 'AcrPush' -ErrorAction Stop |
+        Where-Object { $_.Scope -match "Microsoft.ContainerRegistry/registries/$ContainerRegistryName`$" }
+
+    if ($roleAssignments) {
+        Write-TestResult $moduleName 'PASS' ("AcrPush role assignment exists on registry '$ContainerRegistryName' for the image build identity (PrincipalId: $($roleAssignments[0].ObjectId))")
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' ("No AcrPush role assignment found on registry '$ContainerRegistryName' (required for jumplinux1 to build and push the instrumented image)")
+        $failed++
+    }
+}
+catch {
+    Write-TestResult $moduleName 'FAIL' "Failed to query AcrPush role assignments on registry '$ContainerRegistryName'"
     Write-TestResult $moduleName 'FAIL' "Exception: $_"
     $failed++
 }

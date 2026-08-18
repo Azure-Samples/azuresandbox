@@ -25,6 +25,24 @@ resource "azurerm_mssql_database" "this" {
   server_id    = azurerm_mssql_server.this.id
   license_type = "BasePrice"
 }
+
+# Enables server-level auditing (remediates Defender for Cloud finding VA2061) by routing
+# audit events to Azure Monitor. The diagnostic setting on the server's 'master' database
+# completes the audit pipeline to the shared Log Analytics workspace.
+resource "azurerm_mssql_server_extended_auditing_policy" "this" {
+  server_id              = azurerm_mssql_server.this.id
+  log_monitoring_enabled = true
+}
+
+resource "azurerm_monitor_diagnostic_setting" "this" {
+  name                       = "Audit Logs"
+  target_resource_id         = "${azurerm_mssql_server.this.id}/databases/master"
+  log_analytics_workspace_id = var.log_analytics_workspace_id
+
+  enabled_log {
+    category = "SQLSecurityAuditEvents"
+  }
+}
 #endregion 
 
 #region modules

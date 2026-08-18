@@ -13,7 +13,9 @@
 
 ## Overview
 
-This module deploys a demo [petstore](https://petstore.swagger.io/) RESTful API using **Azure Container Apps**. The container app is network isolated, and Azure RBAC is used to pull container images from a network isolated shared container registry.
+This module deploys a demo [petstore](https://petstore.swagger.io/) RESTful API using **Azure Container Apps**, instrumented with **Azure Monitor Application Insights**. The container app is network isolated, and Azure RBAC is used to pull container images from a network isolated shared container registry.
+
+Application Insights observability is added without any application code changes by baking the standalone [Application Insights Java agent](https://learn.microsoft.com/azure/azure-monitor/app/opentelemetry-enable?tabs=java) into the image (attached to the JVM via `JAVA_TOOL_OPTIONS`). Because the shared container registry has public network access disabled, the instrumented image is built and pushed from *jumplinux1* (the in-VNet Docker host provisioned by the *vm-jumpbox-linux* module) using its system-assigned managed identity, orchestrated by an `azurerm_virtual_machine_run_command`. The shared Application Insights resource has local (instrumentation key) authentication disabled, so the container app authenticates to it with **Microsoft Entra ID** using its own system-assigned managed identity (granted *Monitoring Metrics Publisher*) and the `APPLICATIONINSIGHTS_AUTHENTICATION_STRING=Authorization=AAD` environment variable.
 
 The estimated provisioning time for this module is 15 minutes.
 
@@ -27,6 +29,24 @@ Follow these steps after deployment to validate functionality.
 2. From *jumpwin1*, launch Edge and navigate to the petstore FQDN. This should display the Swagger UI for the petstore API.
 
 3. Try navigating to the petstore FQDN from your local machine. This should fail, as the Container App network isolated.
+
+4. Generate some traffic (e.g. refresh the Swagger UI a few times), then verify request telemetry has been ingested. From *jumplinux1* (Application Insights query is only reachable over the private network):
+
+   ```bash
+   az monitor app-insights query \
+     --app <application-insights-resource-id> \
+     --analytics-query "AppRequests | where TimeGenerated > ago(30m) | summarize count() by ResultCode"
+   ```
+
+   > This telemetry-ingestion check is also automated: `Test-Integration-Petstore.ps1` (run via `Invoke-UnitTests.ps1 -Module petstore -Integration`) queries the Log Analytics workspace from *jumpwin1* and asserts that `AppRequests` with `AppRoleName='petstore'` have been ingested, confirming the end-to-end Entra ID telemetry path.
+
+5. *(Optional, for Application Insights demos)* Generate a richer, sustained mix of successful and failing traffic to populate the Application Insights **Performance**, **Requests**, **Failures**, and **Smart Detection** blades. Because the Container App is network isolated, run the demo load generator from *jumpwin1*:
+
+   ```powershell
+   ./scripts/Invoke-PetstoreLoad.ps1 -PetstoreFqdn '<petstore-fqdn>' -DurationSeconds 300 -FailureRate 0.3
+   ```
+
+   It sends a weighted blend of valid operations (HTTP 200) and deliberate failures (HTTP 4xx) against the real `/api/v31/pet` endpoints for the requested duration, then prints a status-code breakdown. Review the resulting telemetry from *jumpwin1* using the Application Insights portal blades. This script is an on-demand demo utility and is not part of `terraform apply`.
 
 ## Documentation
 
@@ -44,39 +64,45 @@ This module depends upon resources provisioned in the following modules:
 
 * Root
 * vnet-shared (key vault, log analytics)
-* vnet-app (Windows jumpbox, virtual networks / subnets, private DNS zones, container registry)
-* vm-jumpbox-linux (Linux jumpbox with Docker CLI for container image testing)
+* vnet-app (Windows jumpbox, virtual networks / subnets, private DNS zones, container registry, Application Insights)
+* vm-jumpbox-linux (Linux jumpbox *jumplinux1* with Docker CLI, used to build and push the instrumented image)
 
 ### Module Structure
 
 ```plaintext
 ├── images/
-|   └── petstore-diagram.drawio.svg             # Architecture diagram for module
+|   └── petstore-diagram.drawio.svg     # Architecture diagram for module
 ├── scripts/
-|   ├── Set-ContainerRegistryConfiguration.ps1  # Script to import container image into ACR
-|   └── Test-Petstore.ps1                       # Unit test script
-├── locals.tf                                   # Local values (derived names, script parameters)
-├── main.tf                                     # Container App & Environment resources
-├── network.tf                                  # Private endpoint
-├── outputs.tf                                  # Module outputs
-├── terraform.tf                                # Terraform configuration block
-└── variables.tf                                # Input variables 
+|   ├── build-petstore-image.sh         # Builds/pushes the instrumented image on jumplinux1
+|   ├── Invoke-PetstoreLoad.ps1         # On-demand demo load/failure generator (run from jumpwin1)
+|   └── Test-Petstore.ps1               # Unit test script
+├── Dockerfile                          # Adds the Application Insights Java agent to the stock image
+├── locals.tf                           # Local values (derived names, build script)
+├── main.tf                             # Container App, Environment, run command & role assignments
+├── network.tf                          # Private endpoint
+├── outputs.tf                          # Module outputs
+├── terraform.tf                        # Terraform configuration block
+└── variables.tf                        # Input variables
 ```
 
 ### Input Variables
 
 Variable | Default | Description
 --- | --- | ---
-arm_client_secret |  | The password for the service principal used for authenticating with Azure (sensitive).
+app_insights_connection_string |  | Connection string of the shared Application Insights resource (sensitive; endpoint/resource pointer only).
+app_insights_id |  | Resource ID of the shared Application Insights resource telemetry is published to.
+appinsights_agent_version | 3.7.9 | Version of the Application Insights Java agent to install; also used as the image tag.
+appinsights_role_name | petstore | Cloud role name (AppRoleName) reported to Application Insights.
 container_apps_subnet_id |  | Resource ID of subnet for the Container Apps Environment infrastructure.
-container_registry_id |  | The resource ID of an existing Azure Container Registry (ACR) containing / to receive the image.
+container_registry_id |  | The resource ID of an existing Azure Container Registry (ACR) to receive the image.
+jumplinux1_principal_id |  | Principal ID of the jumplinux1 managed identity (granted AcrPush to build/push the image).
+jumplinux1_vm_id |  | Resource ID of the jumplinux1 VM used to build and push the instrumented image.
 location |  | Azure region for deployment (lowercase, numbers, dashes only).
 log_analytics_workspace_id |  | Resource ID of Log Analytics workspace used for diagnostics.
 private_dns_zone_id |  | Resource ID of private DNS zone linked to the managed environment.
 private_endpoint_subnet_id |  | Subnet where the private endpoint to the Container Apps Environment is placed.
 resource_group_name |  | Name of the existing resource group.
-source_container_image | swaggerapi/petstore31:latest | Source image (repo/image:tag) to seed into ACR / run.
-source_container_registry | docker.io | Source registry domain of the image.
+source_container_image | swaggerapi/petstore31:latest | Stock base image (repo/image:tag) used for the instrumented build.
 tags |  | Map of resource tags.
 unique_seed |  | Unique seed appended to generated names (via Azure naming module).
 
@@ -84,11 +110,13 @@ unique_seed |  | Unique seed appended to generated names (via Azure naming modul
 
 Address | Name | Notes
 --- | --- | ---
-azurerm_container_app.this | petstore | Runs the petstore container image pulled from the shared container registry.
+azurerm_container_app.this | petstore | Runs the instrumented petstore image; has a system-assigned identity for Entra ID telemetry auth.
 azurerm_container_app_environment.this | cae-sand-dev-xxx | Managed Container Apps Environment.
 azurerm_private_endpoint.this | pe-sand-dev-cae | Private endpoint for the Container Apps Environment.
-azurerm_role_assignment.this | | Grants environment managed identity pull access to ACR.
-null_resource.this | | Executes PowerShell script to import the container image into the shared container registry.
+azurerm_role_assignment.acr_pull | | Grants the environment managed identity AcrPull on the shared registry.
+azurerm_role_assignment.acr_push | | Grants the jumplinux1 managed identity AcrPush on the shared registry.
+azurerm_role_assignment.app_insights_publisher | | Grants the container app identity Monitoring Metrics Publisher on Application Insights.
+azurerm_virtual_machine_run_command.build_image | BuildPetstoreImage | Builds and pushes the instrumented image from jumplinux1 (in-VNet, keeps the registry private).
 module.naming | | Azure naming module instance for consistent resource naming.
 
 ### Output Variables

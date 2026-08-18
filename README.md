@@ -60,9 +60,9 @@ Enable only the modules you need for your specific sandbox environment. Disable 
 * **Private DNS Server**: Pre-configured  private DNS server for name resolution within the sandbox environment, ensuring secure and isolated DNS queries.
 * **Private DNS Zones**: Pre-configured private DNS zones for popular Azure services.
 * **Private Endpoints**: Pre-configured network isolated endpoints for PaaS services.
-* **Azure Firewall**: Pre-configured firewall for secure outbound internet access and threat intelligence.
-* **Azure Bastion**: Pre-configured Bastion for secure and seamless RDP/SSH access to virtual machines without exposing them to the public internet.
-* **Point-to-site VPN Gateway**: Pre-configured point-to-site VPN gateway for secure remote access to your sandbox environment.
+* **Azure Firewall**: Pre-configured firewall for secure outbound internet access and threat intelligence. Structured (resource-specific) application-rule, network-rule, NAT-rule, threat-intel, and DNS-query logs plus metrics are routed to the shared Log Analytics workspace (high-volume aggregation/flow-trace and Premium-only IDPS categories are omitted by default to control ingestion cost).
+* **Azure Bastion**: Pre-configured Bastion (Standard SKU) for secure and seamless RDP/SSH access to virtual machines without exposing them to the public internet. Bastion audit logs (`BastionAuditLogs`) and metrics are routed to the shared Log Analytics workspace for observability.
+* **Point-to-site VPN Gateway**: Pre-configured point-to-site VPN gateway for secure remote access to your sandbox environment. Gateway, IKE, and P2S diagnostic logs (`GatewayDiagnosticLog`, `IKEDiagnosticLog`, `P2SDiagnosticLog`) and metrics are routed to the shared Log Analytics workspace for observability.
 
 ### Pre-configured Virtual Machines
 
@@ -76,8 +76,8 @@ A variety of Windows and Linux virtual machines are include and are fully config
 
 Two storage options are included and are fully configured for use in the sandbox.
 
-* **Azure Blob Storage**: Container for startup configuration scripts with network isolated endpoints for secure access.
-* **Azure Files**:  Azure Files share configured for integrated Active Directory Domain Services (AD DS) authentication and network isolated endpoints for secure file sharing.
+* **Azure Blob Storage**: Container for startup configuration scripts with network isolated endpoints for secure access. Storage write/delete logs and transaction metrics are routed to the shared Log Analytics workspace (read logging is omitted by default to control ingestion cost on high-volume accounts).
+* **Azure Files**:  Azure Files share configured for integrated Active Directory Domain Services (AD DS) authentication and network isolated endpoints for secure file sharing. Storage write/delete logs and transaction metrics are routed to the shared Log Analytics workspace (read logging is omitted by default to control ingestion cost on high-volume accounts).
 
 ### Pre-configured SQL Database Options
 
@@ -91,12 +91,14 @@ Multiple SQL database options are provided to suit various use cases and require
 * **Azure SQL Database (PaaS)**:
   * Deploys a fully managed Azure SQL Database instance.
   * Network isolated endpoints for secure access.
+  * Enables server-level auditing with audit logs routed to the shared Log Analytics workspace.
   * Simplifies database management by handling backups, scaling, and high availability.
   * Suitable for applications requiring a scalable and cost-effective relational database solution.
 
 * **Azure Database for MySQL (PaaS)**:
   * Deploys a fully managed MySQL database instance.
   * Network isolated endpoints for secure access.
+  * Enables slow query and audit logging with logs and metrics routed to the shared Log Analytics workspace.
   * Provides high availability, automated backups, and scaling options.
   * Ideal for applications built on open-source technologies requiring MySQL as the backend database.
 
@@ -468,7 +470,6 @@ The variable defaults set in each module can be overridden by customizing the ap
 module "vnet_shared" {
   source = "./modules/vnet-shared"
 
-  arm_client_secret   = var.arm_client_secret
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
   tags                = var.tags
@@ -691,7 +692,7 @@ The following subnets are configured in *vnet-shared*:
 
 Subnet Name | Default CIDR | Min prefix length | NSG | UDR | Purpose
 --- | --- | --- | --- | --- | ---
-AzureBastionSubnet | `10.1.0.0/27` | `/27` | Yes | No | Reserved for Azure Bastion to provide secure RDP/SSH access to virtual machines.
+AzureBastionSubnet | `10.1.0.0/26` | `/26` | Yes | No | Reserved for Azure Bastion to provide secure RDP/SSH access to virtual machines. `/26` is the minimum size required for the Bastion Standard SKU.
 snet-adds-01 | `10.1.1.0/24` | `/27` | Yes | Yes | Hosts the Active Directory Domain Services (AD DS) domain controller and DNS server.
 snet-misc-01 | `10.1.2.0/24` | `/27` | Yes | Yes | Reserved for optional configurations requiring connectivity in the shared virtual network.
 snet-misc-02 | `10.1.3.0/24` | `/27` | Yes | Yes | Reserved for optional configurations requiring connectivity in the shared virtual network.
@@ -740,13 +741,13 @@ Bi-directional virtual network peering is enabled between the virtual networks i
 
 #### **Routing and Security**
 
-* **Azure Firewall**: Configured in the dedicated *AzureFirewallSubnet* of *vnet-shared* to provide secure outbound internet access and threat intelligence.
+* **Azure Firewall**: Configured in the dedicated *AzureFirewallSubnet* of *vnet-shared* to provide secure outbound internet access and threat intelligence. Structured firewall logs and metrics are routed to the shared Log Analytics workspace for observability.
 * **Route Tables**: A custom route table is used to direct traffic through the Azure Firewall for secure internet access. The route table sets the next hop for the default route to go to Azure Firewall for all sandbox subnets except those used for the Firewall itself and for Azure Bastion.
 * **Network Security Groups (NSGs)**: Associated with each subnet to control inbound and outbound traffic based on security rules.
 
 #### **Secure VPN Access**
 
-The optional *vwan* module implements an Azure Virtual WAN point-to-site VPN gateway for secure remote connectivity to your sandbox environment from a remote computer. This is ideal for scenarios where access via Bastion is not sufficient, for example if you need to transfer data into your sandbox environment or use tools that are only available on a remote computer. A self-signed certificate is used for authentication. The virtual WAN hub is connected to both the *vnet-shared* and *vnet-app* virtual networks, allowing secure VPN access to resources in your sandbox environment.
+The optional *vwan* module implements an Azure Virtual WAN point-to-site VPN gateway for secure remote connectivity to your sandbox environment from a remote computer. This is ideal for scenarios where access via Bastion is not sufficient, for example if you need to transfer data into your sandbox environment or use tools that are only available on a remote computer. A self-signed certificate is used for authentication. The virtual WAN hub is connected to both the *vnet-shared* and *vnet-app* virtual networks, allowing secure VPN access to resources in your sandbox environment. Gateway, IKE, and point-to-site diagnostic logs and metrics from the VPN gateway are routed to the shared Log Analytics workspace for observability.
 
 The following address ranges are used for the point-to-site VPN gateway:
 

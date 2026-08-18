@@ -17,17 +17,22 @@
 #   ./scripts/Invoke-CIChecks.sh bash terraform  # run only the named checks
 #
 # Available checks (map 1:1 to a CI workflow):
-#   bash        ShellCheck                  (ci-bash.yml)        pin 0.10.0
-#   powershell  PSScriptAnalyzer            (ci-powershell.yml)  pin 1.24.0
-#   markdown    markdownlint-cli2           (ci-docs.yml)        pin 0.22.1
+#   bash        ShellCheck                  (ci-bash.yml)        pin 0.11.0
+#   powershell  PSScriptAnalyzer            (ci-powershell.yml)  pin 1.25.0
+#   markdown    markdownlint-cli2           (ci-docs.yml)        pin 0.23.2
 #   links       lychee (offline/internal)   (ci-docs.yml)
 #   actions     actionlint                  (ci-actions.yml)     pin 1.7.12
 #   secrets     gitleaks                    (ci-secrets.yml)     pin 8.30.1
-#   terraform   terraform fmt + tflint      (ci-terraform.yml)   tflint pin v0.63.1
+#   terraform   terraform fmt + tflint      (ci-terraform.yml)   tflint pin v0.64.0
 #
 # A missing tool is reported as SKIPPED (with an install hint) and does not fail
 # the run, but the final summary flags it so you know the gate was not verified.
 # Exit code: 0 when nothing FAILED, non-zero otherwise (CI-friendly).
+#
+# The tool version pins above are mirrored from the CI workflows and are NOT
+# tracked by Dependabot. The scheduled ci-tool-versions.yml workflow (and its
+# scripts/Check-ToolVersionDrift.sh helper) watches for upstream drift and files
+# a tracking issue when any pin here or in a workflow falls behind latest.
 
 set -uo pipefail
 
@@ -65,7 +70,7 @@ skip() {
 }
 
 check_bash() {
-    have shellcheck || { skip bash "install shellcheck 0.10.0 (https://github.com/koalaman/shellcheck/releases)"; return; }
+    have shellcheck || { skip bash "install shellcheck 0.11.0 (https://github.com/koalaman/shellcheck/releases)"; return; }
     run_check bash "$repo_root/scripts/Invoke-ShellCheck.sh"
 }
 
@@ -73,7 +78,7 @@ check_powershell() {
     have pwsh || { skip powershell "install PowerShell 7.x (pwsh)"; return; }
     run_check powershell pwsh -NoProfile -Command '
         if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
-            Write-Host "SKIPPED: install PSScriptAnalyzer 1.24.0 (Install-Module PSScriptAnalyzer -RequiredVersion 1.24.0)"; exit 0
+            Write-Host "SKIPPED: install PSScriptAnalyzer 1.25.0 (Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0)"; exit 0
         }
         $r = Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./PSScriptAnalyzerSettings.psd1 -Severity @("Error","Warning")
         if ($r) { $r | Format-Table -AutoSize Severity, RuleName, ScriptName, Line, Message | Out-String -Width 200 | Write-Host; exit 1 }
@@ -82,7 +87,7 @@ check_powershell() {
 
 check_markdown() {
     have npx || { skip markdown "install Node.js/npm (provides npx)"; return; }
-    run_check markdown npx --yes markdownlint-cli2@0.22.1
+    run_check markdown npx --yes markdownlint-cli2@0.23.2
 }
 
 check_links() {
@@ -113,7 +118,7 @@ check_terraform() {
         done < <(find . -name .tflint.hcl -printf '%h\n' | sort -u)
         run_check tflint tflint --recursive
     else
-        skip tflint "install tflint v0.63.1 (https://github.com/terraform-linters/tflint)"
+        skip tflint "install tflint v0.64.0 (https://github.com/terraform-linters/tflint)"
     fi
 }
 

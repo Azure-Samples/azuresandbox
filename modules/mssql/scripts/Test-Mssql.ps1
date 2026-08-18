@@ -160,6 +160,40 @@ catch {
     $failed++
 }
 
+# Test 6: Server-level auditing is enabled and audit events stream to Log Analytics (remediates VA2061)
+try {
+    $auditIssues = @()
+
+    # Get-AzSqlServerAudit is the Azure SQL-native auditing cmdlet: LogAnalyticsTargetState
+    # and WorkspaceResourceId together reflect the master-database diagnostic setting that
+    # streams the SQLSecurityAuditEvents category to a Log Analytics workspace (the canonical
+    # VA2061 remediation). Using it avoids Get-AzDiagnosticSetting, whose Log/Metric output
+    # properties are being changed to List types in Az.Monitor 7.0.0.
+    $audit = Get-AzSqlServerAudit -ResourceGroupName $ResourceGroupName -ServerName $MssqlServerName -ErrorAction Stop
+
+    if (-not $audit -or $audit.LogAnalyticsTargetState -ne 'Enabled') {
+        $auditIssues += "LogAnalyticsTargetState='$($audit.LogAnalyticsTargetState)' (expected 'Enabled')"
+    }
+
+    if (-not $audit.WorkspaceResourceId) {
+        $auditIssues += 'auditing is not targeting a Log Analytics workspace (WorkspaceResourceId is empty)'
+    }
+
+    if ($auditIssues.Count -eq 0) {
+        Write-TestResult $moduleName 'PASS' ("Server-level auditing is enabled and streaming 'SQLSecurityAuditEvents' to Log Analytics (remediates VA2061)")
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' ("Server-level auditing issues: " + ($auditIssues -join '; '))
+        $failed++
+    }
+}
+catch {
+    Write-TestResult $moduleName 'FAIL' "Failed to verify server-level auditing for SQL server '$MssqlServerName'"
+    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    $failed++
+}
+
 # Summary
 $total = $passed + $failed
 Write-TestResult $moduleName 'SUMMARY' ("Passed: $passed Failed: $failed Total: $total")

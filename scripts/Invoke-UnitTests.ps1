@@ -450,6 +450,21 @@ $testConfigs = [ordered]@{
             MysqlDatabaseName = $resourceNames['mysql_db']
         }
     }
+    # Control-plane checks for the always-on vnet_shared module that do not need to run
+    # VM-side on the domain controller (e.g. the Azure Firewall diagnostic setting). Running
+    # these in the orchestrator's authenticated Az session avoids granting adds1 a standing
+    # Monitoring Reader role. VM-side vnet_shared checks remain in Test-VnetShared.ps1.
+    '$local_vnet_shared' = @{
+        Module     = 'vnet-shared'
+        ModuleName = 'vnet_shared'
+        RunLocal   = $true
+        ScriptPath = Join-Path $repoRoot 'modules' 'vnet-shared' 'scripts' 'Test-VnetSharedLocal.ps1'
+        Parameters = @{
+            ResourceGroupName = $resourceGroupName
+            FirewallName      = $resourceNames['firewall']
+            BastionName       = $resourceNames['bastion_host']
+        }
+    }
     '$local_petstore' = @{
         Module     = 'petstore'
         ModuleName = 'petstore'
@@ -460,6 +475,7 @@ $testConfigs = [ordered]@{
             ContainerAppEnvironmentName  = $resourceNames['container_app_environment']
             ContainerAppName             = 'petstore'
             ContainerRegistryName        = $resourceNames['container_registry']
+            ApplicationInsightsName      = $resourceNames['application_insights']
         }
     }
     '$local_vwan' = @{
@@ -653,7 +669,9 @@ if ($runIntegration) {
             ScriptPath   = Join-Path $repoRoot 'scripts' 'Test-Integration-Petstore.ps1'
             CommandId    = 'RunPowerShellScript'
             Parameters   = @{
-                PetstoreFqdn = $fqdns['petstore']
+                PetstoreFqdn                    = $fqdns['petstore']
+                LogAnalyticsWorkspaceResourceId = "/subscriptions/$($context.Subscription.Id)/resourceGroups/$resourceGroupName/providers/Microsoft.OperationalInsights/workspaces/$($resourceNames['log_analytics_workspace'])"
+                ExpectedRoleName                = 'petstore'
             }
         }
         @{

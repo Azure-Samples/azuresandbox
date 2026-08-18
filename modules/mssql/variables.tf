@@ -8,6 +8,16 @@ variable "location" {
   }
 }
 
+variable "log_analytics_workspace_id" {
+  type        = string
+  description = "The resource ID of the existing Log Analytics workspace where SQL audit logs will be sent. Defined in the vnet-shared module."
+
+  validation {
+    condition     = can(regex("^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[a-zA-Z0-9-_()]+/providers/Microsoft.OperationalInsights/workspaces/[a-zA-Z0-9-_()]+$", var.log_analytics_workspace_id))
+    error_message = "Must be a valid Azure Resource ID for a Log Analytics workspace. It should follow the format '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.OperationalInsights/workspaces/{workspaceName}'."
+  }
+}
+
 variable "mssql_database_name" {
   type        = string
   description = "The name of the Azure SQL Database to be provisioned."

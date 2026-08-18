@@ -48,22 +48,6 @@ variable "admin_username_secret" {
   }
 }
 
-variable "arm_client_secret" {
-  type        = string
-  description = "The password for the service principal used for authenticating with Azure. Set interactively or using an environment variable 'TF_VAR_arm_client_secret'."
-  sensitive   = true
-
-  validation {
-    condition     = length(var.arm_client_secret) >= 8
-    error_message = "Must be at least 8 characters long."
-  }
-}
-
-variable "arm_client_secret_version" {
-  type        = number
-  description = "Increment to create new arm_client_secret."
-  default     = 1
-}
 variable "location" {
   type        = string
   description = "The name of the Azure Region where resources will be provisioned."
@@ -109,7 +93,7 @@ variable "subnet_adds_address_prefix" {
 variable "subnet_AzureBastionSubnet_address_prefix" {
   type        = string
   description = "The address prefix for the AzureBastionSubnet subnet."
-  default     = "10.1.0.0/27" # TODO: eliminate this variable and calculate with a function
+  default     = "10.1.0.0/26" # TODO: eliminate this variable and calculate with a function. /26 is the minimum AzureBastionSubnet size required for the Standard SKU (host scaling).
 
   validation {
     condition     = can(cidrhost(var.subnet_AzureBastionSubnet_address_prefix, 0))

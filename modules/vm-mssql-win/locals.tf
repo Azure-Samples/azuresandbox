@@ -7,7 +7,6 @@ locals {
       parameters = [
         "TenantId = '${data.azurerm_client_config.current.tenant_id}';",
         "SubscriptionId = '${data.azurerm_client_config.current.subscription_id}';",
-        "AppId = '${data.azurerm_client_config.current.client_id}';",
         "ResourceGroupName = '${var.resource_group_name}';",
         "KeyVaultName = '${var.key_vault_name}';",
         "Domain = '${var.adds_domain_name}';",

@@ -82,6 +82,7 @@ This section lists input variables used in this module. Defaults can be overridd
 Variable | Default | Description
 --- | --- | ---
 location | | The name of the Azure Region where resources will be provisioned.
+log_analytics_workspace_id | | The ID of the Log Analytics workspace where SQL audit logs will be sent. Defined in the vnet-shared module.
 mssql_database_name | testdb | The name of the Azure SQL Database to be provisioned.
 private_dns_zone_id | | The ID of the private DNS zone for Azure SQL Database. Defined in the vnet-app module.
 resource_group_name | | The name of the resource group defined in the root module.
@@ -99,6 +100,8 @@ Address | Name | Notes
 --- | --- | ---
 module.mssql[0].azurerm_mssql_database.this | testdb | The Azure SQL Database.
 module.mssql[0].azurerm_mssql_server.this | sql&#8209;sand&#8209;dev&#8209;xxxxxxxx | The Azure SQL logical server.
+module.mssql[0].azurerm_mssql_server_extended_auditing_policy.this | | The server-level auditing policy that routes audit events to Azure Monitor (remediates VA2061).
+module.mssql[0].azurerm_monitor_diagnostic_setting.this | Audit Logs | The diagnostic setting that sends server audit logs (master database) to the Log Analytics workspace.
 module.mssql[0].azurerm_private_endpoint.this | pe&#8209;sand&#8209;dev&#8209;mssql&#8209;server | The private endpoint for the Azure SQL logical server.
 
 ### Output Variables

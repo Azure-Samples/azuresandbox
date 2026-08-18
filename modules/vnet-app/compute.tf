@@ -99,7 +99,7 @@ resource "azurerm_virtual_machine_extension" "configure_azure_files" {
   type                       = "CustomScriptExtension"
   type_handler_version       = "1.10"
   auto_upgrade_minor_version = true
-  depends_on                 = [azurerm_virtual_machine_extension.join_domain]
+  depends_on                 = [azurerm_virtual_machine_extension.join_domain, azurerm_role_assignment.assignments_vm_win]
 
   settings = jsonencode({
     fileUris = [

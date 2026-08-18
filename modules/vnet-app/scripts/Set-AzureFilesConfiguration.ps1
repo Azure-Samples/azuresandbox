@@ -1,19 +1,10 @@
 #region parameters
 param(
     [Parameter(Mandatory = $true)]
-    [string]$TenantId,
-
-    [Parameter(Mandatory = $true)]
     [string]$SubscriptionId,
-    
-    [Parameter(Mandatory = $true)]
-    [String]$AppId,
 
     [Parameter(Mandatory = $true)]
     [string]$ResourceGroupName,
-    
-    [Parameter(Mandatory = $true)]
-    [string]$KeyVaultName,
 
     [Parameter(Mandatory = $true)]
     [string]$StorageAccountName,
@@ -48,34 +39,30 @@ Write-Log "Running '$PSCommandPath'..."
 Write-Log "Setting execution policy to 'RemoteSigned'..."
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
 
-# Retrieve secrets from key vault using managed identity
+# Authenticate with the VM managed identity. Keep the context in this process
+# only so no credential material is written to the user profile.
+Write-Log "Disabling Azure PowerShell context autosave for this process..."
+Disable-AzContextAutosave -Scope Process | Out-Null
+
 Write-Log "Logging into Azure using managed identity..."
 
 try {
-    Connect-AzAccount -Identity 
+    Connect-AzAccount -Identity -ErrorAction Stop | Out-Null
 }
 catch {
     Exit-WithError $_
 }
 
-Write-Log "Getting secret '$AppId' from key vault '$KeyVaultName'..."
+Write-Log "Setting default subscription to '$SubscriptionId'..."
 
 try {
-    $appSecret = Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name $AppId -AsPlainText
+    Set-AzContext -Subscription $SubscriptionId | Out-Null
 }
 catch {
     Exit-WithError $_
 }
 
-if ([string]::IsNullOrEmpty($appSecret)) {
-    Exit-WithError "Secret '$AppId' not found in key vault '$KeyVaultName'..."
-}
-
-Write-Log "The length of secret '$AppId' is '$($appSecret.Length)'..."
-
-Disconnect-AzAccount
-
-# Configure identity-based access for storage account using service principal (not managed identity)
+# Configure identity-based access for the storage account using the VM managed identity
 $xDot500Path = "DC=$($Domain.Split('.')[0]),DC=$($Domain.Split('.')[1])"
 $spnValue = "cifs/$StorageAccountName.file.core.windows.net"
 
@@ -95,27 +82,6 @@ else {
     catch {
         Exit-WithError $_
     }
-}
-
-Write-Log "Logging into Azure using service principal id '$AppId'..."
-
-$appSecretSecure = ConvertTo-SecureString $appSecret -AsPlainText -Force
-$spCredential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $AppId, $appSecretSecure
-
-try {
-    Connect-AzAccount -Credential $spCredential -Tenant $TenantId -ServicePrincipal -ErrorAction Stop | Out-Null
-}
-catch {
-    Exit-WithError $_
-}
-
-Write-Log "Setting default subscription to '$SubscriptionId'..."
-
-try {
-    Set-AzContext -Subscription $SubscriptionId | Out-Null
-}
-catch {
-    Exit-WithError $_
 }
 
 Write-Log "Creating 'kerb1' key for storage account '$StorageAccountName' in resource group '$ResourceGroupName'..."

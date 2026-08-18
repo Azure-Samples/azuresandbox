@@ -4,12 +4,12 @@ terraform {
   required_providers {
     azapi = {
       source  = "Azure/azapi"
-      version = "~> 2.11.0"
+      version = "~> 2.12.0"
     }
 
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 5.0.1"
+      version = "~> 5.1.0"
     }
 
     cloudinit = {
