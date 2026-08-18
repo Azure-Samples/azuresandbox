@@ -88,7 +88,6 @@ admin_password_secret | adminpassword | The name of the key vault secret contain
 admin_password_secret_version | 1 | Increment to create a new admin password secret.
 admin_username | bootstrapadmin | The default admin username used when configuring services.
 admin_username_secret | adminuser | The name of the key vault secret containing the admin username.
-arm_client_secret | | The password for the service principal used for authenticating with Azure. Set interactively or using an environment variable 'TF_VAR_arm_client_secret'.
 location | | The Azure region defined in the root module.
 log_analytics_workspace_retention_days | 30 | The retention period for the new log analytics workspace.
 resource_group_name | | The resource group defined in the root module.
@@ -122,7 +121,6 @@ module.vnet_shared.azurerm_firewall_policy_rule_collection_group.this | fwprcg&#
 module.vnet_shared.azurerm_key_vault.this | kv&#8209;sand&#8209;dev | The Azure Key Vault used to store secrets.
 module.vnet_shared.azurerm_key_vault_secret.adminpassword | adminpassword | Randomly generated admin password used for sandbox VMs and services.
 module.vnet_shared.azurerm_key_vault_secret.adminusername | adminuser | Admin username used for sandbox VMs and services, default is *bootstrapadmin*.
-module.vnet_shared.azurerm_key_vault_secret.spn_password | | The password for the service principal used for authenticating with Azure. The secret name is the same as the AppID / object id.
 module.vnet_shared.azurerm_log_analytics_workspace.this | log&#8209;sand&#8209;dev&#8209;xxx | The Log Analytics workspace used to collect logs and metrics from Azure resources.
 module.vnet_shared.azurerm_monitor_data_collection_endpoint.this | dce&#8209;sand&#8209;dev&#8209;xxx | The data collection endpoint (DCE) for Azure Monitor.
 module.vnet_shared.azurerm_monitor_data_collection_rule.linux | dcr&#8209;sand&#8209;dev&#8209;linux | The data collection rules (DCR) for Linux VMs.

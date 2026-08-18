@@ -5,9 +5,7 @@ locals {
     orchestrator = {
       name = "Invoke-AzureFilesConfiguration.ps1"
       parameters = [
-        "TenantId = '${data.azurerm_client_config.current.tenant_id}';",
         "SubscriptionId = '${data.azurerm_client_config.current.subscription_id}';",
-        "AppId = '${data.azurerm_client_config.current.client_id}';",
         "ResourceGroupName = '${var.resource_group_name}';",
         "KeyVaultName = '${var.key_vault_name}';",
         "StorageAccountName = '${azurerm_storage_account.this.name}';",
@@ -191,6 +189,18 @@ locals {
       principal_id         = azurerm_windows_virtual_machine.this.identity[0].principal_id
       principal_type       = "ServicePrincipal"
       role_definition_name = "Storage Blob Data Reader"
+      scope                = azurerm_storage_account.this.id
+    }
+    # Required so Set-AzureFilesConfiguration.ps1 can configure identity-based
+    # (Kerberos) access for Azure Files using the VM managed identity:
+    # regenerate/list the storage account 'kerb1' key and enable AD DS
+    # authentication (Microsoft.Storage/storageAccounts/regeneratekey/action,
+    # /listkeys/action, /write). Replaces the former service principal login,
+    # which required the SP secret to be stored in Key Vault.
+    st_account_contributor_vm_win = {
+      principal_id         = azurerm_windows_virtual_machine.this.identity[0].principal_id
+      principal_type       = "ServicePrincipal"
+      role_definition_name = "Storage Account Contributor"
       scope                = azurerm_storage_account.this.id
     }
     # Required for unit-test ARM GETs against Application Insights

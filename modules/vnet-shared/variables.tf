@@ -48,22 +48,6 @@ variable "admin_username_secret" {
   }
 }
 
-variable "arm_client_secret" {
-  type        = string
-  description = "The password for the service principal used for authenticating with Azure. Set interactively or using an environment variable 'TF_VAR_arm_client_secret'."
-  sensitive   = true
-
-  validation {
-    condition     = length(var.arm_client_secret) >= 8
-    error_message = "Must be at least 8 characters long."
-  }
-}
-
-variable "arm_client_secret_version" {
-  type        = number
-  description = "Increment to create new arm_client_secret."
-  default     = 1
-}
 variable "location" {
   type        = string
   description = "The name of the Azure Region where resources will be provisioned."

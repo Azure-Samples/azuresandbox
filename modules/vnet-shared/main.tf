@@ -26,19 +26,6 @@ resource "azurerm_role_assignment" "roles" {
   scope                = azurerm_key_vault.this.id
 }
 
-resource "azurerm_key_vault_secret" "spn_password" {
-  name             = data.azurerm_client_config.current.client_id
-  value_wo         = var.arm_client_secret
-  value_wo_version = var.arm_client_secret_version
-  key_vault_id     = azurerm_key_vault.this.id
-  expiration_date  = timeadd(timestamp(), "8760h")
-  depends_on       = [time_sleep.wait_for_roles]
-
-  lifecycle {
-    ignore_changes = [expiration_date]
-  }
-}
-
 resource "azurerm_key_vault_secret" "adminpassword" {
   name             = var.admin_password_secret
   value_wo         = local.admin_password
@@ -213,7 +200,6 @@ resource "terraform_data" "key_vault_operations_complete" {
   input = {
     secret_adminpassword = azurerm_key_vault_secret.adminpassword.id
     secret_adminusername = azurerm_key_vault_secret.adminusername.id
-    secret_spn_password  = azurerm_key_vault_secret.spn_password.id
   }
 }
 
