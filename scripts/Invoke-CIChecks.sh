@@ -19,7 +19,7 @@
 # Available checks (map 1:1 to a CI workflow):
 #   bash        ShellCheck                  (ci-bash.yml)        pin 0.11.0
 #   powershell  PSScriptAnalyzer            (ci-powershell.yml)  pin 1.25.0
-#   markdown    markdownlint-cli2           (ci-docs.yml)        pin 0.23.2
+#   markdown    markdownlint-cli2           (ci-docs.yml)        pin 0.23.2, requires Node.js 20 (ci-docs.yml actions/setup-node)
 #   links       lychee (offline/internal)   (ci-docs.yml)
 #   actions     actionlint                  (ci-actions.yml)     pin 1.7.12
 #   secrets     gitleaks                    (ci-secrets.yml)     pin 8.30.1
@@ -87,6 +87,15 @@ check_powershell() {
 
 check_markdown() {
     have npx || { skip markdown "install Node.js/npm (provides npx)"; return; }
+    # ci-docs.yml runs markdownlint-cli2 under actions/setup-node@v7 pinned to
+    # Node 20. This isn't a hard requirement (markdownlint-cli2 runs fine on
+    # other Node majors), but a mismatch is a plausible source of local-vs-CI
+    # false negatives, so warn rather than silently diverge.
+    local node_major
+    node_major="$(node --version 2> /dev/null | grep -oP '^v\K[0-9]+')"
+    if [ -n "$node_major" ] && [ "$node_major" != "20" ]; then
+        printf '\n=== markdown ===\nWARNING: Node.js v%s detected; ci-docs.yml pins Node 20 (actions/setup-node@v7). Install Node 20.x for full CI parity.\n' "$node_major"
+    fi
     run_check markdown npx --yes markdownlint-cli2@0.23.2
 }
 
