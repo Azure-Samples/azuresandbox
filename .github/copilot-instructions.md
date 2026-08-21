@@ -24,14 +24,6 @@ tflint                   # uses .tflint.hcl (recommended + azurerm ruleset)
 
 The SPN password must come from the env var `TF_VAR_arm_client_secret` — never commit it.
 
-**MCAPS tenants — `SecurityControl=Ignore` tag (applies to this tenant):** When deploying on an MCAPS tenant (such as the one in use here), Azure Policy requires resources to carry the `SecurityControl=Ignore` tag or the apply is denied. The root module supports merging extra tags over the base `tags` map via the `additional_tags` variable, so pass this tag on the command line rather than editing `terraform.tfvars`. Append the following to **every** `terraform plan` and `terraform apply` invocation in all workflows/scenarios below:
-
-```bash
--var='additional_tags={SecurityControl="Ignore"}'
-```
-
-For example: `terraform apply -var='additional_tags={SecurityControl="Ignore"}'`. To add more MCAPS tags, include them in the same map, e.g. `-var='additional_tags={SecurityControl="Ignore",owner="rob"}'`. Keys in `additional_tags` win on collisions with the base `tags` map.
-
 ## Run CI checks locally before pushing a PR
 
 PR-time CI gates (workflows under `.github/workflows/`) are reproduced locally by the umbrella runner **`./scripts/Invoke-CIChecks.sh`**, which avoids the push → CI-fail → fix → re-push loop:
@@ -118,8 +110,6 @@ The intended workflow is a clean two-phase handoff:
 5. **Terraform execution environment identified** — determine whether this session is on **WSL / local client** or **`jumplinux2`** (rg-devops-iac), per the "Terraform execution environments" section above. On jumplinux2 with no `backend.tf` yet, look up the backend values and create it before `terraform init`; leave an existing `backend.tf` untouched. On WSL, no action needed (local state is the default).
 6. **Module enablement confirmed** — use `ask_user` to ask whether **all base modules** in `./modules` should be deployed (every `enable_module_*` flag `true`). Extra modules in `./extras/modules` (`ai-foundry`, `avd`, `petstore`, `vnet-onprem`, etc.) are **always excluded** from this question and left **disabled**. If the answer is **no**, use `ask_user` again to have the user specify exactly which base modules to enable (e.g. `vnet_app` only); all other base modules stay disabled. Confirm the selection before editing `terraform.tfvars`.
 7. **Automated unit testing decision** — use `ask_user` to ask whether automated unit tests (`Invoke-UnitTests.ps1`) should be run after a successful `terraform apply`. Capture this decision now, batched with the other preflight prompts, because it determines whether preflight item 3 (Azure PowerShell auth) is required — that human-gated input must be collected up front, not after the `/allow-all`-mode handoff. If the answer is **yes**, also confirm scope: all installed modules (`Invoke-UnitTests.ps1`, which runs each installed module's unit **and** integration tests automatically) versus a single module's unit tests, optionally with its integration tests (`-Module <name> [-Integration]` — `-Integration` applies only to a single-module run). If the answer is **no**, record it and skip item 3 (unless otherwise needed). The recorded decision drives the post-apply test step in Scenarios 1 and 2 — do not re-prompt for it after the apply.
-8. **MCAPS tenant tagging** — confirm whether the target subscription is on an **MCAPS tenant** (the default assumption for this environment; the tenant in use here is MCAPS). If yes, **every** `terraform plan` and `terraform apply` command in every scenario below must include `-var='additional_tags={SecurityControl="Ignore"}'` so the `SecurityControl=Ignore` tag is merged over the base `tags` map and Azure Policy does not deny the apply. Record this decision now so the flag is applied consistently across the run without re-prompting. Do not edit `terraform.tfvars` for this — pass it on the command line.
-
 After all preflight items pass, the remaining attended setup depends on the scenario: for a fresh vnext sandbox there are additional human-gated prep steps (see Scenario 1) that must also be completed attended. Once **all** attended setup (preflight plus any scenario-specific prep) is done and nothing further requires `ask_user`, **use `ask_user` to prompt the user to enable `/allow-all` mode by running `/allow-all`**, and wait for their confirmation before proceeding. This is the handoff from the attended phase to fully automated execution. Once `/allow-all` mode is enabled, normal Terraform rules apply: `terraform init` before `terraform apply`; run `terraform validate` and `terraform plan` first.
 
 ## Applying Terraform configurations
@@ -187,14 +177,6 @@ The barrier pattern leaves Key Vault and Storage Account with public access **di
 ```bash
 ./scripts/enable-public-access.sh
 ```
-
-**MCAPS precheck — verify the `SecurityControl=Ignore` tag on the resource group first (required before `enable-public-access.sh` can work on MCAPS tenants).** On MCAPS tenants a `modify`-effect Azure Policy rewrites Key Vault (and similarly Storage) update requests to force `publicNetworkAccess=Disabled`. The `SecurityControl=Ignore` tag on the resource group (evaluated at RG **or** resource level) exempts resources from this policy. If that tag is **missing** from the RG — e.g. a prior `apply`/`destroy` ran without `-var='additional_tags={SecurityControl="Ignore"}'` and stripped it — then `enable-public-access.sh` will report success but the change is **silently reverted to `Disabled`**, and the next `terraform plan`/`apply` fails with `403 ForbiddenByConnection` on Key Vault data-plane reads/writes. Therefore, **before running `enable-public-access.sh`, confirm the tag exists on the RG**:
-
-```bash
-az group show --name <rg> --query "tags.SecurityControl" -o tsv   # must print: Ignore
-```
-
-If it prints empty/`None`, restore the tag before proceeding (either `az tag update --resource-id <rg id> --operation Merge --tags SecurityControl=Ignore`, or a `terraform apply` with the `additional_tags` var). Only once the tag is present will `enable-public-access.sh` persist and the barrier workflow succeed. Follow the error-handling policy if the tag cannot be restored.
 
 Then perform the `/allow-all`-mode handoff — prompt the user to run `/allow-all` and wait for confirmation — then proceed with `terraform init` (if providers changed) → `terraform plan` → `terraform apply`. The barrier resources will re-disable public access at the end of the apply. On `jumplinux2`, wrap the `terraform apply` (and the `Invoke-UnitTests.ps1` run below) in the detached `tmux` session per the progress-reporting section; on WSL / local this is unchanged (`mode="async"`).
 
@@ -309,7 +291,7 @@ Every module has a `README.md` with the same sections: Architecture (drawio SVG 
 
 ## Sanitizing public GitHub content
 
-This is a **public repo** — issues, PRs, comments, and commit messages are world-readable. Before writing any (including auto-filed error issues), replace internal/environment specifics with generic wording: Azure Policy definition/assignment/initiative names → "a `modify`-effect Azure Policy"; internal program acronyms and `aka.ms`/wiki links → omit; subscription/tenant/management-group IDs, SPN `appId`/`objectId`, user object IDs → `<subscription>`, `<tenant>`, etc.; per-deployment resource names, execution-host names, private IPs → placeholders. The literal `SecurityControl=Ignore` tag may appear **only** in this file — elsewhere call it "an organization-specific exemption tag." Keep non-identifying technical content (resource types, file paths, public ARM schema, `learn.microsoft.com` links, error codes).
+This is a **public repo** — issues, PRs, comments, and commit messages are world-readable. Before writing any (including auto-filed error issues), replace internal/environment specifics with generic wording: Azure Policy definition/assignment/initiative names → "a `modify`-effect Azure Policy"; internal program acronyms and `aka.ms`/wiki links → omit; subscription/tenant/management-group IDs, SPN `appId`/`objectId`, user object IDs → `<subscription>`, `<tenant>`, etc.; per-deployment resource names, execution-host names, private IPs → placeholders. Keep non-identifying technical content (resource types, file paths, public ARM schema, `learn.microsoft.com` links, error codes).
 
 ## Branch / PR notes
 
