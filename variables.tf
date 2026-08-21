@@ -185,3 +185,25 @@ variable "user_object_id" {
     error_message = "Must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
   }
 }
+
+variable "vm_jumpbox_size" {
+  type        = string
+  description = "The size of the jumpbox and domain controller virtual machines: 'jumpwin1', 'jumplinux1', and 'adds1'."
+  default     = "Standard_D2ls_v6"
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9_]+$", var.vm_jumpbox_size))
+    error_message = "The 'vm_jumpbox_size' must conform to Azure virtual machine size naming conventions: it can only contain alphanumeric characters and underscores (_). Examples include 'Standard_DS1_v2' or 'Standard_B2ms'."
+  }
+}
+
+variable "vm_mssql_win_size" {
+  type        = string
+  description = "The size of the database server virtual machine 'mssqlwin1'. Must be a Diskful Ddsv6 (general purpose) or Edsv6 (memory optimized) size with local NVMe temp disks and a minimum of 4 vCPUs."
+  default     = "Standard_D4ds_v6" # use az-vm list-skus to determine if this size is available in your region
+
+  validation {
+    condition     = can(regex("^Standard_(D|E)[0-9]+ds_v6$", var.vm_mssql_win_size))
+    error_message = "The 'vm_mssql_win_size' must be a Ddsv6 or Edsv6 Diskful size matching the pattern 'Standard_(D|E)<vCPU>ds_v6' (e.g. 'Standard_D4ds_v6', 'Standard_D8ds_v6', 'Standard_E4ds_v6', 'Standard_E16ds_v6'). Other Azure VM sizes are not currently supported by this module."
+  }
+}
