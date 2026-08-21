@@ -372,6 +372,7 @@ subscription_id | | The Azure subscription id used to provision resources.
 storage_container_name | tfstate | The name of the storage container to be created in the new storage account.
 tags | | The tags in map format to be used when creating new resources.
 user_object_id | | The object id of the user in Microsoft Entra ID.
+vm_jumpbox_linux_size | `Standard_D2ls_v6` | The size of the jumpbox virtual machine (`jumplinux2`).
 vnet_address_space | 10.0.0.0/16 | The address space in CIDR notation for the new virtual network. The minimum size is /24.
 vnet_name | devops | The name of the new virtual
 
