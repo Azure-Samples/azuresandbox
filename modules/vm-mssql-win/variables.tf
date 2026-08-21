@@ -232,7 +232,7 @@ variable "vm_mssql_win_name" {
 variable "vm_mssql_win_size" {
   type        = string
   description = "The size of the virtual machine. Must be a Diskful Ddsv6 (general purpose) or Edsv6 (memory optimized) size with local NVMe temp disks and a minimum of 4 vCPUs."
-  default     = "Standard_D4ds_v6" # use az-vm list-skus to determine if this size is available in your region
+  # default     = "Standard_D4ds_v6" # Now sourced from root variable 'vm_mssql_win_size'; see main.tf. (use az-vm list-skus to determine if this size is available in your region)
 
   validation {
     condition     = can(regex("^Standard_(D|E)[0-9]+ds_v6$", var.vm_mssql_win_size))

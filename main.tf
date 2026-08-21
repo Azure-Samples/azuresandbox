@@ -210,6 +210,7 @@ module "vnet_shared" {
   tags                = local.tags
   unique_seed         = module.naming.unique-seed
   user_object_id      = var.user_object_id
+  vm_adds_size        = var.vm_jumpbox_size
 }
 #endregion
 
@@ -241,6 +242,7 @@ module "vnet_app" {
   user_object_id                  = var.user_object_id
   virtual_network_shared_id       = module.vnet_shared.resource_ids["virtual_network_shared"]
   virtual_network_shared_name     = module.vnet_shared.resource_names["virtual_network_shared"]
+  vm_jumpbox_win_size             = var.vm_jumpbox_size
 
   depends_on = [module.vnet_shared.log_analytics_operations_complete] # Transitively waits for AD DS config + all vnet-shared AMPLS-touching writes (PE, scoped services, DNS links, adds1 DCR/DCE). Eliminates 409 race on vnet-app's AMPLS scoped service. Limits taint blast radius. See AMPLS_IMPLEMENTATION_PLAN.md Phase 2a.
 }
@@ -263,6 +265,7 @@ module "vm_jumpbox_linux" {
   storage_share_name            = module.vnet_app[0].resource_names["storage_share"]
   subnet_id                     = module.vnet_app[0].subnets["snet-app-01"].id
   tags                          = local.tags
+  vm_jumpbox_linux_size         = var.vm_jumpbox_size
 
   depends_on = [module.vnet_app[0].configure_azure_files_id] # Ensures that Azure Files is configured
 }
@@ -289,6 +292,7 @@ module "vm_mssql_win" {
   storage_container_name          = module.vnet_app[0].storage_container_name
   subnet_id                       = module.vnet_app[0].subnets["snet-db-01"].id
   tags                            = local.tags
+  vm_mssql_win_size               = var.vm_mssql_win_size
 
   depends_on = [module.vnet_app[0].configure_azure_files_id] # Ensures that Azure Files is configured
 }
