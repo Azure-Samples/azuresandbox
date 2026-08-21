@@ -204,7 +204,7 @@ This is a specialization of Scenario 2 (it disables then re-enables a single mod
    The script starts `adds1` (domain controller) **first** and waits for it; verify with `az vm list -g <rg> -d --query "[].{Name:name, PowerState:powerState}" -o table` that the relevant VMs report `VM running` before continuing. The DC being up is the whole point — do not skip this.
 2. **Disable** the target module's `enable_module_<name>` flag in `terraform.tfvars`.
 3. `./scripts/enable-public-access.sh` (re-enable KV/Storage public access before the plan).
-4. `terraform apply` to **de-provision** the module's VM(s) (run `terraform init` first if needed; `terraform validate` + `terraform plan -out=<name>.tfplan` then apply the saved plan).
+4. `terraform apply` to **de-provision** the module's VM(s) (run `terraform init` first if needed; `terraform validate` + `terraform plan` then `terraform apply`).
 5. **Re-enable** the same `enable_module_<name>` flag in `terraform.tfvars`.
 6. `./scripts/enable-public-access.sh` again (the prior apply's barrier re-disabled public access).
 7. `terraform apply` to **re-provision** the module's VM(s); cloud-init / run-command VM-side config re-runs.
@@ -218,7 +218,7 @@ This is a specialization of Scenario 2 (it disables then re-enables a single mod
 - `RESULT: PASS` → **no repro**. Post a comment to the issue documenting the full steps, the passing summary (per-check `[PASS]` lines + overall `Passed=N Failed=0`), and the conclusion that the original failure was environmental (e.g. deallocated DC). **Close the issue** (`gh issue close <n> --reason "not planned"`).
 - `RESULT: FAIL` → **repro confirmed**. Post a comment with the failing `[FAIL]` lines and context, and **leave the issue open** for a fix. A reproduced test FAIL is the expected *outcome* of this scenario and is **not** itself a workflow error — do **not** open a second issue or invoke the error-handling policy for it. (The error-handling policy still applies to *infrastructure/command* failures — a `terraform apply` error, a script crash, etc. — which are distinct from a test reporting FAIL.)
 
-**Cleanup.** Always restore `terraform.tfvars` to its original module configuration (the target flag back to its starting value, normally `true`) and delete any temporary plan/log files created during the repro.
+**Cleanup.** Always restore `terraform.tfvars` to its original module configuration (the target flag back to its starting value, normally `true`) and delete any temporary log files created during the repro.
 
 ### Tests (Pester-free, PowerShell-orchestrated)
 
