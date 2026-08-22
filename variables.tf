@@ -207,3 +207,14 @@ variable "vm_mssql_win_size" {
     error_message = "The 'vm_mssql_win_size' must be a Ddsv6 or Edsv6 Diskful size matching the pattern 'Standard_(D|E)<vCPU>ds_v6' (e.g. 'Standard_D4ds_v6', 'Standard_D8ds_v6', 'Standard_E4ds_v6', 'Standard_E16ds_v6'). Other Azure VM sizes are not currently supported by this module."
   }
 }
+
+variable "vm_mssql_win_zone" {
+  type        = string
+  description = "The availability zone for the database server virtual machine 'mssqlwin1'. Required because the module's SQL Server data and log disks use Premium SSD v2 (PremiumV2_LRS), which is a zonal-only disk type."
+  default     = "2" # use az-vm list-skus to determine if this zone is available in your region/subscription
+
+  validation {
+    condition     = contains(["1", "2", "3"], var.vm_mssql_win_zone)
+    error_message = "Must be a valid Azure availability zone: '1', '2', or '3'."
+  }
+}

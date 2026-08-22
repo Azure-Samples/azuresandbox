@@ -293,6 +293,7 @@ module "vm_mssql_win" {
   subnet_id                       = module.vnet_app[0].subnets["snet-db-01"].id
   tags                            = local.tags
   vm_mssql_win_size               = var.vm_mssql_win_size
+  vm_mssql_win_zone               = var.vm_mssql_win_zone
 
   depends_on = [module.vnet_app[0].configure_azure_files_id] # Ensures that Azure Files is configured
 }

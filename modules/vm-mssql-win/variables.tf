@@ -270,7 +270,7 @@ variable "vm_mssql_win_storage_account_type_os_disk" {
 variable "vm_mssql_win_zone" {
   type        = string
   description = "The availability zone for the virtual machine."
-  default     = "2" # use az-vm list-skus to determine if this size is available in your region / zone
+  # default     = "2" # Now sourced from root variable 'vm_mssql_win_zone'; see main.tf. (use az-vm list-skus to determine if this zone is available in your region)
 
   validation {
     condition     = contains(["1", "2", "3"], var.vm_mssql_win_zone)
