@@ -622,6 +622,9 @@ subscription_id | | The Azure subscription id used to provision sandbox resource
 tags | { costcenter = "mycostcenter", environment = "dev", project = "sand" } | Tags in map format to be applied to the sandbox resource group and used for resource naming.
 user_name | | The user name of the interactive user (e.g. Azure CLI or Az PowerShell signed in user).
 user_object_id | | The object id of the interactive user (e.g. Azure CLI or Az PowerShell signed in user).
+vm_jumpbox_size | `Standard_D2ls_v6` | The size of the jumpbox and domain controller virtual machines: `jumpwin1`, `jumplinux1`, and `adds1`.
+vm_mssql_win_size | `Standard_D4ds_v6` | The size of the database server virtual machine `mssqlwin1`. Must be a Diskful Ddsv6 (general purpose) or Edsv6 (memory optimized) size with local NVMe temp disks and a minimum of 4 vCPUs.
+vm_mssql_win_zone | `2` | The availability zone for the database server virtual machine `mssqlwin1`. Required because the module's SQL Server data and log disks use Premium SSD v2 (`PremiumV2_LRS`), which is a zonal-only disk type.
 
 ---
 

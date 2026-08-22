@@ -105,7 +105,7 @@ vm_adds_image_publisher | MicrosoftWindowsServer | The publisher for the virtual
 vm_adds_image_sku | 2025-datacenter-azure-edition-core | The SKU of the virtual machine image used to create the VM.
 vm_adds_image_version | Latest | The version of the virtual machine image used to create the VM.
 vm_adds_name | adds1 | The name of the VM.
-vm_adds_size | Standard_B2ls_v2 | The size of the virtual machine.
+vm_adds_size | `Standard_D2ls_v6` | The size of the virtual machine. Defined by the root module's `vm_jumpbox_size` variable.
 vm_adds_storage_account_type | `StandardSSD_LRS` | The storage type to be used for the VM's OS disk. Standard HDD (`Standard_LRS`) is not permitted because Azure is retiring Standard HDD OS disks on September 8, 2028.
 vnet_address_space | 10.1.0.0/16 | The address range for the virtual network.
 vnet_name | shared | The name of the new virtual network.

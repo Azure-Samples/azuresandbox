@@ -18,7 +18,7 @@ usage() {
 #region constants
 default_costcenter=mycostcenter
 default_environment=dev
-default_location=centralus
+default_location=southcentralus
 default_project=devops
 #endregion
 
