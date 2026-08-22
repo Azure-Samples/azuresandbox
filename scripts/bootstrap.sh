@@ -19,7 +19,7 @@ usage() {
 
 default_costcenter=mycostcenter
 default_environment=dev
-default_location=centralus
+default_location=southcentralus
 default_project=sand
 
 #endregion
