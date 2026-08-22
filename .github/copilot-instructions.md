@@ -17,9 +17,9 @@ Run from repo root. Terraform state lives locally by default (sensitive — see 
 ```bash
 terraform init
 terraform validate
-terraform plan
-terraform apply          # 25–95 min depending on enabled modules
-tflint                   # uses .tflint.hcl (recommended + azurerm ruleset)
+terraform plan -out=main.tfplan     # saved plans must use the .tfplan extension (git-ignored)
+terraform apply main.tfplan         # 25–95 min depending on enabled modules
+tflint                              # uses .tflint.hcl (recommended + azurerm ruleset)
 ```
 
 The SPN password must come from the env var `TF_VAR_arm_client_secret` — never commit it.
