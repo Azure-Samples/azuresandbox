@@ -678,6 +678,7 @@ The Azure Sandbox project uses a structured IPv4 address scheme to ensure proper
 * [Shared Services Virtual Network](#shared-services-virtual-network)
 * [Application Virtual Network](#application-virtual-network)
 * [Virtual Network Peering](#virtual-network-peering)
+* [Private Endpoints and Private DNS](#private-endpoints-and-private-dns)
 * [Routing and Security](#routing-and-security)
 * [Secure VPN Access](#secure-vpn-access)
 
@@ -700,23 +701,32 @@ snet-adds-01 | `10.1.1.0/24` | `/27` | Yes | Yes | Hosts the Active Directory Do
 snet-misc-01 | `10.1.2.0/24` | `/27` | Yes | Yes | Reserved for optional configurations requiring connectivity in the shared virtual network.
 snet-misc-02 | `10.1.3.0/24` | `/27` | Yes | Yes | Reserved for optional configurations requiring connectivity in the shared virtual network.
 AzureFirewallSubnet | `10.1.4.0/26` | `/26` | No | No | Reserved for Azure Firewall to provide network security.
-snet-privatelink-02 | `10.1.5.0/24` | `/27` | No | No | Reserved for key vault private endpoint using Azure Private Link.
+snet-privatelink-01 | `10.1.5.0/24` | `/27` | No | No | Hosts the private endpoints for every Azure PaaS service used by the sandbox, regardless of which module creates them.
 
-The following private endpoints are configured in the *snet-privatelink-02* subnet to provide secure, network-isolated access to the following Azure PaaS services:
+The following private endpoints are configured in the *snet-privatelink-01* subnet to provide secure, network-isolated access to the following Azure PaaS services:
 
 Service | Module
 --- | ---
 Key Vault | vnet-shared
+Azure Monitor (AMPLS) | vnet-shared
+Azure Blob Storage | vnet-app
+Azure Files | vnet-app
+Azure Container Registry | vnet-app
+Azure SQL Database | mssql
+Azure Database for MySQL | mysql
+
+See [Private Endpoints and Private DNS](#private-endpoints-and-private-dns) for the rationale behind hosting them all here.
 
 #### **Application Virtual Network**
 
-The application virtual network (vnet-app) is used to host application-specific resources, such as virtual machines, databases, and private endpoints. The virtual network is configured as follows:
+The application virtual network (vnet-app) is used to host application-specific resources, such as virtual machines and databases. The virtual network is configured as follows:
 
 Setting | Value | Notes
 --- | --- | ---
 Default CIDR | `10.2.0.0/16` | Min prefix length is `/24`
 Primary DNS Server | `10.1.1.4` | Private IP domain controller VM in vnet-shared
-Secondary DNS Server | `168.63.129.16` | Azure Recursive DNS Resolver
+
+*vnet-app* deliberately has no secondary DNS server. See [Private Endpoints and Private DNS](#private-endpoints-and-private-dns).
 
 The following subnets are configured in *vnet-app*:
 
@@ -724,23 +734,28 @@ Subnet Name | Default CIDR | Min prefix length | NSG | UDR | Purpose
 --- | --- | --- | --- | --- | ---
 snet-app-01 | `10.2.0.0/24` | `/27` | Yes | Yes | Reserved for web server, application server, and jumpbox VMs.
 snet-db-01 | `10.2.1.0/24` | `/27` | Yes | Yes | Reserved for Database Server VMs.
-snet-privatelink-01 | `10.2.2.0/24` | `/27` | No | No | Reserved for private endpoints using Azure Private Link.
 snet-misc-03 | `10.2.3.0/24` | `/27` | Yes | Yes | Reserved for future use.
 snet-appservice-01 | `10.2.4.0/24` | `/27` | Yes | Yes | Reserved for Azure App Service with delegation to `Microsoft.Web/serverFarms`.
 snet-containerapps-01 | `10.2.5.0/24` | `/27` | Yes | Yes | Reserved for Azure Container Apps with delegation to `Microsoft.App/environments`.
 
-The following private endpoints are configured in the *snet-privatelink-01* subnet to provide secure, network-isolated access to the following Azure PaaS services:
-
-Service | Module
---- | ---
-Azure Blob Storage | vnet-app
-Azure Files | vnet-app
-Azure SQL Database | mssql
-Azure Database for MySQL | mysql
+*vnet-app* has no private endpoint subnet of its own. The private endpoints created by the *vnet-app*, *mssql* and *mysql* modules are all provisioned in the centralized *snet-privatelink-01* subnet in *vnet-shared*.
 
 #### **Virtual Network Peering**
 
 Bi-directional virtual network peering is enabled between the virtual networks in *vnet-shared* and *vnet-app* to allow network connectivity between resources in both virtual networks.
+
+#### **Private Endpoints and Private DNS**
+
+Private endpoints and private DNS zones are centralized in *vnet-shared*, following the hub and spoke pattern described in [Private Link and DNS integration at scale](https://learn.microsoft.com/azure/cloud-adoption-framework/ready/azure-best-practices/private-link-and-dns-integration-at-scale) and [Azure Private Link in a hub-and-spoke network](https://learn.microsoft.com/azure/architecture/networking/guide/private-link-hub-spoke-network).
+
+* **One private endpoint subnet.** Every private endpoint in the sandbox is provisioned in *snet-privatelink-01* (`10.1.5.0/24`) in *vnet-shared*, no matter which module creates it. Modules that need a private endpoint accept the subnet and the private DNS zone as inputs rather than creating their own.
+* **All private DNS zones are created in *vnet-shared***, and each zone is linked to the *vnet-shared* virtual network only. There is one virtual network link per zone.
+* **Resolution flows through *adds1***, the domain controller and DNS server in *vnet-shared*. It is the DNS server for both virtual networks and forwards queries it cannot answer to [168.63.129.16](https://learn.microsoft.com/azure/virtual-network/what-is-ip-address-168-63-129-16). Because the recursive lookup is performed by *adds1* inside *vnet-shared*, a zone link on *vnet-shared* alone is sufficient for clients in *vnet-app* to receive private endpoint IP addresses.
+* **Spoke virtual networks do not list `168.63.129.16` as a secondary DNS server.** This is deliberate: a client that fell back to Azure DNS would resolve a private endpoint FQDN to its public IP address. A clean resolution failure is preferable to silently bypassing Private Link.
+
+This replaces an earlier design that used a second private endpoint subnet in *vnet-app* and a mesh of private DNS zone virtual network links, which required every zone to be linked to both virtual networks and grew with the number of zones multiplied by the number of virtual networks.
+
+Because *adds1* is the only DNS server for both virtual networks, name resolution in *vnet-app* depends on it being running. Use `./scripts/manage-vms.sh start` to start all sandbox VMs (it starts *adds1* first and waits for it) before running tests or troubleshooting name resolution.
 
 #### **Routing and Security**
 

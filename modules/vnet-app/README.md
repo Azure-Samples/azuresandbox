@@ -62,7 +62,7 @@ The steps in this section verify that the Windows jumpbox VM (jumpwin1) is confi
   * Connect to the DNS Server on *adds1*.
   * Click on *adds1* in the left pane
     * Double-click on *Forwarders* in the right pane.
-    * Verify that [168.63.129.16](https://learn.microsoft.com/azure/virtual-network/what-is-ip-address-168-63-129-16) is listed. This ensures that the DNS server will forward any DNS queries it cannot resolve to the Azure Recursive DNS resolver.
+    * Verify that [168.63.129.16](https://learn.microsoft.com/azure/virtual-network/what-is-ip-address-168-63-129-16) is listed. This ensures that *adds1* forwards any DNS queries it cannot resolve to the Azure Recursive DNS resolver. *vnet-app* itself does not list this address as a DNS server, so all name resolution for this virtual network flows through *adds1*.
     * Click *Cancel*.
     * Navigate to *adds1* > *Forward Lookup Zones* > *mysandbox.local* and verify that there are *Host (A)* records for *adds1* and *jumpwin1*.
 
@@ -73,7 +73,7 @@ The steps in this section verify that the Windows jumpbox VM (jumpwin1) is confi
     Resolve-DnsName "<storage-account-name-here>.file.core.windows.net"
     ```
 
-  * Verify the *IP4Address* returned is within the subnet IP address prefix for the subnet *snet-privatelink-01*, e.g. `10.2.2.*`.
+  * Verify the *IP4Address* returned is within the subnet IP address prefix for the centralized private endpoint subnet *snet-privatelink-01* in *vnet-shared*, e.g. `10.1.5.*`.
 
 * From *jumpwin1*, test SMB connectivity with integrated Windows Authentication to Azure Files private endpoint
   * Execute the following command from PowerShell:
@@ -145,6 +145,9 @@ location | | The Azure region defined in the root module.
 log_analytics_workspace_id | | The ID of the shared log analytics workspace.
 monitor_private_link_scope_id | | The ID of the Azure Monitor Private Link Scope (AMPLS) owned by vnet-shared. Used to register Application Insights as a scoped service.
 monitor_private_link_scope_name | | The name of the Azure Monitor Private Link Scope (AMPLS) owned by vnet-shared. Required by azurerm_monitor_private_link_scoped_service.
+private_dns_zone_links_complete | | Dependency signal from the *vnet-shared* module indicating all private DNS zone virtual network links are complete.
+private_dns_zones | | A map of the private DNS zones defined in the *vnet-shared* module, keyed by zone name.
+private_endpoint_subnet_id | | The resource ID of the centralized private endpoint subnet *snet-privatelink-01* in the *vnet-shared* module.
 resource_group_name | | The name of the resource group defined in the root module.
 storage_container_name | scripts | The name of the storage container used to store scripts.
 storage_share_name | myfileshare | The name of the Azure Files share.
@@ -153,7 +156,6 @@ subnet_application_address_prefix | 10.2.0.0/24 | The address prefix for the app
 subnet_appservice_address_prefix | 10.2.4.0/24 | The address prefix for the app service subnet.
 subnet_database_address_prefix | 10.2.1.0/24 | The address prefix for the database subnet.
 subnet_misc_address_prefix | 10.2.3.0/24 | The address prefix for the miscellaneous subnet.
-subnet_privatelink_address_prefix | 10.2.2.0/24 | The address prefix for the private link subnet.
 tags | | The tags defined in the root module.
 unique_seed | | The unique seed used to generate unique names for resources. Defined in the root module.
 user_object_id | | The object ID of the interactive user. Defined in the root module.
@@ -186,25 +188,9 @@ module.vnet_app[0].azurerm_monitor_private_link_scoped_service.app_insights | | 
 module.vnet_app[0].azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;jumpwin1 | Network interface for the VM.
 module.vnet_app[0].azurerm_network_security_group.groups[*] | | NSGs for each subnet.
 module.vnet_app[0].azurerm_network_security_rule.rules[*] | | NSG rules for each NSG. See *locals.tf* for rule definitions.
-module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.api.azureml.ms"] | | Private DNS zone for use with AI Foundry.
-module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.azurecr.io"] | | Private DNS zone for Azure Container Registry.
-module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.&lt;region&gt;.azurecontainerapps.io"] | | Private DNS zone for Azure Container Registry.
-module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.blob.core.windows.net"] | | Private DNS zone for Azure Blob storage.
-module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.cognitiveservices.azure.com"] | | Private DNS zone for use with AI Foundry.
-module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.database.windows.net"] | | Private DNS zone for Azure SQL Database.
-module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.documents.azure.com"] | | Private DNS zone for Azure Cosmos DB.
-module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.file.core.windows.net"] | | Private DNS zone for Azure Files.
-module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.mysql.database.azure.com"] | | Private DNS zone for Azure MySQL Database.
-module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.notebooks.azure.net"] | | Private DNS zone for use with Foundry.
-module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.openai.azure.com"] | | Private DNS zone for use with Foundry.
-module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.search.windows.net"] | | Private DNS zone for use with Foundry.
-module.vnet_app[0].azurerm_private_dns_zone.zones["privatelink.services.ai.azure.com"] | | Private DNS zone for use with Foundry.
-module.vnet_app[0].azurerm_private_dns_zone_virtual_network_link.vnet_app_links[*] | | Private DNS zone virtual network links for the application virtual network.
-module.vnet_app[0].azurerm_private_dns_zone_virtual_network_link.vnet_app_links_from_vnet_shared[*} | | Private DNS zone virtual network links for the applicatino virtual network for zones created in shared services virtual network.
-module.vnet_app[0].azurerm_private_dns_zone_virtual_network_link.vnet_shared_links[*] | | Private DNS zone virtual network links for the shared services virtual network for zones zreated in applicatiion virtual network.
-module.vnet_app[0].azurerm_private_endpoint.container_registry | pe&#8209;sand&#8209;dev&#8209;cr | Private endpoint for the blob storage endpoint.
-module.vnet_app[0].azurerm_private_endpoint.storage_blob | pe&#8209;sand&#8209;dev&#8209;storage&#8209;blob | Private endpoint for the blob storage endpoint.
-module.vnet_app[0].azurerm_private_endpoint.storage_file | pe&#8209;sand&#8209;dev&#8209;storage&#8209;file | Private endpoint for the file storage endpoint.
+module.vnet_app[0].azurerm_private_endpoint.container_registry | pe&#8209;sand&#8209;dev&#8209;cr | Private endpoint for the container registry. Provisioned in the centralized private endpoint subnet in *vnet-shared*.
+module.vnet_app[0].azurerm_private_endpoint.storage_blob | pe&#8209;sand&#8209;dev&#8209;storage&#8209;blob | Private endpoint for the blob storage endpoint. Provisioned in the centralized private endpoint subnet in *vnet-shared*.
+module.vnet_app[0].azurerm_private_endpoint.storage_file | pe&#8209;sand&#8209;dev&#8209;storage&#8209;file | Private endpoint for the file storage endpoint. Provisioned in the centralized private endpoint subnet in *vnet-shared*.
 module.vnet_app[0].azurerm_role_assignment.assignments_storage[*] | | Role assignments for the storage account as defined in *locals.tf*.
 module.vnet_app[0].azurerm_role_assignment.assignments_vm_win[*] | | Role assignments for the VM as defined in *locals.tf*.
 module.vnet_app[0].azurerm_storage_account.this | stsanddevxxxxxxxx | Storage account for the blob and file storage.
@@ -216,7 +202,6 @@ module.vnet_app[0].azurerm_subnet.subnets["snet-app-01"] | | Dedicated subnet fo
 module.vnet_app[0].azurerm_subnet.subnets["snet-appservice-01"] | | Dedicated subnet for Azure App Service.
 module.vnet_app[0].azurerm_subnet.subnets["snet-db-01"] | | Dedicated subnet for database server VMs.
 module.vnet_app[0].azurerm_subnet.subnets["snet-misc-03"] | | Reserved for future use by optional configurations.
-module.vnet_app[0].azurerm_subnet.subnets["snet-privatelink-01"] | | Dedicated subnet for PrivateLink endpoints.
 module.vnet_app[0].azurerm_subnet_network_security_group_association.associations[*] | | Associates the NSGs with the subnets.
 module.vnet_app[0].azurerm_subnet_route_table_association.associations[*] | | Associates the route table with the subnets.
 module.vnet_app[0].azurerm_virtual_machine_extension.this | | Custom script extension for the VM. Downloads scripts from the storage container and runs the orchestration script.
@@ -233,7 +218,6 @@ Name | Comments
 --- | --- | ---
 app_insights_connection_string | | Application Insights connection string. Use this in application code instead of the legacy instrumentation key.
 fqdns | | A map of fqdns for resources provisioned in the module.
-private_dns_zones | | A map of private DNS zones provisioned in the module.
 resource_ids | | A map of resource IDs for key resources in the module.
 resource_names | | A map of resource names for key resources in the module.
 storage_container_name | scripts | The name of the storage container used to store scripts.

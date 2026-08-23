@@ -678,12 +678,12 @@ key $clientKeyPath
         try {
             # DNS resolution
             $ip = Resolve-DnsViaServer -Name $storageFqdn -DnsServer $dnsServer
-            if ($ip -and $ip -match '^10\.2\.') {
+            if ($ip -and $ip -match '^10\.1\.5\.') {
                 Write-TestResult $moduleName 'PASS' "P2S VPN: $storageFqdn resolved to private IP $ip"
                 $passed++
             }
             elseif ($ip) {
-                Write-TestResult $moduleName 'FAIL' "P2S VPN: $storageFqdn resolved to $ip (expected 10.2.x.x privatelink IP)"
+                Write-TestResult $moduleName 'FAIL' "P2S VPN: $storageFqdn resolved to $ip (expected 10.1.5.x privatelink IP in the centralized snet-privatelink-01 subnet)"
                 $failed++
             }
             else {

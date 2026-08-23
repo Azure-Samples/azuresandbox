@@ -126,7 +126,7 @@ This smoke testing uses the RDP connection to *jumpwin2* established previously 
   Resolve-DnsName <your-storage-account-name>.file.core.windows.net
   ```
 
-* Verify the *IP4Address* returned is in the *snet-privatelink-01* subnet, e.g. `10.2.2.5`.
+* Verify the *IP4Address* returned is in the centralized private endpoint subnet *snet-privatelink-01* in *vnet-shared*, e.g. `10.1.5.5`.
 
 * From a Windows PowerShell command prompt, run the following command:
 
@@ -210,7 +210,7 @@ In order to complete this smoke test, SQL Server Management Studio must be insta
   Resolve-DnsName <your-mssql-server-name-here>.database.windows.net
   ```
 
-* Verify the *IP4Address* returned is in the *snet-privatelink-01* subnet.
+* Verify the *IP4Address* returned is in the centralized private endpoint subnet *snet-privatelink-01* in *vnet-shared*.
 * Navigate to *Start* > *Microsoft SQL Server Tools 22* > *Microsoft SQL Server Management Studio 22*
 * Sign in using the same Entra ID work account you used to log in with Azure CLI / Azure PowerShell
 * Connect to the network isolated Azure SQL Database server
@@ -232,7 +232,7 @@ In order to complete this smoke test, MySQL Workbench must be installed on *jump
   Resolve-DnsName <your-mysql-server-name-here>.mysql.database.azure.com
   ```
 
-* Verify the *IP4Address* returned is in the *snet-privatelink-01* subnet, e.g. `10.2.2.7`.
+* Verify the *IP4Address* returned is in the centralized private endpoint subnet *snet-privatelink-01* in *vnet-shared*, e.g. `10.1.5.7`.
 * Navigate to *Start* > *MySQL Workbench*
 * Navigate to *Database* > *Connect to Database* and connect using the following values:
   * Connection method: *Standard (TCP/IP)*

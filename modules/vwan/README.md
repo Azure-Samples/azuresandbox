@@ -179,7 +179,7 @@ Use the following sections to test secure VPN connectivity the remote Windows cl
   Resolve-DnsName <storage-account-name-here>.file.core.windows.net
   ```
 
-* Verify the *IP4Address* returned is in the *vnet_app[0].subnets["snet-privatelink-01"]* subnet.
+* Verify the *IP4Address* returned is in the centralized private endpoint subnet *vnet_shared.subnets["snet-privatelink-01"]* (`10.1.5.0/24`).
 * From a Windows PowerShell command prompt run the following command:
 
   ```powershell
@@ -260,7 +260,7 @@ In order to complete this smoke test, SQL Server Management Studio must be insta
   Resolve-DnsName <mssql-server-name-here>.database.windows.net
   ```
 
-* Verify the *IP4Address* returned is in the *vnet_app[0].subnets["snet-privatelink-01"]* subnet.
+* Verify the *IP4Address* returned is in the centralized private endpoint subnet *vnet_shared.subnets["snet-privatelink-01"]* (`10.1.5.0/24`).
 * Navigate to *Start* > *Microsoft SQL Server Tools 20* > *Microsoft SQL Server Management Studio 20*
 * Connect to the Azure SQL Database server private endpoint
   * Server name:
@@ -292,7 +292,7 @@ In order to complete this smoke test, MySQL Workbench must be installed on the r
   Resolve-DnsName <mysql-server-name-here>.mysql.database.azure.com
   ```
 
-* Verify the *IP4Address* returned is in the *vnet_app[0].subnets["snet-privatelink-01"]* subnet.
+* Verify the *IP4Address* returned is in the centralized private endpoint subnet *vnet_shared.subnets["snet-privatelink-01"]* (`10.1.5.0/24`).
 * Navigate to *Start* > *MySQL Workbench*
 * Navigate to *Database* > *Connect to Database* and connect using the following values:
   * Connection method: *Standard (TCP/IP)*

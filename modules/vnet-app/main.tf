@@ -3,7 +3,7 @@ data "azurerm_client_config" "current" {}
 
 resource "terraform_data" "log_analytics_operations_complete" {
   input = {
-    ampls_dns_zone_links           = join(",", [for l in azurerm_private_dns_zone_virtual_network_link.vnet_app_links_from_vnet_shared : l.id])
+    ampls_dns_zone_links           = var.private_dns_zone_links_complete
     app_insights                   = azurerm_application_insights.this.id
     app_insights_scoped_service    = azurerm_monitor_private_link_scoped_service.app_insights.id
     container_registry_diagnostics = azurerm_monitor_diagnostic_setting.container_registry.id

@@ -161,9 +161,32 @@ variable "monitor_private_link_scope_name" {
   }
 }
 
-variable "private_dns_zones_vnet_shared" {
+variable "private_dns_zone_links_complete" {
+  type        = string
+  description = "Dependency signal from the vnet-shared module indicating all private DNS zone virtual network links are complete."
+}
+
+variable "private_dns_zones" {
   type        = map(any)
-  description = "A map of private DNS zones defined in vnet-shared module."
+  description = "A map of the private DNS zones defined in the vnet-shared module, keyed by zone name."
+
+  validation {
+    condition = alltrue([
+      for zone in ["privatelink.azurecr.io", "privatelink.blob.core.windows.net", "privatelink.file.core.windows.net"] :
+      contains(keys(var.private_dns_zones), zone)
+    ])
+    error_message = "Must include the privatelink.azurecr.io, privatelink.blob.core.windows.net and privatelink.file.core.windows.net zones."
+  }
+}
+
+variable "private_endpoint_subnet_id" {
+  type        = string
+  description = "The resource ID of the centralized private endpoint subnet in the vnet-shared module."
+
+  validation {
+    condition     = can(regex("^/subscriptions/.+/subnets/.+$", var.private_endpoint_subnet_id))
+    error_message = "Must be a valid subnet resource ID."
+  }
 }
 
 variable "resource_group_name" {
@@ -260,17 +283,6 @@ variable "subnet_misc_address_prefix" {
 
   validation {
     condition     = can(cidrhost(var.subnet_misc_address_prefix, 0))
-    error_message = "Must be valid IPv4 CIDR."
-  }
-}
-
-variable "subnet_privatelink_address_prefix" {
-  type        = string
-  description = "The address prefix for the PrivateLink subnet."
-  default     = "10.2.2.0/24"
-
-  validation {
-    condition     = can(cidrhost(var.subnet_privatelink_address_prefix, 0))
     error_message = "Must be valid IPv4 CIDR."
   }
 }

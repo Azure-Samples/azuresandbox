@@ -235,7 +235,9 @@ module "vnet_app" {
   log_analytics_workspace_id      = module.vnet_shared.resource_ids["log_analytics_workspace"]
   monitor_private_link_scope_id   = module.vnet_shared.resource_ids["monitor_private_link_scope"]
   monitor_private_link_scope_name = module.vnet_shared.resource_names["monitor_private_link_scope"]
-  private_dns_zones_vnet_shared   = module.vnet_shared.private_dns_zones
+  private_dns_zone_links_complete = module.vnet_shared.private_dns_zone_links_complete
+  private_dns_zones               = module.vnet_shared.private_dns_zones
+  private_endpoint_subnet_id      = module.vnet_shared.resource_ids["subnet_privatelink"]
   resource_group_name             = azurerm_resource_group.this.name
   tags                            = local.tags
   unique_seed                     = module.naming.unique-seed
@@ -305,11 +307,11 @@ module "mssql" {
 
   location                   = azurerm_resource_group.this.location
   log_analytics_workspace_id = module.vnet_shared.resource_ids["log_analytics_workspace"]
-  private_dns_zone_id        = module.vnet_app[0].private_dns_zones["privatelink.database.windows.net"].id
+  private_dns_zone_id        = module.vnet_shared.private_dns_zones["privatelink.database.windows.net"].id
   resource_group_name        = azurerm_resource_group.this.name
   sql_admin_login_name       = azuread_group.sql_admins[0].display_name
   sql_admin_object_id        = azuread_group.sql_admins[0].object_id
-  subnet_id                  = module.vnet_app[0].subnets["snet-privatelink-01"].id
+  subnet_id                  = module.vnet_shared.resource_ids["subnet_privatelink"]
   tags                       = local.tags
   unique_seed                = module.naming.unique-seed
 
@@ -325,9 +327,9 @@ module "mysql" {
   admin_username             = module.vnet_shared.admin_username
   location                   = azurerm_resource_group.this.location
   log_analytics_workspace_id = module.vnet_shared.resource_ids["log_analytics_workspace"]
-  private_dns_zone_id        = module.vnet_app[0].private_dns_zones["privatelink.mysql.database.azure.com"].id
+  private_dns_zone_id        = module.vnet_shared.private_dns_zones["privatelink.mysql.database.azure.com"].id
   resource_group_name        = azurerm_resource_group.this.name
-  subnet_id                  = module.vnet_app[0].subnets["snet-privatelink-01"].id
+  subnet_id                  = module.vnet_shared.resource_ids["subnet_privatelink"]
   tags                       = local.tags
   unique_seed                = module.naming.unique-seed
 
@@ -369,8 +371,8 @@ module "petstore" {
   jumplinux1_vm_id               = module.vm_jumpbox_linux[0].resource_ids["virtual_machine_jumplinux1"]
   location                       = azurerm_resource_group.this.location
   log_analytics_workspace_id     = module.vnet_shared.resource_ids["log_analytics_workspace"]
-  private_dns_zone_id            = module.vnet_app[0].private_dns_zones["privatelink.${var.location}.azurecontainerapps.io"].id
-  private_endpoint_subnet_id     = module.vnet_app[0].subnets["snet-privatelink-01"].id
+  private_dns_zone_id            = module.vnet_shared.private_dns_zones["privatelink.${var.location}.azurecontainerapps.io"].id
+  private_endpoint_subnet_id     = module.vnet_shared.resource_ids["subnet_privatelink"]
   resource_group_name            = azurerm_resource_group.this.name
   tags                           = local.tags
   unique_seed                    = module.naming.unique-seed

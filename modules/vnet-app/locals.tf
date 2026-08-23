@@ -92,22 +92,6 @@ locals {
     }
   }
 
-  private_dns_zones = [
-    "privatelink.api.azureml.ms",
-    "privatelink.${var.location}.azurecontainerapps.io",
-    "privatelink.azurecr.io",
-    "privatelink.blob.core.windows.net",
-    "privatelink.cognitiveservices.azure.com",
-    "privatelink.database.windows.net",
-    "privatelink.documents.azure.com",
-    "privatelink.file.core.windows.net",
-    "privatelink.mysql.database.azure.com",
-    "privatelink.notebooks.azure.net",
-    "privatelink.openai.azure.com",
-    "privatelink.search.windows.net",
-    "privatelink.services.ai.azure.com"
-  ]
-
   subnets = {
     snet-app-01 = {
       address_prefix                    = var.subnet_application_address_prefix
@@ -169,13 +153,6 @@ locals {
       route_table = "firewall"
     }
 
-    snet-privatelink-01 = {
-      address_prefix                    = var.subnet_privatelink_address_prefix
-      delegation                        = ""
-      private_endpoint_network_policies = "Disabled"
-      nsg_rules                         = []
-      route_table                       = null
-    }
   }
 
   vm_win_roles = {
