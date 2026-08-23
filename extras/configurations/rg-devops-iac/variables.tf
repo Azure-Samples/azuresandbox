@@ -151,6 +151,17 @@ variable "user_object_id" {
   }
 }
 
+variable "vm_jumpbox_linux_size" {
+  type        = string
+  description = "The size of the virtual machine"
+  default     = "Standard_D2ls_v6"
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9_]+$", var.vm_jumpbox_linux_size))
+    error_message = "The 'vm_jumpbox_linux_size' must conform to Azure virtual machine size naming conventions: it can only contain alphanumeric characters and underscores (_). Examples include 'Standard_DS1_v2' or 'Standard_B2ms'."
+  }
+}
+
 variable "vnet_address_space" {
   type        = string
   description = "The address space in CIDR notation for the new virtual network."

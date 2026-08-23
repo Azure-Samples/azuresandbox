@@ -361,7 +361,7 @@ Variable | Default | Description
 aad_tenant_id | | The Microsoft Entra tenant id.
 arm_client_id | | The AppId of the service principal used for authenticating with Azure. Must have a 'Contributor' role assignment.
 arm_client_secret | | The password for the service principal used for authenticating with Azure. Set interactively or using an environment variable 'TF_VAR_arm_client_secret'.
-location | centralus | The name of the Azure Region where resources will be provisioned.
+location | | The name of the Azure Region where resources will be provisioned.
 storage_access_tier | Hot | The access tier for the new storage account.
 storage_replication_type | LRS | The type of replication for the new storage account.
 subnet_address_prefix | 10.0.0.0/24 | The address prefix for the miscellaneous subnet. The minimum size is /29.
@@ -372,6 +372,7 @@ subscription_id | | The Azure subscription id used to provision resources.
 storage_container_name | tfstate | The name of the storage container to be created in the new storage account.
 tags | | The tags in map format to be used when creating new resources.
 user_object_id | | The object id of the user in Microsoft Entra ID.
+vm_jumpbox_linux_size | `Standard_D2ls_v6` | The size of the jumpbox virtual machine (`jumplinux2`).
 vnet_address_space | 10.0.0.0/16 | The address space in CIDR notation for the new virtual network. The minimum size is /24.
 vnet_name | devops | The name of the new virtual
 

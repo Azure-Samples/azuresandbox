@@ -150,7 +150,7 @@ variable "vm_jumpbox_linux_name" {
 variable "vm_jumpbox_linux_size" {
   type        = string
   description = "The size of the virtual machine"
-  default     = "Standard_B2ls_v2"
+  # default     = "Standard_B2ls_v2"
 
   validation {
     condition     = can(regex("^[a-zA-Z0-9_]+$", var.vm_jumpbox_linux_size))

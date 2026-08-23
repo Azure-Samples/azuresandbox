@@ -232,7 +232,7 @@ vm_jumpbox_linux_image_publisher | `Canonical` | The publisher for the virtual m
 vm_jumpbox_linux_image_sku | `server` | The SKU of the virtual machine image used to create the VM.
 vm_jumpbox_linux_image_version | `Latest` | The version of the virtual machine image used to create the VM.
 vm_jumpbox_linux_name | jumplinux1 | The name of the VM.
-vm_jumpbox_linux_size | `Standard_B2ls_v2` | The size of the virtual machine.
+vm_jumpbox_linux_size | `Standard_D2ls_v6` | The size of the virtual machine. Defined by the root module's `vm_jumpbox_size` variable.
 vm_jumpbox_linux_storage_account_type | `StandardSSD_LRS` | The storage type to be used for the VM's OS disk. Standard HDD (`Standard_LRS`) is not permitted because Azure is retiring Standard HDD OS disks on September 8, 2028.
 
 ### Module Resources
