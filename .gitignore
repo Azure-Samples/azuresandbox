@@ -94,3 +94,12 @@ sshkeytemp.pub
 
 # Ignore log files
 *.log
+
+# Ignore Node.js dependencies. The repo vendors no JavaScript packages;
+# scripts/render-drawio-svg.js expects puppeteer to be installed out-of-tree
+# (see DRAWIO_PUPPETEER_DIR in that script's header).
+node_modules/
+
+# Ignore Python bytecode caches (scripts/build-module-diagrams.py)
+__pycache__/
+*.py[cod]
