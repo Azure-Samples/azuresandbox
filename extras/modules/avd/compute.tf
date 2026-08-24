@@ -3,7 +3,7 @@ resource "azurerm_windows_virtual_machine" "personal" {
   name                = var.vm_name_personal
   location            = var.location
   resource_group_name = var.resource_group_name
-  size                = var.vm_size
+  size                = var.vm_avd_size
   admin_username      = var.admin_username
   admin_password      = var.admin_password
   license_type        = "Windows_Client"
@@ -117,7 +117,7 @@ resource "azurerm_windows_virtual_machine" "remoteapp" {
   name                = var.vm_name_remoteapp
   location            = var.location
   resource_group_name = var.resource_group_name
-  size                = var.vm_size
+  size                = var.vm_avd_size
   admin_username      = var.admin_username
   admin_password      = var.admin_password
   license_type        = "Windows_Client"

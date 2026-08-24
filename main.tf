@@ -395,6 +395,7 @@ module "avd" {
   subnet_id                     = module.vnet_app[0].subnets["snet-app-01"].id
   tags                          = local.tags
   unique_seed                   = module.naming.unique-seed
+  vm_avd_size                   = var.vm_avd_size
 
   depends_on = [module.vnet_app[0].azure_files_config_vm_extension_id] # Ensure that Azure Files is configured
 }

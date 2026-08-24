@@ -150,13 +150,13 @@ variable "vm_name_remoteapp" {
   }
 }
 
-variable "vm_size" {
+variable "vm_avd_size" {
   type        = string
-  description = "The size of the session host VMs"
-  default     = "Standard_D4ds_v4"
+  description = "The size of the session host VMs. A size without a local temp disk is sufficient because the session hosts do not use local temp storage."
+  default     = "Standard_D4s_v6"
 
   validation {
-    condition     = can(regex("^[a-zA-Z0-9_]+$", var.vm_size))
-    error_message = "Must conform to Azure virtual machine size naming conventions: it can only contain alphanumeric characters and underscores (_). Examples include 'Standard_DS1_v2' or 'Standard_B2ms'."
+    condition     = can(regex("^[a-zA-Z0-9_]+$", var.vm_avd_size))
+    error_message = "Must conform to Azure virtual machine size naming conventions: it can only contain alphanumeric characters and underscores (_). Examples include 'Standard_D4s_v6' or 'Standard_D8s_v6'."
   }
 }

@@ -186,6 +186,17 @@ variable "user_object_id" {
   }
 }
 
+variable "vm_avd_size" {
+  type        = string
+  description = "The size of the Azure Virtual Desktop session host virtual machines: 'sessionhost1' and 'sessionhost2'."
+  default     = "Standard_D4s_v6"
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9_]+$", var.vm_avd_size))
+    error_message = "The 'vm_avd_size' must conform to Azure virtual machine size naming conventions: it can only contain alphanumeric characters and underscores (_). Examples include 'Standard_D4s_v6' or 'Standard_D8s_v6'."
+  }
+}
+
 variable "vm_jumpbox_size" {
   type        = string
   description = "The size of the jumpbox and domain controller virtual machines: 'jumpwin1', 'jumplinux1', and 'adds1'."
