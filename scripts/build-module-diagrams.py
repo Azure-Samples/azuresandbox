@@ -166,14 +166,12 @@ VWAN = {
 # Each entry is (path relative to the repo root, set of cell ids to keep).
 #
 # Scope rule: keep a shape if it belongs to the module itself, or to a module
-# this one genuinely depends on. vnet_shared is always included (required
-# module). vnet_app is included only where it is a FUNCTIONAL dependency, i.e.
-# the module actually consumes something from it.
-#
-# mssql and mysql deliberately omit vnet_app. Since private endpoints were
-# centralized into vnet_shared, those modules take their subnet and private DNS
-# zone from vnet_shared and reference vnet_app only through a depends_on used to
-# order an Azure Files operation. There is nothing from vnet_app to draw.
+# this one depends on. vnet_shared is the hub and is always included. vnet_app
+# is a prerequisite for every optional module except vnet_shared itself, so it
+# is included in all of them too - each optional module is only deployable on
+# top of an already-deployed vnet_app (see the enable_module_* wiring and the
+# depends_on edges in the root main.tf), and its smoke tests are driven from
+# the jumpboxes that vnet_app hosts.
 # --------------------------------------------------------------------------
 SCOPES = {
     'vnet-shared': (
@@ -195,15 +193,18 @@ SCOPES = {
     ),
     'mssql': (
         'modules/mssql/images/mssql-diagram.drawio.svg',
-        GLOBAL | SHARED | MSSQL,
+        GLOBAL | SHARED | VNET_APP | MSSQL,
     ),
     'mysql': (
         'modules/mysql/images/mysql-diagram.drawio.svg',
-        GLOBAL | SHARED | MYSQL,
+        GLOBAL | SHARED | VNET_APP | MYSQL,
     ),
     'vwan': (
+        # vwan requires every other base module to be deployed: it connects the
+        # hub and spoke vnets to a virtual WAN hub so remote clients reach all
+        # of the workloads, so its diagram keeps the full set of shapes.
         'modules/vwan/images/vwan-diagram.drawio.svg',
-        GLOBAL | SHARED | VNET_APP | VWAN,
+        GLOBAL | SHARED | VNET_APP | JUMPLINUX | MSSQLWIN | MSSQL | MYSQL | VWAN,
     ),
 }
 
