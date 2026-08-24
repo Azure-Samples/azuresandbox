@@ -333,14 +333,14 @@ vm_adds_image_publisher | MicrosoftWindowsServer | The publisher for the virtual
 vm_adds_image_sku | 2025-datacenter-azure-edition-core | The sku of the virtual machine image used to create the VM.
 vm_adds_image_version | Latest | The version of the virtual machine image used to create the VM.
 vm_adds_name | adds2 | The name of the VM.
-vm_adds_size | Standard_B2ls_v2 | The size of the virtual machine.
+vm_adds_size | `Standard_D2ls_v6` | The size of the virtual machine. Defined by the root module's `vm_jumpbox_size` variable.
 vm_adds_storage_account_type | Standard_LRS | The storage replication type to be used for the VMs OS and data disks.
 vm_jumpbox_win_image_offer | WindowsServer | The offer type of the virtual machine image used to create the VM.
 vm_jumpbox_win_image_publisher | MicrosoftWindowsServer | The publisher for the virtual machine image used to create the VM.
 vm_jumpbox_win_image_sku | 2025-datacenter-azure-edition | The sku of the virtual machine image used to create the VM.
 vm_jumpbox_win_image_version | Latest | The version of the virtual machine image used to create the VM.
 vm_jumpbox_win_name | jumpwin2 | The name of the VM.
-vm_jumpbox_win_size | Standard_B2ls_v2 | The size of the virtual machine.
+vm_jumpbox_win_size | `Standard_D2ls_v6` | The size of the virtual machine. Defined by the root module's `vm_jumpbox_size` variable.
 vm_jumpbox_win_storage_account_type | Standard_LRS | The storage replication type to be used for the VMs OS and data disks.
 vnet_address_space | `192.168.0.0/16` | The address space in CIDR notation for the new virtual network used to simulate an on-premises network.
 vnet_asn | 65123 | The ASN for the on premises network.

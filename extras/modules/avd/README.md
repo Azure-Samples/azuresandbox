@@ -78,7 +78,7 @@ security_principal_object_ids | | Azure AD object IDs for role assignments.
 subnet_id | | Resource ID of existing subnet for session hosts.
 tags | | Map of resource tags.
 unique_seed | | Seed value for Azure naming module.
-vm_avd_size | Standard_D4s_v6 | Azure VM size for session host VMs. A size without a local temp disk is sufficient because the session hosts do not use local temp storage.
+vm_avd_size | `Standard_D4s_v6` | Azure VM size for session host VMs. Defined by the root module's `vm_avd_size` variable. A size without a local temp disk is sufficient because the session hosts do not use local temp storage.
 vm_image_sku | win11-24h2-avd-m365 | Marketplace image SKU for session host VMs.
 vm_name_personal | sessionhost1 | Name of the personal desktop session host virtual machine.
 vm_name_remoteapp | sessionhost2 | Name of the RemoteApp session host virtual machine.

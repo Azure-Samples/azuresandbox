@@ -413,6 +413,8 @@ module "vnet_onprem" {
   resource_group_name    = azurerm_resource_group.this.name
   subnets_cloud          = module.vnet_shared.subnets
   tags                   = local.tags
+  vm_adds_size           = var.vm_jumpbox_size
+  vm_jumpbox_win_size    = var.vm_jumpbox_size
 
   virtual_networks_cloud = {
     virtual_network_shared = {

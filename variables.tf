@@ -199,7 +199,7 @@ variable "vm_avd_size" {
 
 variable "vm_jumpbox_size" {
   type        = string
-  description = "The size of the jumpbox and domain controller virtual machines: 'jumpwin1', 'jumplinux1', and 'adds1'."
+  description = "The size of the jumpbox and domain controller virtual machines: 'jumpwin1', 'jumplinux1', and 'adds1', as well as 'jumpwin2' and 'adds2' when the vnet_onprem module is enabled."
   default     = "Standard_D2ls_v6"
 
   validation {

@@ -153,7 +153,7 @@ variable "vm_name_remoteapp" {
 variable "vm_avd_size" {
   type        = string
   description = "The size of the session host VMs. A size without a local temp disk is sufficient because the session hosts do not use local temp storage."
-  default     = "Standard_D4s_v6"
+  # default     = "Standard_D4s_v6" # Now sourced from root variable 'vm_avd_size'; see main.tf.
 
   validation {
     condition     = can(regex("^[a-zA-Z0-9_]+$", var.vm_avd_size))
