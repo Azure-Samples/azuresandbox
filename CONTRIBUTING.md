@@ -162,6 +162,22 @@ The PSScriptAnalyzer settings file excludes a small set of rules that conflict w
 
 Each CI linter/scanner is pinned to a specific tool version — ShellCheck, actionlint, and gitleaks as direct binary downloads (env-var version + SHA256), PSScriptAnalyzer via `Install-Module -RequiredVersion`, markdownlint-cli2 via `npx …@<ver>`, and Terraform CLI / tflint / the tflint `azurerm` ruleset via setup-action inputs and `.tflint.hcl`. Dependabot only tracks the `terraform` and `github-actions` ecosystems (see [`.github/dependabot.yml`](.github/dependabot.yml)), so it cannot see any of these pins. The scheduled [`ci-tool-versions`](.github/workflows/ci-tool-versions.yml) workflow fills that gap: weekly it runs [`scripts/Check-ToolVersionDrift.sh`](scripts/Check-ToolVersionDrift.sh), which compares every pin against its upstream latest stable release and, when anything is behind, opens (or updates) a **single** tracking issue — labelled `tool-version-drift` — listing each drifted tool's current pin, latest version, and every file that must be updated (the workflow, the mirrored copy in `scripts/Invoke-CIChecks.sh`, plus `.tflint.hcl` for the ruleset and `terraform.tf` for the Terraform CLI). The issue is closed automatically once all pins are back in sync. Run the detector locally at any time with `./scripts/Check-ToolVersionDrift.sh`. When bumping a tool, update every file the report lists and re-run `./scripts/Invoke-CIChecks.sh` before pushing so the pins stay consistent.
 
+## Architecture diagrams
+
+Every module has an architecture diagram under `modules/<module>/images/`, and the whole sandbox has a root diagram at [`images/azuresandbox.drawio.svg`](images/azuresandbox.drawio.svg). They are draw.io **editable SVG** files (`*.drawio.svg`), which store the diagram twice: the editable mxGraph model in the root `<svg content="...">` attribute, and the rendered SVG body that browsers and GitHub display. Editing only one half leaves the file displaying the wrong topology, so always edit them in draw.io (or the VS Code draw.io extension), which keeps both halves in sync.
+
+The root diagram is the **single source of truth** for the shared visual language — connector labels, colour coding, frame naming, and the vnet/subnet layout. The module diagrams are generated from it rather than maintained by hand, so refinements made once to the root propagate everywhere:
+
+```bash
+./scripts/build-module-diagrams.py list     # show the root diagram's cells and their owning module
+./scripts/build-module-diagrams.py build    # regenerate every module diagram from the root diagram
+./scripts/build-module-diagrams.py verify   # integrity-check the generated files
+```
+
+For each module the script copies the root diagram, retitles it, and deletes the shapes that belong neither to a required module nor to the module being drawn. Shape geometry is deliberately left alone — deleted shapes simply leave whitespace — so the diagrams stay visually comparable. Which shapes belong to which module is recorded in a commented cell-id map at the top of the script; `list` reports any shape that is missing from it, which is what to run first after adding a shape to the root diagram.
+
+**Workflow:** edit `images/azuresandbox.drawio.svg` in draw.io, run `build`, then run `verify` (it checks that no connector points at a deleted shape and that the embedded model and the rendered picture still agree). Rendering is delegated to draw.io's own engine running headless via [`scripts/render-drawio-svg.js`](scripts/render-drawio-svg.js), which needs Node.js, puppeteer, and network access to `app.diagrams.net`; see that script's header for setup. Commit the regenerated diagrams together with the root diagram change.
+
 ## Submission Guidelines
 
 ### Submitting an Issue

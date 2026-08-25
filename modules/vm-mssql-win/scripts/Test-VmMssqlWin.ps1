@@ -766,7 +766,9 @@ catch {
 }
 
 # AMPLS DNS - well-known Azure Monitor control FQDN resolves to a private IP.
-# Confirms the privatelink.monitor.azure.com zone is linked to this VNet and the PE is reachable.
+# Confirms hub-centralized private DNS resolution works from a spoke virtual network: the
+# privatelink.monitor.azure.com zone is linked to vnet-shared only, so a private IP here proves
+# the query was resolved by adds1 in the hub and that the AMPLS private endpoint is reachable.
 try {
     $amplsFqdn = 'global.handler.control.monitor.azure.com'
     $dnsResult = Resolve-DnsName $amplsFqdn -ErrorAction Stop

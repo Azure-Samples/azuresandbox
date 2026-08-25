@@ -1,0 +1,22 @@
+{
+  // The 'extras/modules/retired' folder holds frozen, out-of-date configurations
+  // that are kept for reference only. They are intentionally not maintained, so
+  // hide them from the editor to keep language servers, linters and other
+  // extensions from analyzing them and reporting findings that will not be fixed.
+  //
+  // 'files.exclude' removes the folder from the Explorer and from most extension
+  // file scans, 'search.exclude' keeps it out of full-text search results, and
+  // 'files.watcherExclude' stops the file watcher from monitoring it.
+  //
+  // To browse the retired configurations, temporarily set the 'files.exclude'
+  // entry below to false, or open the folder directly from a terminal.
+  "files.exclude": {
+    "**/extras/modules/retired": true
+  },
+  "search.exclude": {
+    "**/extras/modules/retired": true
+  },
+  "files.watcherExclude": {
+    "**/extras/modules/retired/**": true
+  }
+}

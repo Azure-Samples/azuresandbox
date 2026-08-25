@@ -185,7 +185,7 @@ variable "vm_adds_name" {
 variable "vm_adds_size" {
   type        = string
   description = "The size of the virtual machine."
-  default     = "Standard_B2ls_v2"
+  # default     = "Standard_B2ls_v2" # Now sourced from root variable 'vm_jumpbox_size'; see main.tf.
 
   validation {
     condition     = can(regex("^[a-zA-Z0-9_]+$", var.vm_adds_size))
@@ -262,7 +262,7 @@ variable "vm_jumpbox_win_name" {
 variable "vm_jumpbox_win_size" {
   type        = string
   description = "The size of the virtual machine."
-  default     = "Standard_B2ls_v2"
+  # default     = "Standard_B2ls_v2" # Now sourced from root variable 'vm_jumpbox_size'; see main.tf.
 
   validation {
     condition     = can(regex("^[a-zA-Z0-9_]+$", var.vm_jumpbox_win_size))

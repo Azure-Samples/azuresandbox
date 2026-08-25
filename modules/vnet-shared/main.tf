@@ -208,7 +208,7 @@ resource "terraform_data" "log_analytics_operations_complete" {
     ampls_scope_log_analytics = azurerm_monitor_private_link_scoped_service.log_analytics.id
     ampls_scope_dce           = azurerm_monitor_private_link_scoped_service.dce.id
     ampls_private_endpoint    = azurerm_private_endpoint.ampls.id
-    ampls_dns_zone_links      = join(",", [for l in azurerm_private_dns_zone_virtual_network_link.ampls : l.id])
+    ampls_dns_zone_links      = terraform_data.private_dns_zone_links_complete.id
     key_vault_diagnostics     = azurerm_monitor_diagnostic_setting.this.id
     adds1_dcr_association     = azurerm_monitor_data_collection_rule_association.adds1_dcr.id
     adds1_dce_association     = azurerm_monitor_data_collection_rule_association.adds1_dce.id

@@ -262,23 +262,37 @@ resource "azurerm_public_ip" "firewall" {
 }
 #endregion
 
-#region private-endpoints
-resource "azurerm_private_dns_zone" "key_vault" {
-  name                = "privatelink.vaultcore.azure.net"
+#region private-dns-zones
+# All private DNS zones for the sandbox environment are created here and linked to this
+# virtual network only. See local.private_dns_zones in locals.tf for the rationale.
+resource "azurerm_private_dns_zone" "zones" {
+  for_each = toset(local.private_dns_zones)
+
+  name                = each.value
   resource_group_name = var.resource_group_name
 }
 
-resource "azurerm_private_dns_zone_virtual_network_link" "key_vault" {
-  name                = "link-${azurerm_private_dns_zone.key_vault.name}-${azurerm_virtual_network.this.name}"
-  private_dns_zone_id = azurerm_private_dns_zone.key_vault.id
+resource "azurerm_private_dns_zone_virtual_network_link" "zones" {
+  for_each = azurerm_private_dns_zone.zones
+
+  name                = "link-${each.value.name}-${azurerm_virtual_network.this.name}"
+  private_dns_zone_id = each.value.id
   virtual_network_id  = azurerm_virtual_network.this.id
 }
 
+# Dependency signal consumed by modules that provision private endpoints, so they are not
+# created until every private DNS zone virtual network link exists.
+resource "terraform_data" "private_dns_zone_links_complete" {
+  input = join(",", [for link in azurerm_private_dns_zone_virtual_network_link.zones : link.id])
+}
+#endregion
+
+#region private-endpoints
 resource "azurerm_private_endpoint" "key_vault" {
   name                = "${module.naming.private_endpoint.name}-key-vault"
   resource_group_name = var.resource_group_name
   location            = var.location
-  subnet_id           = azurerm_subnet.subnets["snet-privatelink-02"].id
+  subnet_id           = azurerm_subnet.subnets["snet-privatelink-01"].id
 
   private_service_connection {
     name                           = "key_vault"
@@ -289,35 +303,17 @@ resource "azurerm_private_endpoint" "key_vault" {
 
   private_dns_zone_group {
     name                 = "default"
-    private_dns_zone_ids = [azurerm_private_dns_zone.key_vault.id]
+    private_dns_zone_ids = [azurerm_private_dns_zone.zones["privatelink.vaultcore.azure.net"].id]
   }
-}
 
-resource "azurerm_private_dns_zone" "ampls" {
-  for_each = toset([
-    "privatelink.monitor.azure.com",            # App Insights ingestion + Live Metrics + API; AMA config pull
-    "privatelink.oms.opinsights.azure.com",     # Log Analytics agent onboarding / registration
-    "privatelink.ods.opinsights.azure.com",     # Log Analytics data ingestion (log writes)
-    "privatelink.agentsvc.azure-automation.net" # Legacy agent service channel
-  ])
-
-  name                = each.value
-  resource_group_name = var.resource_group_name
-}
-
-resource "azurerm_private_dns_zone_virtual_network_link" "ampls" {
-  for_each = azurerm_private_dns_zone.ampls
-
-  name                = "link-${each.value.name}-${azurerm_virtual_network.this.name}"
-  private_dns_zone_id = each.value.id
-  virtual_network_id  = azurerm_virtual_network.this.id
+  depends_on = [terraform_data.private_dns_zone_links_complete]
 }
 
 resource "azurerm_private_endpoint" "ampls" {
   name                = "${module.naming.private_endpoint.name}-ampls"
   resource_group_name = var.resource_group_name
   location            = var.location
-  subnet_id           = azurerm_subnet.subnets["snet-privatelink-02"].id
+  subnet_id           = azurerm_subnet.subnets["snet-privatelink-01"].id
 
   private_service_connection {
     name                           = "ampls"
@@ -328,7 +324,7 @@ resource "azurerm_private_endpoint" "ampls" {
 
   private_dns_zone_group {
     name                 = "default"
-    private_dns_zone_ids = [for z in azurerm_private_dns_zone.ampls : z.id]
+    private_dns_zone_ids = [for zone in local.ampls_private_dns_zones : azurerm_private_dns_zone.zones[zone].id]
   }
 
   # Serialize control-plane writes on the AMPLS scope. Creating the PE issues a PATCH on the
@@ -341,6 +337,7 @@ resource "azurerm_private_endpoint" "ampls" {
     azurerm_monitor_private_link_scoped_service.dce,
     azurerm_monitor_data_collection_rule_association.adds1_dcr,
     azurerm_monitor_data_collection_rule_association.adds1_dce,
+    terraform_data.private_dns_zone_links_complete,
   ]
 }
 #endregion

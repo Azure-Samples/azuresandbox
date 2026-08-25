@@ -99,8 +99,8 @@ jumplinux1_principal_id |  | Principal ID of the jumplinux1 managed identity (gr
 jumplinux1_vm_id |  | Resource ID of the jumplinux1 VM used to build and push the instrumented image.
 location |  | Azure region for deployment (lowercase, numbers, dashes only).
 log_analytics_workspace_id |  | Resource ID of Log Analytics workspace used for diagnostics.
-private_dns_zone_id |  | Resource ID of private DNS zone linked to the managed environment.
-private_endpoint_subnet_id |  | Subnet where the private endpoint to the Container Apps Environment is placed.
+private_dns_zone_id |  | Resource ID of the `privatelink.<location>.azurecontainerapps.io` private DNS zone. The zone is created in and linked to *vnet-shared*, the hub virtual network.
+private_endpoint_subnet_id |  | Subnet where the private endpoint to the Container Apps Environment is placed. This is the centralized private endpoint subnet *snet-privatelink-01* in *vnet-shared*.
 resource_group_name |  | Name of the existing resource group.
 source_container_image | swaggerapi/petstore31:latest | Stock base image (repo/image:tag) used for the instrumented build.
 tags |  | Map of resource tags.
