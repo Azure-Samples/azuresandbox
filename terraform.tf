@@ -1,5 +1,5 @@
 terraform {
-  required_version = "~> 1.15.8"
+  required_version = "~> 1.15.9"
 
   required_providers {
     azuread = {
@@ -14,7 +14,7 @@ terraform {
 
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 5.1.0"
+      version = "~> 5.2.0"
     }
 
     cloudinit = {

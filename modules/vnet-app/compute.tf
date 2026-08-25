@@ -29,7 +29,8 @@ resource "azurerm_windows_virtual_machine" "this" {
   }
 
   depends_on = [
-    azurerm_private_dns_zone_virtual_network_link.vnet_app_links
+    azurerm_virtual_network_peering.app_to_shared,
+    azurerm_virtual_network_peering.shared_to_app
   ]
 }
 

@@ -47,9 +47,21 @@ catch {
     Exit-WithError "Failed to set DNS forwarder: $_"
 }
 
-# Configure conditional forwarders
+# Configure conditional forwarders.
+#
+# These forward Azure PaaS name resolution to the Azure DNS Private Resolver inbound endpoint in
+# the cloud shared services virtual network. The resolver answers from the private DNS zones
+# linked to that virtual network, which is where every private DNS zone in the sandbox is created
+# and linked. The authoritative zone list is local.private_dns_zones in
+# modules/vnet-shared/locals.tf -- keep this list and the matching list in Test-VnetOnpremAdds.ps1
+# in sync with it.
+#
+# Note the public zone name is used here, not the privatelink.* zone name. The CNAME chain from
+# the public name to the privatelink name is resolved by the private resolver.
 $conditionalForwarders = @(
     @{ Name = $AddsDomainNameCloud; Description = "Cloud sandbox domain" },
+    @{ Name = "azurecr.io"; Description = "Azure Container Registry" },
+    @{ Name = "blob.core.windows.net"; Description = "Azure Blob Storage" },
     @{ Name = "file.core.windows.net"; Description = "Azure Files" },
     @{ Name = "database.windows.net"; Description = "Azure SQL Database" },
     @{ Name = "mysql.database.azure.com"; Description = "Azure MySQL Flexible Server" }

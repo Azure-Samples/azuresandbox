@@ -30,10 +30,13 @@ output "fqdns" {
 }
 
 output "private_dns_zones" {
-  value = merge(
-    { "privatelink.vaultcore.azure.net" = azurerm_private_dns_zone.key_vault },
-    azurerm_private_dns_zone.ampls
-  )
+  value       = azurerm_private_dns_zone.zones
+  description = "All private DNS zones for the sandbox environment, keyed by zone name. Consumed by modules that provision private endpoints."
+}
+
+output "private_dns_zone_links_complete" {
+  value       = terraform_data.private_dns_zone_links_complete.id
+  description = "Dependency signal: all private DNS zone virtual network links in this module are complete."
 }
 
 output "resource_ids" {
@@ -47,6 +50,7 @@ output "resource_ids" {
     key_vault                    = azurerm_key_vault.this.id
     log_analytics_workspace      = azurerm_log_analytics_workspace.this.id
     monitor_private_link_scope   = azurerm_monitor_private_link_scope.this.id
+    subnet_privatelink           = azurerm_subnet.subnets["snet-privatelink-01"].id
     virtual_machine_adds1        = azurerm_windows_virtual_machine.this.id
     virtual_network_shared       = azurerm_virtual_network.this.id
   }

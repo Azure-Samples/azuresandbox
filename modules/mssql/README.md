@@ -28,7 +28,7 @@ This section describes how to test the module after deployment.
     Resolve-DnsName <azure-sql-server-name-here>.database.windows.net
     ```
 
-  * Verify the *IP4Address* returned is within the subnet IP address prefix for *vnet_app[0].subnets["snet-privatelink-01"]*, e.g. `10.2.2.*`.
+  * Verify the *IP4Address* returned is within the subnet IP address prefix for the centralized private endpoint subnet *vnet_shared.subnets["snet-privatelink-01"]*, e.g. `10.1.5.*`.
 * From *jumpwin1*, test SQL Server Connectivity with SQL Server Management Studio (SSMS)
   * Navigate to *Start* > *Microsoft SQL Server Tools 22* > *Microsoft SQL Server Management Studio 22*
   * Sign in using the same Entra ID work account you used to log in with Azure CLI / Azure PowerShell

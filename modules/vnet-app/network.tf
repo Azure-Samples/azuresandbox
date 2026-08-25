@@ -4,7 +4,12 @@ resource "azurerm_virtual_network" "this" {
   location            = var.location
   resource_group_name = var.resource_group_name
   address_space       = [var.vnet_address_space]
-  dns_servers         = [var.dns_server, "168.63.129.16"]
+  # Deliberately no fallback to the Azure recursive resolver (168.63.129.16). The domain
+  # controller / DNS server *adds1* in the shared services virtual network is authoritative for
+  # this virtual network and forwards queries it cannot answer. Private DNS zones are linked to
+  # the shared services virtual network only, so a client that fell back to Azure DNS would
+  # resolve private endpoint FQDNs to their public IP addresses, silently bypassing Private Link.
+  dns_servers = [var.dns_server]
 }
 
 resource "azurerm_subnet" "subnets" {
@@ -100,38 +105,6 @@ resource "azurerm_virtual_network_peering" "app_to_shared" {
 }
 #endregion
 
-#region private-dns-zones
-resource "azurerm_private_dns_zone" "zones" {
-  for_each            = toset(local.private_dns_zones)
-  name                = each.value
-  resource_group_name = var.resource_group_name
-}
-
-resource "azurerm_private_dns_zone_virtual_network_link" "vnet_app_links" {
-  for_each            = azurerm_private_dns_zone.zones
-  name                = "link-${each.value.name}-${azurerm_virtual_network.this.name}"
-  private_dns_zone_id = each.value.id
-  virtual_network_id  = azurerm_virtual_network.this.id
-  depends_on          = [azurerm_virtual_network_peering.app_to_shared, azurerm_virtual_network_peering.shared_to_app]
-}
-
-resource "azurerm_private_dns_zone_virtual_network_link" "vnet_app_links_from_vnet_shared" {
-  for_each            = var.private_dns_zones_vnet_shared
-  name                = "link-${each.value.name}-${azurerm_virtual_network.this.name}"
-  private_dns_zone_id = each.value.id
-  virtual_network_id  = azurerm_virtual_network.this.id
-  depends_on          = [azurerm_virtual_network_peering.app_to_shared, azurerm_virtual_network_peering.shared_to_app]
-}
-
-resource "azurerm_private_dns_zone_virtual_network_link" "vnet_shared_links" {
-  for_each            = azurerm_private_dns_zone.zones
-  name                = "link-${each.value.name}-${var.virtual_network_shared_name}"
-  private_dns_zone_id = each.value.id
-  virtual_network_id  = var.virtual_network_shared_id
-  depends_on          = [azurerm_virtual_network_peering.app_to_shared, azurerm_virtual_network_peering.shared_to_app]
-}
-#endregion
-
 #region route-tables
 resource "azurerm_subnet_route_table_association" "associations" {
   for_each = { for subnet_key, subnet in local.subnets : subnet_key => subnet if subnet.route_table == "firewall" }
@@ -146,7 +119,7 @@ resource "azurerm_private_endpoint" "container_registry" {
   name                = "${module.naming.private_endpoint.name}-cr"
   location            = var.location
   resource_group_name = var.resource_group_name
-  subnet_id           = azurerm_subnet.subnets["snet-privatelink-01"].id
+  subnet_id           = var.private_endpoint_subnet_id
 
   private_service_connection {
     name                           = "${module.naming.container_registry.name_unique}-psc"
@@ -157,15 +130,13 @@ resource "azurerm_private_endpoint" "container_registry" {
 
 
   private_dns_zone_group {
-    name = "default"
-    private_dns_zone_ids = [azurerm_private_dns_zone.zones["privatelink.azurecr.io"].id
-    ]
+    name                 = "default"
+    private_dns_zone_ids = [var.private_dns_zones["privatelink.azurecr.io"].id]
   }
 
   depends_on = [
-    azurerm_private_dns_zone_virtual_network_link.vnet_app_links,
-    azurerm_private_dns_zone_virtual_network_link.vnet_app_links_from_vnet_shared,
-    azurerm_private_dns_zone_virtual_network_link.vnet_shared_links,
+    azurerm_virtual_network_peering.app_to_shared,
+    azurerm_virtual_network_peering.shared_to_app,
     azurerm_subnet_route_table_association.associations
   ]
 }
@@ -174,7 +145,7 @@ resource "azurerm_private_endpoint" "storage_blob" {
   name                = "${module.naming.private_endpoint.name}-storage-blob"
   resource_group_name = var.resource_group_name
   location            = var.location
-  subnet_id           = azurerm_subnet.subnets["snet-privatelink-01"].id
+  subnet_id           = var.private_endpoint_subnet_id
 
   private_service_connection {
     name                           = "azure_blob"
@@ -185,13 +156,12 @@ resource "azurerm_private_endpoint" "storage_blob" {
 
   private_dns_zone_group {
     name                 = "default"
-    private_dns_zone_ids = [azurerm_private_dns_zone.zones["privatelink.blob.core.windows.net"].id]
+    private_dns_zone_ids = [var.private_dns_zones["privatelink.blob.core.windows.net"].id]
   }
 
   depends_on = [
-    azurerm_private_dns_zone_virtual_network_link.vnet_app_links,
-    azurerm_private_dns_zone_virtual_network_link.vnet_app_links_from_vnet_shared,
-    azurerm_private_dns_zone_virtual_network_link.vnet_shared_links,
+    azurerm_virtual_network_peering.app_to_shared,
+    azurerm_virtual_network_peering.shared_to_app,
     azurerm_subnet_route_table_association.associations
   ]
 }
@@ -200,7 +170,7 @@ resource "azurerm_private_endpoint" "storage_file" {
   name                = "${module.naming.private_endpoint.name}-storage-file"
   resource_group_name = var.resource_group_name
   location            = var.location
-  subnet_id           = azurerm_subnet.subnets["snet-privatelink-01"].id
+  subnet_id           = var.private_endpoint_subnet_id
 
   private_service_connection {
     name                           = "azure_files"
@@ -211,13 +181,12 @@ resource "azurerm_private_endpoint" "storage_file" {
 
   private_dns_zone_group {
     name                 = "default"
-    private_dns_zone_ids = [azurerm_private_dns_zone.zones["privatelink.file.core.windows.net"].id]
+    private_dns_zone_ids = [var.private_dns_zones["privatelink.file.core.windows.net"].id]
   }
 
   depends_on = [
-    azurerm_private_dns_zone_virtual_network_link.vnet_app_links,
-    azurerm_private_dns_zone_virtual_network_link.vnet_app_links_from_vnet_shared,
-    azurerm_private_dns_zone_virtual_network_link.vnet_shared_links,
+    azurerm_virtual_network_peering.app_to_shared,
+    azurerm_virtual_network_peering.shared_to_app,
     azurerm_subnet_route_table_association.associations
   ]
 }
@@ -230,9 +199,8 @@ resource "azurerm_network_interface" "this" {
   resource_group_name = var.resource_group_name
 
   depends_on = [
-    azurerm_private_dns_zone_virtual_network_link.vnet_app_links,
-    azurerm_private_dns_zone_virtual_network_link.vnet_app_links_from_vnet_shared,
-    azurerm_private_dns_zone_virtual_network_link.vnet_shared_links,
+    azurerm_virtual_network_peering.app_to_shared,
+    azurerm_virtual_network_peering.shared_to_app,
     azurerm_subnet_route_table_association.associations
   ]
 

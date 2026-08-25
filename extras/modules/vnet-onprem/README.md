@@ -126,7 +126,7 @@ This smoke testing uses the RDP connection to *jumpwin2* established previously 
   Resolve-DnsName <your-storage-account-name>.file.core.windows.net
   ```
 
-* Verify the *IP4Address* returned is in the *snet-privatelink-01* subnet, e.g. `10.2.2.5`.
+* Verify the *IP4Address* returned is in the centralized private endpoint subnet *snet-privatelink-01* in *vnet-shared*, e.g. `10.1.5.5`.
 
 * From a Windows PowerShell command prompt, run the following command:
 
@@ -210,7 +210,7 @@ In order to complete this smoke test, SQL Server Management Studio must be insta
   Resolve-DnsName <your-mssql-server-name-here>.database.windows.net
   ```
 
-* Verify the *IP4Address* returned is in the *snet-privatelink-01* subnet.
+* Verify the *IP4Address* returned is in the centralized private endpoint subnet *snet-privatelink-01* in *vnet-shared*.
 * Navigate to *Start* > *Microsoft SQL Server Tools 22* > *Microsoft SQL Server Management Studio 22*
 * Sign in using the same Entra ID work account you used to log in with Azure CLI / Azure PowerShell
 * Connect to the network isolated Azure SQL Database server
@@ -232,7 +232,7 @@ In order to complete this smoke test, MySQL Workbench must be installed on *jump
   Resolve-DnsName <your-mysql-server-name-here>.mysql.database.azure.com
   ```
 
-* Verify the *IP4Address* returned is in the *snet-privatelink-01* subnet, e.g. `10.2.2.7`.
+* Verify the *IP4Address* returned is in the centralized private endpoint subnet *snet-privatelink-01* in *vnet-shared*, e.g. `10.1.5.7`.
 * Navigate to *Start* > *MySQL Workbench*
 * Navigate to *Database* > *Connect to Database* and connect using the following values:
   * Connection method: *Standard (TCP/IP)*
@@ -333,14 +333,14 @@ vm_adds_image_publisher | MicrosoftWindowsServer | The publisher for the virtual
 vm_adds_image_sku | 2025-datacenter-azure-edition-core | The sku of the virtual machine image used to create the VM.
 vm_adds_image_version | Latest | The version of the virtual machine image used to create the VM.
 vm_adds_name | adds2 | The name of the VM.
-vm_adds_size | Standard_B2ls_v2 | The size of the virtual machine.
+vm_adds_size | `Standard_D2ls_v6` | The size of the virtual machine. Defined by the root module's `vm_jumpbox_size` variable.
 vm_adds_storage_account_type | Standard_LRS | The storage replication type to be used for the VMs OS and data disks.
 vm_jumpbox_win_image_offer | WindowsServer | The offer type of the virtual machine image used to create the VM.
 vm_jumpbox_win_image_publisher | MicrosoftWindowsServer | The publisher for the virtual machine image used to create the VM.
 vm_jumpbox_win_image_sku | 2025-datacenter-azure-edition | The sku of the virtual machine image used to create the VM.
 vm_jumpbox_win_image_version | Latest | The version of the virtual machine image used to create the VM.
 vm_jumpbox_win_name | jumpwin2 | The name of the VM.
-vm_jumpbox_win_size | Standard_B2ls_v2 | The size of the virtual machine.
+vm_jumpbox_win_size | `Standard_D2ls_v6` | The size of the virtual machine. Defined by the root module's `vm_jumpbox_size` variable.
 vm_jumpbox_win_storage_account_type | Standard_LRS | The storage replication type to be used for the VMs OS and data disks.
 vnet_address_space | `192.168.0.0/16` | The address space in CIDR notation for the new virtual network used to simulate an on-premises network.
 vnet_asn | 65123 | The ASN for the on premises network.

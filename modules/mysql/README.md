@@ -28,7 +28,7 @@ This section describes how to test the module after deployment.
     Resolve-DnsName <mysql-server-name-here>.mysql.database.azure.com
     ```
 
-  * Verify the *IP4Address* returned is within the subnet IP address prefix for *vnet_app[0].subnets["snet-privatelink-01"]*, e.g. `10.2.2.*`.
+  * Verify the *IP4Address* returned is within the subnet IP address prefix for the centralized private endpoint subnet *vnet_shared.subnets["snet-privatelink-01"]*, e.g. `10.1.5.*`.
 * From *jumpwin1*, test network isolated MySQL connectivity using MySQL Workbench.
   * Navigate to *Start* > *MySQL Workbench*
   * Navigate to *Database* > *Connect to Database* and connect using the following values:

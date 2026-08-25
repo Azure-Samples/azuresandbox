@@ -13,8 +13,11 @@ resource "azurerm_mysql_flexible_database" "this" {
   name                = var.mysql_database_name
   resource_group_name = var.resource_group_name
   server_name         = azurerm_mysql_flexible_server.this.name
-  charset             = "utf8"
-  collation           = "utf8_unicode_ci"
+  # utf8 is a deprecated alias that MySQL 8.0 normalizes to utf8mb3, which causes a
+  # perpetual force-new diff. utf8mb4 is the canonical modern default and is reported
+  # back unchanged by the API.
+  charset   = "utf8mb4"
+  collation = "utf8mb4_unicode_ci"
 }
 
 # Server parameters that must be enabled for the diagnostic categories below to produce data.

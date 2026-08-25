@@ -222,7 +222,7 @@ catch {
 
 # Test 8: AMPLS data plane FQDNs resolve to private (RFC1918) IPs via the AMPLS private DNS zones.
 # When AMPLS is in PrivateOnly mode, AMA must resolve these hostnames to the private endpoint IP
-# in snet-privatelink-02 (10.1.5.0/24) -- resolving to a public IP here would mean private DNS
+# in snet-privatelink-01 (10.1.5.0/24) -- resolving to a public IP here would mean private DNS
 # links are missing and ingestion would fail. The global control endpoint is always in
 # privatelink.monitor.azure.com when AMPLS is active, so it is a reliable DNS-shadowing probe.
 try {

@@ -136,7 +136,7 @@ variable "subnet_misc_02_address_prefix" {
 
 variable "subnet_privatelink_address_prefix" {
   type        = string
-  description = "The address prefix for the PrivateLink subnet."
+  description = "The address prefix for the PrivateLink subnet, which hosts the private endpoints for the entire sandbox environment."
   default     = "10.1.5.0/24"
 
   validation {

@@ -128,8 +128,12 @@ else {
 }
 
 # Test 6: Conditional forwarder for cloud domain
+# Keep this list in sync with Configure-AddsDns.ps1, which derives it from the authoritative
+# private DNS zone list in modules/vnet-shared/locals.tf.
 $conditionalForwarders = @(
     @{ Name = 'mysandbox.local'; Description = 'Cloud sandbox domain' }
+    @{ Name = 'azurecr.io'; Description = 'Azure Container Registry' }
+    @{ Name = 'blob.core.windows.net'; Description = 'Azure Blob Storage' }
     @{ Name = 'file.core.windows.net'; Description = 'Azure Files' }
     @{ Name = 'database.windows.net'; Description = 'Azure SQL Database' }
     @{ Name = 'mysql.database.azure.com'; Description = 'Azure MySQL Flexible Server' }

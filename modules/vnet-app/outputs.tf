@@ -21,10 +21,6 @@ output "log_analytics_operations_complete" {
   description = "Dependency signal: AMA install and DCR/DCE associations on jumpwin1 are complete and AMPLS DNS zone links are in place. Consumed by the root ampls_access_barrier."
 }
 
-output "private_dns_zones" {
-  value = azurerm_private_dns_zone.zones
-}
-
 output "resource_ids" {
   value = {
     application_insights     = azurerm_application_insights.this.id

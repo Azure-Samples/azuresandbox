@@ -96,7 +96,7 @@ subnet_AzureBastionSubnet_address_prefix | 10.1.0.0/26 | The address prefix for 
 subnet_AzureFirewallSubnet_address_prefix | 10.1.4.0/26 | The address prefix for the AzureFirewallSubnet subnet.
 subnet_misc_address_prefix | 10.1.2.0/24 | The address prefix for the miscellaneous subnet.
 subnet_misc_02_address_prefix | 10.1.3.0/24 | The address prefix for the miscellaneous 2 subnet.
-subnet_privatelink_address_prefix | 10.1.5.0/24 | The address prefix for the PrivateLink subnet.
+subnet_privatelink_address_prefix | 10.1.5.0/24 | The address prefix for the PrivateLink subnet, which hosts the private endpoints for the entire sandbox environment.
 tags | | The tags defined in the root module.
 unique_seed | | A unique seed used by the Azure/naming module to generate random values for resources. Set in the root module and used here for consistent naming.
 user_object_id | | The object id of the interactive user in Microsoft Entra ID.
@@ -136,13 +136,18 @@ module.vnet_shared.azurerm_monitor_private_link_scoped_service.log_analytics | a
 module.vnet_shared.azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;adds1 | Nic for *adds1* VM.
 module.vnet_shared.azurerm_network_security_group.groups[*] | | NSGs for each subnet except *AzureFirewallSubnet*.
 module.vnet_shared.azurerm_network_security_rule.rules[*] | | NSG rules for each NSG. See *locals.tf* for rule definitions.
-module.vnet_shared.azurerm_private_dns_zone.ampls["privatelink.agentsvc.azure-automation.net"] | | Private DNS zone for Azure Monitor Agent.
-module.vnet_shared.azurerm_private_dns_zone.ampls["privatelink.monitor.azure.com"] | | Private DNS zone for Azure Monitor.
-module.vnet_shared.azurerm_private_dns_zone.ampls["privatelink.ods.opinsights.azure.com"] | | Private DNS zone for Log Analytics data ingestion.
-module.vnet_shared.azurerm_private_dns_zone.ampls["privatelink.oms.opinsights.azure.com"] | | Private DNS zone for Log Analytics agent onboarding.
-module.vnet_shared.azurerm_private_dns_zone.key_vault | privatelink.vaultcore.azure.net | The private DNS zone for the key vault.
-module.vnet_shared.azurerm_private_dns_zone_virtual_network_link.ampls[*] | | Private DNS zone links to the virtual network.
-module.vnet_shared.azurerm_private_dns_zone_virtual_network_link.key_vault | link&#8209;privatelink.vaultcore.azure.net&#8209;vnet&#8209;sand&#8209;dev&#8209;shared | Links the private DNS zone for key vault to the virtual network.
+module.vnet_shared.azurerm_private_dns_zone.zones["privatelink.agentsvc.azure-automation.net"] | | Private DNS zone for Azure Monitor Agent.
+module.vnet_shared.azurerm_private_dns_zone.zones["privatelink.azurecr.io"] | | Private DNS zone for Azure Container Registry, consumed by the *vnet-app* module.
+module.vnet_shared.azurerm_private_dns_zone.zones["privatelink.blob.core.windows.net"] | | Private DNS zone for Azure Blob Storage, consumed by the *vnet-app* module.
+module.vnet_shared.azurerm_private_dns_zone.zones["privatelink.database.windows.net"] | | Private DNS zone for Azure SQL Database, consumed by the *mssql* module.
+module.vnet_shared.azurerm_private_dns_zone.zones["privatelink.file.core.windows.net"] | | Private DNS zone for Azure Files, consumed by the *vnet-app* module.
+module.vnet_shared.azurerm_private_dns_zone.zones["privatelink.monitor.azure.com"] | | Private DNS zone for Azure Monitor.
+module.vnet_shared.azurerm_private_dns_zone.zones["privatelink.mysql.database.azure.com"] | | Private DNS zone for Azure Database for MySQL, consumed by the *mysql* module.
+module.vnet_shared.azurerm_private_dns_zone.zones["privatelink.ods.opinsights.azure.com"] | | Private DNS zone for Log Analytics data ingestion.
+module.vnet_shared.azurerm_private_dns_zone.zones["privatelink.oms.opinsights.azure.com"] | | Private DNS zone for Log Analytics agent onboarding.
+module.vnet_shared.azurerm_private_dns_zone.zones["privatelink.vaultcore.azure.net"] | | Private DNS zone for the key vault.
+module.vnet_shared.azurerm_private_dns_zone.zones["privatelink.&lt;location&gt;.azurecontainerapps.io"] | | Private DNS zone for Azure Container Apps, consumed by the *petstore* configuration.
+module.vnet_shared.azurerm_private_dns_zone_virtual_network_link.zones[*] | | Links each private DNS zone to *vnet-sand-dev-shared*. Zones are linked to the shared services virtual network only; see the root README section on Private Endpoints and Private DNS.
 module.vnet_shared.azurerm_private_endpoint.ampls | pe&#8209;sand&#8209;dev&#8209;ampls | The private endpoint for Azure Monitor.
 module.vnet_shared.azurerm_private_endpoint.key_vault | pe&#8209;sand&#8209;dev&#8209;key&#8209;vault | The private endpoint for the key vault.
 module.vnet_shared.azurerm_public_ip.bastion | pip&#8209;sand&#8209;dev&#8209;bastion | Public IP for Azure Bastion.
@@ -154,9 +159,9 @@ module.vnet_shared.azurerm_subnet.subnets["AzureFirewallSubnet"] | | Dedicated s
 module.vnet_shared.azurerm_subnet.subnets["snet-adds-01"] | | Dedicated subnet for *adds1* Domain Controller / DNS Server VM.
 module.vnet_shared.azurerm_subnet.subnets["snet-misc-01"] | | Reserved for use by optional configurations.
 module.vnet_shared.azurerm_subnet.subnets["snet-misc-02"] | | Reserved for use by optional configurations.
-module.vnet_shared.azurerm_subnet.subnets["snet-privatelink-02"] | | Dedicated subnet for Private Link.
-module.vnet_shared.azurerm_subnet_network_security_group_association.associations[*] | | NSGs are associated with all subnets except *AzureFirewallSubnet* and *snet-privatelink-02*.
-module.vnet_shared.azurerm_subnet_route_table_association.associations[*] | | The *route-sand-dev* route table is associated with all subnets except *AzureFirewallSubnet*,*AzureBastionSubnet* and *snet-privatelink-02*.
+module.vnet_shared.azurerm_subnet.subnets["snet-privatelink-01"] | | Dedicated subnet for Private Link, hosting the private endpoints for every module in the sandbox environment.
+module.vnet_shared.azurerm_subnet_network_security_group_association.associations[*] | | NSGs are associated with all subnets except *AzureFirewallSubnet* and *snet-privatelink-01*.
+module.vnet_shared.azurerm_subnet_route_table_association.associations[*] | | The *route-sand-dev* route table is associated with all subnets except *AzureFirewallSubnet*,*AzureBastionSubnet* and *snet-privatelink-01*.
 module.vnet_shared.azurerm_virtual_network.this | vnet&#8209;sand&#8209;dev&#8209;shared | The shared services virtual network.
 module.vnet_shared.azurerm_windows_virtual_machine.this | adds1 | The AD DS Domain Controller / DNS Server VM.
 
@@ -173,7 +178,8 @@ admin_username | bootstrapadmin | The user name for provisioning administrator a
 admin_username_secret | adminuser | The name of the key vault secret containing the admin username.
 dns_server | 10.1.1.4 | The primary DNS server IP address for the virtual network.
 fqdns | | A map of fqdns for resources provisioned in the module.
-private_dns_zones | | A map of private DNS zones used in the module.
+private_dns_zone_links_complete | | A dependency signal indicating all private DNS zone virtual network links have been created. Consumed by modules that provision private endpoints.
+private_dns_zones | | A map of all private DNS zones used by the sandbox environment, keyed by zone name. Consumed by modules that provision private endpoints.
 resource_ids | | A map of resource IDs for key resources in the module.
 resource_names | | A map of resource names for key resources in the module.
 subnets | | A list of subnets in the shared virtual network.
