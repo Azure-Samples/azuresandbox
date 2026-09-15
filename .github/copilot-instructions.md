@@ -80,14 +80,15 @@ Two Terraform execution environments are in active use for this repo — identif
 
 ## Preflight checklist (complete before any apply or test work)
 
-This project runs long operations (`terraform apply` is 25–95 min; unit tests can be 10+ min), so a missing secret or expired auth discovered mid-run is expensive. The gate this checklist enforces is **provenance of the preflight data**: every value used for the apply/test run (secrets, subscription/tenant IDs, module selection, the unit-testing decision) must be supplied or explicitly confirmed by the human — never assumed, guessed, or fabricated by the agent. **Collect every human-gated input up front**, batching all `ask_user` prompts back-to-back, so that once preflight passes the rest of the run needs no user intervention.
+This project runs long operations (`terraform apply` is 25–95 min; unit tests can be 10+ min), so a missing secret or expired auth discovered mid-run is expensive. The gate this checklist enforces is **provenance of the preflight data**: every value used for the apply/test run (secrets, subscription/tenant IDs, module selection, environment-specific tags, the unit-testing decision) must be supplied or explicitly confirmed by the human — never assumed, guessed, or fabricated by the agent. **Collect every human-gated input up front**, batching all `ask_user` prompts back-to-back, so that once preflight passes the rest of the run needs no user intervention.
 
 **Hard rules — never violate:**
 
-- **Never fabricate, guess, or reuse stale preflight data (secrets, IDs, module selections, the unit-testing decision) to avoid an `ask_user` prompt.** If a required preflight value is missing or unconfirmed, stop and surface it to the user — do not proceed on an assumed value.
+- **Never fabricate, guess, or reuse stale preflight data (secrets, IDs, module selections, environment-specific tags, the unit-testing decision) to avoid an `ask_user` prompt.** If a required preflight value is missing or unconfirmed, stop and surface it to the user — do not proceed on an assumed value.
 - **Do not start `terraform apply`, `terraform plan`, or `Invoke-UnitTests.ps1` until every preflight item below is satisfied with human-provided data.** A failed apply 40 minutes in because a secret was missing is the worst outcome — fail fast at preflight instead.
 - Never run concurrent `terraform apply` operations against the same sandbox environment (state file). One apply at a time, full stop.
 - Never inspect Terraform state (`terraform state ...`, `terraform output`, `terraform show`, `terraform plan`, etc.) while a `terraform apply` is in flight — it will read/lock the same state file and cause errors or corruption.
+- **Never omit the `-var='additional_tags={...}'` argument** from a `terraform plan` / `terraform apply` once it has been captured in preflight item 8 — omitting it silently removes those tags from every resource. Never edit `terraform.tfvars` to carry these tags instead; the command-line argument is the required mechanism.
 - Batch all `ask_user` prompts back-to-back at the start of the session. Do not interleave human prompts with long-running tool calls.
 
 **Preflight items — check each one and resolve before proceeding:**
@@ -105,6 +106,18 @@ This project runs long operations (`terraform apply` is 25–95 min; unit tests 
 5. **Terraform execution environment identified** — determine whether this session is on **WSL / local client** or **`jumplinux2`** (rg-devops-iac), per the "Terraform execution environments" section above. On jumplinux2 with no `backend.tf` yet, look up the backend values and create it before `terraform init`; leave an existing `backend.tf` untouched. On WSL, no action needed (local state is the default).
 6. **Module enablement confirmed** — use `ask_user` to ask whether **all base modules** in `./modules` should be deployed (every `enable_module_*` flag `true`). Extra modules in `./extras/modules` (`ai-foundry`, `avd`, `petstore`, `vnet-onprem`, etc.) are **always excluded** from this question and left **disabled**. If the answer is **no**, use `ask_user` again to have the user specify exactly which base modules to enable (e.g. `vnet_app` only); all other base modules stay disabled. Confirm the selection before editing `terraform.tfvars`.
 7. **Automated unit testing decision** — use `ask_user` to ask whether automated unit tests (`Invoke-UnitTests.ps1`) should be run after a successful `terraform apply`. Capture this decision now, batched with the other preflight prompts, because it determines whether preflight item 3 (Azure PowerShell auth) is required. If the answer is **yes**, also confirm scope: all installed modules (`Invoke-UnitTests.ps1`, which runs each installed module's unit **and** integration tests automatically) versus a single module's unit tests, optionally with its integration tests (`-Module <name> [-Integration]` — `-Integration` applies only to a single-module run). If the answer is **no**, record it and skip item 3 (unless otherwise needed). The recorded decision drives the post-apply test step in Scenarios 1 and 2 — do not re-prompt for it after the apply.
+8. **Environment-specific tags (`additional_tags`)** — some subscriptions enforce organizational tagging policies that the base `tags` map in `terraform.tfvars` does not satisfy. Use `ask_user` (batched with the other preflight prompts) to ask whether any environment-specific tags are required for this deployment, and if so to supply them as one or more name/value pairs in the format `name = "value"` (e.g. `owner = "rob"`, `ticket = "AB-123"`). Rules:
+   - The value is **human-supplied only** — never invent, infer, or carry over tag names or values from a previous session.
+   - Assemble the answer into a single Terraform map argument and append it to **every** `terraform plan` and `terraform apply` for the remainder of the session:
+
+     ```bash
+     terraform apply -var='additional_tags={owner="rob",ticket="AB-123"}'
+     ```
+
+   - **This argument is sticky for the whole session.** Terraform applies only what the current command specifies, so any later plan/apply that omits it will strip the tags from previously tagged resources. Include it on every plan/apply in Scenarios 1, 2, and 3 — including the de-provision and re-provision applies in the Scenario 3 repro.
+   - **Do not** hand-edit `terraform.tfvars` to add `additional_tags` after `bootstrap.sh` generates it — the command-line `-var` argument is the preferred mechanism for this repo.
+   - If the user answers that no additional tags are required, record that and run the plain `terraform plan` / `terraform apply` commands without the argument.
+
 After all preflight items pass, the remaining setup depends on the scenario: for a fresh vnext sandbox there are additional human-gated prep steps (see Scenario 1) that must also be completed with the user present. Once **all** setup is done and nothing further requires `ask_user`, proceed: `terraform init` before `terraform apply`; run `terraform validate` and `terraform plan` first.
 
 ## Applying Terraform configurations
@@ -156,7 +169,7 @@ Do not resume the workflow until the user explicitly instructs you to. Never sil
 
 When deploying a new sandbox environment while the working branch is `vnext` in the IDE, **assume this is vnext testing** and complete the following vnext-testing prep steps after preflight passes but before `terraform init` — these steps contain their own `ask_user` prompts (PR decisions):
 
-After the vnext-testing prep steps complete (or for non-vnext branches, immediately after preflight), run `terraform init && terraform plan && terraform apply`. On `jumplinux2`, wrap the `terraform apply` (and the `Invoke-UnitTests.ps1` run below) in the detached `tmux` session per the progress-reporting section; on WSL / local this is unchanged (`mode="async"`).
+After the vnext-testing prep steps complete (or for non-vnext branches, immediately after preflight), run `terraform init && terraform plan && terraform apply`, appending the `-var='additional_tags={...}'` argument captured in preflight item 8 to the plan and apply commands if any were supplied. On `jumplinux2`, wrap the `terraform apply` (and the `Invoke-UnitTests.ps1` run below) in the detached `tmux` session per the progress-reporting section; on WSL / local this is unchanged (`mode="async"`).
 
 After a successful apply, act on the unit-testing decision captured in preflight item 7. If it was **yes**, run unit tests for all installed modules (per the scope confirmed in preflight) without re-prompting; if it was **no**, skip this step. **First satisfy the VM-start gate** (`./scripts/manage-vms.sh start`; see the Tests section) — a policy may have deallocated VMs since the apply:
 
@@ -173,7 +186,7 @@ The barrier pattern leaves Key Vault and Storage Account with public access **di
 ./scripts/enable-public-access.sh
 ```
 
-Then proceed with `terraform init` (if providers changed) → `terraform plan` → `terraform apply`. The barrier resources will re-disable public access at the end of the apply. On `jumplinux2`, wrap the `terraform apply` (and the `Invoke-UnitTests.ps1` run below) in the detached `tmux` session per the progress-reporting section; on WSL / local this is unchanged (`mode="async"`).
+Then proceed with `terraform init` (if providers changed) → `terraform plan` → `terraform apply`, appending the `-var='additional_tags={...}'` argument from preflight item 8 to the plan and apply commands if any were supplied. The barrier resources will re-disable public access at the end of the apply. On `jumplinux2`, wrap the `terraform apply` (and the `Invoke-UnitTests.ps1` run below) in the detached `tmux` session per the progress-reporting section; on WSL / local this is unchanged (`mode="async"`).
 
 After a successful apply, act on the unit-testing decision captured in preflight item 7. If it was **yes** and a module was **newly enabled**, run that module's unit tests + integration tests (per the scope confirmed in preflight) without re-prompting; if it was **no**, skip this step. **First satisfy the VM-start gate** (`./scripts/manage-vms.sh start`; see the Tests section) — a policy may have deallocated VMs since the apply:
 
@@ -188,7 +201,7 @@ pwsh -File ./scripts/Invoke-UnitTests.ps1 -Module <module_name> -Integration
 
 **Why this works (root-cause class it targets).** Many VM-module test failures are environmental rather than code defects — most commonly a **dependency VM (especially the domain controller `adds1`) was stopped/deallocated** (e.g. by a cost-optimization auto-shutdown policy) when the original tests ran, breaking AD DNS resolution, Kerberos TGT acquisition, domain join, CIFS mounts, SQL auth, etc. Re-provisioning the failing module's VM **with every VM confirmed running** isolates that class: if the tests now **pass**, the failure was environmental (transient) → **close the issue**; if they still **fail**, it is a genuine, reproducible defect → **update the issue** with the evidence and leave it open.
 
-This is a specialization of Scenario 2 (it disables then re-enables a single module), so all Scenario 2 rules apply — most importantly running `./scripts/enable-public-access.sh` before **each** `terraform plan`/`apply`. It requires an already-applied sandbox in the current Terraform state.
+This is a specialization of Scenario 2 (it disables then re-enables a single module), so all Scenario 2 rules apply — most importantly running `./scripts/enable-public-access.sh` before **each** `terraform plan`/`apply`, and passing the preflight item 8 `-var='additional_tags={...}'` argument on **both** the de-provision and re-provision plan/apply. It requires an already-applied sandbox in the current Terraform state.
 
 **Steps (this is exactly the repro plan validated against issue #447):**
 
