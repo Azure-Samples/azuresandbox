@@ -74,7 +74,10 @@ Write-Log "Installing software using winget..."
 $packages = @(
     @{ Id = "Microsoft.VisualStudioCode"; Name = "Visual Studio Code" },
     @{ Id = "Microsoft.SQLServerManagementStudio.22"; Name = "SQL Server Management Studio" },
-    @{ Id = "Oracle.MySQLWorkbench"; Name = "MySQL Workbench" }
+    # Pinned to 8.0.47: the default/latest Oracle.MySQLWorkbench package (26.x, relaunched
+    # 2026-09-10 on a new ElectronJS-based installer) ignores --scope machine and installs
+    # per-user instead of machine-wide. See https://github.com/Azure-Samples/azuresandbox/issues/717
+    @{ Id = "Oracle.MySQLWorkbench"; Name = "MySQL Workbench"; Version = "8.0.47" }
 )
 
 $failed = $false
@@ -82,7 +85,13 @@ $failed = $false
 foreach ($package in $packages) {
     Write-Log "Installing $($package.Name) (winget id: $($package.Id))..."
 
-    $output = & $wingetPath install --id $package.Id --source winget --silent --scope machine --accept-package-agreements --accept-source-agreements 2>&1
+    $wingetArgs = @("install", "--id", $package.Id, "--source", "winget", "--silent", "--scope", "machine", "--accept-package-agreements", "--accept-source-agreements")
+    if ($package.Version) {
+        $wingetArgs += @("--version", $package.Version, "--force")
+        Write-Log "Pinning $($package.Name) to version $($package.Version)."
+    }
+
+    $output = & $wingetPath @wingetArgs 2>&1
     $exitCode = $LASTEXITCODE
 
     if ($exitCode -eq $WINGET_SUCCESS) {

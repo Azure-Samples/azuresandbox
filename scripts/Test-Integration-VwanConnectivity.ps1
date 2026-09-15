@@ -257,15 +257,43 @@ try {
         throw 'Terraform output client_cert_pem not available'
     }
 
-    # Temporarily enable public access on Key Vault to retrieve the client private key
+    # Temporarily enable public access on Key Vault to retrieve the client private key.
+    # NOTE: setting --public-network-access Enabled alone is not sufficient — the Key Vault's
+    # networkAcls.defaultAction independently controls whether traffic is allowed, and it stays
+    # 'Deny' (blocking all non-Azure-service callers) unless explicitly set to 'Allow'. Both must
+    # be flipped together, otherwise every secret read fails with 'Forbidden' regardless of how
+    # long you wait for propagation. In this environment, defaultAction is enforced back to 'Deny'
+    # by an org-level (management group) modify-effect Azure Policy, so it is not solely under this
+    # repo's control — read and restore the pre-existing values instead of assuming/hardcoding
+    # 'Disabled'/'Deny', in case the policy (or another actor) has since changed the baseline.
+    $originalKeyVaultAccess = az keyvault show --name $KeyVaultName --resource-group $ResourceGroupName --query "{publicNetworkAccess: properties.publicNetworkAccess, defaultAction: properties.networkAcls.defaultAction}" --only-show-errors -o json | ConvertFrom-Json
+    Write-Log "Key Vault '$KeyVaultName' current network access before change: publicNetworkAccess='$($originalKeyVaultAccess.publicNetworkAccess)', networkAcls.defaultAction='$($originalKeyVaultAccess.defaultAction)'"
+
     Write-Log "Enabling public network access on Key Vault '$KeyVaultName'..."
-    az keyvault update --name $KeyVaultName --resource-group $ResourceGroupName --public-network-access Enabled --only-show-errors | Out-Null
+    az keyvault update --name $KeyVaultName --resource-group $ResourceGroupName --public-network-access Enabled --default-action Allow --only-show-errors | Out-Null
     try {
-        $clientKeyPem = (Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name 'p2svpn-client-private-key-pem' -AsPlainText -ErrorAction Stop)
+        # A short retry/backoff is still kept as a safety net for any residual ARM-to-data-plane
+        # propagation lag, but the primary fix is the --default-action Allow above.
+        $maxAttempts = 5
+        $retryDelaySeconds = 10
+        $clientKeyPem = $null
+        for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+            try {
+                $clientKeyPem = (Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name 'p2svpn-client-private-key-pem' -AsPlainText -ErrorAction Stop)
+                break
+            }
+            catch {
+                if ($attempt -eq $maxAttempts) {
+                    throw
+                }
+                Write-Log "Attempt $attempt/$maxAttempts to read Key Vault secret failed: $($_.Exception.Message). Retrying in $retryDelaySeconds s..."
+                Start-Sleep -Seconds $retryDelaySeconds
+            }
+        }
     }
     finally {
-        Write-Log "Disabling public network access on Key Vault '$KeyVaultName'..."
-        az keyvault update --name $KeyVaultName --resource-group $ResourceGroupName --public-network-access Disabled --only-show-errors | Out-Null
+        Write-Log "Restoring Key Vault '$KeyVaultName' network access to its prior state: publicNetworkAccess='$($originalKeyVaultAccess.publicNetworkAccess)', networkAcls.defaultAction='$($originalKeyVaultAccess.defaultAction)'..."
+        az keyvault update --name $KeyVaultName --resource-group $ResourceGroupName --public-network-access $originalKeyVaultAccess.publicNetworkAccess --default-action $originalKeyVaultAccess.defaultAction --only-show-errors | Out-Null
     }
 
     # Write cert files (join array output with newlines — PowerShell captures multi-line output as string arrays)

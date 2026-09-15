@@ -27,7 +27,9 @@ This configuration implements a virtual network for applications including:
     * Remote Server Administration Tools (RSAT)
     * Visual Studio Code
     * SQL Server Management Studio (SSMS)
-    * MySQL Workbench
+    * MySQL Workbench (pinned to version 8.0.47 via winget; the current 26.x line has a
+      known upstream regression that installs per-user instead of machine-wide — see
+      [#717](https://github.com/Azure-Samples/azuresandbox/issues/717))
 
 The estimated provisioning time for this module is 31 minutes.
 
