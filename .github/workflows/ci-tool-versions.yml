@@ -35,7 +35,7 @@ jobs:
       # Label used to find the one existing tracking issue across runs.
       DRIFT_LABEL: tool-version-drift
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Check tool-version drift
         id: drift
