@@ -10,13 +10,13 @@ resource "azurerm_storage_account" "this" {
   shared_access_key_enabled       = false
   https_traffic_only_enabled      = true
   min_tls_version                 = "TLS1_2"
-  public_network_access_enabled   = true # Centralized disable in root main.tf will set this to false after all modules complete
+  public_network_access           = "Enabled" # Centralized disable in root main.tf will set this to "Disabled" after all modules complete
   allow_nested_items_to_be_public = false
 
   lifecycle {
     ignore_changes = [
-      azure_files_authentication,   # Configured separately by ./scripts/Set-AzureFilesConfiguration.ps1
-      public_network_access_enabled # Centralized disable in root main.tf will set this to false after all modules complete
+      azure_files_authentication, # Configured separately by ./scripts/Set-AzureFilesConfiguration.ps1
+      public_network_access       # Centralized disable in root main.tf will set this to "Disabled" after all modules complete
     ]
   }
 }
