@@ -61,8 +61,8 @@ jobs:
 
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
-          # Matches required_version (~> 1.16.2) in terraform.tf.
-          terraform_version: 1.16.2
+          # Matches required_version (~> 1.16.3) in terraform.tf.
+          terraform_version: 1.16.3
           terraform_wrapper: false
 
       - name: Check formatting
@@ -129,8 +129,8 @@ jobs:
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         if: ${{ needs.changes.outputs.terraform == 'true' }}
         with:
-          # Matches required_version (~> 1.16.2) in terraform.tf.
-          terraform_version: 1.16.2
+          # Matches required_version (~> 1.16.3) in terraform.tf.
+          terraform_version: 1.16.3
           terraform_wrapper: false
 
       # -backend=false downloads providers/initializes modules without
