@@ -19,7 +19,7 @@
 # Available checks (map 1:1 to a CI workflow):
 #   bash        ShellCheck                  (ci-bash.yml)        pin 0.11.0
 #   powershell  PSScriptAnalyzer            (ci-powershell.yml)  pin 1.25.0
-#   markdown    markdownlint-cli2           (ci-docs.yml)        pin 0.23.2, requires Node.js 20 (ci-docs.yml actions/setup-node)
+#   markdown    markdownlint-cli2           (ci-docs.yml)        pin 0.23.3, requires Node.js 20 (ci-docs.yml actions/setup-node)
 #   links       lychee (offline/internal)   (ci-docs.yml)
 #   actions     actionlint                  (ci-actions.yml)     pin 1.7.12
 #   secrets     gitleaks                    (ci-secrets.yml)     pin 8.30.1
@@ -96,7 +96,7 @@ check_markdown() {
     if [ -n "$node_major" ] && [ "$node_major" != "20" ]; then
         printf '\n=== markdown ===\nWARNING: Node.js v%s detected; ci-docs.yml pins Node 20 (actions/setup-node@v7). Install Node 20.x for full CI parity.\n' "$node_major"
     fi
-    run_check markdown npx --yes markdownlint-cli2@0.23.2
+    run_check markdown npx --yes markdownlint-cli2@0.23.3
 }
 
 check_links() {
