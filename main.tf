@@ -1,16 +1,9 @@
-#region data
-data "azuread_service_principal" "this" {
-  count     = var.enable_module_mssql ? 1 : 0
-  client_id = var.arm_client_id
-}
-#endregion
-
 #region resources
 resource "azuread_group" "sql_admins" {
   count            = var.enable_module_mssql ? 1 : 0
   display_name     = "grp-sql-admins-${var.tags["project"]}-${var.tags["environment"]}-${element(split("-", azurerm_resource_group.this.name), length(split("-", azurerm_resource_group.this.name)) - 1)}"
   security_enabled = true
-  members          = [var.user_object_id, data.azuread_service_principal.this[0].object_id]
+  members          = [var.user_object_id, module.vnet_app[0].virtual_machine_jumpwin1_identity.principal_id]
 }
 
 resource "azurerm_resource_group" "this" {
@@ -30,16 +23,6 @@ resource "azurerm_virtual_machine_run_command" "create_mssql_db_user" {
   }
 
   parameter {
-    name  = "ArmClientId"
-    value = var.arm_client_id
-  }
-
-  parameter {
-    name  = "AadTenantId"
-    value = var.aad_tenant_id
-  }
-
-  parameter {
     name  = "MssqlServerFqdn"
     value = module.mssql[0].fqdns.mssql_server
   }
@@ -52,11 +35,6 @@ resource "azurerm_virtual_machine_run_command" "create_mssql_db_user" {
   parameter {
     name  = "VmName"
     value = module.vnet_app[0].resource_names.virtual_machine_jumpwin1
-  }
-
-  protected_parameter {
-    name  = "ArmClientSecret"
-    value = var.arm_client_secret
   }
 
   depends_on = [

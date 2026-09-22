@@ -1,7 +1,4 @@
 param(
-    [Parameter(Mandatory = $true)][string]$ArmClientId,
-    [Parameter(Mandatory = $true)][string]$ArmClientSecret,
-    [Parameter(Mandatory = $true)][string]$AadTenantId,
     [Parameter(Mandatory = $true)][string]$MssqlServerFqdn,
     [Parameter(Mandatory = $true)][string]$MssqlDatabaseName,
     [Parameter(Mandatory = $true)][string]$VmName
@@ -13,24 +10,16 @@ $ProgressPreference = 'SilentlyContinue'
 
 Write-Output "Creating contained database user '$VmName' with db_datareader on '$MssqlDatabaseName'..."
 
-# Discover this VM's managed identity client_id via IMDS
-$imdsUrl = 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com/'
-$imdsResponse = Invoke-RestMethod -Uri $imdsUrl -Headers @{ Metadata = 'true' } -ErrorAction Stop
+# Discover this VM's managed identity client ID via IMDS.
+$imdsHeaders = @{ Metadata = 'true' }
+$imdsManagementTokenUrl = 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com/'
+$imdsResponse = Invoke-RestMethod -Uri $imdsManagementTokenUrl -Headers $imdsHeaders -ErrorAction Stop
 $VmClientId = $imdsResponse.client_id
 Write-Output "Discovered VM managed identity client_id: $VmClientId"
 
-# Authenticate as SP (SQL admin) and acquire SQL access token
-$secureSecret = ConvertTo-SecureString $ArmClientSecret -AsPlainText -Force
-$credential = New-Object PSCredential($ArmClientId, $secureSecret)
-Connect-AzAccount -ServicePrincipal -Credential $credential -TenantId $AadTenantId | Out-Null
-$rawToken = (Get-AzAccessToken -ResourceUrl 'https://database.windows.net/').Token
-if ($rawToken -is [System.Security.SecureString]) {
-    $bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($rawToken)
-    $token = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
-    [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
-} else {
-    $token = $rawToken
-}
+# This VM is an Azure SQL administrator through its managed identity.
+$imdsSqlTokenUrl = 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fdatabase.windows.net%2F'
+$token = (Invoke-RestMethod -Uri $imdsSqlTokenUrl -Headers $imdsHeaders -ErrorAction Stop).access_token
 
 # Connect to database and create contained database user with db_datareader
 $conn = New-Object System.Data.SqlClient.SqlConnection
@@ -61,6 +50,5 @@ ALTER ROLE db_datareader ADD MEMBER [$VmName];
 "@
 $cmd.ExecuteNonQuery() | Out-Null
 $conn.Close()
-Disconnect-AzAccount | Out-Null
 
 Write-Output "Created contained database user '$VmName' with db_datareader on '$MssqlDatabaseName'."
