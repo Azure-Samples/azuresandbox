@@ -1,21 +1,24 @@
 provider "azuread" {
   tenant_id     = var.aad_tenant_id
   client_id     = var.arm_client_id
-  client_secret = var.arm_client_secret
+  client_secret = var.arm_auth_mode == "secret" ? var.arm_client_secret : null
+  use_msi       = var.arm_auth_mode == "msi"
 }
 
 provider "azapi" {
   subscription_id = var.subscription_id
   client_id       = var.arm_client_id
-  client_secret   = var.arm_client_secret
+  client_secret   = var.arm_auth_mode == "secret" ? var.arm_client_secret : null
   tenant_id       = var.aad_tenant_id
+  use_msi         = var.arm_auth_mode == "msi"
 }
 
 provider "azurerm" {
   subscription_id                 = var.subscription_id
   client_id                       = var.arm_client_id
-  client_secret                   = var.arm_client_secret
+  client_secret                   = var.arm_auth_mode == "secret" ? var.arm_client_secret : null
   tenant_id                       = var.aad_tenant_id
+  use_msi                         = var.arm_auth_mode == "msi"
   resource_provider_registrations = "extended"
 
   # The "extended" set does not include the resource providers required by some

@@ -375,7 +375,8 @@ There are hundreds of variables in this configuration. Defaults have been set fo
 
 Follow these steps to configure the variables for your sandbox:
 
-* First, create an environment variable for the service principal password. For security reasons this secret should not be stored in the `terraform.tfvars` file.
+* For the default service-principal authentication, set the password as an environment variable
+  rather than storing it in `terraform.tfvars`.
 
   ```bash
   # Set environment variable in bash
@@ -609,8 +610,9 @@ This section lists input variables used in the root module. Defaults can be over
 Variable | Default | Description
 --- | --- | ---
 aad_tenant_id | | The Microsoft Entra tenant id.
-arm_client_id | | The AppId of the service principal used for authenticating with Azure. Must have an `Owner` role assignment scoped to the subscription.
-arm_client_secret | | The password for the service principal used for authenticating with Azure. Set interactively or using an environment variable 'TF_VAR_arm_client_secret'.
+arm_auth_mode | `secret` | Authentication mode: `secret` or `msi`.
+arm_client_id | | Service principal client ID for `secret` authentication or user-assigned managed identity client ID for `msi` authentication.
+arm_client_secret | | Password for secret authentication. Required only when `arm_auth_mode` is `secret`; set it using `TF_VAR_arm_client_secret`.
 enable_module_mssql | false | Set to true to enable the Azure SQL Database (mssql) module, false to skip it.
 enable_module_mysql | false | Set to true to enable the Azure Database for MySQL (mysql) module, false to skip it.
 enable_module_vm_jumpbox_linux | false | Set to true to enable the vm_jumpbox_linux module, false to skip it.

@@ -16,22 +16,40 @@ variable "additional_tags" {
 
 variable "arm_client_id" {
   type        = string
-  description = "The AppId of the service principal used for authenticating with Azure. Must have an 'Owner' role assignment."
+  description = "The service principal client ID for secret authentication or the user-assigned managed identity client ID for MSI authentication."
+  default     = null
 
   validation {
-    condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.arm_client_id))
-    error_message = "Must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
+    condition     = var.arm_client_id == null || can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.arm_client_id))
+    error_message = "When specified, arm_client_id must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
+  }
+
+  validation {
+    condition     = var.arm_client_id != null
+    error_message = "arm_client_id is required. It identifies the service principal when arm_auth_mode is secret or the user-assigned managed identity when arm_auth_mode is msi."
+  }
+}
+
+variable "arm_auth_mode" {
+  type        = string
+  description = "The Azure authentication mode: secret for a service principal client secret or msi for a managed identity."
+  default     = "secret"
+
+  validation {
+    condition     = contains(["secret", "msi"], var.arm_auth_mode)
+    error_message = "arm_auth_mode must be one of: secret or msi."
   }
 }
 
 variable "arm_client_secret" {
   type        = string
-  description = "The password for the service principal used for authenticating with Azure. Set interactively or using an environment variable 'TF_VAR_arm_client_secret'."
+  description = "The password for secret authentication. Set it with TF_VAR_arm_client_secret when arm_auth_mode is secret."
+  default     = null
   sensitive   = true
 
   validation {
-    condition     = length(var.arm_client_secret) >= 8
-    error_message = "Must be at least 8 characters long."
+    condition     = var.arm_auth_mode != "secret" || (var.arm_client_secret != null && length(var.arm_client_secret) >= 8)
+    error_message = "arm_client_secret must be at least 8 characters long when arm_auth_mode is secret. Set it with TF_VAR_arm_client_secret."
   }
 }
 

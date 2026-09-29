@@ -138,7 +138,7 @@ To reproduce the checks locally before opening a PR:
 
 ```bash
 # Docs
-npx --yes markdownlint-cli2@0.23.2
+npx --yes markdownlint-cli2@0.23.3
 lychee --offline --no-progress './**/*.md'
 
 # Terraform
