@@ -353,19 +353,31 @@ try {
 
         Start-ScheduledTask -TaskName $taskName -ErrorAction Stop
 
-        # Wait for the task to complete (max 60 seconds)
+        # Wait for the task to complete. LastTaskResult values 267009 (0x41301, SCHED_S_TASK_RUNNING)
+        # and 267011 (0x41303, SCHED_S_TASK_HAS_NOT_RUN) are Task Scheduler status codes, not task
+        # exit codes. The first run as the domain user incurs profile creation, initial Kerberos
+        # ticket acquisition, and first SMB session setup, so allow the same 120s budget used by
+        # other waits in this module.
+        $taskStatusRunning = 267009
+        $taskStatusHasNotRun = 267011
+        $maxTaskWaitSec = 120
         $waited = 0
         do {
             Start-Sleep -Seconds 2
             $waited += 2
             $taskInfo = Get-ScheduledTaskInfo -TaskName $taskName -ErrorAction SilentlyContinue
-        } while ($waited -lt 60 -and $taskInfo.LastTaskResult -eq 267009)
-
-        $lastResult = $taskInfo.LastTaskResult
+            $lastResult = $taskInfo.LastTaskResult
+        } while ($waited -lt $maxTaskWaitSec -and ($null -eq $lastResult -or $lastResult -in @($taskStatusRunning, $taskStatusHasNotRun)))
 
         if ($lastResult -eq 0) {
             $smbTestPassed = $true
-            $smbTestReason = ("SMB: Read/write test succeeded on '" + $uncPath + "' as '" + $domainUser + "'")
+            $smbTestReason = ("SMB: Read/write test succeeded on '" + $uncPath + "' as '" + $domainUser + "' (waited " + $waited + "s)")
+        }
+        elseif ($lastResult -eq $taskStatusRunning) {
+            $smbTestReason = ("SMB: Read/write test timed out after " + $maxTaskWaitSec + "s (task still running)")
+        }
+        elseif ($null -eq $lastResult -or $lastResult -eq $taskStatusHasNotRun) {
+            $smbTestReason = ("SMB: Read/write test timed out after " + $maxTaskWaitSec + "s (task did not start)")
         }
         else {
             $smbTestReason = ("SMB: Read/write test failed (task exit code: " + $lastResult + ")")
