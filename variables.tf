@@ -183,17 +183,6 @@ variable "tags" {
   }
 }
 
-# tflint-ignore: terraform_unused_declarations # Public input consumed by bootstrap tooling and validated here; not referenced by a resource.
-variable "user_name" {
-  type        = string
-  description = "The user name of the user in Microsoft Entra ID."
-
-  validation {
-    condition     = can(regex("^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]@[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]\\.[a-zA-Z]{2,}$", var.user_name))
-    error_message = "Must be a valid User Principal Name (UPN) format like 'user@domain.com'. The username part must start and end with alphanumeric characters and can contain periods (.), underscores (_), or hyphens (-). The domain must be a valid domain name."
-  }
-}
-
 variable "user_object_id" {
   type        = string
   description = "The object id of the user in Microsoft Entra ID."
