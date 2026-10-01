@@ -93,7 +93,6 @@ if (-not $defaultSubscriptionId) {
 
 # Set default user from currently logged in Azure PowerShell session
 $defaultUserObjectId = (Show-JWTtoken -token (Get-AzAccessToken -AsSecureString).Token).oid
-$defaultUserName = (Get-AzADUser -ObjectId $defaultUserObjectId).UserPrincipalName
 
 # Set default Microsoft Entra tenant id from currently logged in Azure PowerShell session
 $defaultAadTenantId = (Get-AzContext).Tenant.Id
@@ -112,12 +111,6 @@ $aadTenantId = Read-Host "Microsoft Entra tenant id (aad_tenant_id) default '$de
 
 if (-not $aadTenantId) {
     $aadTenantId = $defaultAadTenantId
-}
-
-$userName = Read-Host "User name for Azure PowerShell signed in user (user_name) default '$defaultUserName'"
-
-if (-not $username) {
-    $userName = $defaultUserName
 }
 
 $userObjectId = Read-Host "Object id for Azure PowerShell signed in user (user_object_id) default '$defaultUserObjectId'"
@@ -204,7 +197,6 @@ aad_tenant_id   = "$aadTenantId"
 arm_client_id   = "$armClientId"
 location        = "$location"
 subscription_id = "$subscriptionId"
-user_name       = "$userName"
 user_object_id  = "$userObjectId"
 
 tags = {
