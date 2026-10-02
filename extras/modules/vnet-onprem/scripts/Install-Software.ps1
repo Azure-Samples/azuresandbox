@@ -74,7 +74,11 @@ Write-Log "Installing software using winget..."
 $packages = @(
     @{ Id = "Microsoft.VisualStudioCode"; Name = "Visual Studio Code" },
     @{ Id = "Microsoft.SQLServerManagementStudio.22"; Name = "SQL Server Management Studio" },
-    @{ Id = "Oracle.MySQLWorkbench"; Name = "MySQL Workbench" }
+    # The 26.x MSI is a dual-purpose WiX package that defaults to a per-user install when run
+    # silently, and the winget manifest doesn't map --scope machine to an MSI property. Override
+    # the installer arguments with ALLUSERS=1 to force a machine-wide install.
+    # See https://github.com/Azure-Samples/azuresandbox/issues/760
+    @{ Id = "Oracle.MySQLWorkbench"; Name = "MySQL Workbench"; Override = "/qn /norestart ALLUSERS=1" }
 )
 
 $failed = $false
@@ -82,7 +86,13 @@ $failed = $false
 foreach ($package in $packages) {
     Write-Log "Installing $($package.Name) (winget id: $($package.Id))..."
 
-    $output = & $wingetPath install --id $package.Id --source winget --silent --scope machine --accept-package-agreements --accept-source-agreements 2>&1
+    $wingetArgs = @("install", "--id", $package.Id, "--source", "winget", "--silent", "--scope", "machine", "--accept-package-agreements", "--accept-source-agreements")
+    if ($package.Override) {
+        $wingetArgs += @("--override", $package.Override)
+        Write-Log "Overriding $($package.Name) installer arguments with '$($package.Override)'."
+    }
+
+    $output = & $wingetPath @wingetArgs 2>&1
     $exitCode = $LASTEXITCODE
 
     if ($exitCode -eq $WINGET_SUCCESS) {

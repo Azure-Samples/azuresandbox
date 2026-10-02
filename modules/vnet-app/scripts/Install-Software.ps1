@@ -74,10 +74,11 @@ Write-Log "Installing software using winget..."
 $packages = @(
     @{ Id = "Microsoft.VisualStudioCode"; Name = "Visual Studio Code" },
     @{ Id = "Microsoft.SQLServerManagementStudio.22"; Name = "SQL Server Management Studio" },
-    # Pinned to 8.0.47: the default/latest Oracle.MySQLWorkbench package (26.x, relaunched
-    # 2026-09-10 on a new ElectronJS-based installer) ignores --scope machine and installs
-    # per-user instead of machine-wide. See https://github.com/Azure-Samples/azuresandbox/issues/717
-    @{ Id = "Oracle.MySQLWorkbench"; Name = "MySQL Workbench"; Version = "8.0.47" }
+    # The 26.x MSI is a dual-purpose WiX package that defaults to a per-user install when run
+    # silently, and the winget manifest doesn't map --scope machine to an MSI property. Override
+    # the installer arguments with ALLUSERS=1 to force a machine-wide install.
+    # See https://github.com/Azure-Samples/azuresandbox/issues/760
+    @{ Id = "Oracle.MySQLWorkbench"; Name = "MySQL Workbench"; Override = "/qn /norestart ALLUSERS=1" }
 )
 
 $failed = $false
@@ -89,6 +90,10 @@ foreach ($package in $packages) {
     if ($package.Version) {
         $wingetArgs += @("--version", $package.Version, "--force")
         Write-Log "Pinning $($package.Name) to version $($package.Version)."
+    }
+    if ($package.Override) {
+        $wingetArgs += @("--override", $package.Override)
+        Write-Log "Overriding $($package.Name) installer arguments with '$($package.Override)'."
     }
 
     $output = & $wingetPath @wingetArgs 2>&1

@@ -125,7 +125,7 @@ else {
 }
 
 # Test 6: Software - MySQL Workbench installed
-$mysqlWbPath = Get-ChildItem 'C:\Program Files\MySQL\MySQL Workbench*\MySQLWorkbench.exe' -ErrorAction SilentlyContinue |
+$mysqlWbPath = Get-ChildItem 'C:\Program Files\MySQL\MySQL Workbench*\MySQL*Workbench.exe' -ErrorAction SilentlyContinue |
     Select-Object -First 1
 if ($mysqlWbPath) {
     $mysqlWbVersion = $mysqlWbPath.VersionInfo.ProductVersion
