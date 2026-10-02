@@ -32,9 +32,9 @@ This section describes how to test the module after deployment.
 * From *jumpwin1*, test network isolated MySQL connectivity using MySQL Workbench.
   * Navigate to *Start* > *MySQL Workbench*
   * Navigate to *Database Connections* > *New Connection* and connect using the following values:
-    * Caption: *<mysql-server-name-here>.mysql.database.azure.com*
+    * Caption: `<mysql-server-name-here>.mysql.database.azure.com`
     * Connection method: `mysql`
-    * Hostname or IP address: *<mysql-server-name-here>.mysql.database.azure.com*
+    * Hostname or IP address: `<mysql-server-name-here>.mysql.database.azure.com`
     * Port: *3306*
     * User Name: *bootstrapadmin*
     * Default Schema: *testdb*
