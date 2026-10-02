@@ -622,7 +622,6 @@ enable_module_vwan | false | Set to true to enable the vwan module, false to ski
 location | | The name of the Azure Region where resources will be provisioned.
 subscription_id | | The Azure subscription id used to provision sandbox resources.
 tags | { costcenter = "mycostcenter", environment = "dev", project = "sand" } | Tags in map format to be applied to the sandbox resource group and used for resource naming.
-user_name | | The user name of the interactive user (e.g. Azure CLI or Az PowerShell signed in user).
 user_object_id | | The object id of the interactive user (e.g. Azure CLI or Az PowerShell signed in user).
 vm_avd_size | `Standard_D4s_v6` | The size of the Azure Virtual Desktop session host virtual machines: `sessionhost1` and `sessionhost2`.
 vm_jumpbox_size | `Standard_D2ls_v6` | The size of the jumpbox and domain controller virtual machines: `jumpwin1`, `jumplinux1`, and `adds1`, as well as `jumpwin2` and `adds2` when the `vnet_onprem` module is enabled.
