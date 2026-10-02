@@ -101,9 +101,9 @@ catch {
     $failed++
 }
 
-# Test 4: MySQL query via mysql.exe CLI (shipped with MySQL Workbench)
+# Test 4: MySQL query via the CLI shipped with MySQL Workbench
+# Workbench 8.0.x ships mysql.exe; Workbench 26.x ships MySQL Shell (mysqlsh.exe) instead.
 if ($adminUsername -and $adminPassword) {
-    # Locate mysql.exe from MySQL Workbench or MySQL Server installation
     $mysqlExe = $null
     $searchPaths = @(
         "${env:ProgramFiles}\MySQL\MySQL Workbench*",
@@ -111,36 +111,46 @@ if ($adminUsername -and $adminPassword) {
         "${env:ProgramFiles(x86)}\MySQL\MySQL Workbench*",
         "${env:ProgramFiles}\MySQL\MySQL Shell*\bin"
     )
-    foreach ($pattern in $searchPaths) {
-        $candidate = Get-ChildItem -Path $pattern -Filter 'mysql.exe' -Recurse -ErrorAction SilentlyContinue |
-            Select-Object -First 1
-        if ($candidate) {
-            $mysqlExe = $candidate.FullName
-            break
+    foreach ($exeName in @('mysql.exe', 'mysqlsh.exe')) {
+        foreach ($pattern in $searchPaths) {
+            $candidate = Get-ChildItem -Path $pattern -Filter $exeName -Recurse -ErrorAction SilentlyContinue |
+                Select-Object -First 1
+            if ($candidate) {
+                $mysqlExe = $candidate.FullName
+                break
+            }
         }
+        if ($mysqlExe) { break }
     }
 
     if ($mysqlExe) {
-        Write-Log "MySQL: Found mysql.exe at '$mysqlExe'"
+        $mysqlExeName = Split-Path $mysqlExe -Leaf
+        Write-Log "MySQL: Found $mysqlExeName at '$mysqlExe'"
         try {
             $query = "SELECT DATABASE() AS DatabaseName;"
-            $env:MYSQL_PWD = $adminPassword
-            $result = & $mysqlExe --host=$MysqlServerFqdn --port=3306 --user=$adminUsername --database=$MysqlDatabaseName --ssl-mode=REQUIRED --batch --skip-column-names --execute=$query 2>&1
-            $env:MYSQL_PWD = $null
+            if ($mysqlExeName -eq 'mysqlsh.exe') {
+                $output = $adminPassword | & $mysqlExe --sql --host=$MysqlServerFqdn --port=3306 --user=$adminUsername --schema=$MysqlDatabaseName --ssl-mode=REQUIRED --passwords-from-stdin --save-passwords=never --result-format=tabbed --execute=$query 2>&1
+            }
+            else {
+                $env:MYSQL_PWD = $adminPassword
+                $output = & $mysqlExe --host=$MysqlServerFqdn --port=3306 --user=$adminUsername --database=$MysqlDatabaseName --ssl-mode=REQUIRED --batch --skip-column-names --execute=$query 2>&1
+                $env:MYSQL_PWD = $null
+            }
             $exitCode = $LASTEXITCODE
+            $result = @($output | ForEach-Object { "$_".Trim() } | Where-Object { $_ -eq $MysqlDatabaseName }) | Select-Object -First 1
 
             Disconnect-AzAccount -ErrorAction SilentlyContinue | Out-Null
 
             if ($exitCode -eq 0 -and $result -eq $MysqlDatabaseName) {
-                Write-TestResult $moduleName 'PASS' "MySQL: Connected to '$result' as '$adminUsername' via private endpoint"
+                Write-TestResult $moduleName 'PASS' "MySQL: Connected to '$result' as '$adminUsername' via private endpoint using $mysqlExeName"
                 $passed++
             }
             elseif ($exitCode -ne 0) {
-                Write-TestResult $moduleName 'FAIL' "MySQL: mysql.exe exited with code $exitCode`: $result"
+                Write-TestResult $moduleName 'FAIL' "MySQL: $mysqlExeName exited with code $exitCode`: $($output -join ' ')"
                 $failed++
             }
             else {
-                Write-TestResult $moduleName 'FAIL' "MySQL: Unexpected database name '$result' (expected '$MysqlDatabaseName')"
+                Write-TestResult $moduleName 'FAIL' "MySQL: Expected database name '$MysqlDatabaseName' not found in $mysqlExeName output: $($output -join ' ')"
                 $failed++
             }
         }
@@ -152,7 +162,7 @@ if ($adminUsername -and $adminPassword) {
         }
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "MySQL: mysql.exe not found in standard MySQL installation paths"
+        Write-TestResult $moduleName 'FAIL' "MySQL: mysql.exe or mysqlsh.exe not found in standard MySQL installation paths"
         $failed++
         Disconnect-AzAccount -ErrorAction SilentlyContinue | Out-Null
     }
