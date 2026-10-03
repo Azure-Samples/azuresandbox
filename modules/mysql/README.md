@@ -15,7 +15,9 @@
 
 This configuration implements a network isolated Azure Database for MySQL using private endpoints.
 
-The estimated provisioning time for this module is 8 minutes.
+Enabling this module also causes the *vnet-app* module to install MySQL Workbench on *jumpwin1*. MySQL Workbench is not uninstalled if this module is later disabled.
+
+The estimated provisioning time for this module is 10 minutes.
 
 ## Smoke Testing
 

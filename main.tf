@@ -207,6 +207,8 @@ module "vnet_app" {
   data_collection_rule_windows_id = module.vnet_shared.resource_ids["data_collection_rule_windows"]
   dns_server                      = module.vnet_shared.dns_server
   firewall_route_table_id         = module.vnet_shared.resource_ids["firewall_route_table"]
+  install_mysql_workbench         = var.enable_module_mysql
+  install_ssms                    = var.enable_module_mssql || var.enable_module_vm_mssql_win
   key_vault_id                    = module.vnet_shared.resource_ids["key_vault"]
   key_vault_name                  = module.vnet_shared.resource_names["key_vault"]
   location                        = azurerm_resource_group.this.location

@@ -101,6 +101,18 @@ variable "firewall_route_table_id" {
   }
 }
 
+variable "install_mysql_workbench" {
+  type        = bool
+  description = "Install MySQL Workbench on jumpwin1. Set by the root module when the mysql module is enabled."
+  default     = false
+}
+
+variable "install_ssms" {
+  type        = bool
+  description = "Install SQL Server Management Studio (SSMS) on jumpwin1. Set by the root module when the mssql or vm_mssql_win module is enabled."
+  default     = false
+}
+
 variable "key_vault_id" {
   type        = string
   description = "The existing key vault where secrets are stored"

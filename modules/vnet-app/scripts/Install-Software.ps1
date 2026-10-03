@@ -1,3 +1,9 @@
+param(
+    # Run-command parameters arrive as strings; parsed to bool below.
+    [string]$InstallSsms = 'false',
+    [string]$InstallMysqlWorkbench = 'false'
+)
+
 #region functions
 function Write-Log {
     param( [string] $msg)
@@ -14,6 +20,10 @@ function Exit-WithError {
 
 #region main
 Write-Log "Running '$PSCommandPath' (PowerShell $($PSVersionTable.PSVersion))..."
+
+$installSsmsFlag = [System.Convert]::ToBoolean($InstallSsms)
+$installMysqlWorkbenchFlag = [System.Convert]::ToBoolean($InstallMysqlWorkbench)
+Write-Log "Parameters: InstallSsms='$installSsmsFlag' InstallMysqlWorkbench='$installMysqlWorkbenchFlag'"
 
 # Resolve winget executable path
 # When running as SYSTEM (e.g. via VM RunCommand), winget is not in PATH and the
@@ -71,15 +81,23 @@ $WINGET_PACKAGE_IN_USE       = -1978335231  # 0x8A150101 APPINSTALLER_CLI_ERROR_
 # Install software using winget CLI.
 Write-Log "Installing software using winget..."
 
+# Packages are installed serially; winget does not support concurrent installs.
+# Optional packages are included only when the related database module is enabled.
 $packages = @(
-    @{ Id = "Microsoft.VisualStudioCode"; Name = "Visual Studio Code" },
-    @{ Id = "Microsoft.SQLServerManagementStudio.22"; Name = "SQL Server Management Studio" },
+    @{ Id = "Microsoft.VisualStudioCode"; Name = "Visual Studio Code" }
+)
+
+if ($installSsmsFlag) {
+    $packages += @{ Id = "Microsoft.SQLServerManagementStudio.22"; Name = "SQL Server Management Studio" }
+}
+
+if ($installMysqlWorkbenchFlag) {
     # The 26.x MSI is a dual-purpose WiX package that defaults to a per-user install when run
     # silently, and the winget manifest doesn't map --scope machine to an MSI property. Override
     # the installer arguments with ALLUSERS=1 to force a machine-wide install.
     # See https://github.com/Azure-Samples/azuresandbox/issues/760
-    @{ Id = "Oracle.MySQLWorkbench"; Name = "MySQL Workbench"; Override = "/qn /norestart ALLUSERS=1" }
-)
+    $packages += @{ Id = "Oracle.MySQLWorkbench"; Name = "MySQL Workbench"; Override = "/qn /norestart ALLUSERS=1" }
+}
 
 $failed = $false
 

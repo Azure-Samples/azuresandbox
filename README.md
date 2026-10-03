@@ -461,7 +461,7 @@ enable_module_mysql             = true
 enable_module_vwan              = true
 ```
 
-The estimated provisioning time for the required vnet-shared module and all 6 of these optional modules is 95 minutes.
+The estimated provisioning time for the required vnet-shared module and all 6 of these optional modules is 90 minutes.
 
 #### **Overriding Defaults**
 

@@ -15,7 +15,9 @@
 
 This configuration implements a network isolated Azure SQL Database using private endpoints.
 
-The estimated provisioning time for this module is 6 minutes.
+Enabling this module also causes the *vnet-app* module to install SQL Server Management Studio (SSMS) on *jumpwin1*. SSMS is not uninstalled if this module is later disabled.
+
+The estimated provisioning time for this module is 10 minutes.
 
 ## Smoke Testing
 
