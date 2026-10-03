@@ -153,6 +153,7 @@ private_dns_zone_links_complete | | Dependency signal from the *vnet-shared* mod
 private_dns_zones | | A map of the private DNS zones defined in the *vnet-shared* module, keyed by zone name.
 private_endpoint_subnet_id | | The resource ID of the centralized private endpoint subnet *snet-privatelink-01* in the *vnet-shared* module.
 resource_group_name | | The name of the resource group defined in the root module.
+sql_admin_uami_id | null | Resource ID of the SQL admin user-assigned managed identity attached to jumpwin1 alongside its system-assigned identity. Set by the root module when the *mssql* module is enabled.
 storage_container_name | scripts | The name of the storage container used to store scripts.
 storage_share_name | myfileshare | The name of the Azure Files share.
 storage_share_quota_gb | 1024 | The quota for the Azure Files share in GB.
