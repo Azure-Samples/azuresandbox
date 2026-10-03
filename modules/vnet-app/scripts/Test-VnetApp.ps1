@@ -21,7 +21,12 @@ param(
     [string]$SubscriptionId,
 
     [Parameter(Mandatory = $true)]
-    [string]$LogAnalyticsWorkspaceId
+    [string]$LogAnalyticsWorkspaceId,
+
+    # Run-command parameters arrive as strings; parsed to bool below.
+    [string]$ExpectSsms = 'false',
+
+    [string]$ExpectMysqlWorkbench = 'false'
 )
 
 #region functions
@@ -59,7 +64,7 @@ if (Test-Path $script:logPath) {
 }
 
 Write-Log "Starting unit tests for module '$moduleName' on '$env:COMPUTERNAME'..."
-Write-Log ("Parameters: KeyVaultName='$KeyVaultName' StorageAccountName='$StorageAccountName' StorageShareName='$StorageShareName' ApplicationInsightsName='$ApplicationInsightsName' MonitorPrivateLinkScopeName='$MonitorPrivateLinkScopeName' ResourceGroupName='$ResourceGroupName' SubscriptionId='$SubscriptionId' LogAnalyticsWorkspaceId='$LogAnalyticsWorkspaceId'")
+Write-Log ("Parameters: KeyVaultName='$KeyVaultName' StorageAccountName='$StorageAccountName' StorageShareName='$StorageShareName' ApplicationInsightsName='$ApplicationInsightsName' MonitorPrivateLinkScopeName='$MonitorPrivateLinkScopeName' ResourceGroupName='$ResourceGroupName' SubscriptionId='$SubscriptionId' LogAnalyticsWorkspaceId='$LogAnalyticsWorkspaceId' ExpectSsms='$ExpectSsms' ExpectMysqlWorkbench='$ExpectMysqlWorkbench'")
 
 $passed = 0
 $failed = 0
@@ -246,30 +251,41 @@ else {
     $failed++
 }
 
-# Test 10: Software - SQL Server Management Studio installed
-$ssmsPath = Get-ChildItem 'C:\Program Files\Microsoft SQL Server Management Studio*\Release\Common7\IDE\Ssms.exe' -ErrorAction SilentlyContinue |
-    Select-Object -First 1
-if ($ssmsPath) {
-    $ssmsVersion = $ssmsPath.VersionInfo.ProductVersion
-    Write-TestResult $moduleName 'PASS' ("Software: SSMS installed at '" + $ssmsPath.FullName + "' (version: $ssmsVersion)")
-    $passed++
+# Test 10: Software - SQL Server Management Studio installed (only when mssql or vm_mssql_win is enabled)
+# Absence is not asserted when not expected: tools are intentionally not uninstalled when a module is disabled.
+if ([System.Convert]::ToBoolean($ExpectSsms)) {
+    $ssmsPath = Get-ChildItem 'C:\Program Files\Microsoft SQL Server Management Studio*\Release\Common7\IDE\Ssms.exe' -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if ($ssmsPath) {
+        $ssmsVersion = $ssmsPath.VersionInfo.ProductVersion
+        Write-TestResult $moduleName 'PASS' ("Software: SSMS installed at '" + $ssmsPath.FullName + "' (version: $ssmsVersion)")
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' "Software: SQL Server Management Studio not found"
+        $failed++
+    }
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "Software: SQL Server Management Studio not found"
-    $failed++
+    Write-TestResult $moduleName 'SKIP' "Software: SSMS check skipped (mssql and vm_mssql_win modules not enabled)"
 }
 
-# Test 11: Software - MySQL Workbench installed
-$mysqlWbPath = Get-ChildItem 'C:\Program Files\MySQL\MySQL Workbench*\MySQL*Workbench.exe' -ErrorAction SilentlyContinue |
-    Select-Object -First 1
-if ($mysqlWbPath) {
-    $mysqlWbVersion = $mysqlWbPath.VersionInfo.ProductVersion
-    Write-TestResult $moduleName 'PASS' ("Software: MySQL Workbench installed at '" + $mysqlWbPath.FullName + "' (version: $mysqlWbVersion)")
-    $passed++
+# Test 11: Software - MySQL Workbench installed (only when mysql is enabled)
+if ([System.Convert]::ToBoolean($ExpectMysqlWorkbench)) {
+    $mysqlWbPath = Get-ChildItem 'C:\Program Files\MySQL\MySQL Workbench*\MySQL*Workbench.exe' -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if ($mysqlWbPath) {
+        $mysqlWbVersion = $mysqlWbPath.VersionInfo.ProductVersion
+        Write-TestResult $moduleName 'PASS' ("Software: MySQL Workbench installed at '" + $mysqlWbPath.FullName + "' (version: $mysqlWbVersion)")
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' "Software: MySQL Workbench not found"
+        $failed++
+    }
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "Software: MySQL Workbench not found"
-    $failed++
+    Write-TestResult $moduleName 'SKIP' "Software: MySQL Workbench check skipped (mysql module not enabled)"
 }
 
 # Test 12: SMB - TCP port 445 reachable on Azure Files private endpoint

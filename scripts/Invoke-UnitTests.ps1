@@ -409,6 +409,9 @@ $testConfigs = [ordered]@{
             ResourceGroupName           = $resourceGroupName
             SubscriptionId              = $context.Subscription.Id
             LogAnalyticsWorkspaceId     = "/subscriptions/$($context.Subscription.Id)/resourceGroups/$resourceGroupName/providers/Microsoft.OperationalInsights/workspaces/$($resourceNames['log_analytics_workspace'])"
+            # Mirrors root main.tf install_ssms / install_mysql_workbench wiring, derived from deployed modules.
+            ExpectSsms                  = ($resourceNames.ContainsKey('mssql_server') -or $resourceNames.ContainsKey('virtual_machine_mssqlwin1')).ToString().ToLower()
+            ExpectMysqlWorkbench        = $resourceNames.ContainsKey('mysql_server').ToString().ToLower()
         }
     }
     'virtual_machine_jumplinux1' = @{

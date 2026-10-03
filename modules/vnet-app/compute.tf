@@ -86,8 +86,22 @@ resource "azurerm_virtual_machine_run_command" "install_software" {
     script = file("${path.module}/scripts/Install-Software.ps1")
   }
 
+  # Optional tools are driven by database module enablement. Changing a flag updates
+  # this run command in place, which re-runs the script; already-installed packages
+  # are treated as success, so only newly requested tools are installed.
+  parameter {
+    name  = "InstallSsms"
+    value = tostring(var.install_ssms)
+  }
+
+  parameter {
+    name  = "InstallMysqlWorkbench"
+    value = tostring(var.install_mysql_workbench)
+  }
+
   timeouts {
     create = "60m"
+    update = "60m"
   }
 }
 #endregion
