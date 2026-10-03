@@ -24,8 +24,11 @@ resource "azurerm_windows_virtual_machine" "this" {
     version   = var.vm_jumpbox_win_image_version
   }
 
+  # The system-assigned identity is always present. The SQL admin UAMI is added only when the
+  # root module enables mssql.
   identity {
-    type = "SystemAssigned"
+    type         = var.sql_admin_uami_id != null ? "SystemAssigned, UserAssigned" : "SystemAssigned"
+    identity_ids = var.sql_admin_uami_id != null ? [var.sql_admin_uami_id] : null
   }
 
   depends_on = [

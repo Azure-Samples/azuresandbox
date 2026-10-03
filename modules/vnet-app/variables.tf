@@ -211,6 +211,12 @@ variable "resource_group_name" {
   }
 }
 
+variable "sql_admin_uami_id" {
+  type        = string
+  description = "Resource ID of the SQL admin user-assigned managed identity to attach to jumpwin1 alongside its system-assigned identity. Set by the root module when the mssql module is enabled; null otherwise."
+  default     = null
+}
+
 variable "storage_container_name" {
   type        = string
   description = "The name of the Azure storage container to be provisioned."

@@ -17,6 +17,8 @@ This configuration implements a network isolated Azure SQL Database using privat
 
 Enabling this module also causes the *vnet-app* module to install SQL Server Management Studio (SSMS) on *jumpwin1*. SSMS is not uninstalled if this module is later disabled.
 
+Enabling this module also creates, in the root module, an Entra ID group used as the Azure SQL Entra admin and a dedicated SQL admin user-assigned managed identity. The identity is a member of the group and is attached to *jumpwin1* alongside its system-assigned identity. A run command on *jumpwin1* uses it to add *jumpwin1*'s system-assigned identity to *testdb* as a `db_datareader` user. The group and identity are deleted when this module is disabled and replaced with new ones when it is re-enabled, so a token cached by a previous identity can never carry a stale group membership.
+
 The estimated provisioning time for this module is 10 minutes.
 
 ## Smoke Testing
