@@ -26,12 +26,12 @@ This configuration implements a virtual network for applications including:
   * Pre-installed Windows features and software packages, including:
     * Remote Server Administration Tools (RSAT)
     * Visual Studio Code
-    * SQL Server Management Studio (SSMS)
-    * MySQL Workbench (pinned to version 8.0.47 via winget; the current 26.x line has a
-      known upstream regression that installs per-user instead of machine-wide — see
-      [#717](https://github.com/Azure-Samples/azuresandbox/issues/717))
+  * Database tools installed only when the related database module is enabled (controlled by the `install_ssms` and `install_mysql_workbench` inputs, which the root module sets automatically):
+    * SQL Server Management Studio (SSMS) — when the *mssql* or *vm-mssql-win* module (or both) is enabled.
+    * MySQL Workbench — when the *mysql* module is enabled.
+  * Enabling a database module on an existing sandbox installs its tool; disabling it does **not** uninstall the tool.
 
-The estimated provisioning time for this module is 31 minutes.
+The estimated provisioning time for this module is 15 minutes.
 
 > [!IMPORTANT]
 > **OS disk type change (Standard HDD retirement).** The default for `vm_jumpbox_win_storage_account_type` is now `StandardSSD_LRS` and Standard HDD (`Standard_LRS`) is no longer permitted, because [Azure is retiring Standard HDD OS disks on September 8, 2028](https://learn.microsoft.com/en-us/azure/virtual-machines/disks-hdd-os-retirement). Fresh deployments are unaffected. For an **existing** deployment created with `Standard_LRS`, changing `os_disk.storage_account_type` forces Terraform to **replace the VM** (destroy and recreate), which causes downtime; the Windows jumpbox is domain-joined and re-provisioned by its run-command configuration, so the recommended path is to let Terraform recreate it during a maintenance window. To avoid replacement, deallocate the VM and change its OS disk SKU in place (Azure portal/CLI) *before* applying, then set the variable to the new SKU so Terraform detects no change.
@@ -141,6 +141,8 @@ data_collection_endpoint_id | | The ID of the data collection endpoint (DCE) to 
 data_collection_rule_windows_id | | The ID of the Windows data collection rule (DCR) to associate with jumpwin1.
 dns_server | | The IP address of the DNS server used for the virtual network. Defined in the *vnet-shared* module.
 firewall_route_table_id | | The ID of the route table used for the firewall. Defined in the *vnet-shared* module.
+install_mysql_workbench | false | Install MySQL Workbench on jumpwin1. Set by the root module to `true` when the *mysql* module is enabled.
+install_ssms | false | Install SQL Server Management Studio (SSMS) on jumpwin1. Set by the root module to `true` when the *mssql* or *vm-mssql-win* module is enabled.
 key_vault_id | | The ID of the key vault defined in the root module.
 key_vault_name | | The name of the key vault defined in the root module.
 location | | The Azure region defined in the root module.
@@ -151,6 +153,7 @@ private_dns_zone_links_complete | | Dependency signal from the *vnet-shared* mod
 private_dns_zones | | A map of the private DNS zones defined in the *vnet-shared* module, keyed by zone name.
 private_endpoint_subnet_id | | The resource ID of the centralized private endpoint subnet *snet-privatelink-01* in the *vnet-shared* module.
 resource_group_name | | The name of the resource group defined in the root module.
+sql_admin_uami_id | null | Resource ID of the SQL admin user-assigned managed identity attached to jumpwin1 alongside its system-assigned identity. Set by the root module when the *mssql* module is enabled.
 storage_container_name | scripts | The name of the storage container used to store scripts.
 storage_share_name | myfileshare | The name of the Azure Files share.
 storage_share_quota_gb | 1024 | The quota for the Azure Files share in GB.

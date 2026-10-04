@@ -24,8 +24,11 @@ resource "azurerm_windows_virtual_machine" "this" {
     version   = var.vm_jumpbox_win_image_version
   }
 
+  # The system-assigned identity is always present. The SQL admin UAMI is added only when the
+  # root module enables mssql.
   identity {
-    type = "SystemAssigned"
+    type         = var.sql_admin_uami_id != null ? "SystemAssigned, UserAssigned" : "SystemAssigned"
+    identity_ids = var.sql_admin_uami_id != null ? [var.sql_admin_uami_id] : null
   }
 
   depends_on = [
@@ -86,8 +89,22 @@ resource "azurerm_virtual_machine_run_command" "install_software" {
     script = file("${path.module}/scripts/Install-Software.ps1")
   }
 
+  # Optional tools are driven by database module enablement. Changing a flag updates
+  # this run command in place, which re-runs the script; already-installed packages
+  # are treated as success, so only newly requested tools are installed.
+  parameter {
+    name  = "InstallSsms"
+    value = tostring(var.install_ssms)
+  }
+
+  parameter {
+    name  = "InstallMysqlWorkbench"
+    value = tostring(var.install_mysql_workbench)
+  }
+
   timeouts {
     create = "60m"
+    update = "60m"
   }
 }
 #endregion

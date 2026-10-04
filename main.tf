@@ -3,7 +3,7 @@ resource "azuread_group" "sql_admins" {
   count            = var.enable_module_mssql ? 1 : 0
   display_name     = "grp-sql-admins-${var.tags["project"]}-${var.tags["environment"]}-${element(split("-", azurerm_resource_group.this.name), length(split("-", azurerm_resource_group.this.name)) - 1)}"
   security_enabled = true
-  members          = [var.user_object_id, module.vnet_app[0].virtual_machine_jumpwin1_identity.principal_id]
+  members          = [var.user_object_id, azurerm_user_assigned_identity.sql_admin[0].principal_id]
 }
 
 resource "azurerm_resource_group" "this" {
@@ -37,10 +37,31 @@ resource "azurerm_virtual_machine_run_command" "create_mssql_db_user" {
     value = module.vnet_app[0].resource_names.virtual_machine_jumpwin1
   }
 
+  parameter {
+    name  = "SqlAdminUamiClientId"
+    value = azurerm_user_assigned_identity.sql_admin[0].client_id
+  }
+
+  parameter {
+    name  = "SqlAdminGroupObjectId"
+    value = azuread_group.sql_admins[0].object_id
+  }
+
   depends_on = [
     module.mssql,
     module.vnet_app,
   ]
+}
+
+# Dedicated SQL admin identity, attached to jumpwin1 and used only by create_mssql_db_user.
+# It is created and destroyed with the mssql module, like sql_admins, so each re-enable gets a
+# new identity with no cached tokens carrying a stale groups claim (#772).
+resource "azurerm_user_assigned_identity" "sql_admin" {
+  count               = var.enable_module_mssql ? 1 : 0
+  name                = "${module.naming.user_assigned_identity.name}-sqladmin"
+  resource_group_name = azurerm_resource_group.this.name
+  location            = azurerm_resource_group.this.location
+  tags                = local.tags
 }
 #endregion
 
@@ -207,6 +228,8 @@ module "vnet_app" {
   data_collection_rule_windows_id = module.vnet_shared.resource_ids["data_collection_rule_windows"]
   dns_server                      = module.vnet_shared.dns_server
   firewall_route_table_id         = module.vnet_shared.resource_ids["firewall_route_table"]
+  install_mysql_workbench         = var.enable_module_mysql
+  install_ssms                    = var.enable_module_mssql || var.enable_module_vm_mssql_win
   key_vault_id                    = module.vnet_shared.resource_ids["key_vault"]
   key_vault_name                  = module.vnet_shared.resource_names["key_vault"]
   location                        = azurerm_resource_group.this.location
@@ -217,6 +240,7 @@ module "vnet_app" {
   private_dns_zones               = module.vnet_shared.private_dns_zones
   private_endpoint_subnet_id      = module.vnet_shared.resource_ids["subnet_privatelink"]
   resource_group_name             = azurerm_resource_group.this.name
+  sql_admin_uami_id               = var.enable_module_mssql ? azurerm_user_assigned_identity.sql_admin[0].id : null
   tags                            = local.tags
   unique_seed                     = module.naming.unique-seed
   user_object_id                  = var.user_object_id

@@ -20,9 +20,11 @@ This configuration implements a SQL Server virtual machine. The VM is pre-config
 * Pre-configured SQL Server data and log disks on [Azure Premium SSD v2 managed disks](https://learn.microsoft.com/en-us/azure/virtual-machines/disks-deploy-premium-v2?tabs=azure-cli)
 * Pre-configured SQL Server instance for the above storage configurations.
 
+Enabling this module also causes the *vnet-app* module to install SQL Server Management Studio (SSMS) on *jumpwin1*. SSMS is not uninstalled if this module is later disabled.
+
 **Note:** Only [Ddsv6](https://learn.microsoft.com/en-us/azure/virtual-machines/sizes/general-purpose/ddsv6-series?tabs=sizebasic) and [Edsv6](https://learn.microsoft.com/en-us/azure/virtual-machines/sizes/memory-optimized/edsv6-series?tabs=sizebasic) virtual machine sizes with a minimum of 4 vCPUs are supported by this module.
 
-The estimated provisioning time for this module is 31 minutes.
+The estimated provisioning time for this module is 10 minutes.
 
 ## Smoke testing
 

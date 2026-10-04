@@ -15,7 +15,9 @@
 
 This configuration implements a network isolated Azure Database for MySQL using private endpoints.
 
-The estimated provisioning time for this module is 8 minutes.
+Enabling this module also causes the *vnet-app* module to install MySQL Workbench on *jumpwin1*. MySQL Workbench is not uninstalled if this module is later disabled.
+
+The estimated provisioning time for this module is 10 minutes.
 
 ## Smoke Testing
 
@@ -31,13 +33,16 @@ This section describes how to test the module after deployment.
   * Verify the *IP4Address* returned is within the subnet IP address prefix for the centralized private endpoint subnet *vnet_shared.subnets["snet-privatelink-01"]*, e.g. `10.1.5.*`.
 * From *jumpwin1*, test network isolated MySQL connectivity using MySQL Workbench.
   * Navigate to *Start* > *MySQL Workbench*
-  * Navigate to *Database* > *Connect to Database* and connect using the following values:
-    * Connection method: Standard (TCP/IP)
-    * Hostname: *<mysql-server-name-here>.mysql.database.azure.com*
+  * Navigate to *Database Connections* > *New Connection* and connect using the following values:
+    * Caption: `<mysql-server-name-here>.mysql.database.azure.com`
+    * Connection method: `mysql`
+    * Hostname or IP address: `<mysql-server-name-here>.mysql.database.azure.com`
     * Port: *3306*
-    * Username: *bootstrapadmin*
-    * Schema: *testdb*
-    * Click *OK* and when prompted for *password* use the value of the *adminpassword* secret in the sandbox environment key vault.
+    * User Name: *bootstrapadmin*
+    * Default Schema: *testdb*
+    * Click *OK*
+  * Click on the newly created Database Connection
+    * When prompted for *password* use the value of the *adminpassword* secret in the sandbox environment key vault.
     * Create a table, insert some data and run some sample queries to verify functionality.
 
 ## Documentation

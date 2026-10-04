@@ -101,6 +101,18 @@ variable "firewall_route_table_id" {
   }
 }
 
+variable "install_mysql_workbench" {
+  type        = bool
+  description = "Install MySQL Workbench on jumpwin1. Set by the root module when the mysql module is enabled."
+  default     = false
+}
+
+variable "install_ssms" {
+  type        = bool
+  description = "Install SQL Server Management Studio (SSMS) on jumpwin1. Set by the root module when the mssql or vm_mssql_win module is enabled."
+  default     = false
+}
+
 variable "key_vault_id" {
   type        = string
   description = "The existing key vault where secrets are stored"
@@ -197,6 +209,12 @@ variable "resource_group_name" {
     condition     = can(regex("^[a-zA-Z0-9._()-]{1,90}$", var.resource_group_name))
     error_message = "Must conform to Azure resource group naming requirements: it can only contain alphanumeric characters, periods (.), underscores (_), parentheses (()), and hyphens (-), and must be between 1 and 90 characters long."
   }
+}
+
+variable "sql_admin_uami_id" {
+  type        = string
+  description = "Resource ID of the SQL admin user-assigned managed identity to attach to jumpwin1 alongside its system-assigned identity. Set by the root module when the mssql module is enabled; null otherwise."
+  default     = null
 }
 
 variable "storage_container_name" {

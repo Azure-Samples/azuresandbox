@@ -461,7 +461,7 @@ enable_module_mysql             = true
 enable_module_vwan              = true
 ```
 
-The estimated provisioning time for the required vnet-shared module and all 6 of these optional modules is 95 minutes.
+The estimated provisioning time for the required vnet-shared module and all 6 of these optional modules is 90 minutes.
 
 #### **Overriding Defaults**
 
@@ -636,9 +636,10 @@ The root module includes a resource group.
 
 Address | Name | Notes
 --- | --- | ---
-azuread_group.sql_admins[0] | grp&#8209;sql&#8209;admins&#8209;sand&#8209;dev&#8209;xxxxxxxx | Entra ID group for Azure Sql Db admin authorization
+azuread_group.sql_admins[0] | grp&#8209;sql&#8209;admins&#8209;sand&#8209;dev&#8209;xxxxxxxx | Entra ID group for Azure Sql Db admin authorization. Members are the user and the SQL admin user-assigned identity.
 azurerm_resource_group.this | rg&#8209;sand&#8209;dev&#8209;xxxxxxxx | Resource group for the sandbox environment.
-azurerm_virtual_machine_run_command.create_mssql_db_user[0] | vmx&#8209;sand&#8209;dev&#8209;jumpwin1&#8209;CreateMssqlDbUser | Adds jumpwin1 as db_datareader on Azure SQL Db testdb
+azurerm_user_assigned_identity.sql_admin[0] | uai&#8209;sand&#8209;dev&#8209;sqladmin | SQL admin user-assigned identity, attached to jumpwin1 and used by the CreateMssqlDbUser run command. Recreated whenever the mssql module is re-enabled.
+azurerm_virtual_machine_run_command.create_mssql_db_user[0] | vmx&#8209;sand&#8209;dev&#8209;jumpwin1&#8209;CreateMssqlDbUser | Signs in to Azure SQL Db as the SQL admin user-assigned identity and adds jumpwin1's system-assigned identity as db_datareader on testdb
 
 ---
 
