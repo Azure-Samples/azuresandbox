@@ -1,5 +1,6 @@
 #requires -Version 7.0
-#requires -Modules Az.Accounts, Az.Compute, Az.Resources, Az.Sql, Az.Network, Az.PrivateDns, Az.MySql, Az.DesktopVirtualization
+# Az modules are imported explicitly in the main region rather than via '#requires -Modules':
+# with Az modules loaded by '#requires', 'pwsh -File' discards the script's exit code (always 0).
 
 # Overview:
 #   This script is the unit/integration test orchestrator for the sandbox. It auto-discovers
@@ -37,8 +38,35 @@
 #   Valid module names: vnet_shared, vnet_app, vm_jumpbox_linux, vm_mssql_win, mssql, mysql,
 #                       vwan, vnet_onprem, avd, petstore (ai_foundry is not currently supported)
 #
+#   Optional: emit machine-readable results for CI/CD (either or both; any scope above)
+#     From bash:       pwsh -File ./scripts/Invoke-UnitTests.ps1 -ResultsJsonPath ./test-results.json -JUnitXmlPath ./test-results.xml
+#     From PowerShell: .\scripts\Invoke-UnitTests.ps1 -Module vnet_app -JUnitXmlPath .\test-results.xml
+#
+# Exit codes: 0 = all tests passed, 1 = one or more tests failed, 2 = harness error (bad
+#   parameters, missing Azure auth / terraform state, etc. - no or partial tests ran).
+#
+# Machine-readable results (-ResultsJsonPath / -JUnitXmlPath):
+#   Off by default; supplying either path does not change the exit code, log file, or console
+#   output. Files are written on every exit (0, 1, and 2), relative paths resolve against the
+#   current directory, and missing parent directories are created. Per-check detail is parsed
+#   from the '[MODULE:<name>] [PASS|FAIL|SKIP] <message>' lines every test script emits; a
+#   following 'FAIL Exception: ...' line is attached as detail to the preceding failed check.
+#   - JSON (schemaVersion 1): result ('pass'|'fail'|'error'), exitCode, error, module,
+#     integration, startedAt/finishedAt (UTC ISO 8601), durationSeconds, totals, and suites[]
+#     (one per module test config or integration test; name, type 'module'|'integration',
+#     module, target, status 'passed'|'failed'|'skipped', passed, failed, skipped, skipReason,
+#     startedAt, durationSeconds, checks[] of { name, status, message }). Suite and overall
+#     passed/failed counts mirror the log's [SUMMARY] counts (the exit-code source of truth).
+#     If a test script reports more failures than [FAIL] lines, an 'Unattributed failures'
+#     check is added; if a script cannot be run or parsed, a 'Test harness' check is added.
+#   - JUnit XML: <testsuites>/<testsuite>/<testcase> with <failure> for failed checks,
+#     <skipped> for skipped checks or undeployed modules, and an <error> 'harness' suite on
+#     exit code 2 - consumable by standard GitHub test-reporter actions.
+#   The files contain the same resource names and messages as the log file; handle them alike.
+#
 # Prerequisites:
-#   - PowerShell 7.x (pwsh) with Az.Accounts, Az.Compute, and Az.Resources modules installed
+#   - PowerShell 7.x (pwsh) with Az.Accounts, Az.Compute, Az.Resources, Az.Sql, Az.Network,
+#     Az.PrivateDns, Az.MySql, and Az.DesktopVirtualization installed (missing modules exit 2)
 #   - Authenticated Azure session (see Step 1 above)
 #   - Terraform CLI in PATH with initialized state in the repo root
 #   - All VMs started before running (a policy may deallocate them); a deallocated domain
@@ -50,7 +78,13 @@ param(
     [string]$Module,
 
     [Parameter(Mandatory = $false)]
-    [switch]$Integration
+    [switch]$Integration,
+
+    [Parameter(Mandatory = $false)]
+    [string]$ResultsJsonPath,
+
+    [Parameter(Mandatory = $false)]
+    [string]$JUnitXmlPath
 )
 
 #region functions
@@ -65,7 +99,315 @@ function Exit-WithError {
     param([string]$msg)
     Write-Log "There was an exception during the process, please review..."
     Write-Log $msg
+    Write-ResultFiles -ExitCode 2 -ErrorMessage $msg
     exit 2
+}
+
+function Remove-AnsiEscape {
+    param([string]$Value)
+    if ($null -eq $Value) { return $null }
+    return ($Value -replace '\x1B\[[0-9;?]*[ -/]*[@-~]', '')
+}
+
+function ConvertFrom-TestOutput {
+    # Parses the per-check protocol shared by all test scripts: '[MODULE:<name>] [PASS|FAIL|SKIP] <message>'.
+    # A 'FAIL Exception: ...' line, and any untimestamped continuation lines of a multi-line
+    # message, are detail for the preceding failed check rather than separate checks.
+    param([string[]]$Lines)
+
+    $statusMap = @{ PASS = 'passed'; FAIL = 'failed'; SKIP = 'skipped' }
+    $parsed = [System.Collections.Generic.List[object]]::new()
+    $current = $null
+
+    foreach ($entry in $Lines) {
+        foreach ($line in ((Remove-AnsiEscape "$entry") -split '\r?\n')) {
+            $trimmed = $line.Trim()
+            if (-not $trimmed) { continue }
+
+            if ($trimmed -match '\[MODULE:[^\]]*\]\s+\[(PASS|FAIL|SKIP)\]\s?(.*)$') {
+                $status = $statusMap[$Matches[1]]
+                $text = $Matches[2].Trim()
+                if ($status -eq 'failed' -and $text -like 'Exception:*' -and $current -and $current.Status -eq 'failed') {
+                    $current.Details.Add($text)
+                    continue
+                }
+                $current = @{ Name = $text; Status = $status; Details = [System.Collections.Generic.List[string]]::new() }
+                $parsed.Add($current)
+            }
+            elseif ($current -and $current.Status -eq 'failed' -and $trimmed -notmatch '^\d{4}-?\d{2}-?\d{2}[T ]') {
+                $current.Details.Add($trimmed)
+            }
+            else {
+                $current = $null
+            }
+        }
+    }
+
+    $checks = [System.Collections.Generic.List[object]]::new()
+    foreach ($p in $parsed) {
+        $checks.Add([ordered]@{
+                name    = $p.Name
+                status  = $p.Status
+                message = if ($p.Details.Count -gt 0) { $p.Details -join "`n" } else { $null }
+            })
+    }
+    return , $checks.ToArray()
+}
+
+function Get-UtcTimestamp {
+    param([datetime]$Date = (Get-Date))
+    return $Date.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ', [cultureinfo]::InvariantCulture)
+}
+
+function Add-SuiteResult {
+    param(
+        [string]$Name,
+        [string]$Type,
+        [string]$ModuleName,
+        [string]$Target,
+        [hashtable]$TestResult,
+        [datetime]$StartedAt,
+        [System.Diagnostics.Stopwatch]$Stopwatch
+    )
+
+    $checks = [System.Collections.Generic.List[object]]::new()
+    foreach ($c in @($TestResult.Checks)) { if ($c) { $checks.Add($c) } }
+
+    if ($TestResult.HarnessError) {
+        $checks.Add([ordered]@{ name = 'Test harness'; status = 'failed'; message = (Remove-AnsiEscape $TestResult.HarnessError) })
+    }
+    else {
+        $attributed = @($checks | Where-Object { $_.status -eq 'failed' }).Count
+        if ($TestResult.Failed -gt $attributed) {
+            $checks.Add([ordered]@{
+                    name    = 'Unattributed failures'
+                    status  = 'failed'
+                    message = "[SUMMARY] reported $($TestResult.Failed) failed check(s) but only $attributed [FAIL] line(s) were emitted; see the log file for details."
+                })
+        }
+    }
+
+    $script:suiteResults.Add([ordered]@{
+            name            = $Name
+            type            = $Type
+            module          = $ModuleName
+            target          = $Target
+            status          = if ($TestResult.Failed -gt 0) { 'failed' } else { 'passed' }
+            passed          = [int]$TestResult.Passed
+            failed          = [int]$TestResult.Failed
+            skipped         = @($checks | Where-Object { $_.status -eq 'skipped' }).Count
+            skipReason      = $null
+            startedAt       = Get-UtcTimestamp $StartedAt
+            durationSeconds = [math]::Round($Stopwatch.Elapsed.TotalSeconds, 3)
+            checks          = $checks.ToArray()
+        })
+}
+
+function Add-SkippedSuite {
+    param(
+        [string]$Name,
+        [string]$Type,
+        [string]$ModuleName,
+        [string]$Target,
+        [string]$Reason
+    )
+
+    $script:suiteResults.Add([ordered]@{
+            name            = $Name
+            type            = $Type
+            module          = $ModuleName
+            target          = $Target
+            status          = 'skipped'
+            passed          = 0
+            failed          = 0
+            skipped         = 0
+            skipReason      = $Reason
+            startedAt       = Get-UtcTimestamp
+            durationSeconds = 0
+            checks          = @()
+        })
+}
+
+function Get-XmlSafeString {
+    param([string]$Value)
+    if ($null -eq $Value) { return '' }
+    return ($Value -replace '[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]', '')
+}
+
+function Write-JUnitXml {
+    param(
+        [string]$Path,
+        [object[]]$Suites,
+        [string]$ErrorMessage,
+        [string]$StartedAt,
+        [double]$DurationSeconds
+    )
+
+    $inv = [cultureinfo]::InvariantCulture
+    $totalTests = 0; $totalFailures = 0; $totalSkipped = 0
+    foreach ($s in $Suites) {
+        if ($s.status -eq 'skipped') { $totalTests++; $totalSkipped++; continue }
+        $totalTests += $s.checks.Count
+        $totalFailures += @($s.checks | Where-Object { $_.status -eq 'failed' }).Count
+        $totalSkipped += @($s.checks | Where-Object { $_.status -eq 'skipped' }).Count
+    }
+    $totalErrors = if ($ErrorMessage) { 1 } else { 0 }
+    $totalTests += $totalErrors
+
+    $settings = [System.Xml.XmlWriterSettings]::new()
+    $settings.Indent = $true
+    $settings.Encoding = [System.Text.UTF8Encoding]::new($false)
+    $writer = [System.Xml.XmlWriter]::Create($Path, $settings)
+    try {
+        $writer.WriteStartDocument()
+        $writer.WriteStartElement('testsuites')
+        $writer.WriteAttributeString('name', 'Invoke-UnitTests')
+        $writer.WriteAttributeString('tests', [string]$totalTests)
+        $writer.WriteAttributeString('failures', [string]$totalFailures)
+        $writer.WriteAttributeString('errors', [string]$totalErrors)
+        $writer.WriteAttributeString('skipped', [string]$totalSkipped)
+        $writer.WriteAttributeString('time', $DurationSeconds.ToString('0.###', $inv))
+        $writer.WriteAttributeString('timestamp', $StartedAt)
+
+        if ($ErrorMessage) {
+            $writer.WriteStartElement('testsuite')
+            $writer.WriteAttributeString('name', 'harness')
+            foreach ($a in @(@('tests', '1'), @('failures', '0'), @('errors', '1'), @('skipped', '0'), @('time', '0'))) {
+                $writer.WriteAttributeString($a[0], $a[1])
+            }
+            $writer.WriteAttributeString('timestamp', $StartedAt)
+            $writer.WriteStartElement('testcase')
+            $writer.WriteAttributeString('name', 'Invoke-UnitTests.ps1')
+            $writer.WriteAttributeString('classname', 'harness')
+            $writer.WriteAttributeString('time', '0')
+            $writer.WriteStartElement('error')
+            $writer.WriteAttributeString('message', (Get-XmlSafeString $ErrorMessage))
+            $writer.WriteAttributeString('type', 'HarnessError')
+            $writer.WriteString((Get-XmlSafeString $ErrorMessage))
+            $writer.WriteEndElement()
+            $writer.WriteEndElement()
+            $writer.WriteEndElement()
+        }
+
+        foreach ($s in $Suites) {
+            $suiteName = Get-XmlSafeString $s.name
+            $isSkippedSuite = $s.status -eq 'skipped'
+            $failures = @($s.checks | Where-Object { $_.status -eq 'failed' }).Count
+            $skipped = if ($isSkippedSuite) { 1 } else { @($s.checks | Where-Object { $_.status -eq 'skipped' }).Count }
+            $tests = if ($isSkippedSuite) { 1 } else { $s.checks.Count }
+
+            $writer.WriteStartElement('testsuite')
+            $writer.WriteAttributeString('name', $suiteName)
+            $writer.WriteAttributeString('tests', [string]$tests)
+            $writer.WriteAttributeString('failures', [string]$failures)
+            $writer.WriteAttributeString('errors', '0')
+            $writer.WriteAttributeString('skipped', [string]$skipped)
+            $writer.WriteAttributeString('time', ([double]$s.durationSeconds).ToString('0.###', $inv))
+            $writer.WriteAttributeString('timestamp', $s.startedAt)
+
+            if ($isSkippedSuite) {
+                $writer.WriteStartElement('testcase')
+                $writer.WriteAttributeString('name', $suiteName)
+                $writer.WriteAttributeString('classname', $suiteName)
+                $writer.WriteAttributeString('time', '0')
+                $writer.WriteStartElement('skipped')
+                $writer.WriteAttributeString('message', (Get-XmlSafeString $s.skipReason))
+                $writer.WriteEndElement()
+                $writer.WriteEndElement()
+            }
+
+            foreach ($c in $s.checks) {
+                $writer.WriteStartElement('testcase')
+                $writer.WriteAttributeString('name', (Get-XmlSafeString $c.name))
+                $writer.WriteAttributeString('classname', $suiteName)
+                $writer.WriteAttributeString('time', '0')
+                if ($c.status -eq 'failed') {
+                    $writer.WriteStartElement('failure')
+                    $writer.WriteAttributeString('message', (Get-XmlSafeString $c.name))
+                    $writer.WriteAttributeString('type', $(if ($c.name -eq 'Test harness') { 'HarnessError' } else { 'TestFailure' }))
+                    if ($c.message) { $writer.WriteString((Get-XmlSafeString $c.message)) }
+                    $writer.WriteEndElement()
+                }
+                elseif ($c.status -eq 'skipped') {
+                    $writer.WriteStartElement('skipped')
+                    $writer.WriteAttributeString('message', (Get-XmlSafeString $c.name))
+                    $writer.WriteEndElement()
+                }
+                $writer.WriteEndElement()
+            }
+
+            $writer.WriteEndElement()
+        }
+
+        $writer.WriteEndElement()
+        $writer.WriteEndDocument()
+    }
+    finally {
+        $writer.Dispose()
+    }
+}
+
+function Write-ResultFiles {
+    # Best-effort: a failure to write results is logged but never changes the exit code.
+    param(
+        [int]$ExitCode,
+        [string]$ErrorMessage
+    )
+
+    if (-not $script:resultsJsonFullPath -and -not $script:junitXmlFullPath) { return }
+
+    $ErrorMessage = Remove-AnsiEscape $ErrorMessage
+    $finishedAt = Get-Date
+    $startedAt = if ($script:runStartedAt) { $script:runStartedAt } else { $finishedAt }
+    $durationSeconds = [math]::Round(($finishedAt - $startedAt).TotalSeconds, 3)
+    $suites = if ($script:suiteResults) { $script:suiteResults.ToArray() } else { @() }
+    $passed = [int]$script:overallPassed
+    $failed = [int]$script:overallFailed
+
+    if ($script:resultsJsonFullPath) {
+        try {
+            $doc = [ordered]@{
+                schemaVersion   = 1
+                generator       = 'scripts/Invoke-UnitTests.ps1'
+                result          = switch ($ExitCode) { 0 { 'pass' } 1 { 'fail' } default { 'error' } }
+                exitCode        = $ExitCode
+                error           = if ($ErrorMessage) { $ErrorMessage } else { $null }
+                module          = if ($Module) { $Module } else { $null }
+                integration     = [bool]$Integration
+                startedAt       = Get-UtcTimestamp $startedAt
+                finishedAt      = Get-UtcTimestamp $finishedAt
+                durationSeconds = $durationSeconds
+                totals          = [ordered]@{
+                    passed        = $passed
+                    failed        = $failed
+                    total         = $passed + $failed
+                    suites        = $suites.Count
+                    suitesFailed  = @($suites | Where-Object { $_.status -eq 'failed' }).Count
+                    suitesSkipped = @($suites | Where-Object { $_.status -eq 'skipped' }).Count
+                }
+                suites          = $suites
+            }
+            $dir = Split-Path $script:resultsJsonFullPath -Parent
+            if ($dir -and -not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+            $doc | ConvertTo-Json -Depth 10 | Set-Content -Path $script:resultsJsonFullPath -Encoding utf8NoBOM
+            Write-Log "Results JSON: $($script:resultsJsonFullPath)"
+        }
+        catch {
+            Write-Log "[WARNING] Failed to write results JSON '$($script:resultsJsonFullPath)': $_"
+        }
+    }
+
+    if ($script:junitXmlFullPath) {
+        try {
+            $dir = Split-Path $script:junitXmlFullPath -Parent
+            if ($dir -and -not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+            Write-JUnitXml -Path $script:junitXmlFullPath -Suites $suites -ErrorMessage $ErrorMessage -StartedAt (Get-UtcTimestamp $startedAt) -DurationSeconds $durationSeconds
+            Write-Log "Results JUnit XML: $($script:junitXmlFullPath)"
+        }
+        catch {
+            Write-Log "[WARNING] Failed to write results JUnit XML '$($script:junitXmlFullPath)': $_"
+        }
+    }
 }
 
 function Invoke-VMTest {
@@ -78,10 +420,11 @@ function Invoke-VMTest {
         [string]$Label
     )
 
-    $testResult = @{ Passed = 0; Failed = 1 }
+    $testResult = @{ Passed = 0; Failed = 1; Checks = @(); HarnessError = $null }
 
     if (-not (Test-Path $ScriptPath)) {
         Write-Log "[WARNING] Test script not found: $ScriptPath. Skipping."
+        $testResult.HarnessError = "Test script not found: $ScriptPath"
         return $testResult
     }
 
@@ -115,6 +458,7 @@ function Invoke-VMTest {
 
         $stdout = $stdoutValue.Message
         $stderr = $stderrValue.Message
+        $lines = @()
 
         if ($stdout) {
             $lines = $stdout -split "`n" | ForEach-Object { $_.Trim() } | Where-Object {
@@ -135,15 +479,19 @@ function Invoke-VMTest {
         # Parse summary line
         $summaryLine = ($stdout -split "`n") | Where-Object { $_ -match '\[SUMMARY\]' } | Select-Object -Last 1
         if ($summaryLine -match 'Passed:\s*(\d+)\s+Failed:\s*(\d+)\s+Total:\s*(\d+)') {
-            $testResult = @{ Passed = [int]$Matches[1]; Failed = [int]$Matches[2] }
+            $testResult.Passed = [int]$Matches[1]
+            $testResult.Failed = [int]$Matches[2]
         }
         else {
             Write-Log "[WARNING] Could not parse summary line from '$Label'. Treating as failure."
+            $testResult.HarnessError = "Could not parse the [SUMMARY] line from the test output (VM '$VMName'). Treating as failure."
         }
+        $testResult.Checks = ConvertFrom-TestOutput -Lines $lines
     }
     catch {
         Write-Log "[$Label] [FAIL] Failed to execute tests on VM '$VMName'"
         Write-Log "[$Label] [FAIL] Exception: $_"
+        $testResult.HarnessError = "Failed to execute tests on VM '$VMName'. Exception: $_"
     }
 
     return $testResult
@@ -156,10 +504,11 @@ function Invoke-LocalTest {
         [string]$Label
     )
 
-    $testResult = @{ Passed = 0; Failed = 1 }
+    $testResult = @{ Passed = 0; Failed = 1; Checks = @(); HarnessError = $null }
 
     if (-not (Test-Path $ScriptPath)) {
         Write-Log "[WARNING] Test script not found: $ScriptPath. Skipping."
+        $testResult.HarnessError = "Test script not found: $ScriptPath"
         return $testResult
     }
 
@@ -180,15 +529,20 @@ function Invoke-LocalTest {
         # Parse summary line
         $summaryLine = $collectedLines | Where-Object { $_ -match '\[SUMMARY\]' } | Select-Object -Last 1
         if ($summaryLine -match 'Passed:\s*(\d+)\s+Failed:\s*(\d+)\s+Total:\s*(\d+)') {
-            $testResult = @{ Passed = [int]$Matches[1]; Failed = [int]$Matches[2] }
+            $testResult.Passed = [int]$Matches[1]
+            $testResult.Failed = [int]$Matches[2]
         }
         else {
             Write-Log "[WARNING] Could not parse summary line from '$Label'. Treating as failure."
+            $testResult.HarnessError = "Could not parse the [SUMMARY] line from the local test output. Treating as failure."
         }
+        $testResult.Checks = ConvertFrom-TestOutput -Lines $collectedLines.ToArray()
     }
     catch {
         Write-Log "[$Label] [FAIL] Failed to execute local tests"
         Write-Log "[$Label] [FAIL] Exception: $_"
+        $testResult.HarnessError = "Failed to execute local tests. Exception: $_"
+        if ($collectedLines) { $testResult.Checks = ConvertFrom-TestOutput -Lines $collectedLines.ToArray() }
     }
 
     return $testResult
@@ -249,12 +603,23 @@ function Invoke-VMStopDeallocateStart {
 #region main
 $script:logPath = Join-Path $PWD 'Invoke-UnitTests.ps1.log'
 $repoRoot = Split-Path $PSScriptRoot -Parent
+$script:runStartedAt = Get-Date
+$script:suiteResults = [System.Collections.Generic.List[object]]::new()
+$script:resultsJsonFullPath = if ($ResultsJsonPath) { $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($ResultsJsonPath) } else { $null }
+$script:junitXmlFullPath = if ($JUnitXmlPath) { $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($JUnitXmlPath) } else { $null }
 
 # Clear previous log
 if (Test-Path $script:logPath) { Remove-Item $script:logPath -Force }
 
 Write-Log "Starting unit test collection..."
 Write-Log "Log file: $($script:logPath)"
+
+try {
+    Import-Module Az.Accounts, Az.Compute, Az.Resources, Az.Sql, Az.Network, Az.PrivateDns, Az.MySql, Az.DesktopVirtualization -ErrorAction Stop
+}
+catch {
+    Exit-WithError "Required Az PowerShell modules could not be imported. Install them with 'Install-Module Az -Scope CurrentUser'. Exception: $_"
+}
 
 # Verify Azure connection
 try {
@@ -571,6 +936,7 @@ foreach ($configKey in $testConfigs.Keys) {
 
         if ($skipLocal) {
             Write-Log "Skipping module '$($config.Module)': required terraform outputs not found (module not deployed)."
+            Add-SkippedSuite -Name "$($config.Module) (local)" -Type 'module' -ModuleName $config.ModuleName -Target 'local' -Reason 'Required terraform outputs not found (module not deployed).'
             continue
         }
 
@@ -578,20 +944,28 @@ foreach ($configKey in $testConfigs.Keys) {
         Write-Log "Module: $($config.Module) | Local"
         Write-Log "========================================"
 
+        $suiteTarget = 'local'
+        $suiteStartedAt = Get-Date
+        $suiteStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
         $testResult = Invoke-LocalTest -ScriptPath $config.ScriptPath -Parameters $config.Parameters -Label "MODULE:$($config.Module)"
     }
     else {
         # VM-based test
         $vmName = $resourceNames[$configKey]
+        $suiteTarget = $configKey -replace '^virtual_machine_', ''
 
         if (-not $vmName) {
             Write-Log "Skipping module '$($config.Module)': VM key '$configKey' not found in terraform outputs (module not deployed)."
+            Add-SkippedSuite -Name "$($config.Module) ($suiteTarget)" -Type 'module' -ModuleName $config.ModuleName -Target $suiteTarget -Reason "VM key '$configKey' not found in terraform outputs (module not deployed)."
             continue
         }
 
         Write-Log "========================================"
         Write-Log "Module: $($config.Module) | VM: $vmName"
         Write-Log "========================================"
+
+        $suiteStartedAt = Get-Date
+        $suiteStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
         # Stop/deallocate and restart VM if required (tests startup configuration after temp disk wipe)
         if ($config.StopDeallocateBeforeTest) {
@@ -602,6 +976,9 @@ foreach ($configKey in $testConfigs.Keys) {
                 Write-Log "[MODULE:$($config.Module)] [FAIL] Failed to stop/deallocate/start VM '$vmName': $_"
                 $overallFailed++
                 $moduleResults += @{ Module = $config.Module; Passed = 0; Failed = 1 }
+                Add-SuiteResult -Name "$($config.Module) ($suiteTarget)" -Type 'module' -ModuleName $config.ModuleName -Target $suiteTarget -StartedAt $suiteStartedAt -Stopwatch $suiteStopwatch -TestResult @{
+                    Passed = 0; Failed = 1; Checks = @(); HarnessError = "Failed to stop/deallocate/start VM '$vmName': $_"
+                }
                 continue
             }
         }
@@ -611,6 +988,7 @@ foreach ($configKey in $testConfigs.Keys) {
     $overallPassed += $testResult.Passed
     $overallFailed += $testResult.Failed
     $moduleResults += @{ Module = $config.Module; Passed = $testResult.Passed; Failed = $testResult.Failed }
+    Add-SuiteResult -Name "$($config.Module) ($suiteTarget)" -Type 'module' -ModuleName $config.ModuleName -Target $suiteTarget -TestResult $testResult -StartedAt $suiteStartedAt -Stopwatch $suiteStopwatch
 }
 
 # Integration tests - run when testing all modules or when -Module -Integration is specified
@@ -757,6 +1135,9 @@ if ($runIntegration) {
     }
 
     foreach ($test in $integrationTests) {
+        $suiteName = "integration: $($test.Name)"
+        $suiteTarget = if ($test.RunLocal) { 'local' } else { $test.RunOnVM -replace '^virtual_machine_', '' }
+
         # Check all required VMs are deployed
         $allDeployed = $true
         $missingVm = $null
@@ -771,12 +1152,14 @@ if ($runIntegration) {
 
         if (-not $allDeployed) {
             Write-Log "Skipping integration test '$($test.Name)': required VM '$missingVm' not deployed."
+            Add-SkippedSuite -Name $suiteName -Type 'integration' -ModuleName $null -Target $suiteTarget -Reason "Required VM '$missingVm' not deployed."
             continue
         }
 
         # Check required FQDN is available (for tests that depend on PaaS modules)
         if ($test.RequiredFqdn -and -not $fqdns[$test.RequiredFqdn]) {
             Write-Log "Skipping integration test '$($test.Name)': required FQDN '$($test.RequiredFqdn)' not found in terraform outputs (module not deployed)."
+            Add-SkippedSuite -Name $suiteName -Type 'integration' -ModuleName $null -Target $suiteTarget -Reason "Required FQDN '$($test.RequiredFqdn)' not found in terraform outputs (module not deployed)."
             continue
         }
 
@@ -786,12 +1169,16 @@ if ($runIntegration) {
             foreach ($key in @('ResourceGroupName', 'KeyVaultName', 'VirtualWanName', 'VirtualHubName')) {
                 if ($test.Parameters.ContainsKey($key) -and -not $test.Parameters[$key]) {
                     Write-Log "Skipping integration test '$($test.Name)': required parameter '$key' not found in terraform outputs (module not deployed)."
+                    Add-SkippedSuite -Name $suiteName -Type 'integration' -ModuleName $null -Target $suiteTarget -Reason "Required parameter '$key' not found in terraform outputs (module not deployed)."
                     $skipLocal = $true
                     break
                 }
             }
             if ($skipLocal) { continue }
         }
+
+        $suiteStartedAt = Get-Date
+        $suiteStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
         if ($test.RunLocal) {
             # Local integration test (e.g. P2S VPN from Terraform execution environment)
@@ -824,6 +1211,7 @@ if ($runIntegration) {
         $overallPassed += $testResult.Passed
         $overallFailed += $testResult.Failed
         $moduleResults += @{ Module = "integration: $($test.Name)"; Passed = $testResult.Passed; Failed = $testResult.Failed }
+        Add-SuiteResult -Name $suiteName -Type 'integration' -ModuleName $null -Target $suiteTarget -TestResult $testResult -StartedAt $suiteStartedAt -Stopwatch $suiteStopwatch
     }
 }
 
@@ -840,10 +1228,12 @@ Write-Log "Overall: Passed=$overallPassed Failed=$overallFailed Total=$overallTo
 
 if ($overallFailed -gt 0) {
     Write-Log "RESULT: FAIL"
+    Write-ResultFiles -ExitCode 1
     exit 1
 }
 else {
     Write-Log "RESULT: PASS"
+    Write-ResultFiles -ExitCode 0
     exit 0
 }
 #endregion
