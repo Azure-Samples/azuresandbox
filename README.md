@@ -843,7 +843,7 @@ Fully automated unit test scripts are provided for each module and are orchestra
 * Module unit tests: These tests focus on functionality in a single module.
 * Integration tests: These tests focus on functionality that spans multiple modules.
 
-The orchestration script returns 0 if all tests completed successfully or 1 if any tests failed. The orchestration script can be incorporated in a CI/CD pipeline.
+The orchestration script returns 0 if all tests completed successfully, 1 if any tests failed, or 2 if the test harness itself failed (for example, missing Azure authentication or Terraform state). The orchestration script can be incorporated in a CI/CD pipeline. For CI/CD consumption, supply `-ResultsJsonPath` and/or `-JUnitXmlPath` to also write machine-readable results with a per-check breakdown, e.g. `pwsh -File ./scripts/Invoke-UnitTests.ps1 -ResultsJsonPath ./test-results.json -JUnitXmlPath ./test-results.xml`. These outputs are optional and do not change the exit codes, log file, or console output. See the header comments in [Invoke-UnitTests.ps1](./scripts/Invoke-UnitTests.ps1) for the output formats.
 
 ### Additional Resources
 
