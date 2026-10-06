@@ -97,6 +97,13 @@ resource "azurerm_public_ip" "this" {
   resource_group_name = azurerm_resource_group.this.name
   allocation_method   = "Static"
   sku                 = "Standard"
+
+  lifecycle {
+    # Azure injects ip_tags such as 'FirstPartyUsage' after creation. Since ip_tags forces
+    # replacement, reconciling that drift would destroy and recreate the public IP on every
+    # subsequent apply, which also forces replacement of the NAT gateway association below.
+    ignore_changes = [ip_tags]
+  }
 }
 
 resource "azurerm_nat_gateway_public_ip_association" "this" {

@@ -88,14 +88,21 @@ module "naming" {
 module "vm_jumpbox_linux" {
   source = "./modules/vm-jumpbox-linux"
 
-  enable_public_access  = true
-  key_vault_id          = azurerm_key_vault.this.id
-  location              = azurerm_resource_group.this.location
-  resource_group_name   = azurerm_resource_group.this.name
-  storage_account_id    = azurerm_storage_account.this.id
-  subnet_id             = azurerm_subnet.devops.id
-  tags                  = var.tags
-  vm_jumpbox_linux_size = var.vm_jumpbox_linux_size
+  enable_github_runner               = var.enable_github_runner
+  enable_public_access               = true
+  github_runner_labels               = var.github_runner_labels
+  github_runner_token                = var.github_runner_token
+  github_runner_token_secret_version = var.github_runner_token_secret_version
+  github_runner_token_type           = var.github_runner_token_type
+  github_runner_url                  = var.github_runner_url
+  key_vault_id                       = azurerm_key_vault.this.id
+  key_vault_name                     = azurerm_key_vault.this.name
+  location                           = azurerm_resource_group.this.location
+  resource_group_name                = azurerm_resource_group.this.name
+  storage_account_id                 = azurerm_storage_account.this.id
+  subnet_id                          = azurerm_subnet.devops.id
+  tags                               = var.tags
+  vm_jumpbox_linux_size              = var.vm_jumpbox_linux_size
 
   depends_on = [time_sleep.wait_for_roles]
 }
