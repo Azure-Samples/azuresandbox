@@ -1,0 +1,32 @@
+#cloud-config
+
+# Writes the GitHub Actions self-hosted runner configuration consumed by configure-github-runner.sh.
+# This part is only included in the VM custom data when var.enable_github_runner is true.
+#
+# Note: the GitHub registration secret is deliberately NOT written here. It is retrieved from Azure
+# Key Vault on the VM using the managed identity, so it never lands in custom data or Terraform state.
+
+# Append to the write_files list defined in configure-vm-jumpbox-linux.yaml rather than replacing it.
+merge_how:
+  - name: list
+    settings: [append]
+  - name: dict
+    settings: [no_replace, recurse_list]
+
+write_files:
+  - path: /etc/github-runner.conf
+    permissions: '0600'
+    owner: 'root:root'
+    content: |
+      runner_url='${github_runner_url}'
+      runner_name='${github_runner_name}'
+      runner_group='${github_runner_group}'
+      runner_labels='${github_runner_labels}'
+      runner_version='${github_runner_version}'
+      runner_user='${github_runner_service_account}'
+      runner_home='${github_runner_home}'
+      key_vault_name='${key_vault_name}'
+      token_secret_name='${github_runner_token_secret}'
+      token_type='${github_runner_token_type}'
+      vwan_sudoers='${github_runner_enable_vwan_sudoers}'
+      aad_tenant_id='${aad_tenant_id}'

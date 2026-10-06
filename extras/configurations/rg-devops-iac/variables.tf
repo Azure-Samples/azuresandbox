@@ -29,6 +29,58 @@ variable "arm_client_secret" {
   }
 }
 
+variable "enable_github_runner" {
+  type        = bool
+  description = "Set to true to install and register the GitHub Actions self-hosted runner agent on the Linux virtual machine, false to skip it."
+  default     = false
+}
+
+variable "github_runner_labels" {
+  type        = list(string)
+  description = "Additional labels to apply to the GitHub Actions self-hosted runner. Only used when var.enable_github_runner is true."
+  default     = ["azuresandbox"]
+
+  validation {
+    condition     = alltrue([for label in var.github_runner_labels : can(regex("^[a-zA-Z0-9._-]{1,64}$", label))])
+    error_message = "Each label must be 1-64 characters long and consist of alphanumeric characters, periods (.), underscores (_), or hyphens (-)."
+  }
+}
+
+variable "github_runner_token" {
+  type        = string
+  description = "A GitHub personal access token or runner registration token used to register the self-hosted runner. Set interactively or using an environment variable 'TF_VAR_github_runner_token'. Required when var.enable_github_runner is true."
+  sensitive   = true
+  default     = ""
+}
+
+variable "github_runner_token_secret_version" {
+  type        = number
+  description = "Increment to write a new value for the GitHub runner token key vault secret."
+  default     = 1
+}
+
+variable "github_runner_token_type" {
+  type        = string
+  description = "The type of token supplied in var.github_runner_token. Use 'pat' for a personal access token, which is exchanged for a short lived registration token on the VM, or 'registration' for a registration token obtained from the GitHub API."
+  default     = "pat"
+
+  validation {
+    condition     = contains(["pat", "registration"], var.github_runner_token_type)
+    error_message = "Must be either 'pat' or 'registration'."
+  }
+}
+
+variable "github_runner_url" {
+  type        = string
+  description = "The GitHub repository or organization URL to register the self-hosted runner with, e.g. 'https://github.com/myorg/myrepo'. Required when var.enable_github_runner is true."
+  default     = ""
+
+  validation {
+    condition     = var.github_runner_url == "" || can(regex("^https://github\\.com/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)?$", var.github_runner_url))
+    error_message = "Must be empty or a valid GitHub organization or repository URL, e.g. 'https://github.com/myorg' or 'https://github.com/myorg/myrepo'."
+  }
+}
+
 variable "location" {
   type        = string
   description = "The name of the Azure Region where resources will be provisioned."
@@ -47,6 +99,17 @@ variable "storage_access_tier" {
   validation {
     condition     = contains(["Hot", "Cool", "Archive"], var.storage_access_tier)
     error_message = "storage_access_tier must be one of: Hot, Cool, or Archive (case-sensitive, as per Azure Blob Storage access tiers)."
+  }
+}
+
+variable "storage_container_name" {
+  type        = string
+  description = "The name of the storage container to be created in the new storage account."
+  default     = "tfstate"
+
+  validation {
+    condition     = can(regex("^[a-z0-9][a-z0-9-]{2,61}[a-z0-9]$", var.storage_container_name))
+    error_message = "Must conform to Azure storage container naming standards: it can only contain lowercase alphanumeric characters and hyphens (-), must start and end with an alphanumeric character, and must be between 3 and 63 characters long."
   }
 }
 
@@ -112,17 +175,6 @@ variable "subscription_id" {
   validation {
     condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.subscription_id))
     error_message = "Must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
-  }
-}
-
-variable "storage_container_name" {
-  type        = string
-  description = "The name of the storage container to be created in the new storage account."
-  default     = "tfstate"
-
-  validation {
-    condition     = can(regex("^[a-z0-9][a-z0-9-]{2,61}[a-z0-9]$", var.storage_container_name))
-    error_message = "Must conform to Azure storage container naming standards: it can only contain lowercase alphanumeric characters and hyphens (-), must start and end with an alphanumeric character, and must be between 3 and 63 characters long."
   }
 }
 

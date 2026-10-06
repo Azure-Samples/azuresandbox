@@ -21,3 +21,8 @@ output "resource_names" {
     module.vm_jumpbox_linux.resource_names
   )
 }
+
+output "github_runner_name" {
+  value       = module.vm_jumpbox_linux.github_runner_name
+  description = "The name the GitHub Actions self-hosted runner is registered with, or null when var.enable_github_runner is false."
+}

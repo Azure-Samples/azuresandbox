@@ -35,6 +35,7 @@ This section provides a brief overview of the features included in this configur
   * Pre-configured environment variables for Terraform azurerm provider to use managed identities
   * Pre-installed software for IaC / DevOps projects
   * Optional public access for connectivity from the internet
+  * Optional registration as a GitHub Actions self-hosted runner for CI/CD workflows (disabled by default)
 
 **NOTE:** The Linux virtual machine is implemented as a module so it can be easily reused in other configurations. It is not intended to be used as a production jumpbox. It is intended to be used as a Terraform execution environment for DevOps / IaC projects.
 
@@ -182,7 +183,7 @@ git clone https://github.com/Azure-Samples/azuresandbox
 
 ### Step 2: Initialize Terraform
 
-**WARNING:** By default this configuration assumes you will be using a local Terraform state file which includes sensitive information. This is by design since it is actually creating the storage account where Terraform state files are to be stored for other configurations.
+**WARNING:** By default this configuration assumes you will be using a local Terraform state file which includes sensitive information. This is by design since it is actually creating the storage account where Terraform state files are to be stored for other configurations. This chicken-and-egg bootstrap is the only scenario in this project that legitimately uses local state, and it runs on an interactive Terraform execution environment such as a workstation or Azure Cloud Shell. Configurations applied *after* the bootstrap - including CI/CD workflows running on `jumplinux2` as a self-hosted runner - should use the `azurerm` backend hosted in the storage account this configuration creates.
 
 After cloning the repository, navigate to the `rg-devops-iac` directory and initialize Terraform. This step downloads the necessary provider plugins and modules.
 
@@ -264,6 +265,40 @@ module "vm_jumpbox_linux" {
 }
 ```
 
+#### **Optional: GitHub Actions Self-Hosted Runner**
+
+The Linux virtual machine can optionally be registered as a [GitHub Actions self-hosted runner](./modules/vm-jumpbox-linux/README.md#github-actions-self-hosted-runner) so it can run CI/CD workflows using the pre-installed IaC toolchain and the VM managed identity. This is **disabled by default**.
+
+To enable it:
+
+* Create a GitHub personal access token (PAT) with `administration:write` on the target repository, or `organization_self_hosted_runners:write` on the target organization. Set it using an environment variable so it is not stored in the `terraform.tfvars` file:
+
+  ```bash
+  # Set environment variable in bash
+  export TF_VAR_github_runner_token=YOUR-GITHUB-PAT-HERE
+  ```
+
+  ```pwsh
+  # Set environment variable in PowerShell
+  $env:TF_VAR_github_runner_token = "YOUR-GITHUB-PAT-HERE"
+  ```
+
+* Add the following to the `terraform.tfvars` file:
+
+  ```hcl
+  enable_github_runner = true
+  github_runner_url    = "https://github.com/YOUR-ORG-HERE/YOUR-REPO-HERE"
+  github_runner_labels = ["azuresandbox"]
+  ```
+
+The token is stored as a **write-only** key vault secret, so it is never written to Terraform state, and it is read on the VM at provisioning time using the VM managed identity. When `enable_github_runner` is `false` no runner software is installed and the VM behaves exactly as it did before.
+
+Workflows running on the runner should store Terraform state in the `azurerm` backend hosted in the storage account provisioned by this configuration, not in a local state file on the runner. See [Terraform State for CD Workflows](./modules/vm-jumpbox-linux/README.md#terraform-state-for-cd-workflows).
+
+If the registration URL is a repository URL the runner is registered as a repository level runner and runner groups do not apply. See [Runner Scope](./modules/vm-jumpbox-linux/README.md#runner-scope).
+
+By default the runner service account is granted command scoped passwordless `sudo` for the binaries used by the `vwan` point-to-site VPN integration tests. Review [Elevated Permissions for Integration Tests](./modules/vm-jumpbox-linux/README.md#elevated-permissions-for-integration-tests) and disable it if the runner will not execute those tests.
+
 ### Step 4: Validate and Apply Configuration
 
 Remember that Terraform will compare the state of existing resources in Azure with what it expects to be there when creating a plan. If the state of existing resources in Azure does not match what Terraform expects, the plan will modify existing resources to match the configuration. This can happen when resources are modified manually or via Policy outside of Terraform. This is known as "drift".
@@ -307,6 +342,17 @@ You now have a fully provisioned DevOps IaC environment! You can use it as a Ter
 ### Step 7: Clean Up
 
 Don't forget to delete your DevOps IaC environment when you're done. You don't want to have to explain to your boss why you left an unused resources laying around that costs your company money. The quickest way to clean up is to delete the DevOps IaC resource group. Do this with care because data loss will occur, including any Terraform state files in the Azure Blob Storage container.
+
+**NOTE:** If you enabled `enable_github_runner`, deleting the virtual machine does not deregister the self-hosted runner from GitHub. Either remove the runner from the VM before deleting it:
+
+```bash
+# Run on jumplinux2
+sudo /opt/actions-runner/svc.sh stop
+sudo /opt/actions-runner/svc.sh uninstall
+sudo -u githubrunner /opt/actions-runner/config.sh remove --token YOUR-REMOVAL-TOKEN-HERE
+```
+
+...or delete the stale offline runner afterwards from GitHub > *Settings* > *Actions* > *Runners*.
 
 If you only need to remove Terraform state file(s) from the Azure Blob Storage container without deleting the whole environment, use `scripts/delete-tfstate.sh`. It authenticates with Azure CLI / Microsoft Entra ID only (the storage account has shared access keys disabled) and relies on the built-in RBAC role assignments granted to the caller (e.g. jumplinux2's managed identity) to delete blobs over the storage account's private endpoint — it does not enable public network access, so it must be run from a host with private network connectivity to the storage account, such as jumplinux2. Run it with no arguments to list and select blob(s) interactively, or pass a blob name (e.g. `azuresandbox.tfstate`) to delete it directly:
 
@@ -361,6 +407,12 @@ Variable | Default | Description
 aad_tenant_id | | The Microsoft Entra tenant id.
 arm_client_id | | The AppId of the service principal used for authenticating with Azure. Must have a 'Contributor' role assignment.
 arm_client_secret | | The password for the service principal used for authenticating with Azure. Set interactively or using an environment variable 'TF_VAR_arm_client_secret'.
+enable_github_runner | false | Set to true to install and register the GitHub Actions self-hosted runner agent on `jumplinux2`. See [vm-jumpbox-linux](./modules/vm-jumpbox-linux/README.md#github-actions-self-hosted-runner).
+github_runner_labels | `["azuresandbox"]` | Additional labels to apply to the GitHub Actions self-hosted runner. Only used when `enable_github_runner` is true.
+github_runner_token | | A GitHub personal access token or runner registration token used to register the self-hosted runner. Set interactively or using an environment variable 'TF_VAR_github_runner_token'. Required when `enable_github_runner` is true.
+github_runner_token_secret_version | 1 | Increment to write a new value for the GitHub runner token key vault secret.
+github_runner_token_type | `pat` | The type of token supplied in `github_runner_token`, either `pat` or `registration`.
+github_runner_url | | The GitHub repository or organization URL to register the self-hosted runner with, e.g. `https://github.com/myorg/myrepo`. Required when `enable_github_runner` is true.
 location | | The name of the Azure Region where resources will be provisioned.
 storage_access_tier | Hot | The access tier for the new storage account.
 storage_replication_type | LRS | The type of replication for the new storage account.
@@ -410,6 +462,7 @@ This section includes a list of output variables returned by the root module.
 
 Name | Comments
 --- | ---
+github_runner_name | The name the GitHub Actions self-hosted runner is registered with, or `null` when `enable_github_runner` is false.
 resource_ids | A map of resource IDs for key resources in the configuration.
 resource_names | A map of resource names for key resources in the configuration.
 
@@ -435,6 +488,7 @@ This section covers the dependencies in this configuration.
 * [Source Control](#source-control)
 * [Terraform](#terraform)
 * [Scripting Technologies](#scripting-technologies)
+* [Continuous Integration / Continuous Delivery](#continuous-integration--continuous-delivery)
 * [Configuration Management Technologies](#configuration-management-technologies)
 * [Operating Systems](#operating-systems)
 
@@ -463,6 +517,10 @@ The following cross-platform scripting technologies are used in this project:
 * **Az PowerShell Module**: Used to connect to and configure Azure resources from PowerShell scripts.
 * **Bash**: Used for general purpose scripting.
 * **Azure CLI**: Used for connecting to Azure resources from Bash scripts.
+
+#### **Continuous Integration / Continuous Delivery**
+
+* **GitHub Actions**: The Linux virtual machine can optionally be registered as a self-hosted runner so GitHub Actions workflows can execute Terraform from within the virtual network using the VM managed identity. Such workflows should store Terraform state in the `azurerm` backend hosted in the storage account provisioned by this configuration rather than in a local state file on the runner. See [vm-jumpbox-linux](./modules/vm-jumpbox-linux/README.md#github-actions-self-hosted-runner).
 
 #### **Configuration Management Technologies**
 
