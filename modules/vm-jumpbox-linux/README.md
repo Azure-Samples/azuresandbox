@@ -43,6 +43,8 @@ This configuration implements a Linux virtual machine for use as a jumpbox. The 
   * samba
   * terraform
   * winbind
+* Ubuntu packages are installed from the Canonical archive (`archive.ubuntu.com`) and security (`security.ubuntu.com`) servers rather than the Azure regional mirror.
+* Security patching using `unattended-upgrades`. A full package upgrade is not performed during provisioning, so provisioning does not depend on every package on the image being downloadable and does not trigger a mid-provisioning reboot.
 
 The estimated provisioning time for this module is 3 minutes.
 
@@ -92,8 +94,7 @@ This section describes how to test the module after deployment.
     ```
 
   * Review the log file output. Note the automated configuration management being performed including:
-    * package updates and upgrades
-    * reboots
+    * package updates and installs
     * user script executions
   * Execute the following command:
 
@@ -198,7 +199,8 @@ This module is organized as follows:
 ├── scripts/
 |   ├── configure-vm-jumpbox-linux.sh       # cloud-init shell script to configure the VM
 |   ├── configure-vm-jumpbox-linux.yaml     # cloud-init cloud-config file to configure the VM
-|   └── test-vm-jumpbox-linux.sh            # Module unit test script
+|   ├── test-vm-jumpbox-linux.sh            # Module unit test script
+|   └── wait-for-cloud-init.sh              # Run command script that waits for cloud-init and apt locks before AMA install
 ├── compute.tf                              # Compute resource configurations
 ├── main.tf                                 # Resource configurations
 ├── network.tf                              # Network resource configurations
@@ -245,6 +247,7 @@ module.vm_jumpbox_linux[0].azurerm_key_vault_secret.ssh_private_key | jumplinux1
 module.vm_jumpbox_linux[0].azurerm_linux_virtual_machine.this | jumplinux1 | The Linux virtual machine resource.
 module.vm_jumpbox_linux[0].azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;jumplinux1 | The network interface associated with the Linux virtual machine.
 module.vm_jumpbox_linux[0].azurerm_role_assignment.kv_secrets_user_vm_linux | | Role assignment for accessing Key Vault secrets from the Linux virtual machine.
+module.vm_jumpbox_linux[0].azurerm_virtual_machine_run_command.wait_for_cloud_init | vmx&#8209;sand&#8209;dev&#8209;jumplinux1&#8209;WaitForCloudInit | Waits for cloud-init and the dpkg/apt locks to be released before the Azure Monitor Agent extension is installed.
 module.vm_jumpbox_linux[0].tls_private_key.ssh_key | | The TLS private key used for SSH authentication.
 
 ### Output Variables

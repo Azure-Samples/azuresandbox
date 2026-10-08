@@ -31,6 +31,9 @@ resource "azurerm_linux_virtual_machine" "this" {
   }
 
   custom_data = data.cloudinit_config.vm_jumpbox_linux.rendered
+
+  # The runner registration secret must exist in key vault before cloud-init reads it on first boot.
+  depends_on = [azurerm_key_vault_secret.github_runner_token]
 }
 
 resource "azurerm_role_assignment" "this" {

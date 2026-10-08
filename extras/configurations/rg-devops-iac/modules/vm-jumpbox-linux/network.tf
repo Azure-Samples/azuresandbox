@@ -19,5 +19,12 @@ resource "azurerm_public_ip" "this" {
   resource_group_name = var.resource_group_name
   allocation_method   = "Static"
   sku                 = "Standard"
+
+  lifecycle {
+    # Azure injects ip_tags such as 'FirstPartyUsage' after creation. Since ip_tags forces
+    # replacement, reconciling that drift would destroy and recreate the public IP on every
+    # subsequent apply, changing the address and breaking SSH access to the VM.
+    ignore_changes = [ip_tags]
+  }
 }
 #endregion
