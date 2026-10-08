@@ -26,6 +26,7 @@ This module implements a stand-alone Linux virtual machine for use as a jumpbox 
   * python3-pip
   * terraform
 * Pre-configured environment variables for using Azure Blob Storage as a Terraform state backend.
+* Security patching using `unattended-upgrades`. A full package upgrade is not performed during provisioning, so provisioning does not depend on every package on the image being downloadable and does not trigger a mid-provisioning reboot.
 * Optional registration as a [GitHub Actions self-hosted runner](#github-actions-self-hosted-runner), disabled by default.
 
 ## GitHub Actions Self-Hosted Runner
