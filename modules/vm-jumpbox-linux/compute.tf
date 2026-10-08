@@ -40,6 +40,23 @@ resource "azurerm_role_assignment" "kv_secrets_user_vm_linux" {
 }
 
 #region azure-monitor-agent
+# The AMA installer fails (exit code 56) if the package manager is locked for more than a few
+# minutes, so wait for cloud-init package installs and first-boot apt activity to finish first.
+resource "azurerm_virtual_machine_run_command" "wait_for_cloud_init" {
+  name               = "${module.naming.virtual_machine_extension.name}-${var.vm_jumpbox_linux_name}-WaitForCloudInit"
+  location           = var.location
+  virtual_machine_id = azurerm_linux_virtual_machine.this.id
+
+  source {
+    script = file("${path.module}/scripts/wait-for-cloud-init.sh")
+  }
+
+  timeouts {
+    create = "90m"
+    update = "90m"
+  }
+}
+
 resource "azurerm_virtual_machine_extension" "ama" {
   name                       = "AzureMonitorLinuxAgent"
   virtual_machine_id         = azurerm_linux_virtual_machine.this.id
@@ -48,6 +65,8 @@ resource "azurerm_virtual_machine_extension" "ama" {
   type_handler_version       = "1.33"
   auto_upgrade_minor_version = true
   automatic_upgrade_enabled  = true
+
+  depends_on = [azurerm_virtual_machine_run_command.wait_for_cloud_init]
 }
 
 resource "azurerm_monitor_data_collection_rule_association" "jumplinux1_dcr" {

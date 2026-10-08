@@ -20,6 +20,14 @@ bootcmd:
   - test -f /etc/apt/keyrings/microsoft.gpg || (curl -fsSL --retry 6 --retry-all-errors --retry-connrefused --retry-delay 2 https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | sudo tee /etc/apt/keyrings/microsoft.gpg && chmod go+r /etc/apt/keyrings/microsoft.gpg)
 
 apt:
+  # Use the Canonical archive and security servers directly instead of the Azure regional mirror
+  # (azure.archive.ubuntu.com) that the Azure datasource configures by default.
+  primary:
+    - arches: [default]
+      uri: http://archive.ubuntu.com/ubuntu
+  security:
+    - arches: [default]
+      uri: http://security.ubuntu.com/ubuntu
   sources:
     azure-cli:
       source: 'deb [arch=amd64 signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ $RELEASE main'
@@ -63,9 +71,11 @@ packages:
   - terraform
   - winbind
 
-package_upgrade: true
-
-package_reboot_if_required: true
+# A full dist-upgrade is deliberately not performed at provisioning time. It is not required to
+# install the packages above, it makes provisioning depend on every package on the image being
+# downloadable from the Ubuntu mirror, and it triggers a mid-provisioning reboot when a new kernel is
+# installed. Ongoing security patching is handled by unattended-upgrades, which is enabled by default.
+package_upgrade: false
 
 write_files:
   - content: |
