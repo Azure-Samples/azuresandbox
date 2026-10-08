@@ -39,8 +39,9 @@ fail() {
     exit 1
 }
 
-# The VM may boot before the managed identity role assignment has propagated and before the key
-# vault private endpoint is reachable, so retry rather than failing the whole provisioning run.
+# Retries transient failures rather than failing the whole provisioning run, e.g. the VM may boot
+# before the managed identity role assignment has propagated or the key vault private endpoint is
+# reachable, or while another process holds the apt lock.
 retry() {
     local description="$1"
     shift
@@ -178,8 +179,11 @@ tar -xzf "/tmp/$tarball" -C "$runner_home"
 rm -f "/tmp/$tarball"
 chown -R "$runner_user:$runner_user" "$runner_home"
 
+# installdependencies.sh calls apt-get without waiting for the apt/dpkg locks, so it fails if another
+# process (e.g. unattended-upgrades, apt-daily or a policy deployed VM extension) is using apt at
+# the same time. It is idempotent, so retry rather than failing the whole provisioning run.
 log "Installing GitHub Actions runner dependencies..."
-"$runner_home/bin/installdependencies.sh"
+retry "Runner dependency installation" "$runner_home/bin/installdependencies.sh"
 
 # svc.sh sources this file into the runner service environment, which makes the pre-installed
 # toolchain and managed identity based azurerm provider auth available to every job.

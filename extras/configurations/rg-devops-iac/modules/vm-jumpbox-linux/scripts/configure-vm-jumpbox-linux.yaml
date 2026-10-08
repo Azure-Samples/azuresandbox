@@ -35,9 +35,11 @@ packages:
   - python3-pip
   - terraform
 
-package_upgrade: true
-
-package_reboot_if_required: true
+# A full dist-upgrade is deliberately not performed at provisioning time. It is not required to
+# install the packages above, it makes provisioning depend on every package on the image being
+# downloadable from the Ubuntu mirror, and it triggers a mid-provisioning reboot when a new kernel is
+# installed. Ongoing security patching is handled by unattended-upgrades, which is enabled by default.
+package_upgrade: false
 
 write_files:
   - path: /etc/environment
