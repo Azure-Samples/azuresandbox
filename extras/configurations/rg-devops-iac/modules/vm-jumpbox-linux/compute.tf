@@ -27,7 +27,8 @@ resource "azurerm_linux_virtual_machine" "this" {
   }
 
   identity {
-    type = "SystemAssigned"
+    type         = length(var.user_assigned_identity_ids) > 0 ? "SystemAssigned, UserAssigned" : "SystemAssigned"
+    identity_ids = length(var.user_assigned_identity_ids) > 0 ? var.user_assigned_identity_ids : null
   }
 
   custom_data = data.cloudinit_config.vm_jumpbox_linux.rendered
