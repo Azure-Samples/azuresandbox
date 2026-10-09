@@ -377,6 +377,8 @@ jobs:
           git --version
           terraform version
           az version --query '"azure-cli"' --output tsv
+          # PowerShell must expand these variables, not Bash.
+          # shellcheck disable=SC2016
           pwsh -NoLogo -NoProfile -Command '$ErrorActionPreference = "Stop"; $PSVersionTable.PSVersion.ToString(); Import-Module Az -ErrorAction Stop; Get-Module Az,Az.Accounts | Select-Object Name,Version'
           printf 'All smoke checks passed.\n'
 
@@ -419,6 +421,10 @@ uses read-only repository token permissions, and explicitly checks out the
 trusted `vnext` source. It verifies the runner's managed identity environment
 without printing tenant values, imports the installed Az modules, and reports
 smoke success, failure, or non-execution separately.
+
+The inline PowerShell command intentionally uses Bash single quotes so that
+PowerShell, not Bash, expands its variables. The preceding ShellCheck directive
+suppresses SC2016 only for that command. Do not change it to Bash double quotes.
 
 The environment's `main` policy means this topic-branch workflow cannot yet
 run its protected job. The publication stage must register the workflow on
