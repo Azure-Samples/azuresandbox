@@ -19,6 +19,7 @@ This module implements a stand-alone Linux virtual machine for use as a jumpbox 
 * Secure SSH access using a private SSH key stored in Azure Key Vault.
 * Automatic swapfile provisioning sized to the VM's memory (larger VMs get no swap).
 * Remote-ssh development capabilities using Visual Studio Code.
+* Azure PowerShell is installed from the latest GitHub release offline bundle, with Microsoft Artifact Registry as a fallback. Installation metadata points to PSGallery for subsequent PowerShell 7 upgrades using `Update-PSResource -Name Az -Scope AllUsers`.
 * Pre-installed software packages, including:
   * azure-cli
   * jp
@@ -27,6 +28,7 @@ This module implements a stand-alone Linux virtual machine for use as a jumpbox 
   * terraform
 * Pre-configured environment variables for using Azure Blob Storage as a Terraform state backend.
 * Security patching using `unattended-upgrades`. A full package upgrade is not performed during provisioning, so provisioning does not depend on every package on the image being downloadable and does not trigger a mid-provisioning reboot.
+* Apt is pinned to the Canonical `archive.ubuntu.com` and `security.ubuntu.com` servers rather than the Azure regional mirror.
 * Optional registration as a [GitHub Actions self-hosted runner](#github-actions-self-hosted-runner), disabled by default.
 
 ## GitHub Actions Self-Hosted Runner
