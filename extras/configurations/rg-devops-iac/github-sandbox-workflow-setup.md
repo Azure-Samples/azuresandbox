@@ -578,16 +578,70 @@ Checks run before both publication actions, and a failure stops the command
 chain. If the local tool availability or check outcomes differ from those
 recorded above, update the PR validation wording to match the actual results.
 
-Share the check summaries and PR URL. Wait for hosted CI and required review
-before merging. Do not bypass failed checks, branch protection, or review
-requirements. The workflow's environment allows only `main` runs, so this
-`vnext` PR is not itself a deployment trigger.
+Share the check summaries and PR URL. Wait for hosted CI and resolve the
+required review gate as described in step 9 before merging. Do not bypass
+failed or pending checks or change repository protection settings. The
+workflow's environment allows only `main` runs, so this `vnext` PR is not
+itself a deployment trigger.
+
+## Step 9: Verify hosted CI and obtain required PR review
+
+Use the PR number returned in step 8. Discover it from the current topic
+branch and inspect its checks and merge readiness:
+
+```bash
+PR_NUMBER=$(gh pr view \
+  --repo Azure-Samples/azuresandbox \
+  --json number --jq '.number') &&
+gh pr checks "$PR_NUMBER" \
+  --repo Azure-Samples/azuresandbox \
+  --watch --interval 10 &&
+gh pr view "$PR_NUMBER" \
+  --repo Azure-Samples/azuresandbox \
+  --json baseRefName,headRefOid,mergeable,mergeStateStatus,reviewDecision,isDraft
+```
+
+Immediately after a push, the checks command may still show the preceding
+commit's results before GitHub registers new runs. Verify the Actions run
+belongs to the current commit before interpreting an apparent lint failure:
+
+```bash
+gh run list \
+  --repo Azure-Samples/azuresandbox \
+  --workflow ci-actions.yml \
+  --branch feat/sandbox-workflow \
+  --commit "$(git rev-parse HEAD)" \
+  --limit 3 \
+  --json databaseId,headSha,status,conclusion,url
+```
+
+A passing CI result and `mergeable: MERGEABLE` do not override required
+review. If `reviewDecision` is `REVIEW_REQUIRED`, obtain approval from eligible
+reviewers before merging. GitHub does not allow the PR author to approve
+their own PR. The deployment environment's self-approval setting is a
+separate control and does not satisfy branch review requirements.
+
+Keep repository protection settings unchanged. If no eligible independent
+reviewer is available, stop and obtain explicit operator authorization
+before using an existing review-bypass permission for that PR. This exception
+merges without independent review; it is not self-approval and must never
+bypass failed or pending checks. Authorization for one PR does not authorize
+any later PR.
+
+Publish any remaining guide changes before requesting final review or using
+an authorized exception, since new commits may invalidate earlier approvals.
+Recheck the final PR head, checks, and merge readiness before proceeding.
+For an authorized exception, use the existing portal bypass option and select
+**Squash and merge** for the topic PR into `vnext`; do not add or modify bypass
+rules. If the portal shows any other unmet requirement besides the explicitly
+authorized review exception, stop and resolve it first. Do not dispatch yet:
+the workflow still needs the separate default-branch registration PR.
 
 ## Remaining setup stages
 
 Subsequent steps will document:
 
-1. Reviewing and merging the topic PR, publishing the narrow default-branch
+1. Merging the reviewed topic PR, publishing the narrow default-branch
    registration PR, and verifying the smoke run.
 2. Capturing human-supplied Sandbox settings and required tags privately.
 3. Checking the selected state key and runner deployment/test prerequisites.
