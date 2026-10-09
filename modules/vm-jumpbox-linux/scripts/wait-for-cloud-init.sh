@@ -87,7 +87,7 @@ user_script_step() {
   echo "step=\"${step:-none}\""
 }
 
-# Az submodules installed so far by Install-Module -Name Az -Scope AllUsers (one directory each).
+# Az submodules installed so far by configure-vm-jumpbox-linux.sh into the AllUsers scope (one directory each).
 az_module_progress() {
   local count
   count=$(find /usr/local/share/powershell/Modules -mindepth 1 -maxdepth 1 -type d -name 'Az.*' 2>/dev/null | wc -l)

@@ -19,6 +19,7 @@ This configuration implements a Linux virtual machine for use as a jumpbox. The 
 * Automatic swapfile provisioning sized to the VM's memory (larger VMs get no swap).
 * Domain joined to the *mysandbox.local* Active Directory domain using winbind.
 * Remote-ssh development capabilities using Visual Studio Code on *jumpwin1*.
+* Azure PowerShell is installed from the latest GitHub release offline bundle, with Microsoft Artifact Registry as a fallback. Installation metadata points to PSGallery for subsequent PowerShell 7 upgrades using `Update-PSResource -Name Az -Scope AllUsers`.
 * Secure AD integrated access to Azure Files SMB/cifs share automatically mounted by the VM.
 * Pre-installed software packages, including:
   * autofs
