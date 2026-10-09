@@ -13,6 +13,14 @@ bootcmd:
   - test -f /etc/apt/keyrings/microsoft.gpg || (curl -sLS https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | sudo tee /etc/apt/keyrings/microsoft.gpg && chmod go+r /etc/apt/keyrings/microsoft.gpg)
 
 apt:
+  # Use the Canonical archive and security servers directly instead of the Azure regional mirror
+  # (azure.archive.ubuntu.com) that the Azure datasource configures by default.
+  primary:
+    - arches: [default]
+      uri: http://archive.ubuntu.com/ubuntu
+  security:
+    - arches: [default]
+      uri: http://security.ubuntu.com/ubuntu
   sources:
     azure-cli:
       source: 'deb [arch=amd64 signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ $RELEASE main'

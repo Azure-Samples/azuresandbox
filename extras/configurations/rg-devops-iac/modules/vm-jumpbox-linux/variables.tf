@@ -214,6 +214,12 @@ variable "tags" {
   }
 }
 
+variable "user_assigned_identity_ids" {
+  type        = list(string)
+  description = "The resource ids of user-assigned managed identities to attach to the virtual machine in addition to its system-assigned identity, which remains the default identity on the VM."
+  default     = []
+}
+
 variable "vm_jumpbox_linux_image_offer" {
   type        = string
   description = "The offer type of the virtual machine image used to create the VM"

@@ -36,6 +36,7 @@ This section provides a brief overview of the features included in this configur
   * Pre-installed software for IaC / DevOps projects
   * Optional public access for connectivity from the internet
   * Optional registration as a GitHub Actions self-hosted runner for CI/CD workflows (disabled by default)
+  * Optional user-assigned managed identity with subscription `Owner` for managed identity (`msi`) sandbox applies (disabled by default)
 
 **NOTE:** The Linux virtual machine is implemented as a module so it can be easily reused in other configurations. It is not intended to be used as a production jumpbox. It is intended to be used as a Terraform execution environment for DevOps / IaC projects.
 
@@ -45,6 +46,7 @@ This section describes the prerequisites required in order to provision this con
 
 * [Microsoft Entra ID Tenant and Azure Subscription](#microsoft-entra-id-tenant-and-azure-subscription)
 * [Service Principal](#service-principal)
+* [Self-Hosted Runner and Managed Identity Prerequisites (Optional)](#self-hosted-runner-and-managed-identity-prerequisites-optional)
 * [Other Prerequisites](#other-prerequisites)
 * [Terraform Execution Environment](#terraform-execution-environment)
 
@@ -75,6 +77,13 @@ This section describes the prerequisites required in order to provision this con
   ```
 
 Save the service principal *appId* and *password* in a secure location such as a password vault.
+
+### Self-Hosted Runner and Managed Identity Prerequisites (Optional)
+
+These prerequisites apply only if you plan to use this configuration as a self-hosted runner that deploys Azure Sandbox with managed identity authentication (`enable_github_runner = true` and `enable_user_assigned_identity = true`). Arrange them **before** provisioning, because some of them need privileged roles that the person running the deployment may not hold.
+
+* **GitHub repository administrator.** Registering a repository-level runner needs a fine-grained personal access token with `Administration: Read and write` on the target repository, created by a repository administrator. See [Optional: GitHub Actions Self-Hosted Runner](#optional-github-actions-self-hosted-runner).
+* **Microsoft Entra Privileged Role Administrator or Global Administrator.** Required only if the sandbox will be deployed with the `mssql` module enabled. The user-assigned managed identity then needs the Microsoft Graph `Group.ReadWrite.All` application permission, and only one of these Entra roles can grant it. Neither the service principal nor an Owner on the subscription can grant it. Read-only Entra roles such as Global Reader are not enough. Privileged Role Administrator is the least privileged role that works. If your organization uses [Privileged Identity Management](https://learn.microsoft.com/entra/id-governance/privileged-identity-management/pim-configure), activate an eligible assignment for the grant, or arrange for an administrator to run it. The grant is a one-time step after the identity is created. See [Optional: User-Assigned Managed Identity for MSI-Mode Sandbox Applies](#optional-user-assigned-managed-identity-for-msi-mode-sandbox-applies).
 
 ### Other Prerequisites
 
@@ -299,6 +308,37 @@ If the registration URL is a repository URL the runner is registered as a reposi
 
 By default the runner service account is granted command scoped passwordless `sudo` for the binaries used by the `vwan` point-to-site VPN integration tests. Review [Elevated Permissions for Integration Tests](./modules/vm-jumpbox-linux/README.md#elevated-permissions-for-integration-tests) and disable it if the runner will not execute those tests.
 
+#### **Optional: User-Assigned Managed Identity for MSI-Mode Sandbox Applies**
+
+The root Azure Sandbox configuration can authenticate with a managed identity instead of a service principal secret (`arm_auth_mode = "msi"`), for example from a CD workflow running on the self-hosted runner. That mode requires a **user-assigned** managed identity attached to the Terraform execution environment. This configuration can create one for you. This is **disabled by default**.
+
+To enable it, add the following to the `terraform.tfvars` file:
+
+```hcl
+enable_user_assigned_identity = true
+```
+
+When enabled, the identity is:
+
+* Created in the resource group provisioned by this configuration.
+* Assigned the `Owner` role at the subscription scope, because sandbox applies create role assignments. This is a standing, privileged identity. Owner on the subscription also includes this configuration's own resource group, so anything running on `jumplinux2` that uses this identity can modify or delete it.
+* Attached to `jumplinux2` **in addition to** the system-assigned identity. The system-assigned identity remains the VM's default identity, so cloud-init, the runner registration script, `az login --identity` and the `azurerm` state backend (`ARM_USE_MSI`) keep using it. Use the user-assigned identity explicitly by its client id, e.g. `az login --identity --client-id <client-id>` or `Connect-AzAccount -Identity -AccountId <client-id>`.
+
+Enabling or disabling the identity on an existing deployment updates the VM in place. It does not replace the VM.
+
+After the apply, use the `user_assigned_identity_client_id` output as `arm_client_id` in the root sandbox `terraform.tfvars`, together with `arm_auth_mode = "msi"`.
+
+If the sandbox will be deployed with the `mssql` module enabled, the identity also needs the Microsoft Graph `Group.ReadWrite.All` application permission, which this configuration cannot grant. A Global Administrator or Privileged Role Administrator must grant it once, after the identity is created:
+
+```bash
+# Run from this configuration's directory, signed in to Azure CLI as a Privileged Role Administrator or Global Administrator
+./scripts/grant-graph-permissions.sh
+```
+
+The script reads the identity from the `user_assigned_identity_principal_id` output (or takes a principal id as its first argument), and skips permissions that are already granted, so it is safe to re-run. If you activated the Entra role just before running it, sign in again with `az login` so the new role is included in your token.
+
+Managed identities have no app registration, so the Entra admin center **API permissions** steps used for a service principal do not apply. Use the script above instead. The grant is removed automatically if the identity is deleted.
+
 ### Step 4: Validate and Apply Configuration
 
 Remember that Terraform will compare the state of existing resources in Azure with what it expects to be there when creating a plan. If the state of existing resources in Azure does not match what Terraform expects, the plan will modify existing resources to match the configuration. This can happen when resources are modified manually or via Policy outside of Terraform. This is known as "drift".
@@ -387,6 +427,7 @@ This configuration is organized into the following structure:
 │   ├── bootstrap.ps1                     # PowerShell helper script for generating terraform.tfvars
 │   ├── cleanterraformtemp.sh             # Bash helper script for removing Terraform temp/local files
 │   ├── enable-public-access.sh           # Bash helper script for re-enabling public access on key vault/storage account
+│   ├── grant-graph-permissions.sh        # Bash helper script for granting Microsoft Graph permissions to the user-assigned managed identity
 │   └── delete-tfstate.sh                 # Bash helper script for deleting Terraform state blob(s) from the storage backend
 ├── locals.tf                             # Local variables 
 ├── main.tf                               # Resource configurations
@@ -408,6 +449,7 @@ aad_tenant_id | | The Microsoft Entra tenant id.
 arm_client_id | | The AppId of the service principal used for authenticating with Azure. Must have a 'Contributor' role assignment.
 arm_client_secret | | The password for the service principal used for authenticating with Azure. Set interactively or using an environment variable 'TF_VAR_arm_client_secret'.
 enable_github_runner | false | Set to true to install and register the GitHub Actions self-hosted runner agent on `jumplinux2`. See [vm-jumpbox-linux](./modules/vm-jumpbox-linux/README.md#github-actions-self-hosted-runner).
+enable_user_assigned_identity | false | Set to true to create a user-assigned managed identity with an `Owner` role assignment on the subscription and attach it to `jumplinux2`, for root sandbox applies with `arm_auth_mode = "msi"`. See [Optional: User-Assigned Managed Identity for MSI-Mode Sandbox Applies](#optional-user-assigned-managed-identity-for-msi-mode-sandbox-applies).
 github_runner_labels | `["azuresandbox"]` | Additional labels to apply to the GitHub Actions self-hosted runner. Only used when `enable_github_runner` is true.
 github_runner_token | | A GitHub personal access token or runner registration token used to register the self-hosted runner. Set interactively or using an environment variable 'TF_VAR_github_runner_token'. Required when `enable_github_runner` is true.
 github_runner_token_secret_version | 1 | Increment to write a new value for the GitHub runner token key vault secret.
@@ -448,12 +490,14 @@ azurerm_public_ip.this | pip-devops-dev-nat | Public IP address for the NAT gate
 azurerm_resource_group.this | rg-devops-dev-xxx | Resource group for all resources in this configuration.
 azurerm_role_assignment.keyvault_roles[*] | | Assigns `Key Vault Secrets Officer` to both the service principal and the interactive user.
 azurerm_role_assignment.storage_roles[*] | | Assigns `Storage Blob Data Contributor` to both the service principal and the interactive user.
+azurerm_role_assignment.user_assigned_identity_owner[0] | | Assigns `Owner` at the subscription scope to the user-assigned managed identity. Created only when `enable_user_assigned_identity` is true.
 azurerm_storage_account.this | stdevopsdevxxx | Storage account for storing Terraform state files.
 azurerm_storage_container.this | tfstate | Storage container for storing Terraform state files.
 azurerm_subnet.devops | snet-devops-01 | Subnet for jumplinux2 VM
 azurerm_subnet.privatelink | snet-privatelink-03 | Subnet for PrivateLink endpoints
 azurerm_subnet_nat_gateway_association.devops | vnet-devops-dev-devops| Associates the NAT gateway with the subnet.
 azurerm_subnet_network_security_group_association.this | | Associates the NSG with the subnet.
+azurerm_user_assigned_identity.this[0] | uai-devops-dev-xxx | User-assigned managed identity for root sandbox applies with `arm_auth_mode = "msi"`, attached to `jumplinux2`. Created only when `enable_user_assigned_identity` is true.
 azurerm_virtual_network.this | vnet-devops-dev-devops | Virtual network for the Linux virtual machine.
 
 ### Root Module Output Variables
@@ -465,6 +509,8 @@ Name | Comments
 github_runner_name | The name the GitHub Actions self-hosted runner is registered with, or `null` when `enable_github_runner` is false.
 resource_ids | A map of resource IDs for key resources in the configuration.
 resource_names | A map of resource names for key resources in the configuration.
+user_assigned_identity_client_id | The client id of the user-assigned managed identity, used as `arm_client_id` for root sandbox applies with `arm_auth_mode = "msi"`, or `null` when `enable_user_assigned_identity` is false.
+user_assigned_identity_principal_id | The principal (object) id of the user-assigned managed identity, used to grant Microsoft Graph application permissions, or `null` when `enable_user_assigned_identity` is false.
 
 ### Child Modules
 

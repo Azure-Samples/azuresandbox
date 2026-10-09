@@ -35,6 +35,12 @@ variable "enable_github_runner" {
   default     = false
 }
 
+variable "enable_user_assigned_identity" {
+  type        = bool
+  description = "Set to true to create a user-assigned managed identity with an 'Owner' role assignment on the subscription and attach it to the Linux virtual machine, for use as 'arm_client_id' when the root sandbox is applied with arm_auth_mode = \"msi\"."
+  default     = false
+}
+
 variable "github_runner_labels" {
   type        = list(string)
   description = "Additional labels to apply to the GitHub Actions self-hosted runner. Only used when var.enable_github_runner is true."

@@ -38,6 +38,28 @@ resource "time_sleep" "wait_for_roles" {
 }
 #endregion
 
+#region user-assigned-identity
+# Identity used by root sandbox applies with arm_auth_mode = "msi". It is attached to the VM alongside the
+# system-assigned identity, which remains the default identity for cloud-init and the state backend.
+resource "azurerm_user_assigned_identity" "this" {
+  count = var.enable_user_assigned_identity ? 1 : 0
+
+  name                = module.naming.user_assigned_identity.name_unique
+  location            = azurerm_resource_group.this.location
+  resource_group_name = azurerm_resource_group.this.name
+  tags                = var.tags
+}
+
+resource "azurerm_role_assignment" "user_assigned_identity_owner" {
+  count = var.enable_user_assigned_identity ? 1 : 0
+
+  principal_id         = azurerm_user_assigned_identity.this[0].principal_id
+  principal_type       = "ServicePrincipal"
+  role_definition_name = "Owner"
+  scope                = "/subscriptions/${var.subscription_id}"
+}
+#endregion
+
 #region public-access-management
 resource "terraform_data" "key_vault_access_barrier" {
   input = {
@@ -102,6 +124,7 @@ module "vm_jumpbox_linux" {
   storage_account_id                 = azurerm_storage_account.this.id
   subnet_id                          = azurerm_subnet.devops.id
   tags                               = var.tags
+  user_assigned_identity_ids         = azurerm_user_assigned_identity.this[*].id
   vm_jumpbox_linux_size              = var.vm_jumpbox_linux_size
 
   depends_on = [time_sleep.wait_for_roles]

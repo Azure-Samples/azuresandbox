@@ -19,6 +19,7 @@ This module implements a stand-alone Linux virtual machine for use as a jumpbox 
 * Secure SSH access using a private SSH key stored in Azure Key Vault.
 * Automatic swapfile provisioning sized to the VM's memory (larger VMs get no swap).
 * Remote-ssh development capabilities using Visual Studio Code.
+* Azure PowerShell is installed from the latest GitHub release offline bundle, with Microsoft Artifact Registry as a fallback. Installation metadata points to PSGallery for subsequent PowerShell 7 upgrades using `Update-PSResource -Name Az -Scope AllUsers`.
 * Pre-installed software packages, including:
   * azure-cli
   * jp
@@ -27,6 +28,7 @@ This module implements a stand-alone Linux virtual machine for use as a jumpbox 
   * terraform
 * Pre-configured environment variables for using Azure Blob Storage as a Terraform state backend.
 * Security patching using `unattended-upgrades`. A full package upgrade is not performed during provisioning, so provisioning does not depend on every package on the image being downloadable and does not trigger a mid-provisioning reboot.
+* Apt is pinned to the Canonical `archive.ubuntu.com` and `security.ubuntu.com` servers rather than the Azure regional mirror.
 * Optional registration as a [GitHub Actions self-hosted runner](#github-actions-self-hosted-runner), disabled by default.
 
 ## GitHub Actions Self-Hosted Runner
@@ -337,6 +339,7 @@ ssh_private_key_version | 1 | Increment to create new ssh_private_key.
 storage_account_id | | The resource ID of of the storage account defined in the root module.
 subnet_id | | The resource ID of the subnet where the VM will be deployed. Defined in the vnet-shared module.
 tags | | The tags from the root module.
+user_assigned_identity_ids | `[]` | The resource ids of user-assigned managed identities to attach to the VM in addition to its system-assigned identity, which remains the default identity on the VM.
 vm_jumpbox_linux_image_offer | `ubuntu-24_04-lts` | The offer type of the virtual machine image used to create the VM.
 vm_jumpbox_linux_image_publisher | `Canonical` | The publisher for the virtual machine image used to create the VM.
 vm_jumpbox_linux_image_sku | `server` | The SKU of the virtual machine image used to create the VM.
