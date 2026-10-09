@@ -128,6 +128,21 @@ A variety of Terraform execution environments can be used to provision this conf
 
 This section covers the steps to get started with this configuration using an interactive Terraform execution environment. The steps include logging into Azure, cloning the repository, initializing Terraform, configuring variables, validating and applying the configuration, and smoke testing.
 
+For an attended Bash walkthrough focused on using the VM as a GitHub Actions
+self-hosted runner for Azure Sandbox deployments, see the
+[GitHub self-hosted runner setup guide](./github-selfhosted-runner-setup.md). It covers preparation,
+runner settings, initialization, validation, planning and applying a fresh
+bootstrap, runner-readiness checks, the optional Microsoft Graph permission
+grant, and cleanup. Configuring and dispatching a Sandbox deployment workflow
+is a separate concern.
+
+Continue with the [GitHub Sandbox workflow setup guide](./github-sandbox-workflow-setup.md)
+to configure a manually triggered deployment with all base modules enabled
+and post-deployment unit/integration testing. That walkthrough currently
+covers scope, prerequisites, GitHub discovery, publication and approval
+choices, deployment environment protection setup, and smoke-only workflow
+creation, local validation, and topic PR preparation.
+
 * [Step 0: Login](#step-0-login)
 * [Step 1: Clone the Repository](#step-1-clone-the-repository)
 * [Step 2: Initialize Terraform](#step-2-initialize-terraform)

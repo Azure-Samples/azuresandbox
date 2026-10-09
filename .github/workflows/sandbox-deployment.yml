@@ -1,0 +1,62 @@
+name: Azure Sandbox deployment
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: azure-sandbox-deployment
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  smoke:
+    name: Self-hosted runner smoke test
+    runs-on: [self-hosted, linux, x64, azuresandbox]
+    environment: sandbox-deployment
+    timeout-minutes: 180
+    steps:
+      - name: Check out the approved Sandbox source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: vnext
+          persist-credentials: false
+
+      - name: Check runner and toolchain
+        id: smoke
+        run: |
+          set -euo pipefail
+          if [[ "$RUNNER_NAME" != "jumplinux2" ]]; then
+            echo "::error::The job did not run on the expected runner."
+            exit 1
+          fi
+          if [[ "${ARM_USE_MSI:-}" != "true" || -z "${ARM_TENANT_ID:-}" ]]; then
+            echo "::error::The runner managed identity environment is incomplete."
+            exit 1
+          fi
+          git --version
+          terraform version
+          az version --query '"azure-cli"' --output tsv
+          pwsh -NoLogo -NoProfile -Command '$ErrorActionPreference = "Stop"; $PSVersionTable.PSVersion.ToString(); Import-Module Az -ErrorAction Stop; Get-Module Az,Az.Accounts | Select-Object Name,Version'
+          printf 'All smoke checks passed.\n'
+
+      - name: Report smoke result
+        if: ${{ always() }}
+        env:
+          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+        run: |
+          case "$SMOKE_OUTCOME" in
+            success) result=PASS ;;
+            failure) result=FAIL ;;
+            *) result="NOT RUN ($SMOKE_OUTCOME)" ;;
+          esac
+          {
+            printf '## Self-hosted runner smoke test\n\n'
+            printf 'Result: **%s**\n\n' "$result"
+            printf 'No Azure resources were deployed and no Sandbox unit/integration tests were run.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
