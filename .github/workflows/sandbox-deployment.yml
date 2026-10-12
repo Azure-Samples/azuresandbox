@@ -1,7 +1,23 @@
 name: Azure Sandbox deployment
+run-name: Sandbox ${{ inputs.deployment_mode == 'new' && format('sandbox-{0}', github.run_id) || inputs.deployment_id }} / ${{ inputs.run_through }}
 
 on:
   workflow_dispatch:
+    inputs:
+      run_through:
+        description: Run through this stage
+        type: choice
+        options: [preflight, apply, unit-test]
+        default: preflight
+      deployment_mode:
+        description: Explicitly select a new or existing Sandbox
+        type: choice
+        options: [existing, new]
+        default: existing
+      deployment_id:
+        description: Existing Sandbox ID (sandbox-<initial-run-id>); leave empty for new
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -15,11 +31,17 @@ defaults:
     shell: bash
 
 jobs:
-  smoke:
-    name: Self-hosted runner smoke test
+  sandbox:
+    name: Sandbox preflight / apply / unit-test
     runs-on: [self-hosted, linux, x64, azuresandbox]
-    environment: sandbox-deployment
+    environment:
+      name: sandbox-deployment
+      url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     timeout-minutes: 180
+    env:
+      SANDBOX_RUN_THROUGH: ${{ inputs.run_through }}
+      SANDBOX_DEPLOYMENT_MODE: ${{ inputs.deployment_mode }}
+      SANDBOX_EXISTING_ID: ${{ inputs.deployment_id }}
     steps:
       - name: Check out the approved Sandbox source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -27,38 +49,51 @@ jobs:
           ref: vnext
           persist-credentials: false
 
-      - name: Check runner and toolchain
-        id: smoke
-        run: |
-          set -euo pipefail
-          if [[ "$RUNNER_NAME" != "jumplinux2" ]]; then
-            echo "::error::The job did not run on the expected runner."
-            exit 1
-          fi
-          if [[ "${ARM_USE_MSI:-}" != "true" || -z "${ARM_TENANT_ID:-}" ]]; then
-            echo "::error::The runner managed identity environment is incomplete."
-            exit 1
-          fi
-          git --version
-          terraform version
-          az version --query '"azure-cli"' --output tsv
-          # PowerShell must expand these variables, not Bash.
-          # shellcheck disable=SC2016
-          pwsh -NoLogo -NoProfile -Command '$ErrorActionPreference = "Stop"; $PSVersionTable.PSVersion.ToString(); Import-Module Az -ErrorAction Stop; Get-Module Az,Az.Accounts | Select-Object Name,Version'
-          printf 'All smoke checks passed.\n'
+      - name: Preflight
+        id: preflight
+        env:
+          SANDBOX_BACKEND_HCL: ${{ secrets.SANDBOX_BACKEND_HCL }}
+          SANDBOX_TFVARS_HCL: ${{ secrets.SANDBOX_TFVARS_HCL }}
+        run: python3 extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.py preflight
 
-      - name: Report smoke result
+      - name: Apply
+        id: apply
+        if: ${{ success() && inputs.run_through != 'preflight' }}
+        run: python3 extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.py apply
+
+      - name: Unit-test
+        id: unit_test
+        if: ${{ success() && inputs.run_through == 'unit-test' }}
+        run: python3 extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.py unit-test
+
+      - name: Prepare sanitized unit-test evidence
+        id: evidence
+        if: ${{ always() && (steps.unit_test.outcome == 'success' || steps.unit_test.outcome == 'failure') }}
+        run: python3 extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.py evidence
+
+      - name: Publish sanitized unit-test evidence
+        id: upload_evidence
+        if: ${{ always() && steps.evidence.outcome == 'success' && steps.evidence.outputs.ready == 'true' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.evidence.outputs.name }}
+          path: |
+            ${{ steps.evidence.outputs.json_path }}
+            ${{ steps.evidence.outputs.xml_path }}
+          if-no-files-found: error
+
+      - name: Report stage results
         if: ${{ always() }}
         env:
-          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+          PREFLIGHT_OUTCOME: ${{ steps.preflight.outcome }}
+          APPLY_OUTCOME: ${{ steps.apply.outcome }}
+          UNIT_TEST_OUTCOME: ${{ steps.unit_test.outcome }}
+          UNIT_TEST_ARTIFACT_OUTCOME: ${{ steps.upload_evidence.outcome }}
+          UNIT_TEST_ARTIFACT_URL: ${{ steps.upload_evidence.outputs.artifact-url }}
         run: |
-          case "$SMOKE_OUTCOME" in
-            success) result=PASS ;;
-            failure) result=FAIL ;;
-            *) result="NOT RUN ($SMOKE_OUTCOME)" ;;
-          esac
-          {
-            printf '## Self-hosted runner smoke test\n\n'
-            printf 'Result: **%s**\n\n' "$result"
-            printf 'No Azure resources were deployed and no Sandbox unit/integration tests were run.\n'
-          } >> "$GITHUB_STEP_SUMMARY"
+          if [[ -f extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.py ]]; then
+            python3 extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.py summary
+          else
+            printf '## Sandbox deployment\n\nSource checkout did not provide the deployment helper. No completed stages are confirmed.\n' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi

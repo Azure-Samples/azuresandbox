@@ -141,7 +141,14 @@ to configure a manually triggered deployment with all base modules enabled
 and post-deployment unit/integration testing. That walkthrough currently
 covers scope, prerequisites, GitHub discovery, publication and approval
 choices, deployment environment protection setup, and smoke-only workflow
-creation, local validation, and topic PR preparation.
+creation, validation, publication to `vnext` and `main`, approval, and verified
+self-hosted execution. The three-stage `preflight`, `apply`, and `unit-test`
+workflow update is implemented locally and awaiting publication and its first
+live preflight. The guide includes sanitized HCL examples for the two protected
+configuration files, deployment-specific state keys, and private runner logs.
+The unit-test stage publishes default-sanitized JSON and JUnit evidence as
+workflow artifacts on both test success and failure; raw logs and plans stay
+on the runner.
 
 * [Step 0: Login](#step-0-login)
 * [Step 1: Clone the Repository](#step-1-clone-the-repository)

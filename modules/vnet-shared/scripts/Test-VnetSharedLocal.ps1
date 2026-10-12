@@ -6,7 +6,10 @@ param(
     [string]$FirewallName,
 
     [Parameter(Mandatory = $true)]
-    [string]$BastionName
+    [string]$BastionName,
+
+    [ValidateSet('true', 'false')]
+    [string]$VerboseResults = 'false'
 )
 
 #region functions
@@ -19,8 +22,12 @@ function Write-TestResult {
     param(
         [string]$module,
         [string]$status,
-        [string]$msg
+        [string]$msg,
+        [string]$SanitizedMessage = 'Check result'
     )
+    if ($status -ne 'SUMMARY' -and $VerboseResults -ne 'true') {
+        $msg = $SanitizedMessage
+    }
     Write-Log ("[MODULE:$module] [$status] $msg")
 }
 #endregion
@@ -79,17 +86,17 @@ try {
     }
 
     if ($diagIssues.Count -eq 0) {
-        Write-TestResult $moduleName 'PASS' ("Firewall diagnostics: '$($laSetting.name)' streams structured AZFW* logs and 'AllMetrics' to Log Analytics (Dedicated tables)")
+        Write-TestResult $moduleName 'PASS' ("Firewall diagnostics: '$($laSetting.name)' streams structured AZFW* logs and 'AllMetrics' to Log Analytics (Dedicated tables)") -SanitizedMessage 'Firewall diagnostics: ''<value>'' streams structured AZFW* logs and ''AllMetrics'' to Log Analytics (Dedicated tables)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("Firewall diagnostics: " + ($diagIssues -join '; '))
+        Write-TestResult $moduleName 'FAIL' ("Firewall diagnostics: " + ($diagIssues -join '; ')) -SanitizedMessage 'Firewall diagnostics: <value>'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to verify diagnostic setting for Azure Firewall '$FirewallName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to verify diagnostic setting for Azure Firewall '$FirewallName'" -SanitizedMessage 'Failed to verify diagnostic setting for Azure Firewall ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -128,17 +135,17 @@ try {
     }
 
     if ($diagIssues.Count -eq 0) {
-        Write-TestResult $moduleName 'PASS' ("Bastion diagnostics: '$($laSetting.name)' streams 'BastionAuditLogs' and 'AllMetrics' to Log Analytics")
+        Write-TestResult $moduleName 'PASS' ("Bastion diagnostics: '$($laSetting.name)' streams 'BastionAuditLogs' and 'AllMetrics' to Log Analytics") -SanitizedMessage 'Bastion diagnostics: ''<value>'' streams ''BastionAuditLogs'' and ''AllMetrics'' to Log Analytics'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("Bastion diagnostics: " + ($diagIssues -join '; '))
+        Write-TestResult $moduleName 'FAIL' ("Bastion diagnostics: " + ($diagIssues -join '; ')) -SanitizedMessage 'Bastion diagnostics: <value>'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to verify diagnostic setting for Azure Bastion '$BastionName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to verify diagnostic setting for Azure Bastion '$BastionName'" -SanitizedMessage 'Failed to verify diagnostic setting for Azure Bastion ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 

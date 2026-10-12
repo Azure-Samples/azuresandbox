@@ -1,6 +1,9 @@
 param(
     [Parameter(Mandatory = $true)]
-    [string]$KeyVaultName
+    [string]$KeyVaultName,
+
+    [ValidateSet('true', 'false')]
+    [string]$VerboseResults = 'false'
 )
 
 #region functions
@@ -15,8 +18,12 @@ function Write-TestResult {
     param(
         [string]$module,
         [string]$status,
-        [string]$msg
+        [string]$msg,
+        [string]$SanitizedMessage = 'Check result'
     )
+    if ($status -ne 'SUMMARY' -and $VerboseResults -ne 'true') {
+        $msg = $SanitizedMessage
+    }
     Write-Log ("[MODULE:$module] [$status] $msg")
 }
 
@@ -116,23 +123,23 @@ try {
     $ranThisBoot = ($null -ne $stTaskInfo.LastRunTime) -and ($stTaskInfo.LastRunTime -gt $lastBootTime)
 
     if ($stTaskInfo.LastTaskResult -eq 0 -and $ranThisBoot) {
-        Write-TestResult $moduleName 'PASS' "Startup: Scheduled task 'Set-MssqlStartupConfiguration' ran this boot and succeeded (result: 0, last run: $($stTaskInfo.LastRunTime), last boot: $lastBootTime)"
+        Write-TestResult $moduleName 'PASS' "Startup: Scheduled task 'Set-MssqlStartupConfiguration' ran this boot and succeeded (result: 0, last run: $($stTaskInfo.LastRunTime), last boot: $lastBootTime)" -SanitizedMessage 'Startup: Scheduled task ''Set-MssqlStartupConfiguration'' ran this boot and succeeded (result: 0, last run: <value>, last boot: <value>)'
         $passed++
     }
     elseif ($stTaskInfo.LastTaskResult -eq 0 -and -not $ranThisBoot) {
-        Write-TestResult $moduleName 'FAIL' "Startup: Scheduled task 'Set-MssqlStartupConfiguration' did not run on the current boot (last run: $($stTaskInfo.LastRunTime) is not after last boot: $lastBootTime). The task likely failed to launch (e.g. domain-logon failure / Credential Guard); its stale success result is a false PASS."
+        Write-TestResult $moduleName 'FAIL' "Startup: Scheduled task 'Set-MssqlStartupConfiguration' did not run on the current boot (last run: $($stTaskInfo.LastRunTime) is not after last boot: $lastBootTime). The task likely failed to launch (e.g. domain-logon failure / Credential Guard); its stale success result is a false PASS." -SanitizedMessage 'Startup: Scheduled task ''Set-MssqlStartupConfiguration'' did not run on the current boot (last run: <value> is not after last boot: <value>). The task likely failed to launch (e.g. domain-logon failure / Credential Guard); its stale success result is a false PASS.'
         $failed++
         $startupOk = $false
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "Startup: Scheduled task 'Set-MssqlStartupConfiguration' last run failed (result: $($stTaskInfo.LastTaskResult), last run: $($stTaskInfo.LastRunTime))"
+        Write-TestResult $moduleName 'FAIL' "Startup: Scheduled task 'Set-MssqlStartupConfiguration' last run failed (result: $($stTaskInfo.LastTaskResult), last run: $($stTaskInfo.LastRunTime))" -SanitizedMessage 'Startup: Scheduled task ''Set-MssqlStartupConfiguration'' last run failed (result: <value>, last run: <value>)'
         $failed++
         $startupOk = $false
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Startup: Scheduled task 'Set-MssqlStartupConfiguration' not found"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Startup: Scheduled task 'Set-MssqlStartupConfiguration' not found" -SanitizedMessage 'Startup: Scheduled task ''Set-MssqlStartupConfiguration'' not found'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
     $startupOk = $false
 }
@@ -142,18 +149,18 @@ try {
     $tempVolume = Get-Volume -DriveLetter 'T' -ErrorAction Stop
 
     if ($tempVolume.FileSystem -eq 'NTFS') {
-        Write-TestResult $moduleName 'PASS' "Startup: Temp disk 'T:' present (FileSystem: NTFS, Label: '$($tempVolume.FileSystemLabel)', Size: $([math]::Round($tempVolume.Size / 1GB, 1)) GB)"
+        Write-TestResult $moduleName 'PASS' "Startup: Temp disk 'T:' present (FileSystem: NTFS, Label: '$($tempVolume.FileSystemLabel)', Size: $([math]::Round($tempVolume.Size / 1GB, 1)) GB)" -SanitizedMessage 'Startup: Temp disk ''T:'' present (FileSystem: NTFS, Label: ''<value>'', Size: <value> GB)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "Startup: Temp disk 'T:' present but FileSystem is '$($tempVolume.FileSystem)' (expected NTFS)"
+        Write-TestResult $moduleName 'FAIL' "Startup: Temp disk 'T:' present but FileSystem is '$($tempVolume.FileSystem)' (expected NTFS)" -SanitizedMessage 'Startup: Temp disk ''T:'' present but FileSystem is ''<value>'' (expected NTFS)'
         $failed++
         $startupOk = $false
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Startup: Temp disk 'T:' not found"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Startup: Temp disk 'T:' not found" -SanitizedMessage 'Startup: Temp disk ''T:'' not found'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
     $startupOk = $false
 }
@@ -170,40 +177,40 @@ try {
     $columns = $vd.NumberOfColumns
 
     if ($columns -eq $expectedDiskCount -and $pool.HealthStatus -eq 'Healthy' -and $vd.HealthStatus -eq 'Healthy') {
-        Write-TestResult $moduleName 'PASS' "Startup: Temp disk 'T:' backed by Storage Spaces stripe (Pool: '$expectedPoolName' Healthy, VirtualDisk: '$expectedVirtualDiskName' Healthy, NumberOfColumns: $columns, NVMe temp disks: $expectedDiskCount)"
+        Write-TestResult $moduleName 'PASS' "Startup: Temp disk 'T:' backed by Storage Spaces stripe (Pool: '$expectedPoolName' Healthy, VirtualDisk: '$expectedVirtualDiskName' Healthy, NumberOfColumns: $columns, NVMe temp disks: $expectedDiskCount)" -SanitizedMessage 'Startup: Temp disk ''T:'' backed by Storage Spaces stripe (Pool: ''<value>'' Healthy, VirtualDisk: ''<value>'' Healthy, NumberOfColumns: <value>, NVMe temp disks: <value>)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "Startup: Storage Spaces stripe configuration mismatch (Pool Health: '$($pool.HealthStatus)', VirtualDisk Health: '$($vd.HealthStatus)', NumberOfColumns: $columns, NVMe temp disks: $expectedDiskCount)"
+        Write-TestResult $moduleName 'FAIL' "Startup: Storage Spaces stripe configuration mismatch (Pool Health: '$($pool.HealthStatus)', VirtualDisk Health: '$($vd.HealthStatus)', NumberOfColumns: $columns, NVMe temp disks: $expectedDiskCount)" -SanitizedMessage 'Startup: Storage Spaces stripe configuration mismatch (Pool Health: ''<value>'', VirtualDisk Health: ''<value>'', NumberOfColumns: <value>, NVMe temp disks: <value>)'
         $failed++
         $startupOk = $false
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Startup: Temp disk 'T:' is not backed by the expected Storage Spaces virtual disk"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Startup: Temp disk 'T:' is not backed by the expected Storage Spaces virtual disk" -SanitizedMessage 'Startup: Temp disk ''T:'' is not backed by the expected Storage Spaces virtual disk'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
     $startupOk = $false
 }
 
 # Startup Check 3: T:\SQLTEMP directory exists
 if (Test-Path 'T:\SQLTEMP') {
-    Write-TestResult $moduleName 'PASS' "Startup: 'T:\SQLTEMP' directory exists"
+    Write-TestResult $moduleName 'PASS' "Startup: 'T:\SQLTEMP' directory exists" -SanitizedMessage 'Startup: ''T:\SQLTEMP'' directory exists'
     $passed++
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "Startup: 'T:\SQLTEMP' directory not found"
+    Write-TestResult $moduleName 'FAIL' "Startup: 'T:\SQLTEMP' directory not found" -SanitizedMessage 'Startup: ''T:\SQLTEMP'' directory not found'
     $failed++
     $startupOk = $false
 }
 
 # Startup Check 4: T:\DATALOSS_WARNING_README.txt exists
 if (Test-Path 'T:\DATALOSS_WARNING_README.txt') {
-    Write-TestResult $moduleName 'PASS' "Startup: 'T:\DATALOSS_WARNING_README.txt' exists"
+    Write-TestResult $moduleName 'PASS' "Startup: 'T:\DATALOSS_WARNING_README.txt' exists" -SanitizedMessage 'Startup: ''T:\DATALOSS_WARNING_README.txt'' exists'
     $passed++
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "Startup: 'T:\DATALOSS_WARNING_README.txt' not found"
+    Write-TestResult $moduleName 'FAIL' "Startup: 'T:\DATALOSS_WARNING_README.txt' not found" -SanitizedMessage 'Startup: ''T:\DATALOSS_WARNING_README.txt'' not found'
     $failed++
     $startupOk = $false
 }
@@ -213,25 +220,25 @@ try {
     $pfCs = Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop
 
     if (-not $pfCs.AutomaticManagedPagefile) {
-        Write-TestResult $moduleName 'PASS' "Startup: Automatic managed pagefile is disabled"
+        Write-TestResult $moduleName 'PASS' "Startup: Automatic managed pagefile is disabled" -SanitizedMessage 'Startup: Automatic managed pagefile is disabled'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "Startup: Automatic managed pagefile is still enabled"
+        Write-TestResult $moduleName 'FAIL' "Startup: Automatic managed pagefile is still enabled" -SanitizedMessage 'Startup: Automatic managed pagefile is still enabled'
         $failed++
         $startupOk = $false
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Startup: Failed to query pagefile configuration"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Startup: Failed to query pagefile configuration" -SanitizedMessage 'Startup: Failed to query pagefile configuration'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
     $startupOk = $false
 }
 
 # If startup validation failed, skip remaining tests - SQL Server will not be functional
 if (-not $startupOk) {
-    Write-TestResult $moduleName 'FAIL' "Startup validation failed - skipping remaining tests"
+    Write-TestResult $moduleName 'FAIL' "Startup validation failed - skipping remaining tests" -SanitizedMessage 'Startup validation failed - skipping remaining tests'
     $total = $passed + $failed
     Write-TestResult $moduleName 'SUMMARY' "Passed: $passed Failed: $failed Total: $total"
     exit 1
@@ -241,17 +248,17 @@ if (-not $startupOk) {
 try {
     $cs = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
     if ($cs.PartOfDomain) {
-        Write-TestResult $moduleName 'PASS' "AD: '$env:COMPUTERNAME' is domain joined to '$($cs.Domain)'"
+        Write-TestResult $moduleName 'PASS' "AD: '$env:COMPUTERNAME' is domain joined to '$($cs.Domain)'" -SanitizedMessage 'AD: ''<value>'' is domain joined to ''<value>'''
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "AD: '$env:COMPUTERNAME' is not domain joined"
+        Write-TestResult $moduleName 'FAIL' "AD: '$env:COMPUTERNAME' is not domain joined" -SanitizedMessage 'AD: ''<value>'' is not domain joined'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "AD: Failed to query domain membership"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "AD: Failed to query domain membership" -SanitizedMessage 'AD: Failed to query domain membership'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -261,17 +268,17 @@ if ($domainName) {
         $fqdn = "$env:COMPUTERNAME.$domainName"
         $dnsResult = Resolve-DnsName $fqdn -ErrorAction Stop
         $ip = ($dnsResult | Where-Object { $_.QueryType -eq 'A' } | Select-Object -First 1).IPAddress
-        Write-TestResult $moduleName 'PASS' "DNS: '$fqdn' resolves to '$ip'"
+        Write-TestResult $moduleName 'PASS' "DNS: '$fqdn' resolves to '$ip'" -SanitizedMessage 'DNS: ''<value>'' resolves to ''<value>'''
         $passed++
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "DNS: '$fqdn' does not resolve"
-        Write-TestResult $moduleName 'FAIL' "Exception: $_"
+        Write-TestResult $moduleName 'FAIL' "DNS: '$fqdn' does not resolve" -SanitizedMessage 'DNS: ''<value>'' does not resolve'
+        Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
         $failed++
     }
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "DNS: Skipped - domain name not available"
+    Write-TestResult $moduleName 'FAIL' "DNS: Skipped - domain name not available" -SanitizedMessage 'DNS: Skipped - domain name not available'
     $failed++
 }
 
@@ -280,17 +287,17 @@ $sqlDataDrive = 'M'
 try {
     $volume = Get-Volume -DriveLetter $sqlDataDrive -ErrorAction Stop
     if ($volume.FileSystemLabel -match 'sqldata') {
-        Write-TestResult $moduleName 'PASS' "Disk: SQL Server data disk '$($sqlDataDrive):' present (label: '$($volume.FileSystemLabel)', size: $([math]::Round($volume.Size / 1GB, 1)) GB)"
+        Write-TestResult $moduleName 'PASS' "Disk: SQL Server data disk '$($sqlDataDrive):' present (label: '$($volume.FileSystemLabel)', size: $([math]::Round($volume.Size / 1GB, 1)) GB)" -SanitizedMessage 'Disk: SQL Server data disk ''<value>:'' present (label: ''<value>'', size: <value> GB)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "Disk: '$($sqlDataDrive):' exists but label '$($volume.FileSystemLabel)' does not contain 'sqldata'"
+        Write-TestResult $moduleName 'FAIL' "Disk: '$($sqlDataDrive):' exists but label '$($volume.FileSystemLabel)' does not contain 'sqldata'" -SanitizedMessage 'Disk: ''<value>:'' exists but label ''<value>'' does not contain ''sqldata'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Disk: SQL Server data disk '$($sqlDataDrive):' not found"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Disk: SQL Server data disk '$($sqlDataDrive):' not found" -SanitizedMessage 'Disk: SQL Server data disk ''<value>:'' not found'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -299,17 +306,17 @@ $sqlLogDrive = 'L'
 try {
     $volume = Get-Volume -DriveLetter $sqlLogDrive -ErrorAction Stop
     if ($volume.FileSystemLabel -match 'sqllog') {
-        Write-TestResult $moduleName 'PASS' "Disk: SQL Server log disk '$($sqlLogDrive):' present (label: '$($volume.FileSystemLabel)', size: $([math]::Round($volume.Size / 1GB, 1)) GB)"
+        Write-TestResult $moduleName 'PASS' "Disk: SQL Server log disk '$($sqlLogDrive):' present (label: '$($volume.FileSystemLabel)', size: $([math]::Round($volume.Size / 1GB, 1)) GB)" -SanitizedMessage 'Disk: SQL Server log disk ''<value>:'' present (label: ''<value>'', size: <value> GB)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "Disk: '$($sqlLogDrive):' exists but label '$($volume.FileSystemLabel)' does not contain 'sqllog'"
+        Write-TestResult $moduleName 'FAIL' "Disk: '$($sqlLogDrive):' exists but label '$($volume.FileSystemLabel)' does not contain 'sqllog'" -SanitizedMessage 'Disk: ''<value>:'' exists but label ''<value>'' does not contain ''sqllog'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Disk: SQL Server log disk '$($sqlLogDrive):' not found"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Disk: SQL Server log disk '$($sqlLogDrive):' not found" -SanitizedMessage 'Disk: SQL Server log disk ''<value>:'' not found'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -317,17 +324,17 @@ catch {
 try {
     $sqlService = Get-Service -Name MSSQLSERVER -ErrorAction Stop
     if ($sqlService.Status -eq 'Running') {
-        Write-TestResult $moduleName 'PASS' "SQL Service: MSSQLSERVER is running"
+        Write-TestResult $moduleName 'PASS' "SQL Service: MSSQLSERVER is running" -SanitizedMessage 'SQL Service: MSSQLSERVER is running'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "SQL Service: MSSQLSERVER status is '$($sqlService.Status)' (expected 'Running')"
+        Write-TestResult $moduleName 'FAIL' "SQL Service: MSSQLSERVER status is '$($sqlService.Status)' (expected 'Running')" -SanitizedMessage 'SQL Service: MSSQLSERVER status is ''<value>'' (expected ''Running'')'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "SQL Service: MSSQLSERVER service not found"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "SQL Service: MSSQLSERVER service not found" -SanitizedMessage 'SQL Service: MSSQLSERVER service not found'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -335,17 +342,17 @@ catch {
 try {
     $agentService = Get-Service -Name SQLSERVERAGENT -ErrorAction Stop
     if ($agentService.Status -eq 'Running') {
-        Write-TestResult $moduleName 'PASS' "SQL Service: SQLSERVERAGENT is running"
+        Write-TestResult $moduleName 'PASS' "SQL Service: SQLSERVERAGENT is running" -SanitizedMessage 'SQL Service: SQLSERVERAGENT is running'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "SQL Service: SQLSERVERAGENT status is '$($agentService.Status)' (expected 'Running')"
+        Write-TestResult $moduleName 'FAIL' "SQL Service: SQLSERVERAGENT status is '$($agentService.Status)' (expected 'Running')" -SanitizedMessage 'SQL Service: SQLSERVERAGENT status is ''<value>'' (expected ''Running'')'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "SQL Service: SQLSERVERAGENT service not found"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "SQL Service: SQLSERVERAGENT service not found" -SanitizedMessage 'SQL Service: SQLSERVERAGENT service not found'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -355,12 +362,12 @@ try {
     $result = Invoke-SqlQuery -Query "SELECT @@SERVERNAME AS ServerName, @@VERSION AS ServerVersion"
     $serverName = $result.ServerName
     $sqlConnected = $true
-    Write-TestResult $moduleName 'PASS' "SQL Connectivity: Connected to SQL Server instance '$serverName'"
+    Write-TestResult $moduleName 'PASS' "SQL Connectivity: Connected to SQL Server instance '$serverName'" -SanitizedMessage 'SQL Connectivity: Connected to SQL Server instance ''<value>'''
     $passed++
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "SQL Connectivity: Failed to connect to SQL Server on localhost"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "SQL Connectivity: Failed to connect to SQL Server on localhost" -SanitizedMessage 'SQL Connectivity: Failed to connect to SQL Server on localhost'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -371,22 +378,22 @@ if ($sqlConnected) {
         $defaultDataPath = $result.DefaultDataPath.TrimEnd('\')
 
         if ($defaultDataPath -like "${sqlDataDrive}:\*") {
-            Write-TestResult $moduleName 'PASS' "SQL Config: Default data directory is '$defaultDataPath'"
+            Write-TestResult $moduleName 'PASS' "SQL Config: Default data directory is '$defaultDataPath'" -SanitizedMessage 'SQL Config: Default data directory is ''<value>'''
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' "SQL Config: Default data directory is '$defaultDataPath' (expected on '$($sqlDataDrive):')"
+            Write-TestResult $moduleName 'FAIL' "SQL Config: Default data directory is '$defaultDataPath' (expected on '$($sqlDataDrive):')" -SanitizedMessage 'SQL Config: Default data directory is ''<value>'' (expected on ''<value>:'')'
             $failed++
         }
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "SQL Config: Failed to query default data directory"
-        Write-TestResult $moduleName 'FAIL' "Exception: $_"
+        Write-TestResult $moduleName 'FAIL' "SQL Config: Failed to query default data directory" -SanitizedMessage 'SQL Config: Failed to query default data directory'
+        Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
         $failed++
     }
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "SQL Config: Skipped default data directory check - SQL not connected"
+    Write-TestResult $moduleName 'FAIL' "SQL Config: Skipped default data directory check - SQL not connected" -SanitizedMessage 'SQL Config: Skipped default data directory check - SQL not connected'
     $failed++
 }
 
@@ -397,22 +404,22 @@ if ($sqlConnected) {
         $defaultLogPath = $result.DefaultLogPath.TrimEnd('\')
 
         if ($defaultLogPath -like "${sqlLogDrive}:\*") {
-            Write-TestResult $moduleName 'PASS' "SQL Config: Default log directory is '$defaultLogPath'"
+            Write-TestResult $moduleName 'PASS' "SQL Config: Default log directory is '$defaultLogPath'" -SanitizedMessage 'SQL Config: Default log directory is ''<value>'''
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' "SQL Config: Default log directory is '$defaultLogPath' (expected on '$($sqlLogDrive):')"
+            Write-TestResult $moduleName 'FAIL' "SQL Config: Default log directory is '$defaultLogPath' (expected on '$($sqlLogDrive):')" -SanitizedMessage 'SQL Config: Default log directory is ''<value>'' (expected on ''<value>:'')'
             $failed++
         }
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "SQL Config: Failed to query default log directory"
-        Write-TestResult $moduleName 'FAIL' "Exception: $_"
+        Write-TestResult $moduleName 'FAIL' "SQL Config: Failed to query default log directory" -SanitizedMessage 'SQL Config: Failed to query default log directory'
+        Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
         $failed++
     }
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "SQL Config: Skipped default log directory check - SQL not connected"
+    Write-TestResult $moduleName 'FAIL' "SQL Config: Skipped default log directory check - SQL not connected" -SanitizedMessage 'SQL Config: Skipped default log directory check - SQL not connected'
     $failed++
 }
 
@@ -422,29 +429,29 @@ try {
     $portFilter = $fwRule | Get-NetFirewallPortFilter
 
     if ($fwRule.Enabled -eq 'True' -and $portFilter.LocalPort -eq '1433' -and $portFilter.Protocol -eq 'TCP') {
-        Write-TestResult $moduleName 'PASS' "Firewall: SQL Server rule 'MssqlFirewallRule' exists (TCP 1433, Enabled)"
+        Write-TestResult $moduleName 'PASS' "Firewall: SQL Server rule 'MssqlFirewallRule' exists (TCP 1433, Enabled)" -SanitizedMessage 'Firewall: SQL Server rule ''MssqlFirewallRule'' exists (TCP 1433, Enabled)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "Firewall: SQL Server rule 'MssqlFirewallRule' exists but misconfigured (Enabled=$($fwRule.Enabled), Port=$($portFilter.LocalPort), Protocol=$($portFilter.Protocol))"
+        Write-TestResult $moduleName 'FAIL' "Firewall: SQL Server rule 'MssqlFirewallRule' exists but misconfigured (Enabled=$($fwRule.Enabled), Port=$($portFilter.LocalPort), Protocol=$($portFilter.Protocol))" -SanitizedMessage 'Firewall: SQL Server rule ''MssqlFirewallRule'' exists but misconfigured (Enabled=<value>, Port=<value>, Protocol=<value>)'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Firewall: SQL Server rule 'MssqlFirewallRule' not found"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Firewall: SQL Server rule 'MssqlFirewallRule' not found" -SanitizedMessage 'Firewall: SQL Server rule ''MssqlFirewallRule'' not found'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
 # Test 11: SQL Server startup scheduled task exists
 try {
     $task = Get-ScheduledTask -TaskName 'Set-MssqlStartupConfiguration' -ErrorAction Stop
-    Write-TestResult $moduleName 'PASS' "Scheduled Task: 'Set-MssqlStartupConfiguration' exists (state: $($task.State))"
+    Write-TestResult $moduleName 'PASS' "Scheduled Task: 'Set-MssqlStartupConfiguration' exists (state: $($task.State))" -SanitizedMessage 'Scheduled Task: ''Set-MssqlStartupConfiguration'' exists (state: <value>)'
     $passed++
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Scheduled Task: 'Set-MssqlStartupConfiguration' not found"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Scheduled Task: 'Set-MssqlStartupConfiguration' not found" -SanitizedMessage 'Scheduled Task: ''Set-MssqlStartupConfiguration'' not found'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -650,22 +657,22 @@ exit 0
                 $label = if ($checkLabels.ContainsKey($checkName)) { $checkLabels[$checkName] } else { $checkName }
 
                 if ($checkStatus -eq 'PASS') {
-                    Write-TestResult $moduleName 'PASS' "$label`: $checkDetail"
+                    Write-TestResult $moduleName 'PASS' "$label`: $checkDetail" -SanitizedMessage '<value>: <value>'
                     $passed++
                 }
                 else {
-                    Write-TestResult $moduleName 'FAIL' "$label`: $checkDetail"
+                    Write-TestResult $moduleName 'FAIL' "$label`: $checkDetail" -SanitizedMessage '<value>: <value>'
                     $failed++
                 }
             }
         }
         else {
-            Write-TestResult $moduleName 'FAIL' "SQL Sysadmin Checks: Scheduled task completed (exit code: $($taskInfo.LastTaskResult)) but result file not found"
+            Write-TestResult $moduleName 'FAIL' "SQL Sysadmin Checks: Scheduled task completed (exit code: $($taskInfo.LastTaskResult)) but result file not found" -SanitizedMessage 'SQL Sysadmin Checks: Scheduled task completed (exit code: <value>) but result file not found'
             $failed++
         }
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "SQL Sysadmin Checks: Scheduled task failed: $_"
+        Write-TestResult $moduleName 'FAIL' "SQL Sysadmin Checks: Scheduled task failed: $_" -SanitizedMessage 'SQL Sysadmin Checks: Scheduled task failed: <value>'
         $failed++
     }
     finally {
@@ -677,15 +684,15 @@ else {
     $skipReason = if (-not $adminUsername -or -not $adminPassword) { 'admin credentials not available from Key Vault' }
                   elseif (-not $domainName) { 'domain name not available' }
                   else { 'unknown prerequisite failure' }
-    Write-TestResult $moduleName 'FAIL' "SQL Login: Skipped - $skipReason"
+    Write-TestResult $moduleName 'FAIL' "SQL Login: Skipped - $skipReason" -SanitizedMessage 'SQL Login: Skipped - <value>'
     $failed++
-    Write-TestResult $moduleName 'FAIL' "SQL Config: Skipped system database data file check - $skipReason"
+    Write-TestResult $moduleName 'FAIL' "SQL Config: Skipped system database data file check - $skipReason" -SanitizedMessage 'SQL Config: Skipped system database data file check - <value>'
     $failed++
-    Write-TestResult $moduleName 'FAIL' "SQL Config: Skipped system database log file check - $skipReason"
+    Write-TestResult $moduleName 'FAIL' "SQL Config: Skipped system database log file check - $skipReason" -SanitizedMessage 'SQL Config: Skipped system database log file check - <value>'
     $failed++
-    Write-TestResult $moduleName 'FAIL' "SQL Config: Skipped tempdb file check - $skipReason"
+    Write-TestResult $moduleName 'FAIL' "SQL Config: Skipped tempdb file check - $skipReason" -SanitizedMessage 'SQL Config: Skipped tempdb file check - <value>'
     $failed++
-    Write-TestResult $moduleName 'FAIL' "SQL Smoke Test: Skipped - $skipReason"
+    Write-TestResult $moduleName 'FAIL' "SQL Smoke Test: Skipped - $skipReason" -SanitizedMessage 'SQL Smoke Test: Skipped - <value>'
     $failed++
 }
 
@@ -729,7 +736,7 @@ try {
             Select-Object -First 1
         $version = if ($amaDir) { $amaDir.Name } else { 'unknown' }
         $names = ($amaProcs | Select-Object -ExpandProperty Name -Unique) -join ', '
-        Write-TestResult $moduleName 'PASS' "AMA: Running (version $version, processes: $names, waited ${waited}s)"
+        Write-TestResult $moduleName 'PASS' "AMA: Running (version $version, processes: $names, waited ${waited}s)" -SanitizedMessage 'AMA: Running (version <value>, processes: <value>, waited <value>s)'
         $passed++
     }
     else {
@@ -756,12 +763,12 @@ try {
                 $extStatus = "status=$s message=$m"
             }
         } catch { $extStatus = "status file error: $_" }
-        Write-TestResult $moduleName 'FAIL' "AMA: MonAgentCore not running after ${waited}s (found: $found, vm_uptime=$uptime, extension: $extStatus)"
+        Write-TestResult $moduleName 'FAIL' "AMA: MonAgentCore not running after ${waited}s (found: $found, vm_uptime=$uptime, extension: $extStatus)" -SanitizedMessage 'AMA: MonAgentCore not running after <value>s (found: <value>, vm_uptime=<value>, extension: <value>)'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "AMA: Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "AMA: Exception: $_" -SanitizedMessage 'AMA: Exception: <value>'
     $failed++
 }
 
@@ -775,17 +782,17 @@ try {
     $ip = ($dnsResult | Where-Object { $_.QueryType -eq 'A' } | Select-Object -First 1).IPAddress
 
     if ($ip -match '^10\.') {
-        Write-TestResult $moduleName 'PASS' "AMPLS DNS: '$amplsFqdn' resolves to private IP '$ip'"
+        Write-TestResult $moduleName 'PASS' "AMPLS DNS: '$amplsFqdn' resolves to private IP '$ip'" -SanitizedMessage 'AMPLS DNS: ''<value>'' resolves to private IP ''<value>'''
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "AMPLS DNS: '$amplsFqdn' resolved to '$ip' (expected private IP 10.x.x.x)"
+        Write-TestResult $moduleName 'FAIL' "AMPLS DNS: '$amplsFqdn' resolved to '$ip' (expected private IP 10.x.x.x)" -SanitizedMessage 'AMPLS DNS: ''<value>'' resolved to ''<value>'' (expected private IP 10.x.x.x)'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "AMPLS DNS: '$amplsFqdn' does not resolve"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "AMPLS DNS: '$amplsFqdn' does not resolve" -SanitizedMessage 'AMPLS DNS: ''<value>'' does not resolve'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -795,17 +802,17 @@ try {
     $tcpTest = Test-NetConnection -ComputerName $amplsFqdn -Port 443 -ErrorAction Stop
 
     if ($tcpTest.TcpTestSucceeded) {
-        Write-TestResult $moduleName 'PASS' ("AMPLS: TCP port 443 reachable on '$amplsFqdn' (remote IP: " + $tcpTest.RemoteAddress + ")")
+        Write-TestResult $moduleName 'PASS' ("AMPLS: TCP port 443 reachable on '$amplsFqdn' (remote IP: " + $tcpTest.RemoteAddress + ")") -SanitizedMessage 'AMPLS: TCP port 443 reachable on ''<value>'' (remote IP: <value>)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "AMPLS: TCP port 443 not reachable on '$amplsFqdn'"
+        Write-TestResult $moduleName 'FAIL' "AMPLS: TCP port 443 not reachable on '$amplsFqdn'" -SanitizedMessage 'AMPLS: TCP port 443 not reachable on ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "AMPLS: Failed to test TCP connectivity to '$amplsFqdn':443"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "AMPLS: Failed to test TCP connectivity to '$amplsFqdn':443" -SanitizedMessage 'AMPLS: Failed to test TCP connectivity to ''<value>'':443'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 

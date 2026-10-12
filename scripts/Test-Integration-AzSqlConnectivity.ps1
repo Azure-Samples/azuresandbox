@@ -3,7 +3,10 @@ param(
     [string]$MssqlServerFqdn,
 
     [Parameter(Mandatory = $true)]
-    [string]$MssqlDatabaseName
+    [string]$MssqlDatabaseName,
+
+    [ValidateSet('true', 'false')]
+    [string]$VerboseResults = 'false'
 )
 
 #region functions
@@ -18,8 +21,12 @@ function Write-TestResult {
     param(
         [string]$module,
         [string]$status,
-        [string]$msg
+        [string]$msg,
+        [string]$SanitizedMessage = 'Check result'
     )
+    if ($status -ne 'SUMMARY' -and $VerboseResults -ne 'true') {
+        $msg = $SanitizedMessage
+    }
     Write-Log ("[MODULE:$module] [$status] $msg")
 }
 #endregion
@@ -50,16 +57,16 @@ try {
     $dnsResult = Resolve-DnsName -Name $MssqlServerFqdn -Type A -ErrorAction Stop
     $ipAddress = ($dnsResult | Where-Object { $_.QueryType -eq 'A' } | Select-Object -First 1).IPAddress
     if ($ipAddress -match '^10\.') {
-        Write-TestResult $moduleName 'PASS' "Azure SQL: DNS resolved to private IP $ipAddress"
+        Write-TestResult $moduleName 'PASS' "Azure SQL: DNS resolved to private IP $ipAddress" -SanitizedMessage 'Azure SQL: DNS resolved to private IP <value>'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "Azure SQL: DNS resolved to non-private IP $ipAddress (expected 10.x.x.x)"
+        Write-TestResult $moduleName 'FAIL' "Azure SQL: DNS resolved to non-private IP $ipAddress (expected 10.x.x.x)" -SanitizedMessage 'Azure SQL: DNS resolved to non-private IP <value> (expected 10.x.x.x)'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Azure SQL: DNS resolution failed for '$MssqlServerFqdn': $_"
+    Write-TestResult $moduleName 'FAIL' "Azure SQL: DNS resolution failed for '$MssqlServerFqdn': $_" -SanitizedMessage 'Azure SQL: DNS resolution failed for ''<value>'': <value>'
     $failed++
 }
 
@@ -68,17 +75,17 @@ try {
     $tcp = New-Object System.Net.Sockets.TcpClient
     $tcp.Connect($MssqlServerFqdn, 1433)
     if ($tcp.Connected) {
-        Write-TestResult $moduleName 'PASS' "Azure SQL: TCP connection to port 1433 succeeded"
+        Write-TestResult $moduleName 'PASS' "Azure SQL: TCP connection to port 1433 succeeded" -SanitizedMessage 'Azure SQL: TCP connection to port 1433 succeeded'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "Azure SQL: TCP connection to port 1433 failed"
+        Write-TestResult $moduleName 'FAIL' "Azure SQL: TCP connection to port 1433 failed" -SanitizedMessage 'Azure SQL: TCP connection to port 1433 failed'
         $failed++
     }
     $tcp.Close()
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Azure SQL: TCP connection to port 1433 failed: $_"
+    Write-TestResult $moduleName 'FAIL' "Azure SQL: TCP connection to port 1433 failed: $_" -SanitizedMessage 'Azure SQL: TCP connection to port 1433 failed: <value>'
     $failed++
 }
 
@@ -94,11 +101,11 @@ try {
     } else {
         $token = $rawToken
     }
-    Write-TestResult $moduleName 'PASS' "Azure SQL: Acquired Entra ID token for managed identity"
+    Write-TestResult $moduleName 'PASS' "Azure SQL: Acquired Entra ID token for managed identity" -SanitizedMessage 'Azure SQL: Acquired Entra ID token for managed identity'
     $passed++
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Azure SQL: Failed to acquire Entra ID token: $_"
+    Write-TestResult $moduleName 'FAIL' "Azure SQL: Failed to acquire Entra ID token: $_" -SanitizedMessage 'Azure SQL: Failed to acquire Entra ID token: <value>'
     $failed++
 }
 
@@ -126,22 +133,22 @@ if ($token) {
         Disconnect-AzAccount -ErrorAction SilentlyContinue | Out-Null
 
         if ($dbName -eq $MssqlDatabaseName -and $hasSelect -eq '1') {
-            Write-TestResult $moduleName 'PASS' "Azure SQL: Connected to '$dbName' as '$loginName' with db_datareader"
+            Write-TestResult $moduleName 'PASS' "Azure SQL: Connected to '$dbName' as '$loginName' with db_datareader" -SanitizedMessage 'Azure SQL: Connected to ''<value>'' as ''<value>'' with db_datareader'
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' "Azure SQL: Unexpected results - DB='$dbName' (expected '$MssqlDatabaseName'), HasSelect='$hasSelect' (expected '1'), Login='$loginName'"
+            Write-TestResult $moduleName 'FAIL' "Azure SQL: Unexpected results - DB='$dbName' (expected '$MssqlDatabaseName'), HasSelect='$hasSelect' (expected '1'), Login='$loginName'" -SanitizedMessage 'Azure SQL: Unexpected results - DB=''<value>'' (expected ''<value>''), HasSelect=''<value>'' (expected ''1''), Login=''<value>'''
             $failed++
         }
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "Azure SQL: SQL query failed: $_"
+        Write-TestResult $moduleName 'FAIL' "Azure SQL: SQL query failed: $_" -SanitizedMessage 'Azure SQL: SQL query failed: <value>'
         $failed++
         Disconnect-AzAccount -ErrorAction SilentlyContinue | Out-Null
     }
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "Azure SQL: Skipped SQL query - no token available"
+    Write-TestResult $moduleName 'FAIL' "Azure SQL: Skipped SQL query - no token available" -SanitizedMessage 'Azure SQL: Skipped SQL query - no token available'
     $failed++
 }
 

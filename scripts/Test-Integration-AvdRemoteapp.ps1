@@ -1,6 +1,9 @@
 param(
     [Parameter(Mandatory = $false)]
-    [string]$PetstoreFqdn
+    [string]$PetstoreFqdn,
+
+    [ValidateSet('true', 'false')]
+    [string]$VerboseResults = 'false'
 )
 
 #region functions
@@ -15,8 +18,12 @@ function Write-TestResult {
     param(
         [string]$module,
         [string]$status,
-        [string]$msg
+        [string]$msg,
+        [string]$SanitizedMessage = 'Check result'
     )
+    if ($status -ne 'SUMMARY' -and $VerboseResults -ne 'true') {
+        $msg = $SanitizedMessage
+    }
     Write-Log ("[MODULE:$module] [$status] $msg")
 }
 #endregion
@@ -53,17 +60,17 @@ if ($PetstoreFqdn) {
         $ipAddress = ($dnsResult | Where-Object { $_.QueryType -eq 'A' } | Select-Object -First 1).IPAddress
 
         if ($ipAddress -match '^10\.') {
-            Write-TestResult $moduleName 'PASS' "Petstore: DNS resolved '$PetstoreFqdn' to private IP '$ipAddress'"
+            Write-TestResult $moduleName 'PASS' "Petstore: DNS resolved '$PetstoreFqdn' to private IP '$ipAddress'" -SanitizedMessage 'Petstore: DNS resolved ''<value>'' to private IP ''<value>'''
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' "Petstore: DNS resolved '$PetstoreFqdn' to '$ipAddress' (expected private IP 10.x.x.x)"
+            Write-TestResult $moduleName 'FAIL' "Petstore: DNS resolved '$PetstoreFqdn' to '$ipAddress' (expected private IP 10.x.x.x)" -SanitizedMessage 'Petstore: DNS resolved ''<value>'' to ''<value>'' (expected private IP 10.x.x.x)'
             $failed++
         }
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "Petstore: DNS resolution failed for '$PetstoreFqdn'"
-        Write-TestResult $moduleName 'FAIL' "Exception: $_"
+        Write-TestResult $moduleName 'FAIL' "Petstore: DNS resolution failed for '$PetstoreFqdn'" -SanitizedMessage 'Petstore: DNS resolution failed for ''<value>'''
+        Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
         $failed++
     }
 
@@ -72,17 +79,17 @@ if ($PetstoreFqdn) {
         $tcpTest = Test-NetConnection -ComputerName $PetstoreFqdn -Port 443 -ErrorAction Stop
 
         if ($tcpTest.TcpTestSucceeded) {
-            Write-TestResult $moduleName 'PASS' "Petstore: TCP connection to port 443 succeeded (remote IP: $($tcpTest.RemoteAddress))"
+            Write-TestResult $moduleName 'PASS' "Petstore: TCP connection to port 443 succeeded (remote IP: $($tcpTest.RemoteAddress))" -SanitizedMessage 'Petstore: TCP connection to port 443 succeeded (remote IP: <value>)'
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' "Petstore: TCP connection to '$PetstoreFqdn':443 failed"
+            Write-TestResult $moduleName 'FAIL' "Petstore: TCP connection to '$PetstoreFqdn':443 failed" -SanitizedMessage 'Petstore: TCP connection to ''<value>'':443 failed'
             $failed++
         }
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "Petstore: TCP connectivity test failed for '$PetstoreFqdn':443"
-        Write-TestResult $moduleName 'FAIL' "Exception: $_"
+        Write-TestResult $moduleName 'FAIL' "Petstore: TCP connectivity test failed for '$PetstoreFqdn':443" -SanitizedMessage 'Petstore: TCP connectivity test failed for ''<value>'':443'
+        Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
         $failed++
     }
 
@@ -92,17 +99,17 @@ if ($PetstoreFqdn) {
         $apiResponse = Invoke-RestMethod -Uri $uri -Method Get -UseBasicParsing -ErrorAction Stop
 
         if ($apiResponse -and $apiResponse.openapi -match '^3\.') {
-            Write-TestResult $moduleName 'PASS' "Petstore: OpenAPI spec returned valid JSON (openapi=$($apiResponse.openapi), title=$($apiResponse.info.title))"
+            Write-TestResult $moduleName 'PASS' "Petstore: OpenAPI spec returned valid JSON (openapi=$($apiResponse.openapi), title=$($apiResponse.info.title))" -SanitizedMessage 'Petstore: OpenAPI spec returned valid JSON (openapi=<value>, title=<value>)'
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' "Petstore: OpenAPI spec response missing or invalid"
+            Write-TestResult $moduleName 'FAIL' "Petstore: OpenAPI spec response missing or invalid" -SanitizedMessage 'Petstore: OpenAPI spec response missing or invalid'
             $failed++
         }
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "Petstore: Failed to fetch OpenAPI spec from '$uri'"
-        Write-TestResult $moduleName 'FAIL' "Exception: $_"
+        Write-TestResult $moduleName 'FAIL' "Petstore: Failed to fetch OpenAPI spec from '$uri'" -SanitizedMessage 'Petstore: Failed to fetch OpenAPI spec from ''<value>'''
+        Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
         $failed++
     }
 }

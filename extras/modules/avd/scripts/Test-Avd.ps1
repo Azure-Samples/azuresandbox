@@ -21,7 +21,10 @@ param(
     [string]$VmNamePersonal,
 
     [Parameter(Mandatory = $true)]
-    [string]$VmNameRemoteapp
+    [string]$VmNameRemoteapp,
+
+    [ValidateSet('true', 'false')]
+    [string]$VerboseResults = 'false'
 )
 
 #region functions
@@ -34,8 +37,12 @@ function Write-TestResult {
     param(
         [string]$module,
         [string]$status,
-        [string]$msg
+        [string]$msg,
+        [string]$SanitizedMessage = 'Check result'
     )
+    if ($status -ne 'SUMMARY' -and $VerboseResults -ne 'true') {
+        $msg = $SanitizedMessage
+    }
     Write-Log ("[MODULE:$module] [$status] $msg")
 }
 #endregion
@@ -57,17 +64,17 @@ try {
     $workspace = Get-AzWvdWorkspace -ResourceGroupName $ResourceGroupName -Name $AvdWorkspaceName -ErrorAction Stop
 
     if ($workspace.FriendlyName -eq 'AVD Quickstart Workspace') {
-        Write-TestResult $moduleName 'PASS' "Workspace '$AvdWorkspaceName' exists with friendly name 'AVD Quickstart Workspace'"
+        Write-TestResult $moduleName 'PASS' "Workspace '$AvdWorkspaceName' exists with friendly name 'AVD Quickstart Workspace'" -SanitizedMessage 'Workspace ''<value>'' exists with friendly name ''AVD Quickstart Workspace'''
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "Workspace '$AvdWorkspaceName' friendly name is '$($workspace.FriendlyName)' (expected 'AVD Quickstart Workspace')"
+        Write-TestResult $moduleName 'FAIL' "Workspace '$AvdWorkspaceName' friendly name is '$($workspace.FriendlyName)' (expected 'AVD Quickstart Workspace')" -SanitizedMessage 'Workspace ''<value>'' friendly name is ''<value>'' (expected ''AVD Quickstart Workspace'')'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Workspace '$AvdWorkspaceName' not found or not accessible"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Workspace '$AvdWorkspaceName' not found or not accessible" -SanitizedMessage 'Workspace ''<value>'' not found or not accessible'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -86,17 +93,17 @@ try {
     if ($pool.CustomRdpProperty -notmatch 'enablerdsaadauth:i:1') { $issues += "CustomRdpProperty missing 'enablerdsaadauth:i:1'" }
 
     if ($issues.Count -eq 0) {
-        Write-TestResult $moduleName 'PASS' "Personal host pool '$HostPoolPersonalName' exists with expected configuration (Pooled, BreadthFirst, MaxSessions=2, Desktop, RDP AAD auth)"
+        Write-TestResult $moduleName 'PASS' "Personal host pool '$HostPoolPersonalName' exists with expected configuration (Pooled, BreadthFirst, MaxSessions=2, Desktop, RDP AAD auth)" -SanitizedMessage 'Personal host pool ''<value>'' exists with expected configuration (Pooled, BreadthFirst, MaxSessions=2, Desktop, RDP AAD auth)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("Personal host pool '$HostPoolPersonalName' configuration issues: " + ($issues -join '; '))
+        Write-TestResult $moduleName 'FAIL' ("Personal host pool '$HostPoolPersonalName' configuration issues: " + ($issues -join '; ')) -SanitizedMessage 'Personal host pool ''<value>'' configuration issues: <value>'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Personal host pool '$HostPoolPersonalName' not found or not accessible"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Personal host pool '$HostPoolPersonalName' not found or not accessible" -SanitizedMessage 'Personal host pool ''<value>'' not found or not accessible'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -115,17 +122,17 @@ try {
     if ($pool.CustomRdpProperty -notmatch 'enablerdsaadauth:i:1') { $issues += "CustomRdpProperty missing 'enablerdsaadauth:i:1'" }
 
     if ($issues.Count -eq 0) {
-        Write-TestResult $moduleName 'PASS' "RemoteApp host pool '$HostPoolRemoteappName' exists with expected configuration (Pooled, BreadthFirst, MaxSessions=10, RailApplications, RDP AAD auth)"
+        Write-TestResult $moduleName 'PASS' "RemoteApp host pool '$HostPoolRemoteappName' exists with expected configuration (Pooled, BreadthFirst, MaxSessions=10, RailApplications, RDP AAD auth)" -SanitizedMessage 'RemoteApp host pool ''<value>'' exists with expected configuration (Pooled, BreadthFirst, MaxSessions=10, RailApplications, RDP AAD auth)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("RemoteApp host pool '$HostPoolRemoteappName' configuration issues: " + ($issues -join '; '))
+        Write-TestResult $moduleName 'FAIL' ("RemoteApp host pool '$HostPoolRemoteappName' configuration issues: " + ($issues -join '; ')) -SanitizedMessage 'RemoteApp host pool ''<value>'' configuration issues: <value>'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "RemoteApp host pool '$HostPoolRemoteappName' not found or not accessible"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "RemoteApp host pool '$HostPoolRemoteappName' not found or not accessible" -SanitizedMessage 'RemoteApp host pool ''<value>'' not found or not accessible'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -140,17 +147,17 @@ try {
     if ($appGroup.FriendlyName -ne 'Personal Desktop') { $issues += "FriendlyName='$($appGroup.FriendlyName)' (expected 'Personal Desktop')" }
 
     if ($issues.Count -eq 0) {
-        Write-TestResult $moduleName 'PASS' "Personal app group '$AppGroupPersonalName' exists (Desktop type, friendly name 'Personal Desktop', linked to '$HostPoolPersonalName')"
+        Write-TestResult $moduleName 'PASS' "Personal app group '$AppGroupPersonalName' exists (Desktop type, friendly name 'Personal Desktop', linked to '$HostPoolPersonalName')" -SanitizedMessage 'Personal app group ''<value>'' exists (Desktop type, friendly name ''Personal Desktop'', linked to ''<value>'')'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("Personal app group '$AppGroupPersonalName' issues: " + ($issues -join '; '))
+        Write-TestResult $moduleName 'FAIL' ("Personal app group '$AppGroupPersonalName' issues: " + ($issues -join '; ')) -SanitizedMessage 'Personal app group ''<value>'' issues: <value>'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Personal app group '$AppGroupPersonalName' not found or not accessible"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Personal app group '$AppGroupPersonalName' not found or not accessible" -SanitizedMessage 'Personal app group ''<value>'' not found or not accessible'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -165,17 +172,17 @@ try {
     if ($appGroup.FriendlyName -ne 'RemoteApp Group') { $issues += "FriendlyName='$($appGroup.FriendlyName)' (expected 'RemoteApp Group')" }
 
     if ($issues.Count -eq 0) {
-        Write-TestResult $moduleName 'PASS' "RemoteApp app group '$AppGroupRemoteappName' exists (RemoteApp type, friendly name 'RemoteApp Group', linked to '$HostPoolRemoteappName')"
+        Write-TestResult $moduleName 'PASS' "RemoteApp app group '$AppGroupRemoteappName' exists (RemoteApp type, friendly name 'RemoteApp Group', linked to '$HostPoolRemoteappName')" -SanitizedMessage 'RemoteApp app group ''<value>'' exists (RemoteApp type, friendly name ''RemoteApp Group'', linked to ''<value>'')'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("RemoteApp app group '$AppGroupRemoteappName' issues: " + ($issues -join '; '))
+        Write-TestResult $moduleName 'FAIL' ("RemoteApp app group '$AppGroupRemoteappName' issues: " + ($issues -join '; ')) -SanitizedMessage 'RemoteApp app group ''<value>'' issues: <value>'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "RemoteApp app group '$AppGroupRemoteappName' not found or not accessible"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "RemoteApp app group '$AppGroupRemoteappName' not found or not accessible" -SanitizedMessage 'RemoteApp app group ''<value>'' not found or not accessible'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -190,17 +197,17 @@ try {
     if ($app.ShowInPortal -ne $true) { $issues += "ShowInPortal='$($app.ShowInPortal)' (expected 'True')" }
 
     if ($issues.Count -eq 0) {
-        Write-TestResult $moduleName 'PASS' "Microsoft Edge published in RemoteApp group (FriendlyName='Microsoft Edge', CommandLineSetting='DoNotAllow', ShowInPortal=True)"
+        Write-TestResult $moduleName 'PASS' "Microsoft Edge published in RemoteApp group (FriendlyName='Microsoft Edge', CommandLineSetting='DoNotAllow', ShowInPortal=True)" -SanitizedMessage 'Microsoft Edge published in RemoteApp group (FriendlyName=''Microsoft Edge'', CommandLineSetting=''DoNotAllow'', ShowInPortal=True)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("Microsoft Edge application issues: " + ($issues -join '; '))
+        Write-TestResult $moduleName 'FAIL' ("Microsoft Edge application issues: " + ($issues -join '; ')) -SanitizedMessage 'Microsoft Edge application issues: <value>'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Microsoft Edge application not found in RemoteApp group '$AppGroupRemoteappName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Microsoft Edge application not found in RemoteApp group '$AppGroupRemoteappName'" -SanitizedMessage 'Microsoft Edge application not found in RemoteApp group ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -218,17 +225,17 @@ try {
     if (-not $remoteappRef) { $issues += "RemoteApp app group '$AppGroupRemoteappName' not found in ApplicationGroupReference" }
 
     if ($issues.Count -eq 0) {
-        Write-TestResult $moduleName 'PASS' "Workspace '$AvdWorkspaceName' has both app groups associated ($($refs.Count) references)"
+        Write-TestResult $moduleName 'PASS' "Workspace '$AvdWorkspaceName' has both app groups associated ($($refs.Count) references)" -SanitizedMessage 'Workspace ''<value>'' has both app groups associated (<value> references)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("Workspace '$AvdWorkspaceName' association issues: " + ($issues -join '; '))
+        Write-TestResult $moduleName 'FAIL' ("Workspace '$AvdWorkspaceName' association issues: " + ($issues -join '; ')) -SanitizedMessage 'Workspace ''<value>'' association issues: <value>'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query workspace '$AvdWorkspaceName' for app group associations"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query workspace '$AvdWorkspaceName' for app group associations" -SanitizedMessage 'Failed to query workspace ''<value>'' for app group associations'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -246,17 +253,17 @@ try {
     if ($vm.Identity.Type -notmatch 'SystemAssigned') { $issues += "Identity Type='$($vm.Identity.Type)' (expected 'SystemAssigned')" }
 
     if ($issues.Count -eq 0) {
-        Write-TestResult $moduleName 'PASS' "Personal VM '$VmNamePersonal' exists with expected config (Windows_Client, TrustedLaunch, SecureBoot, vTPM, ReadWrite cache, SystemAssigned identity)"
+        Write-TestResult $moduleName 'PASS' "Personal VM '$VmNamePersonal' exists with expected config (Windows_Client, TrustedLaunch, SecureBoot, vTPM, ReadWrite cache, SystemAssigned identity)" -SanitizedMessage 'Personal VM ''<value>'' exists with expected config (Windows_Client, TrustedLaunch, SecureBoot, vTPM, ReadWrite cache, SystemAssigned identity)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("Personal VM '$VmNamePersonal' configuration issues: " + ($issues -join '; '))
+        Write-TestResult $moduleName 'FAIL' ("Personal VM '$VmNamePersonal' configuration issues: " + ($issues -join '; ')) -SanitizedMessage 'Personal VM ''<value>'' configuration issues: <value>'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Personal VM '$VmNamePersonal' not found or not accessible"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Personal VM '$VmNamePersonal' not found or not accessible" -SanitizedMessage 'Personal VM ''<value>'' not found or not accessible'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -274,17 +281,17 @@ try {
     if ($vm.Identity.Type -notmatch 'SystemAssigned') { $issues += "Identity Type='$($vm.Identity.Type)' (expected 'SystemAssigned')" }
 
     if ($issues.Count -eq 0) {
-        Write-TestResult $moduleName 'PASS' "RemoteApp VM '$VmNameRemoteapp' exists with expected config (Windows_Client, TrustedLaunch, SecureBoot, vTPM, ReadWrite cache, SystemAssigned identity)"
+        Write-TestResult $moduleName 'PASS' "RemoteApp VM '$VmNameRemoteapp' exists with expected config (Windows_Client, TrustedLaunch, SecureBoot, vTPM, ReadWrite cache, SystemAssigned identity)" -SanitizedMessage 'RemoteApp VM ''<value>'' exists with expected config (Windows_Client, TrustedLaunch, SecureBoot, vTPM, ReadWrite cache, SystemAssigned identity)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("RemoteApp VM '$VmNameRemoteapp' configuration issues: " + ($issues -join '; '))
+        Write-TestResult $moduleName 'FAIL' ("RemoteApp VM '$VmNameRemoteapp' configuration issues: " + ($issues -join '; ')) -SanitizedMessage 'RemoteApp VM ''<value>'' configuration issues: <value>'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "RemoteApp VM '$VmNameRemoteapp' not found or not accessible"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "RemoteApp VM '$VmNameRemoteapp' not found or not accessible" -SanitizedMessage 'RemoteApp VM ''<value>'' not found or not accessible'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -294,17 +301,17 @@ try {
     $match = $sessionHosts | Where-Object { $_.Name -match [regex]::Escape($VmNamePersonal) }
 
     if ($match) {
-        Write-TestResult $moduleName 'PASS' "Personal session host '$VmNamePersonal' registered to host pool '$HostPoolPersonalName' (Status=$($match.Status))"
+        Write-TestResult $moduleName 'PASS' "Personal session host '$VmNamePersonal' registered to host pool '$HostPoolPersonalName' (Status=$($match.Status))" -SanitizedMessage 'Personal session host ''<value>'' registered to host pool ''<value>'' (Status=<value>)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "Personal session host '$VmNamePersonal' not found in host pool '$HostPoolPersonalName'"
+        Write-TestResult $moduleName 'FAIL' "Personal session host '$VmNamePersonal' not found in host pool '$HostPoolPersonalName'" -SanitizedMessage 'Personal session host ''<value>'' not found in host pool ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query session hosts for host pool '$HostPoolPersonalName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query session hosts for host pool '$HostPoolPersonalName'" -SanitizedMessage 'Failed to query session hosts for host pool ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -314,17 +321,17 @@ try {
     $match = $sessionHosts | Where-Object { $_.Name -match [regex]::Escape($VmNameRemoteapp) }
 
     if ($match) {
-        Write-TestResult $moduleName 'PASS' "RemoteApp session host '$VmNameRemoteapp' registered to host pool '$HostPoolRemoteappName' (Status=$($match.Status))"
+        Write-TestResult $moduleName 'PASS' "RemoteApp session host '$VmNameRemoteapp' registered to host pool '$HostPoolRemoteappName' (Status=$($match.Status))" -SanitizedMessage 'RemoteApp session host ''<value>'' registered to host pool ''<value>'' (Status=<value>)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "RemoteApp session host '$VmNameRemoteapp' not found in host pool '$HostPoolRemoteappName'"
+        Write-TestResult $moduleName 'FAIL' "RemoteApp session host '$VmNameRemoteapp' not found in host pool '$HostPoolRemoteappName'" -SanitizedMessage 'RemoteApp session host ''<value>'' not found in host pool ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query session hosts for host pool '$HostPoolRemoteappName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query session hosts for host pool '$HostPoolRemoteappName'" -SanitizedMessage 'Failed to query session hosts for host pool ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -347,17 +354,17 @@ try {
     }
 
     if ($issues.Count -eq 0) {
-        Write-TestResult $moduleName 'PASS' "Both NICs have accelerated networking enabled ($($nics.Count) NICs found)"
+        Write-TestResult $moduleName 'PASS' "Both NICs have accelerated networking enabled ($($nics.Count) NICs found)" -SanitizedMessage 'Both NICs have accelerated networking enabled (<value> NICs found)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("NIC issues: " + ($issues -join '; '))
+        Write-TestResult $moduleName 'FAIL' ("NIC issues: " + ($issues -join '; ')) -SanitizedMessage 'NIC issues: <value>'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query network interfaces"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query network interfaces" -SanitizedMessage 'Failed to query network interfaces'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -369,17 +376,17 @@ try {
         Where-Object { $_.RoleDefinitionId -match $vmUserLoginRole }
 
     if ($assignments) {
-        Write-TestResult $moduleName 'PASS' "Virtual Machine User Login role assigned on resource group '$ResourceGroupName' ($($assignments.Count) assignment(s))"
+        Write-TestResult $moduleName 'PASS' "Virtual Machine User Login role assigned on resource group '$ResourceGroupName' ($($assignments.Count) assignment(s))" -SanitizedMessage 'Virtual Machine User Login role assigned on resource group ''<value>'' (<value> assignment(s))'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "No Virtual Machine User Login role assignment found on resource group '$ResourceGroupName'"
+        Write-TestResult $moduleName 'FAIL' "No Virtual Machine User Login role assignment found on resource group '$ResourceGroupName'" -SanitizedMessage 'No Virtual Machine User Login role assignment found on resource group ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query role assignments on resource group '$ResourceGroupName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query role assignments on resource group '$ResourceGroupName'" -SanitizedMessage 'Failed to query role assignments on resource group ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -392,17 +399,17 @@ try {
         Where-Object { $_.RoleDefinitionId -match $dvuRole }
 
     if ($assignments) {
-        Write-TestResult $moduleName 'PASS' "Desktop Virtualization User role assigned on personal app group '$AppGroupPersonalName' ($($assignments.Count) assignment(s))"
+        Write-TestResult $moduleName 'PASS' "Desktop Virtualization User role assigned on personal app group '$AppGroupPersonalName' ($($assignments.Count) assignment(s))" -SanitizedMessage 'Desktop Virtualization User role assigned on personal app group ''<value>'' (<value> assignment(s))'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "No Desktop Virtualization User role assignment found on personal app group '$AppGroupPersonalName'"
+        Write-TestResult $moduleName 'FAIL' "No Desktop Virtualization User role assignment found on personal app group '$AppGroupPersonalName'" -SanitizedMessage 'No Desktop Virtualization User role assignment found on personal app group ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query role assignments on personal app group '$AppGroupPersonalName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query role assignments on personal app group '$AppGroupPersonalName'" -SanitizedMessage 'Failed to query role assignments on personal app group ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -415,17 +422,17 @@ try {
         Where-Object { $_.RoleDefinitionId -match $dvuRole }
 
     if ($assignments) {
-        Write-TestResult $moduleName 'PASS' "Desktop Virtualization User role assigned on remoteapp app group '$AppGroupRemoteappName' ($($assignments.Count) assignment(s))"
+        Write-TestResult $moduleName 'PASS' "Desktop Virtualization User role assigned on remoteapp app group '$AppGroupRemoteappName' ($($assignments.Count) assignment(s))" -SanitizedMessage 'Desktop Virtualization User role assigned on remoteapp app group ''<value>'' (<value> assignment(s))'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "No Desktop Virtualization User role assignment found on remoteapp app group '$AppGroupRemoteappName'"
+        Write-TestResult $moduleName 'FAIL' "No Desktop Virtualization User role assignment found on remoteapp app group '$AppGroupRemoteappName'" -SanitizedMessage 'No Desktop Virtualization User role assignment found on remoteapp app group ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query role assignments on remoteapp app group '$AppGroupRemoteappName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query role assignments on remoteapp app group '$AppGroupRemoteappName'" -SanitizedMessage 'Failed to query role assignments on remoteapp app group ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
