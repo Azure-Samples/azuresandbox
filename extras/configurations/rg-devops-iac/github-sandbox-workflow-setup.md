@@ -2067,6 +2067,41 @@ but record which checks were unavailable locally; the hosted gate remains
 necessary. Review actual error output as well as the final CI summary.
 This step commits locally only; it does not push or create a PR.
 
+### If PowerShell analysis includes ancillary dependency files
+
+The attended run passed both isolated regression suites: 22 Python tests
+and privacy checks covering 22 child scripts and 667 static descriptions.
+Bash, Markdown, and internal links passed. Actionlint and gitleaks were
+unavailable locally. The PowerShell gate failed on two `make.ps1` warnings;
+the operator confirmed that file is ancillary and not part of the repository.
+
+The local PowerShell gate recursively analyzes the working directory, whereas
+hosted CI starts with a clean checkout. Do not change analyzer rules, edit
+downloaded dependencies, or remove Terraform's initialized directories to
+silence these findings. Instead, run the unchanged CI command against a
+temporary clean worktree of the committed source. This excludes local
+untracked and ignored dependencies without excluding committed scripts.
+
+After committing any documentation updates, run from the repository root:
+
+```bash
+(
+  set -euo pipefail
+  repo_root="$(git rev-parse --show-toplevel)"
+  check_dir="$(mktemp -d "${TMPDIR:-/tmp}/azuresandbox-ci.XXXXXXXX")"
+  git worktree add --detach "$check_dir/checkout" HEAD
+  trap 'git -C "$repo_root" worktree remove "$check_dir/checkout"; rmdir "$check_dir"' EXIT
+  cd "$check_dir/checkout"
+  ./scripts/Invoke-CIChecks.sh bash actions powershell markdown links secrets
+)
+```
+
+The temporary worktree is removed on exit; the original checkout, ignored
+configuration, Terraform dependencies, and state remain untouched.
+Any `FAILED` gate in this clean run still blocks publication.
+Unavailable actionlint or gitleaks gates must be reported as `SKIPPED`,
+not represented as locally verified.
+
 ## Remaining setup stages
 
 Subsequent steps will document:
