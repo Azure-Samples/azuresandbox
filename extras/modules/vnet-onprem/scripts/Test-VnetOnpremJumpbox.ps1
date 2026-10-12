@@ -1,3 +1,8 @@
+param(
+    [ValidateSet('true', 'false')]
+    [string]$VerboseResults = 'false'
+)
+
 #region functions
 function Write-Log {
     param([string]$msg)
@@ -10,8 +15,12 @@ function Write-TestResult {
     param(
         [string]$module,
         [string]$status,
-        [string]$msg
+        [string]$msg,
+        [string]$SanitizedMessage = 'Check result'
     )
+    if ($status -ne 'SUMMARY' -and $VerboseResults -ne 'true') {
+        $msg = $SanitizedMessage
+    }
     Write-Log ("[MODULE:$module] [$status] $msg")
 }
 #endregion
@@ -39,17 +48,17 @@ try {
     $cs = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
 
     if ($cs.PartOfDomain) {
-        Write-TestResult $moduleName 'PASS' "Domain: '$env:COMPUTERNAME' is domain-joined"
+        Write-TestResult $moduleName 'PASS' "Domain: '$env:COMPUTERNAME' is domain-joined" -SanitizedMessage 'Domain: ''<value>'' is domain-joined'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "Domain: '$env:COMPUTERNAME' is not domain-joined"
+        Write-TestResult $moduleName 'FAIL' "Domain: '$env:COMPUTERNAME' is not domain-joined" -SanitizedMessage 'Domain: ''<value>'' is not domain-joined'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Domain: Failed to query computer system"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Domain: Failed to query computer system" -SanitizedMessage 'Domain: Failed to query computer system'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -59,17 +68,17 @@ try {
     $domainName = $cs.Domain
 
     if ($domainName -match '\.local$') {
-        Write-TestResult $moduleName 'PASS' "Domain: Domain name is '$domainName'"
+        Write-TestResult $moduleName 'PASS' "Domain: Domain name is '$domainName'" -SanitizedMessage 'Domain: Domain name is ''<value>'''
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "Domain: Domain name '$domainName' does not match expected pattern (*.local)"
+        Write-TestResult $moduleName 'FAIL' "Domain: Domain name '$domainName' does not match expected pattern (*.local)" -SanitizedMessage 'Domain: Domain name ''<value>'' does not match expected pattern (*.local)'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Domain: Failed to query domain name"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Domain: Failed to query domain name" -SanitizedMessage 'Domain: Failed to query domain name'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -78,17 +87,17 @@ try {
     $feature = Get-WindowsFeature -Name 'RSAT-ADDS' -ErrorAction Stop
 
     if ($feature.InstallState -eq 'Installed') {
-        Write-TestResult $moduleName 'PASS' "Windows Features: RSAT-ADDS is installed"
+        Write-TestResult $moduleName 'PASS' "Windows Features: RSAT-ADDS is installed" -SanitizedMessage 'Windows Features: RSAT-ADDS is installed'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "Windows Features: RSAT-ADDS install state is '$($feature.InstallState)' (expected 'Installed')"
+        Write-TestResult $moduleName 'FAIL' "Windows Features: RSAT-ADDS install state is '$($feature.InstallState)' (expected 'Installed')" -SanitizedMessage 'Windows Features: RSAT-ADDS install state is ''<value>'' (expected ''Installed'')'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Windows Features: Failed to query RSAT-ADDS"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Windows Features: Failed to query RSAT-ADDS" -SanitizedMessage 'Windows Features: Failed to query RSAT-ADDS'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -97,17 +106,17 @@ try {
     $feature = Get-WindowsFeature -Name 'RSAT-DNS-Server' -ErrorAction Stop
 
     if ($feature.InstallState -eq 'Installed') {
-        Write-TestResult $moduleName 'PASS' "Windows Features: RSAT-DNS-Server is installed"
+        Write-TestResult $moduleName 'PASS' "Windows Features: RSAT-DNS-Server is installed" -SanitizedMessage 'Windows Features: RSAT-DNS-Server is installed'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "Windows Features: RSAT-DNS-Server install state is '$($feature.InstallState)' (expected 'Installed')"
+        Write-TestResult $moduleName 'FAIL' "Windows Features: RSAT-DNS-Server install state is '$($feature.InstallState)' (expected 'Installed')" -SanitizedMessage 'Windows Features: RSAT-DNS-Server install state is ''<value>'' (expected ''Installed'')'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Windows Features: Failed to query RSAT-DNS-Server"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Windows Features: Failed to query RSAT-DNS-Server" -SanitizedMessage 'Windows Features: Failed to query RSAT-DNS-Server'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -116,11 +125,11 @@ $ssmsPath = Get-ChildItem 'C:\Program Files\Microsoft SQL Server Management Stud
     Select-Object -First 1
 if ($ssmsPath) {
     $ssmsVersion = $ssmsPath.VersionInfo.ProductVersion
-    Write-TestResult $moduleName 'PASS' ("Software: SSMS installed at '" + $ssmsPath.FullName + "' (version: $ssmsVersion)")
+    Write-TestResult $moduleName 'PASS' ("Software: SSMS installed at '" + $ssmsPath.FullName + "' (version: $ssmsVersion)") -SanitizedMessage 'Software: SSMS installed at ''<value>'' (version: <value>)'
     $passed++
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "Software: SQL Server Management Studio not found"
+    Write-TestResult $moduleName 'FAIL' "Software: SQL Server Management Studio not found" -SanitizedMessage 'Software: SQL Server Management Studio not found'
     $failed++
 }
 
@@ -129,11 +138,11 @@ $mysqlWbPath = Get-ChildItem 'C:\Program Files\MySQL\MySQL Workbench*\MySQL*Work
     Select-Object -First 1
 if ($mysqlWbPath) {
     $mysqlWbVersion = $mysqlWbPath.VersionInfo.ProductVersion
-    Write-TestResult $moduleName 'PASS' ("Software: MySQL Workbench installed at '" + $mysqlWbPath.FullName + "' (version: $mysqlWbVersion)")
+    Write-TestResult $moduleName 'PASS' ("Software: MySQL Workbench installed at '" + $mysqlWbPath.FullName + "' (version: $mysqlWbVersion)") -SanitizedMessage 'Software: MySQL Workbench installed at ''<value>'' (version: <value>)'
     $passed++
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "Software: MySQL Workbench not found"
+    Write-TestResult $moduleName 'FAIL' "Software: MySQL Workbench not found" -SanitizedMessage 'Software: MySQL Workbench not found'
     $failed++
 }
 
@@ -141,11 +150,11 @@ else {
 $vscodePath = 'C:\Program Files\Microsoft VS Code\Code.exe'
 if (Test-Path $vscodePath) {
     $vscodeVersion = (Get-Item $vscodePath).VersionInfo.ProductVersion
-    Write-TestResult $moduleName 'PASS' "Software: Visual Studio Code installed (version: $vscodeVersion)"
+    Write-TestResult $moduleName 'PASS' "Software: Visual Studio Code installed (version: $vscodeVersion)" -SanitizedMessage 'Software: Visual Studio Code installed (version: <value>)'
     $passed++
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "Software: Visual Studio Code not found at '$vscodePath'"
+    Write-TestResult $moduleName 'FAIL' "Software: Visual Studio Code not found at '$vscodePath'" -SanitizedMessage 'Software: Visual Studio Code not found at ''<value>'''
     $failed++
 }
 
@@ -156,17 +165,17 @@ try {
     $ip = ($dnsResult | Where-Object { $_.QueryType -eq 'A' } | Select-Object -First 1).IPAddress
 
     if ($ip -match '^192\.168\.1\.') {
-        Write-TestResult $moduleName 'PASS' "DNS: '$onpremFqdn' resolves to '$ip' (in snet-adds-02 subnet)"
+        Write-TestResult $moduleName 'PASS' "DNS: '$onpremFqdn' resolves to '$ip' (in snet-adds-02 subnet)" -SanitizedMessage 'DNS: ''<value>'' resolves to ''<value>'' (in snet-adds-02 subnet)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "DNS: '$onpremFqdn' resolved to '$ip' (expected IP in 192.168.1.0/24)"
+        Write-TestResult $moduleName 'FAIL' "DNS: '$onpremFqdn' resolved to '$ip' (expected IP in 192.168.1.0/24)" -SanitizedMessage 'DNS: ''<value>'' resolved to ''<value>'' (expected IP in <address>/24)'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "DNS: '$onpremFqdn' does not resolve"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "DNS: '$onpremFqdn' does not resolve" -SanitizedMessage 'DNS: ''<value>'' does not resolve'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 

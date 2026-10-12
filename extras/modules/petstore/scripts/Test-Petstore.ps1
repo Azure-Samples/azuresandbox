@@ -12,7 +12,10 @@ param(
     [string]$ContainerRegistryName,
 
     [Parameter(Mandatory = $true)]
-    [string]$ApplicationInsightsName
+    [string]$ApplicationInsightsName,
+
+    [ValidateSet('true', 'false')]
+    [string]$VerboseResults = 'false'
 )
 
 #region functions
@@ -25,8 +28,12 @@ function Write-TestResult {
     param(
         [string]$module,
         [string]$status,
-        [string]$msg
+        [string]$msg,
+        [string]$SanitizedMessage = 'Check result'
     )
+    if ($status -ne 'SUMMARY' -and $VerboseResults -ne 'true') {
+        $msg = $SanitizedMessage
+    }
     Write-Log ("[MODULE:$module] [$status] $msg")
 }
 #endregion
@@ -58,17 +65,17 @@ try {
     }
 
     if ($issues.Count -eq 0) {
-        Write-TestResult $moduleName 'PASS' ("Container App Environment '$ContainerAppEnvironmentName' exists with expected configuration (Succeeded, internal load balancer enabled)")
+        Write-TestResult $moduleName 'PASS' ("Container App Environment '$ContainerAppEnvironmentName' exists with expected configuration (Succeeded, internal load balancer enabled)") -SanitizedMessage 'Container App Environment ''<value>'' exists with expected configuration (Succeeded, internal load balancer enabled)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("Container App Environment '$ContainerAppEnvironmentName' configuration issues: " + ($issues -join '; '))
+        Write-TestResult $moduleName 'FAIL' ("Container App Environment '$ContainerAppEnvironmentName' configuration issues: " + ($issues -join '; ')) -SanitizedMessage 'Container App Environment ''<value>'' configuration issues: <value>'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Container App Environment '$ContainerAppEnvironmentName' not found or not accessible"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Container App Environment '$ContainerAppEnvironmentName' not found or not accessible" -SanitizedMessage 'Container App Environment ''<value>'' not found or not accessible'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -79,17 +86,17 @@ try {
     $identityType = $envResource.Identity.Type
 
     if ($identityType -match 'SystemAssigned') {
-        Write-TestResult $moduleName 'PASS' ("Container App Environment '$ContainerAppEnvironmentName' has system-assigned managed identity (PrincipalId: $($envResource.Identity.PrincipalId))")
+        Write-TestResult $moduleName 'PASS' ("Container App Environment '$ContainerAppEnvironmentName' has system-assigned managed identity (PrincipalId: $($envResource.Identity.PrincipalId))") -SanitizedMessage 'Container App Environment ''<value>'' has system-assigned managed identity (PrincipalId: <value>)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("Container App Environment '$ContainerAppEnvironmentName' identity type is '$identityType' (expected 'SystemAssigned')")
+        Write-TestResult $moduleName 'FAIL' ("Container App Environment '$ContainerAppEnvironmentName' identity type is '$identityType' (expected 'SystemAssigned')") -SanitizedMessage 'Container App Environment ''<value>'' identity type is ''<value>'' (expected ''SystemAssigned'')'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query identity for Container App Environment '$ContainerAppEnvironmentName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query identity for Container App Environment '$ContainerAppEnvironmentName'" -SanitizedMessage 'Failed to query identity for Container App Environment ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -113,17 +120,17 @@ try {
     }
 
     if ($issues.Count -eq 0) {
-        Write-TestResult $moduleName 'PASS' ("Container App '$ContainerAppName' exists with expected configuration (Succeeded, petstore image, port 8080)")
+        Write-TestResult $moduleName 'PASS' ("Container App '$ContainerAppName' exists with expected configuration (Succeeded, petstore image, port 8080)") -SanitizedMessage 'Container App ''<value>'' exists with expected configuration (Succeeded, petstore image, port 8080)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("Container App '$ContainerAppName' configuration issues: " + ($issues -join '; '))
+        Write-TestResult $moduleName 'FAIL' ("Container App '$ContainerAppName' configuration issues: " + ($issues -join '; ')) -SanitizedMessage 'Container App ''<value>'' configuration issues: <value>'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Container App '$ContainerAppName' not found or not accessible"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Container App '$ContainerAppName' not found or not accessible" -SanitizedMessage 'Container App ''<value>'' not found or not accessible'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -148,17 +155,17 @@ try {
     }
 
     if ($issues.Count -eq 0) {
-        Write-TestResult $moduleName 'PASS' ("Container App '$ContainerAppName' ingress is correctly configured (external, HTTPS-only, 100% latest revision)")
+        Write-TestResult $moduleName 'PASS' ("Container App '$ContainerAppName' ingress is correctly configured (external, HTTPS-only, 100% latest revision)") -SanitizedMessage 'Container App ''<value>'' ingress is correctly configured (external, HTTPS-only, 100% latest revision)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("Container App '$ContainerAppName' ingress issues: " + ($issues -join '; '))
+        Write-TestResult $moduleName 'FAIL' ("Container App '$ContainerAppName' ingress issues: " + ($issues -join '; ')) -SanitizedMessage 'Container App ''<value>'' ingress issues: <value>'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query ingress for Container App '$ContainerAppName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query ingress for Container App '$ContainerAppName'" -SanitizedMessage 'Failed to query ingress for Container App ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -171,17 +178,17 @@ try {
         Where-Object { $_.RoleDefinitionName -eq 'AcrPull' -and $_.Scope -match "Microsoft.ContainerRegistry/registries/$ContainerRegistryName`$" }
 
     if ($roleAssignments) {
-        Write-TestResult $moduleName 'PASS' ("AcrPull role assignment exists for environment identity (PrincipalId: $principalId) on registry '$ContainerRegistryName'")
+        Write-TestResult $moduleName 'PASS' ("AcrPull role assignment exists for environment identity (PrincipalId: $principalId) on registry '$ContainerRegistryName'") -SanitizedMessage 'AcrPull role assignment exists for environment identity (PrincipalId: <value>) on registry ''<value>'''
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("No AcrPull role assignment found for environment identity (PrincipalId: $principalId) on registry '$ContainerRegistryName'")
+        Write-TestResult $moduleName 'FAIL' ("No AcrPull role assignment found for environment identity (PrincipalId: $principalId) on registry '$ContainerRegistryName'") -SanitizedMessage 'No AcrPull role assignment found for environment identity (PrincipalId: <value>) on registry ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query role assignments for Container App Environment identity"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query role assignments for Container App Environment identity" -SanitizedMessage 'Failed to query role assignments for Container App Environment identity'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -197,22 +204,22 @@ try {
         $status = $connection.PrivateLinkServiceConnectionState.Status
 
         if ($status -eq 'Approved') {
-            Write-TestResult $moduleName 'PASS' ("Private endpoint '$($endpoints[0].Name)' is connected with status 'Approved'")
+            Write-TestResult $moduleName 'PASS' ("Private endpoint '$($endpoints[0].Name)' is connected with status 'Approved'") -SanitizedMessage 'Private endpoint ''<value>'' is connected with status ''Approved'''
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' ("Private endpoint '$($endpoints[0].Name)' connection status is '$status' (expected 'Approved')")
+            Write-TestResult $moduleName 'FAIL' ("Private endpoint '$($endpoints[0].Name)' connection status is '$status' (expected 'Approved')") -SanitizedMessage 'Private endpoint ''<value>'' connection status is ''<value>'' (expected ''Approved'')'
             $failed++
         }
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "No private endpoint found for Container App Environment '$ContainerAppEnvironmentName'"
+        Write-TestResult $moduleName 'FAIL' "No private endpoint found for Container App Environment '$ContainerAppEnvironmentName'" -SanitizedMessage 'No private endpoint found for Container App Environment ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query private endpoints for Container App Environment '$ContainerAppEnvironmentName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query private endpoints for Container App Environment '$ContainerAppEnvironmentName'" -SanitizedMessage 'Failed to query private endpoints for Container App Environment ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -226,17 +233,17 @@ try {
 
     if ($recordSets) {
         $ip = $recordSets[0].Records[0].Ipv4Address
-        Write-TestResult $moduleName 'PASS' ("Private DNS A record exists in zone '$zoneName' (IP: $ip)")
+        Write-TestResult $moduleName 'PASS' ("Private DNS A record exists in zone '$zoneName' (IP: $ip)") -SanitizedMessage 'Private DNS A record exists in zone ''<value>'' (IP: <value>)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "No private DNS A record found in zone '$zoneName'"
+        Write-TestResult $moduleName 'FAIL' "No private DNS A record found in zone '$zoneName'" -SanitizedMessage 'No private DNS A record found in zone ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query private DNS zone for Container App Environment"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query private DNS zone for Container App Environment" -SanitizedMessage 'Failed to query private DNS zone for Container App Environment'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -245,17 +252,17 @@ try {
     $app = Get-AzContainerApp -ResourceGroupName $ResourceGroupName -Name $ContainerAppName -ErrorAction Stop
 
     if ($app.IdentityType -match 'SystemAssigned' -and $app.IdentityPrincipalId) {
-        Write-TestResult $moduleName 'PASS' ("Container App '$ContainerAppName' has a system-assigned managed identity (PrincipalId: $($app.IdentityPrincipalId))")
+        Write-TestResult $moduleName 'PASS' ("Container App '$ContainerAppName' has a system-assigned managed identity (PrincipalId: $($app.IdentityPrincipalId))") -SanitizedMessage 'Container App ''<value>'' has a system-assigned managed identity (PrincipalId: <value>)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("Container App '$ContainerAppName' identity type is '$($app.IdentityType)' (expected 'SystemAssigned')")
+        Write-TestResult $moduleName 'FAIL' ("Container App '$ContainerAppName' identity type is '$($app.IdentityType)' (expected 'SystemAssigned')") -SanitizedMessage 'Container App ''<value>'' identity type is ''<value>'' (expected ''SystemAssigned'')'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query identity for Container App '$ContainerAppName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query identity for Container App '$ContainerAppName'" -SanitizedMessage 'Failed to query identity for Container App ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -281,17 +288,17 @@ try {
     }
 
     if ($issues.Count -eq 0) {
-        Write-TestResult $moduleName 'PASS' ("Container App '$ContainerAppName' has Application Insights env vars wired for Entra ID auth (connection string set, Authorization=AAD, role name '$($envVars['APPLICATIONINSIGHTS_ROLE_NAME'])')")
+        Write-TestResult $moduleName 'PASS' ("Container App '$ContainerAppName' has Application Insights env vars wired for Entra ID auth (connection string set, Authorization=AAD, role name '$($envVars['APPLICATIONINSIGHTS_ROLE_NAME'])')") -SanitizedMessage 'Container App ''<value>'' has Application Insights env vars wired for Entra ID auth (connection string set, Authorization=AAD, role name ''<value>'')'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("Container App '$ContainerAppName' Application Insights env var issues: " + ($issues -join '; '))
+        Write-TestResult $moduleName 'FAIL' ("Container App '$ContainerAppName' Application Insights env var issues: " + ($issues -join '; ')) -SanitizedMessage 'Container App ''<value>'' Application Insights env var issues: <value>'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query environment variables for Container App '$ContainerAppName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query environment variables for Container App '$ContainerAppName'" -SanitizedMessage 'Failed to query environment variables for Container App ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -306,17 +313,17 @@ try {
         Where-Object { $_.RoleDefinitionName -eq 'Monitoring Metrics Publisher' }
 
     if ($roleAssignments) {
-        Write-TestResult $moduleName 'PASS' ("Monitoring Metrics Publisher role assignment exists for container app identity (PrincipalId: $principalId) on Application Insights '$ApplicationInsightsName'")
+        Write-TestResult $moduleName 'PASS' ("Monitoring Metrics Publisher role assignment exists for container app identity (PrincipalId: $principalId) on Application Insights '$ApplicationInsightsName'") -SanitizedMessage 'Monitoring Metrics Publisher role assignment exists for container app identity (PrincipalId: <value>) on Application Insights ''<value>'''
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("No Monitoring Metrics Publisher role assignment found for container app identity (PrincipalId: $principalId) on Application Insights '$ApplicationInsightsName'")
+        Write-TestResult $moduleName 'FAIL' ("No Monitoring Metrics Publisher role assignment found for container app identity (PrincipalId: $principalId) on Application Insights '$ApplicationInsightsName'") -SanitizedMessage 'No Monitoring Metrics Publisher role assignment found for container app identity (PrincipalId: <value>) on Application Insights ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query Monitoring Metrics Publisher role assignment for the container app identity"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query Monitoring Metrics Publisher role assignment for the container app identity" -SanitizedMessage 'Failed to query Monitoring Metrics Publisher role assignment for the container app identity'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -328,17 +335,17 @@ try {
         Where-Object { $_.Scope -match "Microsoft.ContainerRegistry/registries/$ContainerRegistryName`$" }
 
     if ($roleAssignments) {
-        Write-TestResult $moduleName 'PASS' ("AcrPush role assignment exists on registry '$ContainerRegistryName' for the image build identity (PrincipalId: $($roleAssignments[0].ObjectId))")
+        Write-TestResult $moduleName 'PASS' ("AcrPush role assignment exists on registry '$ContainerRegistryName' for the image build identity (PrincipalId: $($roleAssignments[0].ObjectId))") -SanitizedMessage 'AcrPush role assignment exists on registry ''<value>'' for the image build identity (PrincipalId: <value>)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("No AcrPush role assignment found on registry '$ContainerRegistryName' (required for jumplinux1 to build and push the instrumented image)")
+        Write-TestResult $moduleName 'FAIL' ("No AcrPush role assignment found on registry '$ContainerRegistryName' (required for jumplinux1 to build and push the instrumented image)") -SanitizedMessage 'No AcrPush role assignment found on registry ''<value>'' (required for jumplinux1 to build and push the instrumented image)'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query AcrPush role assignments on registry '$ContainerRegistryName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query AcrPush role assignments on registry '$ContainerRegistryName'" -SanitizedMessage 'Failed to query AcrPush role assignments on registry ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 

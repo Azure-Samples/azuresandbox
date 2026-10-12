@@ -1,3 +1,8 @@
+param(
+    [ValidateSet('true', 'false')]
+    [string]$VerboseResults = 'false'
+)
+
 #region functions
 function Write-Log {
     param([string]$msg)
@@ -10,8 +15,12 @@ function Write-TestResult {
     param(
         [string]$module,
         [string]$status,
-        [string]$msg
+        [string]$msg,
+        [string]$SanitizedMessage = 'Check result'
     )
+    if ($status -ne 'SUMMARY' -and $VerboseResults -ne 'true') {
+        $msg = $SanitizedMessage
+    }
     Write-Log ("[MODULE:$module] [$status] $msg")
 }
 #endregion
@@ -39,24 +48,24 @@ $domainName = $null
 try {
     $adDomain = Get-ADDomain -ErrorAction Stop
     $domainName = $adDomain.DNSRoot
-    Write-TestResult $moduleName 'PASS' "AD DS: Domain '$domainName' exists"
+    Write-TestResult $moduleName 'PASS' "AD DS: Domain '$domainName' exists" -SanitizedMessage 'AD DS: Domain ''<value>'' exists'
     $passed++
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "AD DS: Domain does not exist or is not reachable"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "AD DS: Domain does not exist or is not reachable" -SanitizedMessage 'AD DS: Domain does not exist or is not reachable'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
 # Test 2: This machine is a domain controller
 try {
     $null = Get-ADDomainController -Identity $env:COMPUTERNAME -ErrorAction Stop
-    Write-TestResult $moduleName 'PASS' "AD DS: '$env:COMPUTERNAME' is a domain controller"
+    Write-TestResult $moduleName 'PASS' "AD DS: '$env:COMPUTERNAME' is a domain controller" -SanitizedMessage 'AD DS: ''<value>'' is a domain controller'
     $passed++
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "AD DS: '$env:COMPUTERNAME' is not a domain controller"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "AD DS: '$env:COMPUTERNAME' is not a domain controller" -SanitizedMessage 'AD DS: ''<value>'' is not a domain controller'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -68,22 +77,22 @@ if ($domainName) {
         $ip = ($dnsResult | Where-Object { $_.QueryType -eq 'A' } | Select-Object -First 1).IPAddress
 
         if ($ip -match '^192\.168\.1\.') {
-            Write-TestResult $moduleName 'PASS' "DNS: '$fqdn' resolves to '$ip' (in snet-adds-02 subnet)"
+            Write-TestResult $moduleName 'PASS' "DNS: '$fqdn' resolves to '$ip' (in snet-adds-02 subnet)" -SanitizedMessage 'DNS: ''<value>'' resolves to ''<value>'' (in snet-adds-02 subnet)'
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' "DNS: '$fqdn' resolved to '$ip' (expected IP in 192.168.1.0/24)"
+            Write-TestResult $moduleName 'FAIL' "DNS: '$fqdn' resolved to '$ip' (expected IP in 192.168.1.0/24)" -SanitizedMessage 'DNS: ''<value>'' resolved to ''<value>'' (expected IP in <address>/24)'
             $failed++
         }
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "DNS: '$fqdn' does not resolve"
-        Write-TestResult $moduleName 'FAIL' "Exception: $_"
+        Write-TestResult $moduleName 'FAIL' "DNS: '$fqdn' does not resolve" -SanitizedMessage 'DNS: ''<value>'' does not resolve'
+        Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
         $failed++
     }
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "DNS: Skipped - domain name not available (Test 1 failed)"
+    Write-TestResult $moduleName 'FAIL' "DNS: Skipped - domain name not available (Test 1 failed)" -SanitizedMessage 'DNS: Skipped - domain name not available (Test 1 failed)'
     $failed++
 }
 
@@ -94,17 +103,17 @@ try {
     $forwarderIPs = @($forwarders.IPAddress | ForEach-Object { "$_" })
 
     if ($forwarderIPs -contains $azureDns) {
-        Write-TestResult $moduleName 'PASS' "DNS: Azure DNS forwarder '$azureDns' is configured"
+        Write-TestResult $moduleName 'PASS' "DNS: Azure DNS forwarder '$azureDns' is configured" -SanitizedMessage 'DNS: Azure DNS forwarder ''<value>'' is configured'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "DNS: Azure DNS forwarder '$azureDns' not found. Current forwarders: $($forwarderIPs -join ', ')"
+        Write-TestResult $moduleName 'FAIL' "DNS: Azure DNS forwarder '$azureDns' not found. Current forwarders: $($forwarderIPs -join ', ')" -SanitizedMessage 'DNS: Azure DNS forwarder ''<value>'' not found. Current forwarders: <value>'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "DNS: Unable to query DNS server forwarders"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "DNS: Unable to query DNS server forwarders" -SanitizedMessage 'DNS: Unable to query DNS server forwarders'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -113,17 +122,17 @@ if ($domainName) {
     try {
         $record = Get-DnsServerResourceRecord -ZoneName $domainName -Name $env:COMPUTERNAME -RRType A -ErrorAction Stop
         $recordIp = "$($record.RecordData.IPv4Address)"
-        Write-TestResult $moduleName 'PASS' "DNS: A record for '$env:COMPUTERNAME' in zone '$domainName' has IP '$recordIp'"
+        Write-TestResult $moduleName 'PASS' "DNS: A record for '$env:COMPUTERNAME' in zone '$domainName' has IP '$recordIp'" -SanitizedMessage 'DNS: A record for ''<value>'' in zone ''<value>'' has IP ''<value>'''
         $passed++
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "DNS: A record for '$env:COMPUTERNAME' in zone '$domainName' not found"
-        Write-TestResult $moduleName 'FAIL' "Exception: $_"
+        Write-TestResult $moduleName 'FAIL' "DNS: A record for '$env:COMPUTERNAME' in zone '$domainName' not found" -SanitizedMessage 'DNS: A record for ''<value>'' in zone ''<value>'' not found'
+        Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
         $failed++
     }
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "DNS: Skipped - domain name not available (Test 1 failed)"
+    Write-TestResult $moduleName 'FAIL' "DNS: Skipped - domain name not available (Test 1 failed)" -SanitizedMessage 'DNS: Skipped - domain name not available (Test 1 failed)'
     $failed++
 }
 
@@ -145,17 +154,17 @@ foreach ($cf in $conditionalForwarders) {
 
         if ($zone.ZoneType -eq 'Forwarder') {
             $masterServers = @($zone.MasterServers | ForEach-Object { "$_" })
-            Write-TestResult $moduleName 'PASS' "DNS: Conditional forwarder for '$($cf.Name)' exists ($($cf.Description)), master servers: $($masterServers -join ', ')"
+            Write-TestResult $moduleName 'PASS' "DNS: Conditional forwarder for '$($cf.Name)' exists ($($cf.Description)), master servers: $($masterServers -join ', ')" -SanitizedMessage 'DNS: Conditional forwarder for ''<value>'' exists (<value>), master servers: <value>'
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' "DNS: Zone '$($cf.Name)' exists but type is '$($zone.ZoneType)' (expected 'Forwarder')"
+            Write-TestResult $moduleName 'FAIL' "DNS: Zone '$($cf.Name)' exists but type is '$($zone.ZoneType)' (expected 'Forwarder')" -SanitizedMessage 'DNS: Zone ''<value>'' exists but type is ''<value>'' (expected ''Forwarder'')'
             $failed++
         }
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "DNS: Conditional forwarder for '$($cf.Name)' ($($cf.Description)) not found"
-        Write-TestResult $moduleName 'FAIL' "Exception: $_"
+        Write-TestResult $moduleName 'FAIL' "DNS: Conditional forwarder for '$($cf.Name)' ($($cf.Description)) not found" -SanitizedMessage 'DNS: Conditional forwarder for ''<value>'' (<value>) not found'
+        Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
         $failed++
     }
 }

@@ -41,6 +41,8 @@
 #   Optional: emit machine-readable results for CI/CD (either or both; any scope above)
 #     From bash:       pwsh -File ./scripts/Invoke-UnitTests.ps1 -ResultsJsonPath ./test-results.json -JUnitXmlPath ./test-results.xml
 #     From PowerShell: .\scripts\Invoke-UnitTests.ps1 -Module vnet_app -JUnitXmlPath .\test-results.xml
+#   Results are sanitized by default. Add -VerboseResults for the original
+#   environment-specific check text and diagnostics (private use only).
 #
 # Exit codes: 0 = all tests passed, 1 = one or more tests failed, 2 = harness error (bad
 #   parameters, missing Azure auth / terraform state, etc. - no or partial tests ran).
@@ -62,7 +64,9 @@
 #   - JUnit XML: <testsuites>/<testsuite>/<testcase> with <failure> for failed checks,
 #     <skipped> for skipped checks or undeployed modules, and an <error> 'harness' suite on
 #     exit code 2 - consumable by standard GitHub test-reporter actions.
-#   The files contain the same resource names and messages as the log file; handle them alike.
+#   Default JSON and JUnit preserve counts/statuses and static child check descriptions,
+#   excluding runtime values and exception text. -VerboseResults restores full detail
+#   in both formats. General console/log diagnostics remain private.
 #
 # Prerequisites:
 #   - PowerShell 7.x (pwsh) with Az.Accounts, Az.Compute, Az.Resources, Az.Sql, Az.Network,
@@ -84,7 +88,10 @@ param(
     [string]$ResultsJsonPath,
 
     [Parameter(Mandatory = $false)]
-    [string]$JUnitXmlPath
+    [string]$JUnitXmlPath,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$VerboseResults
 )
 
 #region functions
@@ -109,11 +116,48 @@ function Remove-AnsiEscape {
     return ($Value -replace '\x1B\[[0-9;?]*[ -/]*[@-~]', '')
 }
 
+function Get-PublicTestDescriptions {
+    param([string]$ScriptPath)
+
+    $descriptions = [System.Collections.Generic.List[string]]::new()
+    if ([IO.Path]::GetExtension($ScriptPath) -eq '.ps1') {
+        $tokens = $null; $parseErrors = $null
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$tokens, [ref]$parseErrors)
+        if ($parseErrors) { throw 'Cannot parse child test descriptions.' }
+        foreach ($command in $ast.FindAll({
+                    param($node)
+                    $node -is [System.Management.Automation.Language.CommandAst] -and $node.GetCommandName() -eq 'Write-TestResult'
+                }, $true)) {
+            for ($index = 0; $index -lt $command.CommandElements.Count - 1; $index++) {
+                $element = $command.CommandElements[$index]
+                if ($element -is [System.Management.Automation.Language.CommandParameterAst] -and $element.ParameterName -eq 'SanitizedMessage') {
+                    $label = $command.CommandElements[$index + 1]
+                    if ($label -isnot [System.Management.Automation.Language.StringConstantExpressionAst]) {
+                        throw 'Public child descriptions must be static strings.'
+                    }
+                    $descriptions.Add($label.Value)
+                }
+            }
+        }
+    }
+    else {
+        foreach ($line in [IO.File]::ReadAllLines($ScriptPath)) {
+            if ($line -match "^\s*write_test_result\s+'(?:PASS|FAIL|SKIP)'.*\s+'([^']*)'\s*$") {
+                $descriptions.Add($Matches[1])
+            }
+        }
+    }
+    return , $descriptions.ToArray()
+}
+
 function ConvertFrom-TestOutput {
     # Parses the per-check protocol shared by all test scripts: '[MODULE:<name>] [PASS|FAIL|SKIP] <message>'.
     # A 'FAIL Exception: ...' line, and any untimestamped continuation lines of a multi-line
     # message, are detail for the preceding failed check rather than separate checks.
-    param([string[]]$Lines)
+    param(
+        [string[]]$Lines,
+        [string[]]$PublicDescriptions = @()
+    )
 
     $statusMap = @{ PASS = 'passed'; FAIL = 'failed'; SKIP = 'skipped' }
     $parsed = [System.Collections.Generic.List[object]]::new()
@@ -145,10 +189,15 @@ function ConvertFrom-TestOutput {
 
     $checks = [System.Collections.Generic.List[object]]::new()
     foreach ($p in $parsed) {
+        $name = $p.Name
+        if (-not $VerboseResults -and $name -notin $PublicDescriptions) {
+            Write-Log '[WARNING] Child emitted an unrecognized check description; runtime text withheld from results.'
+            $name = 'Unrecognized check description (details withheld)'
+        }
         $checks.Add([ordered]@{
-                name    = $p.Name
+                name    = $name
                 status  = $p.Status
-                message = if ($p.Details.Count -gt 0) { $p.Details -join "`n" } else { $null }
+                message = if ($VerboseResults -and $p.Details.Count -gt 0) { $p.Details -join "`n" } else { $null }
             })
     }
     return , $checks.ToArray()
@@ -174,7 +223,8 @@ function Add-SuiteResult {
     foreach ($c in @($TestResult.Checks)) { if ($c) { $checks.Add($c) } }
 
     if ($TestResult.HarnessError) {
-        $checks.Add([ordered]@{ name = 'Test harness'; status = 'failed'; message = (Remove-AnsiEscape $TestResult.HarnessError) })
+        $detail = if ($VerboseResults) { Remove-AnsiEscape $TestResult.HarnessError } else { 'Child test execution or summary parsing failed. Use -VerboseResults for private diagnostics.' }
+        $checks.Add([ordered]@{ name = 'Test harness'; status = 'failed'; message = $detail })
     }
     else {
         $attributed = @($checks | Where-Object { $_.status -eq 'failed' }).Count
@@ -357,6 +407,9 @@ function Write-ResultFiles {
     if (-not $script:resultsJsonFullPath -and -not $script:junitXmlFullPath) { return }
 
     $ErrorMessage = Remove-AnsiEscape $ErrorMessage
+    if ($ErrorMessage -and -not $VerboseResults) {
+        $ErrorMessage = 'Test harness error. Use -VerboseResults for private diagnostics.'
+    }
     $finishedAt = Get-Date
     $startedAt = if ($script:runStartedAt) { $script:runStartedAt } else { $finishedAt }
     $durationSeconds = [math]::Round(($finishedAt - $startedAt).TotalSeconds, 3)
@@ -372,7 +425,7 @@ function Write-ResultFiles {
                 result          = switch ($ExitCode) { 0 { 'pass' } 1 { 'fail' } default { 'error' } }
                 exitCode        = $ExitCode
                 error           = if ($ErrorMessage) { $ErrorMessage } else { $null }
-                module          = if ($Module) { $Module } else { $null }
+                module          = if ($Module -and ($VerboseResults -or $Module -in @('vnet_shared', 'vnet_app', 'vm_jumpbox_linux', 'vm_mssql_win', 'mssql', 'mysql', 'vwan', 'vnet_onprem', 'avd', 'petstore', 'ai_foundry'))) { $Module } else { $null }
                 integration     = [bool]$Integration
                 startedAt       = Get-UtcTimestamp $startedAt
                 finishedAt      = Get-UtcTimestamp $finishedAt
@@ -431,6 +484,7 @@ function Invoke-VMTest {
     Write-Log "Executing test script on VM '$VMName' via run command..."
 
     try {
+        $publicDescriptions = Get-PublicTestDescriptions -ScriptPath $ScriptPath
         $runParams = @{
             ResourceGroupName = $ResourceGroupName
             VMName            = $VMName
@@ -439,9 +493,9 @@ function Invoke-VMTest {
             ErrorAction       = 'Stop'
         }
 
-        if ($Parameters.Count -gt 0) {
-            $runParams['Parameter'] = $Parameters
-        }
+        $childParameters = @{} + $Parameters
+        $childParameters['VerboseResults'] = ([bool]$VerboseResults).ToString().ToLowerInvariant()
+        $runParams['Parameter'] = $childParameters
 
         $result = Invoke-AzVMRunCommand @runParams
 
@@ -486,7 +540,7 @@ function Invoke-VMTest {
             Write-Log "[WARNING] Could not parse summary line from '$Label'. Treating as failure."
             $testResult.HarnessError = "Could not parse the [SUMMARY] line from the test output (VM '$VMName'). Treating as failure."
         }
-        $testResult.Checks = ConvertFrom-TestOutput -Lines $lines
+        $testResult.Checks = ConvertFrom-TestOutput -Lines $lines -PublicDescriptions $publicDescriptions
     }
     catch {
         Write-Log "[$Label] [FAIL] Failed to execute tests on VM '$VMName'"
@@ -505,6 +559,7 @@ function Invoke-LocalTest {
     )
 
     $testResult = @{ Passed = 0; Failed = 1; Checks = @(); HarnessError = $null }
+    $publicDescriptions = @()
 
     if (-not (Test-Path $ScriptPath)) {
         Write-Log "[WARNING] Test script not found: $ScriptPath. Skipping."
@@ -515,10 +570,13 @@ function Invoke-LocalTest {
     Write-Log "Executing test script locally..."
 
     try {
+        $publicDescriptions = Get-PublicTestDescriptions -ScriptPath $ScriptPath
         # Stream output line-by-line so progress is visible in real time
         $collectedLines = [System.Collections.Generic.List[string]]::new()
 
-        & $ScriptPath @Parameters 2>&1 | ForEach-Object {
+        $childParameters = @{} + $Parameters
+        $childParameters['VerboseResults'] = ([bool]$VerboseResults).ToString().ToLowerInvariant()
+        & $ScriptPath @childParameters 2>&1 | ForEach-Object {
             $line = "$_".Trim()
             if ($line) {
                 Write-Log $line
@@ -536,13 +594,13 @@ function Invoke-LocalTest {
             Write-Log "[WARNING] Could not parse summary line from '$Label'. Treating as failure."
             $testResult.HarnessError = "Could not parse the [SUMMARY] line from the local test output. Treating as failure."
         }
-        $testResult.Checks = ConvertFrom-TestOutput -Lines $collectedLines.ToArray()
+        $testResult.Checks = ConvertFrom-TestOutput -Lines $collectedLines.ToArray() -PublicDescriptions $publicDescriptions
     }
     catch {
         Write-Log "[$Label] [FAIL] Failed to execute local tests"
         Write-Log "[$Label] [FAIL] Exception: $_"
         $testResult.HarnessError = "Failed to execute local tests. Exception: $_"
-        if ($collectedLines) { $testResult.Checks = ConvertFrom-TestOutput -Lines $collectedLines.ToArray() }
+        if ($collectedLines) { $testResult.Checks = ConvertFrom-TestOutput -Lines $collectedLines.ToArray() -PublicDescriptions $publicDescriptions }
     }
 
     return $testResult

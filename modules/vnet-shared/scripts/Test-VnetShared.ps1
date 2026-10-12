@@ -1,3 +1,8 @@
+param(
+    [ValidateSet('true', 'false')]
+    [string]$VerboseResults = 'false'
+)
+
 #region functions
 function Write-Log {
     param([string]$msg)
@@ -10,8 +15,12 @@ function Write-TestResult {
     param(
         [string]$module,
         [string]$status,
-        [string]$msg
+        [string]$msg,
+        [string]$SanitizedMessage = 'Check result'
     )
+    if ($status -ne 'SUMMARY' -and $VerboseResults -ne 'true') {
+        $msg = $SanitizedMessage
+    }
     Write-Log ("[MODULE:$module] [$status] $msg")
 }
 #endregion
@@ -39,24 +48,24 @@ $domainName = $null
 try {
     $adDomain = Get-ADDomain -ErrorAction Stop
     $domainName = $adDomain.DNSRoot
-    Write-TestResult $moduleName 'PASS' "AD DS: Domain '$domainName' exists"
+    Write-TestResult $moduleName 'PASS' "AD DS: Domain '$domainName' exists" -SanitizedMessage 'AD DS: Domain ''<value>'' exists'
     $passed++
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "AD DS: Domain does not exist or is not reachable"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "AD DS: Domain does not exist or is not reachable" -SanitizedMessage 'AD DS: Domain does not exist or is not reachable'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
 # Test 2: This machine is a domain controller
 try {
     $null = Get-ADDomainController -Identity $env:COMPUTERNAME -ErrorAction Stop
-    Write-TestResult $moduleName 'PASS' "AD DS: '$env:COMPUTERNAME' is a domain controller"
+    Write-TestResult $moduleName 'PASS' "AD DS: '$env:COMPUTERNAME' is a domain controller" -SanitizedMessage 'AD DS: ''<value>'' is a domain controller'
     $passed++
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "AD DS: '$env:COMPUTERNAME' is not a domain controller"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "AD DS: '$env:COMPUTERNAME' is not a domain controller" -SanitizedMessage 'AD DS: ''<value>'' is not a domain controller'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -66,17 +75,17 @@ if ($domainName) {
         $fqdn = "$env:COMPUTERNAME.$domainName"
         $dnsResult = Resolve-DnsName $fqdn -ErrorAction Stop
         $ip = ($dnsResult | Where-Object { $_.QueryType -eq 'A' } | Select-Object -First 1).IPAddress
-        Write-TestResult $moduleName 'PASS' "DNS: '$fqdn' resolves to '$ip'"
+        Write-TestResult $moduleName 'PASS' "DNS: '$fqdn' resolves to '$ip'" -SanitizedMessage 'DNS: ''<value>'' resolves to ''<value>'''
         $passed++
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "DNS: '$fqdn' does not resolve"
-        Write-TestResult $moduleName 'FAIL' "Exception: $_"
+        Write-TestResult $moduleName 'FAIL' "DNS: '$fqdn' does not resolve" -SanitizedMessage 'DNS: ''<value>'' does not resolve'
+        Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
         $failed++
     }
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "DNS: Skipped - domain name not available (Test 1 failed)"
+    Write-TestResult $moduleName 'FAIL' "DNS: Skipped - domain name not available (Test 1 failed)" -SanitizedMessage 'DNS: Skipped - domain name not available (Test 1 failed)'
     $failed++
 }
 
@@ -87,17 +96,17 @@ try {
     $forwarderIPs = @($forwarders.IPAddress | ForEach-Object { "$_" })
 
     if ($forwarderIPs -contains $azureDns) {
-        Write-TestResult $moduleName 'PASS' "DNS: Azure DNS forwarder '$azureDns' is configured"
+        Write-TestResult $moduleName 'PASS' "DNS: Azure DNS forwarder '$azureDns' is configured" -SanitizedMessage 'DNS: Azure DNS forwarder ''<value>'' is configured'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "DNS: Azure DNS forwarder '$azureDns' not found. Current forwarders: $($forwarderIPs -join ', ')"
+        Write-TestResult $moduleName 'FAIL' "DNS: Azure DNS forwarder '$azureDns' not found. Current forwarders: $($forwarderIPs -join ', ')" -SanitizedMessage 'DNS: Azure DNS forwarder ''<value>'' not found. Current forwarders: <value>'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "DNS: Unable to query DNS server forwarders"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "DNS: Unable to query DNS server forwarders" -SanitizedMessage 'DNS: Unable to query DNS server forwarders'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -106,17 +115,17 @@ if ($domainName) {
     try {
         $record = Get-DnsServerResourceRecord -ZoneName $domainName -Name $env:COMPUTERNAME -RRType A -ErrorAction Stop
         $recordIp = "$($record.RecordData.IPv4Address)"
-        Write-TestResult $moduleName 'PASS' "DNS: A record for '$env:COMPUTERNAME' in zone '$domainName' has IP '$recordIp'"
+        Write-TestResult $moduleName 'PASS' "DNS: A record for '$env:COMPUTERNAME' in zone '$domainName' has IP '$recordIp'" -SanitizedMessage 'DNS: A record for ''<value>'' in zone ''<value>'' has IP ''<value>'''
         $passed++
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "DNS: A record for '$env:COMPUTERNAME' in zone '$domainName' not found"
-        Write-TestResult $moduleName 'FAIL' "Exception: $_"
+        Write-TestResult $moduleName 'FAIL' "DNS: A record for '$env:COMPUTERNAME' in zone '$domainName' not found" -SanitizedMessage 'DNS: A record for ''<value>'' in zone ''<value>'' not found'
+        Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
         $failed++
     }
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "DNS: Skipped - domain name not available (Test 1 failed)"
+    Write-TestResult $moduleName 'FAIL' "DNS: Skipped - domain name not available (Test 1 failed)" -SanitizedMessage 'DNS: Skipped - domain name not available (Test 1 failed)'
     $failed++
 }
 
@@ -160,7 +169,7 @@ try {
             Select-Object -First 1
         $version = if ($amaDir) { $amaDir.Name } else { 'unknown' }
         $names = ($amaProcs | Select-Object -ExpandProperty Name -Unique) -join ', '
-        Write-TestResult $moduleName 'PASS' "AMA: Running (version $version, processes: $names, waited ${waited}s)"
+        Write-TestResult $moduleName 'PASS' "AMA: Running (version $version, processes: $names, waited ${waited}s)" -SanitizedMessage 'AMA: Running (version <value>, processes: <value>, waited <value>s)'
         $passed++
     }
     else {
@@ -187,13 +196,13 @@ try {
                 $extStatus = "status=$s message=$m"
             }
         } catch { $extStatus = "status file error: $_" }
-        Write-TestResult $moduleName 'FAIL' "AMA: MonAgentCore not running after ${waited}s (found: $found, vm_uptime=$uptime, extension: $extStatus)"
+        Write-TestResult $moduleName 'FAIL' "AMA: MonAgentCore not running after ${waited}s (found: $found, vm_uptime=$uptime, extension: $extStatus)" -SanitizedMessage 'AMA: MonAgentCore not running after <value>s (found: <value>, vm_uptime=<value>, extension: <value>)'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "AMA: Unable to enumerate AMA processes"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "AMA: Unable to enumerate AMA processes" -SanitizedMessage 'AMA: Unable to enumerate AMA processes'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -206,17 +215,17 @@ try {
 
     if ($configFiles -and $configFiles.Count -gt 0) {
         $latest = $configFiles | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-        Write-TestResult $moduleName 'PASS' "AMA: DCR config fetched from DCE; $($configFiles.Count) chunk(s) present (latest: $($latest.Name) @ $($latest.LastWriteTime))"
+        Write-TestResult $moduleName 'PASS' "AMA: DCR config fetched from DCE; $($configFiles.Count) chunk(s) present (latest: $($latest.Name) @ $($latest.LastWriteTime))" -SanitizedMessage 'AMA: DCR config fetched from DCE; <value> chunk(s) present (latest: <value> @ <value>)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "AMA: No DCR config chunks found under C:\WindowsAzure\Resources\*\mcs\configchunks -- agent has not successfully contacted the DCE"
+        Write-TestResult $moduleName 'FAIL' "AMA: No DCR config chunks found under C:\WindowsAzure\Resources\*\mcs\configchunks -- agent has not successfully contacted the DCE" -SanitizedMessage 'AMA: No DCR config chunks found under C:\WindowsAzure\Resources\*\mcs\configchunks -- agent has not successfully contacted the DCE'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "AMA: Unable to enumerate AMA config directory"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "AMA: Unable to enumerate AMA config directory" -SanitizedMessage 'AMA: Unable to enumerate AMA config directory'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -232,21 +241,21 @@ try {
         Select-Object -First 1
 
     if (-not $resolved) {
-        Write-TestResult $moduleName 'FAIL' "AMPLS DNS: '$testHost' did not return an A record"
+        Write-TestResult $moduleName 'FAIL' "AMPLS DNS: '$testHost' did not return an A record" -SanitizedMessage 'AMPLS DNS: ''<value>'' did not return an A record'
         $failed++
     }
     elseif ($resolved.IPAddress -match '^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)') {
-        Write-TestResult $moduleName 'PASS' "AMPLS DNS: '$testHost' resolves to private IP '$($resolved.IPAddress)' (AMPLS private endpoint reachable)"
+        Write-TestResult $moduleName 'PASS' "AMPLS DNS: '$testHost' resolves to private IP '$($resolved.IPAddress)' (AMPLS private endpoint reachable)" -SanitizedMessage 'AMPLS DNS: ''<value>'' resolves to private IP ''<value>'' (AMPLS private endpoint reachable)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "AMPLS DNS: '$testHost' resolved to PUBLIC IP '$($resolved.IPAddress)' -- AMPLS private DNS zone link missing or misconfigured"
+        Write-TestResult $moduleName 'FAIL' "AMPLS DNS: '$testHost' resolved to PUBLIC IP '$($resolved.IPAddress)' -- AMPLS private DNS zone link missing or misconfigured" -SanitizedMessage 'AMPLS DNS: ''<value>'' resolved to PUBLIC IP ''<value>'' -- AMPLS private DNS zone link missing or misconfigured'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "AMPLS DNS: Unable to resolve 'global.handler.control.monitor.azure.com'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "AMPLS DNS: Unable to resolve 'global.handler.control.monitor.azure.com'" -SanitizedMessage 'AMPLS DNS: Unable to resolve ''global.handler.control.monitor.azure.com'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -256,17 +265,17 @@ try {
     $amplsProbeHost = 'global.handler.control.monitor.azure.com'
     $tnc = Test-NetConnection -ComputerName $amplsProbeHost -Port 443 -WarningAction SilentlyContinue -ErrorAction Stop
     if ($tnc.TcpTestSucceeded) {
-        Write-TestResult $moduleName 'PASS' "AMPLS: TCP/443 to '$($tnc.ComputerName)' ($($tnc.RemoteAddress)) succeeded"
+        Write-TestResult $moduleName 'PASS' "AMPLS: TCP/443 to '$($tnc.ComputerName)' ($($tnc.RemoteAddress)) succeeded" -SanitizedMessage 'AMPLS: TCP/443 to ''<value>'' (<value>) succeeded'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "AMPLS: TCP/443 to '$($tnc.ComputerName)' ($($tnc.RemoteAddress)) FAILED -- ingestion path is broken"
+        Write-TestResult $moduleName 'FAIL' "AMPLS: TCP/443 to '$($tnc.ComputerName)' ($($tnc.RemoteAddress)) FAILED -- ingestion path is broken" -SanitizedMessage 'AMPLS: TCP/443 to ''<value>'' (<value>) FAILED -- ingestion path is broken'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "AMPLS: TCP connectivity test raised an exception"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "AMPLS: TCP connectivity test raised an exception" -SanitizedMessage 'AMPLS: TCP connectivity test raised an exception'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 

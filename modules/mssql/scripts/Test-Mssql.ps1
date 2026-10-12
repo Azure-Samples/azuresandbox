@@ -6,7 +6,10 @@ param(
     [string]$MssqlServerName,
 
     [Parameter(Mandatory = $true)]
-    [string]$MssqlDatabaseName
+    [string]$MssqlDatabaseName,
+
+    [ValidateSet('true', 'false')]
+    [string]$VerboseResults = 'false'
 )
 
 #region functions
@@ -19,8 +22,12 @@ function Write-TestResult {
     param(
         [string]$module,
         [string]$status,
-        [string]$msg
+        [string]$msg,
+        [string]$SanitizedMessage = 'Check result'
     )
+    if ($status -ne 'SUMMARY' -and $VerboseResults -ne 'true') {
+        $msg = $SanitizedMessage
+    }
     Write-Log ("[MODULE:$module] [$status] $msg")
 }
 #endregion
@@ -56,29 +63,29 @@ try {
     }
 
     if ($issues.Count -eq 0) {
-        Write-TestResult $moduleName 'PASS' ("SQL server '$MssqlServerName' exists with expected configuration (TLS 1.2, public access disabled, Entra-only auth)")
+        Write-TestResult $moduleName 'PASS' ("SQL server '$MssqlServerName' exists with expected configuration (TLS 1.2, public access disabled, Entra-only auth)") -SanitizedMessage 'SQL server ''<value>'' exists with expected configuration (TLS 1.2, public access disabled, Entra-only auth)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("SQL server '$MssqlServerName' configuration issues: " + ($issues -join '; '))
+        Write-TestResult $moduleName 'FAIL' ("SQL server '$MssqlServerName' configuration issues: " + ($issues -join '; ')) -SanitizedMessage 'SQL server ''<value>'' configuration issues: <value>'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "SQL server '$MssqlServerName' not found or not accessible"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "SQL server '$MssqlServerName' not found or not accessible" -SanitizedMessage 'SQL server ''<value>'' not found or not accessible'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
 # Test 2: Database exists
 try {
     $db = Get-AzSqlDatabase -ResourceGroupName $ResourceGroupName -ServerName $MssqlServerName -DatabaseName $MssqlDatabaseName -ErrorAction Stop
-    Write-TestResult $moduleName 'PASS' ("Database '$MssqlDatabaseName' exists on server '$MssqlServerName' (Status: $($db.Status))")
+    Write-TestResult $moduleName 'PASS' ("Database '$MssqlDatabaseName' exists on server '$MssqlServerName' (Status: $($db.Status))") -SanitizedMessage 'Database ''<value>'' exists on server ''<value>'' (Status: <value>)'
     $passed++
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Database '$MssqlDatabaseName' not found on server '$MssqlServerName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Database '$MssqlDatabaseName' not found on server '$MssqlServerName'" -SanitizedMessage 'Database ''<value>'' not found on server ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -94,22 +101,22 @@ try {
         $status = $connection.PrivateLinkServiceConnectionState.Status
 
         if ($status -eq 'Approved') {
-            Write-TestResult $moduleName 'PASS' ("Private endpoint '$($endpoints[0].Name)' is connected with status 'Approved'")
+            Write-TestResult $moduleName 'PASS' ("Private endpoint '$($endpoints[0].Name)' is connected with status 'Approved'") -SanitizedMessage 'Private endpoint ''<value>'' is connected with status ''Approved'''
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' ("Private endpoint '$($endpoints[0].Name)' connection status is '$status' (expected 'Approved')")
+            Write-TestResult $moduleName 'FAIL' ("Private endpoint '$($endpoints[0].Name)' connection status is '$status' (expected 'Approved')") -SanitizedMessage 'Private endpoint ''<value>'' connection status is ''<value>'' (expected ''Approved'')'
             $failed++
         }
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "No private endpoint found for SQL server '$MssqlServerName'"
+        Write-TestResult $moduleName 'FAIL' "No private endpoint found for SQL server '$MssqlServerName'" -SanitizedMessage 'No private endpoint found for SQL server ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query private endpoints for SQL server '$MssqlServerName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query private endpoints for SQL server '$MssqlServerName'" -SanitizedMessage 'Failed to query private endpoints for SQL server ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -121,17 +128,17 @@ try {
 
     if ($recordSets) {
         $ip = $recordSets[0].Records[0].Ipv4Address
-        Write-TestResult $moduleName 'PASS' ("Private DNS A record '$MssqlServerName.$zoneName' exists (IP: $ip)")
+        Write-TestResult $moduleName 'PASS' ("Private DNS A record '$MssqlServerName.$zoneName' exists (IP: $ip)") -SanitizedMessage 'Private DNS A record ''<value>.<value>'' exists (IP: <value>)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "Private DNS A record '$MssqlServerName' not found in zone '$zoneName'"
+        Write-TestResult $moduleName 'FAIL' "Private DNS A record '$MssqlServerName' not found in zone '$zoneName'" -SanitizedMessage 'Private DNS A record ''<value>'' not found in zone ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query private DNS zone '$zoneName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query private DNS zone '$zoneName'" -SanitizedMessage 'Failed to query private DNS zone ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -141,22 +148,22 @@ try {
 
     if ($admin) {
         if ($admin.DisplayName -match '^grp-') {
-            Write-TestResult $moduleName 'PASS' ("Entra ID admin is group '$($admin.DisplayName)' (ObjectId: $($admin.ObjectId))")
+            Write-TestResult $moduleName 'PASS' ("Entra ID admin is group '$($admin.DisplayName)' (ObjectId: $($admin.ObjectId))") -SanitizedMessage 'Entra ID admin is group ''<value>'' (ObjectId: <value>)'
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' ("Entra ID admin '$($admin.DisplayName)' does not appear to be a security group (expected name starting with 'grp-')")
+            Write-TestResult $moduleName 'FAIL' ("Entra ID admin '$($admin.DisplayName)' does not appear to be a security group (expected name starting with 'grp-')") -SanitizedMessage 'Entra ID admin ''<value>'' does not appear to be a security group (expected name starting with ''grp-'')'
             $failed++
         }
     }
     else {
-        Write-TestResult $moduleName 'FAIL' 'No Entra ID administrator configured on SQL server'
+        Write-TestResult $moduleName 'FAIL' 'No Entra ID administrator configured on SQL server' -SanitizedMessage 'No Entra ID administrator configured on SQL server'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query Entra ID administrator for SQL server '$MssqlServerName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query Entra ID administrator for SQL server '$MssqlServerName'" -SanitizedMessage 'Failed to query Entra ID administrator for SQL server ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -180,17 +187,17 @@ try {
     }
 
     if ($auditIssues.Count -eq 0) {
-        Write-TestResult $moduleName 'PASS' ("Server-level auditing is enabled and streaming 'SQLSecurityAuditEvents' to Log Analytics (remediates VA2061)")
+        Write-TestResult $moduleName 'PASS' ("Server-level auditing is enabled and streaming 'SQLSecurityAuditEvents' to Log Analytics (remediates VA2061)") -SanitizedMessage 'Server-level auditing is enabled and streaming ''SQLSecurityAuditEvents'' to Log Analytics (remediates VA2061)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("Server-level auditing issues: " + ($auditIssues -join '; '))
+        Write-TestResult $moduleName 'FAIL' ("Server-level auditing issues: " + ($auditIssues -join '; ')) -SanitizedMessage 'Server-level auditing issues: <value>'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to verify server-level auditing for SQL server '$MssqlServerName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to verify server-level auditing for SQL server '$MssqlServerName'" -SanitizedMessage 'Failed to verify server-level auditing for SQL server ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 

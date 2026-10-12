@@ -10,7 +10,10 @@ param(
 
     # The cloud role name (AppRoleName) the container app reports to Application
     # Insights. Matches the petstore module's appinsights_role_name variable.
-    [string]$ExpectedRoleName = 'petstore'
+    [string]$ExpectedRoleName = 'petstore',
+
+    [ValidateSet('true', 'false')]
+    [string]$VerboseResults = 'false'
 )
 
 #region functions
@@ -25,8 +28,12 @@ function Write-TestResult {
     param(
         [string]$module,
         [string]$status,
-        [string]$msg
+        [string]$msg,
+        [string]$SanitizedMessage = 'Check result'
     )
+    if ($status -ne 'SUMMARY' -and $VerboseResults -ne 'true') {
+        $msg = $SanitizedMessage
+    }
     Write-Log ("[MODULE:$module] [$status] $msg")
 }
 #endregion
@@ -57,16 +64,16 @@ try {
     $dnsResult = Resolve-DnsName -Name $PetstoreFqdn -Type A -ErrorAction Stop
     $ipAddress = ($dnsResult | Where-Object { $_.QueryType -eq 'A' } | Select-Object -First 1).IPAddress
     if ($ipAddress -match '^10\.') {
-        Write-TestResult $moduleName 'PASS' "Petstore: DNS resolved to private IP $ipAddress"
+        Write-TestResult $moduleName 'PASS' "Petstore: DNS resolved to private IP $ipAddress" -SanitizedMessage 'Petstore: DNS resolved to private IP <value>'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "Petstore: DNS resolved to non-private IP $ipAddress (expected 10.x.x.x)"
+        Write-TestResult $moduleName 'FAIL' "Petstore: DNS resolved to non-private IP $ipAddress (expected 10.x.x.x)" -SanitizedMessage 'Petstore: DNS resolved to non-private IP <value> (expected 10.x.x.x)'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Petstore: DNS resolution failed for '$PetstoreFqdn': $_"
+    Write-TestResult $moduleName 'FAIL' "Petstore: DNS resolution failed for '$PetstoreFqdn': $_" -SanitizedMessage 'Petstore: DNS resolution failed for ''<value>'': <value>'
     $failed++
 }
 
@@ -75,17 +82,17 @@ try {
     $tcp = New-Object System.Net.Sockets.TcpClient
     $tcp.Connect($PetstoreFqdn, 443)
     if ($tcp.Connected) {
-        Write-TestResult $moduleName 'PASS' "Petstore: TCP connection to port 443 succeeded"
+        Write-TestResult $moduleName 'PASS' "Petstore: TCP connection to port 443 succeeded" -SanitizedMessage 'Petstore: TCP connection to port 443 succeeded'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "Petstore: TCP connection to port 443 failed"
+        Write-TestResult $moduleName 'FAIL' "Petstore: TCP connection to port 443 failed" -SanitizedMessage 'Petstore: TCP connection to port 443 failed'
         $failed++
     }
     $tcp.Close()
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Petstore: TCP connection to port 443 failed: $_"
+    Write-TestResult $moduleName 'FAIL' "Petstore: TCP connection to port 443 failed: $_" -SanitizedMessage 'Petstore: TCP connection to port 443 failed: <value>'
     $failed++
 }
 
@@ -97,16 +104,16 @@ try {
     $apiResponse = Invoke-RestMethod -Uri $uri -Method Get -UseBasicParsing -ErrorAction Stop
 
     if ($apiResponse) {
-        Write-TestResult $moduleName 'PASS' "Petstore: OpenAPI spec endpoint returned valid JSON response"
+        Write-TestResult $moduleName 'PASS' "Petstore: OpenAPI spec endpoint returned valid JSON response" -SanitizedMessage 'Petstore: OpenAPI spec endpoint returned valid JSON response'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "Petstore: OpenAPI spec endpoint returned empty response"
+        Write-TestResult $moduleName 'FAIL' "Petstore: OpenAPI spec endpoint returned empty response" -SanitizedMessage 'Petstore: OpenAPI spec endpoint returned empty response'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Petstore: Failed to reach OpenAPI spec endpoint '$uri': $_"
+    Write-TestResult $moduleName 'FAIL' "Petstore: Failed to reach OpenAPI spec endpoint '$uri': $_" -SanitizedMessage 'Petstore: Failed to reach OpenAPI spec endpoint ''<value>'': <value>'
     $failed++
 }
 
@@ -138,21 +145,21 @@ if ($apiResponse) {
         if ($issues.Count -eq 0) {
             $version = $apiResponse.info.version
             $title = $apiResponse.info.title
-            Write-TestResult $moduleName 'PASS' "Petstore: API metadata is correct (title='$title', version='$version', openapi='$($apiResponse.openapi)', license='Apache 2.0', contact='apiteam@swagger.io')"
+            Write-TestResult $moduleName 'PASS' "Petstore: API metadata is correct (title='$title', version='$version', openapi='$($apiResponse.openapi)', license='Apache 2.0', contact='apiteam@swagger.io')" -SanitizedMessage 'Petstore: API metadata is correct (title=''<value>'', version=''<value>'', openapi=''<value>'', license=''Apache 2.0'', contact=''apiteam@swagger.io'')'
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' ("Petstore: API metadata issues: " + ($issues -join '; '))
+            Write-TestResult $moduleName 'FAIL' ("Petstore: API metadata issues: " + ($issues -join '; ')) -SanitizedMessage 'Petstore: API metadata issues: <value>'
             $failed++
         }
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "Petstore: Failed to parse API metadata: $_"
+        Write-TestResult $moduleName 'FAIL' "Petstore: Failed to parse API metadata: $_" -SanitizedMessage 'Petstore: Failed to parse API metadata: <value>'
         $failed++
     }
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "Petstore: Skipping metadata validation - no API response available"
+    Write-TestResult $moduleName 'FAIL' "Petstore: Skipping metadata validation - no API response available" -SanitizedMessage 'Petstore: Skipping metadata validation - no API response available'
     $failed++
 }
 
@@ -161,7 +168,7 @@ else {
 # Log Analytics query endpoint (api.loganalytics.io) is only reachable through the
 # Azure Monitor Private Link Scope; jumpwin1's managed identity holds Monitoring Reader.
 if ([string]::IsNullOrWhiteSpace($LogAnalyticsWorkspaceResourceId)) {
-    Write-TestResult $moduleName 'FAIL' "Petstore: LogAnalyticsWorkspaceResourceId not provided; cannot verify Application Insights telemetry ingestion"
+    Write-TestResult $moduleName 'FAIL' "Petstore: LogAnalyticsWorkspaceResourceId not provided; cannot verify Application Insights telemetry ingestion" -SanitizedMessage 'Petstore: LogAnalyticsWorkspaceResourceId not provided; cannot verify Application Insights telemetry ingestion'
     $failed++
 }
 else {
@@ -198,7 +205,7 @@ else {
         }
 
         if ($requestCount -gt 0) {
-            Write-TestResult $moduleName 'PASS' "Petstore: Application Insights received $requestCount request(s) with AppRoleName='$ExpectedRoleName' in the last hour (most recent at $lastSeen), confirming telemetry via Entra ID authentication"
+            Write-TestResult $moduleName 'PASS' "Petstore: Application Insights received $requestCount request(s) with AppRoleName='$ExpectedRoleName' in the last hour (most recent at $lastSeen), confirming telemetry via Entra ID authentication" -SanitizedMessage 'Petstore: Application Insights received <value> request(s) with AppRoleName=''<value>'' in the last hour (most recent at <value>), confirming telemetry via Entra ID authentication'
             $passed++
         }
         else {
@@ -219,12 +226,12 @@ else {
             }
             $diagMsg = if ($diag) { " Other telemetry present for this role: $diag." } else { " No telemetry of any type found for this role." }
             $waitMin = [int]($maxAttempts * $delaySeconds / 60)
-            Write-TestResult $moduleName 'FAIL' ("Petstore: No AppRequests telemetry with AppRoleName='$ExpectedRoleName' found after ${waitMin} min of polling." + $diagMsg)
+            Write-TestResult $moduleName 'FAIL' ("Petstore: No AppRequests telemetry with AppRoleName='$ExpectedRoleName' found after ${waitMin} min of polling." + $diagMsg) -SanitizedMessage 'Petstore: No AppRequests telemetry with AppRoleName=''<value>'' found after <value> min of polling.<value>'
             $failed++
         }
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "Petstore: Failed to query Application Insights telemetry: $_"
+        Write-TestResult $moduleName 'FAIL' "Petstore: Failed to query Application Insights telemetry: $_" -SanitizedMessage 'Petstore: Failed to query Application Insights telemetry: <value>'
         $failed++
     }
 }
