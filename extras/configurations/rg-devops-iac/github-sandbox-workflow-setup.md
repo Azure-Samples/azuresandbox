@@ -17,6 +17,9 @@ Step 51 describes the subsequent Bash + PowerShell port and removal of the
 retained helper test suite. Step 52 records authorization for coordinated
 publication and a fresh full acceptance run. The second deployment used the
 Python implementation; its test failure was correctly reported.
+Step 73 changes the unit-test stage to JSON-only output and consumption.
+Earlier JUnit artifact observations describe historical runs, not the current
+output contract.
 
 ## Deployment scope and success criteria
 
@@ -55,7 +58,7 @@ successful unit-test execution. The workflow must distinguish test failures
 from test harness or infrastructure errors; it must not report full success
 when tests were skipped because an earlier stage failed.
 
-The existing test orchestrator supports JSON and JUnit results and uses these
+The existing test orchestrator supports JSON results and uses these
 exit codes:
 
 | Exit code | Meaning |
@@ -1880,7 +1883,7 @@ Do not dispatch the updated workflow before its helpers are available on
 ## Step 25: Use sanitized unit-test results by default
 
 The parent orchestrator and its PowerShell/Linux child tests now emit sanitized
-check descriptions by default. JSON and JUnit retain their existing schemas,
+check descriptions by default. JSON retains its existing schema,
 statuses, counts, timing, and exit-code semantics. Runtime identifiers, resource
 names, addresses, usernames, and exception text are excluded from the default
 machine-readable results.
@@ -1893,11 +1896,10 @@ into public results. This avoids relying on regex replacements to identify every
 possible environment-specific value.
 
 For private troubleshooting, the parent accepts the optional switch
-`-VerboseResults`, which restores original check text and diagnostics in both
-formats:
+`-VerboseResults`, which restores original check text and diagnostics in JSON:
 
 ```powershell
-./scripts/Invoke-UnitTests.ps1 -ResultsJsonPath ./test-results.json -JUnitXmlPath ./test-results.xml -VerboseResults
+./scripts/Invoke-UnitTests.ps1 -ResultsJsonPath ./test-results.json -VerboseResults
 ```
 
 Existing calls need no additional argument. The parent forwards its setting to
@@ -1908,7 +1910,7 @@ Run Command transports parameters as strings. The Linux child accepts
 No test assertions or pass/fail counters are changed.
 
 General console/log diagnostics remain private; the default publication boundary
-is the structured JSON/JUnit results, not arbitrary logs. Do not publish verbose
+is the structured JSON results, not arbitrary logs. Do not publish verbose
 results. The runner workflow does not opt into verbose mode.
 Step 26 describes publishing these default structured results as GitHub evidence.
 
@@ -1921,18 +1923,17 @@ authentication described earlier.
 
 ## Step 26: Publish structured unit-test evidence
 
-The local workflow now requests both `-ResultsJsonPath` and `-JUnitXmlPath`
+The local workflow now requests only `-ResultsJsonPath`
 through the MSI-authenticated runner wrapper, without `-VerboseResults`.
-Both result files remain in the private deployment/run directory:
+The result file remains in the private deployment/run directory:
 
 ```text
 unit-test-results.json
-unit-test-results.xml
 ```
 
 In the updated workflow, unit-test finalization checks the generated
-JSON schema and XML document after either successful or failed tests, then copies only these
-two named files to an owner-only staging directory under `RUNNER_TEMP`.
+JSON schema after either successful or failed tests, then copies only this
+named file to an owner-only staging directory under `RUNNER_TEMP`.
 The upload action receives explicit file paths, not a deployment-directory
 wildcard. Plans, state, backend/input files, receipts, profiles, and raw logs
 are never included.
@@ -1951,13 +1952,12 @@ pipeline. Upload failures are surfaced explicitly.
 Preparation failures fail the unit-test step if testing succeeded, or preserve
 its existing nonzero exit code if testing failed. Details remain in its private
 log, and no upload is approved when validation or staging fails.
-If only one format was produced, publish that available file and report the
-missing format as partial evidence. Invalid documents are not uploaded.
+Invalid JSON is not uploaded. XML files are neither required nor consumed.
 If the VM-start gate, authentication, or another prerequisite prevented results
 from being generated, report evidence unavailable and skip the upload rather
 than inventing test results.
 
-Find the downloadable JSON/JUnit archive in the workflow run's **Artifacts**
+Find the downloadable JSON archive in the workflow run's **Artifacts**
 section or follow **Download sanitized unit-test evidence** in its job summary.
 The protected environment's deployment-history link leads to that same run.
 The files are downloadable evidence, not an inline JSON viewer or a separate
@@ -2594,7 +2594,7 @@ usernames, exception continuations, or arbitrary diagnostics, even if verbose
 details appear in the private log.
 
 The preview remains limited to four lines and does not replay old output as
-fresh. JSON/JUnit artifacts remain the authoritative detailed result evidence.
+fresh. JSON artifacts remain the authoritative detailed result evidence.
 Preview-read failures produce an explicit sanitized warning, retain private
 diagnostics, and preserve the test subprocess's original exit code.
 This code and its regression coverage are local and uncommitted; the
@@ -2709,7 +2709,7 @@ publication.
 
 The operator requested removing the separate preparation step locally.
 Unit-test now runs the orchestrator once, then validates and stages its existing
-JSON/JUnit results before recording the final stage status. Finalization also
+JSON results before recording the final stage status. Finalization also
 runs after test or prerequisite failures: valid failed-test evidence is retained,
 and missing results are explicitly reported without fabrication.
 
@@ -2931,7 +2931,7 @@ The terminal watch reports completion and exits nonzero for an unsuccessful
 run. Stopping this local watch does not cancel the deployment.
 If deployment fails, preserve and report the failure; do not retry, dispatch
 another run, or alter configuration to work around it.
-After completion, review stage outcomes, the artifact link, and JSON/JUnit
+After completion, review stage outcomes, the artifact link, and JSON
 results separately; a successful checkout or apply does not prove tests passed.
 
 ## Step 51: Port the deployment helpers to Bash + PowerShell
@@ -3037,9 +3037,627 @@ gh run watch <new-run-id> \
   --exit-status
 ```
 
-Review all stage outcomes and the JSON/JUnit artifact. Explicitly distinguish
+Review all stage outcomes and the JSON artifact. Explicitly distinguish
 a reproducible Sandbox test failure from a helper/runtime failure. A correct
 failed stage with matching failed-test evidence validates failure propagation,
 not a fully passing deployment. Raw Terraform and orchestrator diagnostics
 remain private on the runner. Stop and report infrastructure/helper errors
 without automatically retrying or modifying the deployment.
+
+## Step 53: Verify the Bash + PowerShell acceptance dispatch
+
+The operator manually dispatched the full run from `main`:
+[run 38411237820](https://github.com/Azure-Samples/azuresandbox/actions/runs/38411237820).
+Its derived Sandbox ID is `sandbox-38411237820`; its independent state key is
+`sandboxes/sandbox-38411237820/terraform.tfstate`.
+
+Before approving the protected environment, inspect this exact run:
+
+```bash
+gh run view 38411237820 \
+  --repo Azure-Samples/azuresandbox \
+  --json displayTitle,event,headBranch,headSha,status,conclusion,url,jobs \
+  --jq '{displayTitle,event,headBranch,headSha,status,conclusion,url,jobs:[.jobs[]|{name,status,conclusion}]}'
+```
+
+Expect `workflow_dispatch`, `headBranch: main`, the title
+`Sandbox sandbox-38411237820 / unit-test`, and definition revision
+`fb9c6aa9cea3ab5e385aaa47b0b10e9e3b73e05b`.
+This is the workflow definition SHA, not the trusted `vnext` source SHA checked
+out by Repository workspace. The source revision is recorded separately in the
+saved-plan receipt and stage summary.
+
+The job should remain waiting for protected-environment approval. These are
+expected values, not a confirmed execution result. Review the returned snapshot
+before approving; do not redispatch or approve a different run.
+
+The operator's returned snapshot confirmed the expected title, event, branch,
+and definition SHA. Both the run and its deployment job were `waiting`, with
+no conclusion or completed deployment claimed.
+
+## Step 54: Approve the port acceptance run
+
+Open [run 38411237820](https://github.com/Azure-Samples/azuresandbox/actions/runs/38411237820),
+choose **Review deployments**, select `sandbox-deployment`, and choose
+**Approve and deploy**. Use the existing protected-environment approval, not an
+admin bypass.
+
+This authorizes preflight, its saved-plan apply, and full deployed-module
+unit/integration testing for the confirmed new Sandbox. It does not authorize
+updating or recovering a previous Sandbox. Do not run interactive Terraform
+commands against this target while its apply is in flight.
+
+After approval, inspect the same run:
+
+```bash
+gh run view 38411237820 \
+  --repo Azure-Samples/azuresandbox \
+  --json status,conclusion,jobs \
+  --jq '{status,conclusion,jobs:[.jobs[]|{name,status,conclusion,steps:[.steps[]|{name,status,conclusion}]}]}'
+```
+
+Inspect Repository workspace and Preflight first. A completed checkout alone
+does not establish preflight, apply, or test success. Preserve any failure
+without automatically retrying or modifying the deployment.
+
+## Step 55: Observe the port acceptance run
+
+The operator's next snapshot showed the run and deployment job `queued`, with
+no steps and no conclusion. Execution had not started; this snapshot is not a
+failure or proof of deployment success.
+
+Follow this exact run from the operator's Bash terminal:
+
+```bash
+gh run watch 38411237820 \
+  --repo Azure-Samples/azuresandbox \
+  --interval 120 \
+  --exit-status
+```
+
+The command refreshes GitHub job/step status every two minutes and exits nonzero
+if the run fails. Stopping the local watch does not cancel the workflow.
+In GitHub, expand Apply and Unit-test to observe the helpers' sanitized
+two-minute previews; raw logs remain private. Short commands can complete
+without a preview. Keep an advancing Terraform creation heartbeat distinct
+from a stalled process, even when a resource legitimately takes a long time.
+
+If queuing persists for several minutes, inspect the approved runner's current
+online/busy status before treating the delay as a deployment error. Do not
+redispatch, cancel, or modify infrastructure merely because the run is queued.
+
+## Step 56: Stop after the acceptance run's Apply failure
+
+The operator's watch reported run `38411237820` completed with failure.
+Read-only inspection of its public job evidence confirmed:
+
+| Stage | Result |
+|---|---|
+| Repository workspace | Success |
+| Preflight | Success, 1m18s |
+| Apply | Failure, exit 1, 77m48s |
+| Unit-test | Skipped |
+| Publish sanitized unit-test evidence | Skipped |
+| Report stage results | Success |
+| Post Repository workspace | Success |
+
+The job took 1h19m14s. Apply ran from 14:15:02 to 15:32:50 UTC on
+2026-10-13. The actual trusted source checkout was
+`6ca6859a3e91ea0e0ba3a6b62cb43cb400dd54b1`; the workflow definition SHA remained
+`fb9c6aa9cea3ab5e385aaa47b0b10e9e3b73e05b`.
+
+The failing workflow command was:
+
+```bash
+bash extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.sh apply
+```
+
+Its available public error annotations were:
+
+```text
+apply failed (exit 1); review its private runner log.
+Process completed with exit code 1.
+```
+
+The underlying native command/error remains in the private Apply log and has
+not been retrieved. Do not infer a failing resource, a Terraform error, or a
+port regression from these annotations or elapsed time alone.
+
+The failure was recorded in
+[issue #831](https://github.com/Azure-Samples/azuresandbox/issues/831),
+with sanitized revision, scope, timing, and stage evidence. Full sanitized
+native diagnostics and actual runtime/provider versions remain pending.
+No automatic diagnosis, retry, state inspection, configuration change, or
+new dispatch was performed. Stop until the operator explicitly authorizes
+investigation or resumption. End-to-end acceptance of the port remains incomplete.
+
+The operator subsequently requested closing issue #831 and addressing the
+failure in the attended session. The issue was closed as `not planned`, not
+as fixed. This does not establish a passing apply or acceptance result.
+
+## Step 57: Exclude an unrelated alert deployment failure
+
+The operator clarified that the previously supplied Azure Copilot alert
+deployment failure was not part of this deployment. Disregard that finding
+when investigating run `38411237820`; it is not evidence for the Apply failure
+and does not justify changing provider registration for this acceptance run.
+
+The workflow's Apply failure remains unexplained pending its private error
+log. No provider registration, retry, or infrastructure change was performed.
+
+## Step 58: Record the reported P2S gateway operation conflict
+
+The operator supplied the activity-log event identified as the actual
+deployment failure. Its non-identifying technical fields were:
+
+| Field | Value |
+|---|---|
+| Operation | `Microsoft.Network/p2sVpnGateways/write` |
+| Resource type | `Microsoft.Network/p2sVpnGateways` |
+| Status | `Failed` |
+| Event time | 2026-10-13 15:32:07 UTC |
+| Outer error | `ResourceOperationFailure` |
+| Detailed error | `UpdateGatewayInProgress` |
+
+The detailed error message was:
+
+```text
+There is already another operation in progress for updating the gateway.
+Please try any update/delete operation after some time.
+```
+
+Azure reported a conflicting in-progress gateway update. The event occurred
+approximately 43 seconds before the workflow reported Apply failure, which
+aligns with the failure window. It is not a resource-provider registration
+error or a Terraform state-lock error.
+
+The event does not identify the other operation or its initiator. Do not
+infer concurrent workflow applies, a policy action, a helper regression, or
+a specific recovery method without additional evidence. The matching private
+Terraform error remains to be collected.
+
+Identity claims, caller/application identifiers, subscription/tenant IDs,
+correlation/event identifiers, and deployment-specific resource paths are
+intentionally excluded. No gateway update, deletion, retry, or workflow
+redispatch was performed.
+
+## Step 59: Accept the run as an Apply-failure handling case
+
+The operator assessed the gateway operation conflict as transient and accepted
+run `38411237820` as a test case for transient failure during Apply.
+This is the operator's classification, not proof that the underlying conflict
+has cleared or that a subsequent apply would succeed.
+
+The observed workflow behavior met this failure-path expectation: Preflight
+passed, Apply surfaced exit code 1 and failed the job, Unit-test and test
+artifact publication were skipped, and reporting and checkout cleanup completed.
+No test success was fabricated and no automatic retry hid the failure.
+
+This validates the observed Apply-failure propagation and stage gating. It
+does not establish successful infrastructure deployment, completion of the
+public-access barriers, or full unit/integration acceptance of the port.
+Partial infrastructure may remain after the failed apply. No retry, cleanup,
+new dispatch, or code change is authorized by this classification alone.
+
+## Step 60: Await the operator's next full deployment
+
+The operator reported deleting the failed Sandbox and chose to continue
+acceptance with another full, independently dispatched deployment. The operator
+already has the commands and will invoke and approve the workflow manually,
+then provide its outcome.
+
+No new run ID or execution result has been supplied. Do not record a dispatch,
+successful cleanup verification, passing deployment, or passing tests yet.
+Keep the accepted transient Apply-failure case separate from the next run's
+full-success acceptance evidence. No assistant-initiated dispatch or
+configuration change was performed.
+
+## Step 61: Inspect the apparent SQL-module test stall
+
+The operator requested read-only troubleshooting through VM Run Command on
+the self-hosted runner after the portal reported no new unit-test log output.
+The active run was
+[38438999153](https://github.com/Azure-Samples/azuresandbox/actions/runs/38438999153).
+Preflight and Apply succeeded; Unit-test began at 19:06:43 UTC on 2026-10-13.
+
+Runner snapshots at 19:31:58 and 19:33:22 UTC showed an active runner service,
+a live supervisor and test process, and unchanged native/orchestrator logs
+last modified at 19:12:13 UTC. The native test process's stdout and stderr
+were redirected directly to the private stage log, not an undrained pipe.
+The latest module was `vm-mssql-win`; no final test receipt or result files
+existed at those snapshots.
+
+The final lifecycle messages showed SQL VM deallocation followed by startup,
+without the subsequent SQL-readiness message. In the existing orchestrator,
+that places the wait at `Start-AzVM` inside `Invoke-VMStopDeallocateStart`,
+before readiness probes or the SQL module's guest test Run Command.
+Both the orchestrator and managed-identity connection wrapper were unchanged
+between the published Python and Bash/PowerShell implementations.
+
+Read-only Azure inspection showed:
+
+| Evidence | Observation |
+|---|---|
+| SQL VM deallocation | Succeeded at 19:11:52 UTC |
+| SQL VM start | Started and accepted at 19:12:13 UTC; no terminal event in the returned activity-log window |
+| SQL VM power state | Running |
+| SQL VM provisioning state | Updating |
+| Guest-agent status | Not present in the returned instance view |
+
+These findings localize the delay to an unfinished Azure VM startup operation;
+they do not establish why Azure has not completed it. There was no evidence
+of a port-induced stdout/stderr deadlock. Lack of progress for over 20 minutes
+was surfaced as a suspected stall, not reported as healthy test progress.
+
+No processes were killed, tests rerun, VMs restarted, or Terraform state read.
+No guest Run Command was issued to the SQL VM. Deployment-specific identities,
+resource names, and resource paths are omitted from this record. Recovery or
+cancellation requires the operator's decision.
+
+## Step 62: Track the startup-test issue without changing the workflow
+
+The operator classified the stall as a `vm_mssql_win` unit-test issue, requested
+a separate issue, and instructed that the workflow remain unchanged.
+[Issue #832](https://github.com/Azure-Samples/azuresandbox/issues/832)
+records the existing startup-cycle test's long, opaque lifecycle wait and lack
+of a test-level wall-clock bound. No workflow fix or cancellation was performed.
+
+After the operator reported the SQL VM showing Running in the portal, a
+read-only API snapshot confirmed provisioning changed from Updating to
+Succeeded at 19:37:34 UTC. Power state remained Running; the guest agent
+reported Not Ready, with its status blob not yet populated.
+
+A runner snapshot at 19:38:54 UTC confirmed both logs advanced at 19:37:36 UTC
+to the SQL startup-readiness phase. The `Start-AzVM` wait cleared without
+intervention after approximately 25 minutes. It was no longer the blocking
+call at that snapshot. No final unit-test receipt existed.
+
+The issue was updated with this progress rather than treating the earlier
+snapshot as a persistent hang. SQL readiness and full acceptance remain
+pending. No VM recovery, process termination, test rerun, or workflow change
+was performed.
+
+## Step 63: Verify supervisor cadence separately from test progress
+
+The operator reported a portal gap from the 28-minute to the 44-minute
+unit-test heartbeat. This was investigated independently; a blocked native
+test call should not prevent the separate supervisor's two-minute updates.
+
+Read-only runner diagnostics showed successful console-batch uploads at
+19:34:53, 19:36:53, 19:38:53, 19:40:53, 19:42:53, 19:44:53, 19:46:53,
+19:48:52, and 19:50:52 UTC on 2026-10-13, each with success rate `1/1`.
+Uploads continued every two minutes through 19:58:52 UTC.
+
+A 150-second sample from 19:57:21 to 19:59:51 UTC recorded 68 additional
+supervisor-written bytes across two write calls. The native test log remained
+unchanged, last modified at 19:37:36 UTC. These observations support continued
+heartbeat generation and successful runner-side console delivery during the
+quiet test. They do not establish a 16-minute supervisor pause; the apparent
+portal gap concerns live display/delivery downstream of those uploads.
+
+Separately, Azure activity-log evidence showed the first SQL-readiness guest
+Run Command started and accepted at 19:38:07 UTC, without a terminal event in
+the returned window. The SQL VM again reported Updating and guest agent
+Not Ready in the 19:47 snapshot. This explains the current quiet test phase
+without explaining the underlying guest-agent delay.
+
+Issue #832 was updated with both distinctions. No workflow or VM changes,
+process termination, test rerun, or additional SQL guest command were performed.
+
+## Step 64: Confirm whole-job timeout and post-run state
+
+The operator supplied the final watch output for run `38438999153`, including:
+
+```text
+The job has exceeded the maximum execution time of 3h0m0s
+The operation was canceled.
+```
+
+GitHub reported the run and job `cancelled`, not a normally completed test
+failure. The configured `timeout-minutes: 180` applies to the entire deployment
+job, including checkout, Preflight, Apply, and Unit-test. It is not a separate
+180-minute allowance for testing.
+
+| Event | Time or outcome |
+|---|---|
+| Job began | 2026-10-13 17:29:38 UTC |
+| Preflight | Success |
+| Apply | Success; completed at 19:06:43 UTC |
+| Unit-test | Cancelled at 20:30:20 UTC, after about 83m37s |
+| Job ended | 20:30:23 UTC; total 3h0m45s including cancellation/cleanup |
+| Test artifact publication | Skipped; no uploaded artifacts |
+| Reporting and checkout cleanup | Success |
+
+The operator reported manually stopping the SQL VM. Read-only activity logs
+showed deallocation starting at 20:21:30 and succeeding at 20:22:49 UTC.
+Subsequent test Run Commands failed with `OperationNotAllowed`, stating that
+the VM must be running. The test later advanced through readiness attempts and
+into integration tests; it had not completed before the job deadline.
+
+A later operator start succeeded at 20:37:59 UTC; the last VM snapshot before
+cleanup showed Running, provisioning Succeeded, and guest agent Ready.
+The operator then reported deleting the Sandbox resource group. No further
+inspection of that group was performed. Independently stored Terraform state
+is not assumed deleted and was not modified.
+
+A runner snapshot at 20:41:36 UTC confirmed no remaining PowerShell/Terraform
+processes from the workflow. The runner was online and idle. Successful
+Preflight and Apply receipts remained, but no final Unit-test receipt or
+JSON/JUnit result files existed. The private native stage log and workspace
+orchestrator log retained partial test evidence through 20:30:06 UTC.
+Do not fabricate a completed result or treat partial summaries as full acceptance.
+
+The observed whole-job timeout, cancellation, reporting, and process cleanup
+worked as the configured safety boundary. Completed unit/integration acceptance
+and structured test-result publication were not exercised successfully by this
+run. Issue #832 tracks the test-level bounded-wait concern; no workflow or
+unit-test implementation changes were made.
+
+## Step 65: Record the next full acceptance dispatch
+
+The operator manually dispatched another full run from `main` using
+`run_through=unit-test`:
+[run 38465302741](https://github.com/Azure-Samples/azuresandbox/actions/runs/38465302741).
+The workflow implementation was unchanged. The derived Sandbox ID is
+`sandbox-38465302741`, with independent state key
+`sandboxes/sandbox-38465302741/terraform.tfstate`.
+
+Inspect this exact run before protected-environment approval:
+
+```bash
+gh run view 38465302741 \
+  --repo Azure-Samples/azuresandbox \
+  --json displayTitle,event,headBranch,headSha,status,conclusion,url,jobs \
+  --jq '{displayTitle,event,headBranch,headSha,status,conclusion,url,jobs:[.jobs[]|{name,status,conclusion}]}'
+```
+
+Compare its workflow definition revision with the published registration
+`fb9c6aa9cea3ab5e385aaa47b0b10e9e3b73e05b`, and verify the full-test title,
+`workflow_dispatch` event, and `main` branch before approving. The runner-side
+execution observations below do not establish a passing acceptance outcome.
+
+## Step 66: Distinguish stale preparation status from runner execution
+
+The operator reported that run `38465302741` appeared stuck preparing its
+workspace. GitHub's API showed an online, busy runner and an in-progress job,
+but returned an empty step list.
+
+With the operator's authorization, read-only VM Run Command diagnostics inspected
+the runner's worker log, without reading Terraform state or modifying the
+deployment. The worker log showed:
+
+* Workspace checkout completed, and Preflight began at `20:46:07 UTC`.
+* Preflight completed, and Apply began at `20:47:29 UTC`.
+* Console-batch uploads succeeded at approximately two-minute intervals through
+  `20:55:32 UTC`.
+
+These observations establish that execution had advanced beyond preparation
+despite the stale GitHub display. They do not establish an Apply or Unit-test
+result, or identify the cause of the delayed GitHub status.
+
+A second read-only snapshot at `20:56:57 UTC` confirmed an active Terraform
+process for the current run and advancing native Apply heartbeats for Azure
+Firewall and Bastion. Disk space was not exhausted: approximately `9.5 GiB`
+remained available, with `5%` of filesystem inodes used. No lingering
+PowerShell or Terraform process from the previous run appeared in the process
+snapshot. Apply was progressing; no completed deployment or test result had
+yet been observed.
+
+The operator subsequently deleted the previous cancelled workflow run from
+GitHub. The new run had already entered Apply before that deletion, so deleting
+the earlier run was not needed to start it. Deleting a workflow run removes its
+GitHub history and associated logs and artifacts; it does not clean up Azure
+resources or Terraform backend state. Do not use workflow-run deletion as a
+runner recovery mechanism.
+
+The operator also reported missing stage status in both `gh run watch` and the
+portal. Fresh requests to GitHub's individual-job and run-job APIs both returned
+`steps: []`, so this was not merely a browser-refresh problem. At `20:59:28 UTC`,
+the runner log showed that its timeline-update queue had started and its initial
+job timeline update had completed, with no matching warning or error records.
+Console uploads continued to succeed through `20:57:32 UTC`. Successful console
+uploads do not establish successful publication or processing of step-status
+updates. GitHub Status reported Actions operational with no active incidents,
+but that does not exclude a run-specific problem. The missing step timeline's
+root cause remained undetermined; no workflow or runner recovery changes were
+made.
+
+## Step 67: Record operator cancellation and runner restart
+
+The operator cancelled run `38465302741`, reported deleting its Sandbox resource
+group, and restarted the self-hosted runner. GitHub subsequently confirmed that
+the run and job had completed with conclusion `cancelled`, and the runner was
+online and idle.
+
+A read-only runner process snapshot at `21:05:48 UTC` showed the runner listener,
+with no Terraform or PowerShell processes. This confirmed that no previous
+deployment process remained active before another dispatch. The restart's
+effect on step-status reporting was not yet established.
+
+Resource-group deletion does not remove the independently stored backend state.
+Use a new manual dispatch for the next fresh Sandbox; do not rerun the cancelled
+run against its existing state key. This cancelled attempt did not establish a
+passing Apply or Unit-test outcome.
+
+## Step 68: Record the fresh dispatch after runner restart
+
+The operator manually dispatched
+[run 38468152894](https://github.com/Azure-Samples/azuresandbox/actions/runs/38468152894)
+from `main` with `run_through=unit-test`. GitHub confirmed the expected title
+`Sandbox sandbox-38468152894 / unit-test`, the `workflow_dispatch` event, and
+workflow definition revision `fb9c6aa9cea3ab5e385aaa47b0b10e9e3b73e05b`.
+The independent state key is
+`sandboxes/sandbox-38468152894/terraform.tfstate`.
+
+The operator confirmed protected-environment approval for this dispatch.
+
+At `21:10:43 UTC`, the operator reported that stage-status updates were again
+missing from both the portal and `gh run watch`, and elected to leave the run
+running. The restart had not restored visible stage reporting at that point.
+This observation alone does not establish the runner's actual deployment stage
+or whether execution is advancing.
+
+The first API snapshot showed an in-progress job with an empty step list.
+That early snapshot alone does not establish whether the restart resolved the
+previous run's missing step-status updates. No runner-side inspection or
+completed stage result was available for this new run.
+
+Watch the new dispatch:
+
+```bash
+gh run watch 38468152894 \
+  --repo Azure-Samples/azuresandbox \
+  --interval 120 \
+  --exit-status
+```
+
+## Step 69: Enable independent monitoring for the current run
+
+With stage reporting still unavailable, the operator requested independent
+monitoring and approximately two-minute updates for run `38468152894`.
+The existing reviewed Bash/PowerShell collector was copied from the runner's
+checkout into an owner-only directory outside the Actions workspace and started
+as `azuresandbox-monitor-38468152894-1.service`.
+
+The collector records sanitized snapshots every 120 seconds under
+`/var/lib/azuresandbox-monitor/38468152894-1/`, independently of GitHub's live
+status display. It reads private stage receipts, log metadata, allowlisted
+progress lines, and process counts; it does not inspect Terraform state or
+modify the deployment. It stops on a recorded stage failure or completed
+Unit-test stage, with a six-hour maximum lifetime.
+
+The initial snapshot at `21:13:51 UTC` confirmed that the collector was active,
+Preflight had passed, and Apply was healthy at approximately four minutes
+elapsed. Terraform was creating Azure Firewall and Bastion, and the Key Vault
+private endpoint had completed. No completed Apply or Unit-test result had
+yet been observed.
+
+The operator subsequently reported the portal message, "Job is about to start
+running on the runner: <runner>." That message contradicted the verified
+runner-side snapshot, which already showed Preflight complete and Apply
+executing. This confirms misleading GitHub status for this run, but does not
+establish a platform-wide service incident or identify the underlying cause.
+
+## Step 70: Record successful Apply and the start of Unit-test
+
+The independent collector's `22:45:52 UTC` snapshot confirmed successful
+Preflight and Apply receipts (`exit_code = 0`) for run `38468152894`. The
+Unit-test stage was executing at approximately two minutes elapsed, with
+no active Terraform process.
+
+The first visible test summary was `vnet-shared: Passed=9 Failed=0 Total=9`,
+followed by `Module: vnet-app`. The collector reported advancing output and
+healthy execution. Apply succeeded, but full unit/integration acceptance
+remained pending.
+
+## Step 71: Confirm SQL VM unit checks passed and integration tests advanced
+
+By `22:57:52 UTC`, Unit-test was approximately 14 minutes into execution and
+integration testing had advanced through SQL connectivity to Azure SQL
+connectivity. Read-only extraction of allowlisted module-summary fields from
+the native test log confirmed:
+
+| Module | Passed | Failed | Total |
+| --- | --- | --- | --- |
+| `vm-mssql-win` | 25 | 0 | 25 |
+| `mssql` | 6 | 0 | 6 |
+| `mysql` | 6 | 0 | 6 |
+| `vwan` | 6 | 0 | 6 |
+
+The prolonged SQL VM startup/readiness stall from the preceding attempt had
+not prevented completion of this run's SQL VM unit checks. This does not
+establish that the unbounded-wait concern in #832 is fixed. Full integration
+results and the final workflow outcome remained pending.
+
+## Step 72: Record passing tests but failed evidence validation
+
+The collector's final snapshot at `23:01:52 UTC` showed
+`Overall: Passed=109 Failed=0 Total=109` and `RESULT: PASS`. P2S VPN integration
+checks passed `12/12`. The native test process returned exit code `0`, but the
+Unit-test deployment helper subsequently returned exit code `1`.
+
+Read-only capture of the final private log established the helper error:
+
+```text
+Invalid JUnit XML; evidence was not published.
+```
+
+The stack identified `Stop-SandboxStage` at line 18,
+`Export-SandboxEvidence` at line 348, and its caller at line 488 of
+`scripts/Invoke-SandboxDeployment.ps1`. The XML was not inspected and no
+automatic diagnosis, repair, or retry was attempted; this error alone does not
+establish whether the generated XML or the validator is defective.
+
+GitHub confirmed the final workflow conclusion `failure`: Preflight and Apply
+passed, Unit-test failed, sanitized evidence publication was skipped, and
+reporting and checkout cleanup passed. The artifacts API returned no artifacts.
+The final API response included the completed step list despite the missing
+live step status during observation.
+
+The sanitized failure was filed as #833. All unit/integration checks passed,
+but full workflow acceptance remains incomplete because evidence validation
+failed. Apply took approximately `94m27s`; Unit-test approximately `17m01s`.
+
+The collector stopped normally after recording the failure receipt. Its final
+process snapshot showed no Terraform, PowerShell test, or runner-worker
+processes, with the runner listener still active. Monitoring history remains
+in the owner-only per-run directory for follow-up; no deployment resources or
+Terraform state were modified by monitoring.
+
+## Step 73: Remove JUnit output and use JSON-only unit-test evidence
+
+At the operator's request, #833 was closed as not planned while the failure
+was addressed on the current branch. Local reproduction showed that
+PowerShell's XML adapter resolved the root's `name` attribute instead of its
+element name, causing valid generated JUnit XML to be rejected.
+
+The operator then selected JSON-only output instead of retaining XML support.
+The root orchestrator and MSI wrapper no longer accept `-JUnitXmlPath` or
+generate XML. The deployment helper requests, requires, validates, and stages
+only `unit-test-results.json`; the workflow uploads only its explicit
+`json_path`. Existing XML files are ignored, and artifact reporting labels
+the evidence as JSON.
+
+The framework's JUnit writer and XML-only string sanitizer are removed rather
+than retained behind an unused option. No JUnit helper sources, replacement
+test fixtures, or JUnit-specific validation are retained.
+
+JSON schema version `1`, sanitization, test counts, and exit-code semantics
+remain unchanged. Missing JSON is reported as unavailable; invalid JSON is
+rejected rather than published. Successful tests still require their requested
+JSON result file. No raw logs, state, configuration, or directory wildcards
+are added to artifact publication.
+
+At this step, these changes were local to the current branch. They had not
+been published or exercised in a new Azure deployment.
+
+## Step 74: Coordinate JSON-only publication before another deployment test
+
+The operator authorized publication of the JSON-only changes, including
+one-time merge overrides if needed for this publication. This does not
+authorize unrelated protection changes, bypassing failed checks, or
+automatically dispatching or approving another deployment.
+
+Publish the source changes through `feat/sandbox-json-only` into `vnext`,
+then publish only `.github/workflows/sandbox-deployment.yml` through
+`feat/register-sandbox-json-only` into `main`. Keep the operator's checkout
+and pre-existing worktrees intact. Run the applicable local CI checks after
+committing and before every push or PR creation, and require successful
+applicable hosted checks before merging. Verify that the workflow blobs on
+`main` and `vnext` match after both merges.
+
+The remaining deployment test is attended and operator-triggered. A new
+dispatch must use a fresh run-derived state key; do not rerun an old attempt.
+After publication is verified:
+
+```bash
+gh workflow run sandbox-deployment.yml \
+  --repo Azure-Samples/azuresandbox \
+  --ref main \
+  -f run_through=unit-test
+```
+
+Approve the protected environment for that new run, then watch its returned
+run ID. Full acceptance requires successful Preflight, Apply, Unit-test, JSON
+artifact publication, and final reporting. Passing test counts alone are not
+sufficient if evidence validation or upload fails.

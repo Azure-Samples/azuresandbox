@@ -304,8 +304,7 @@ function Invoke-SandboxUnitTest {
         Invoke-SandboxCommand @('pwsh', '-NoLogo', '-NoProfile', '-File',
             'extras/configurations/rg-devops-iac/scripts/Connect-SandboxRunner.ps1',
             '-ProfilePath', (Join-Path $script:directory 'profile.json'), '-RunTests',
-            '-ResultsJsonPath', (Join-Path $script:directory 'unit-test-results.json'),
-            '-JUnitXmlPath', (Join-Path $script:directory 'unit-test-results.xml'))
+            '-ResultsJsonPath', (Join-Path $script:directory 'unit-test-results.json'))
     }
     finally {
         $orchestratorLog = Join-Path $script:root 'Invoke-UnitTests.ps1.log'
@@ -313,55 +312,32 @@ function Invoke-SandboxUnitTest {
             [System.IO.File]::Move($orchestratorLog, (Join-Path $script:directory 'orchestrator.log'), $true)
         }
     }
-    foreach ($name in @('unit-test-results.json', 'unit-test-results.xml')) {
-        if (-not [System.IO.File]::Exists((Join-Path $script:directory $name))) {
-            Stop-SandboxStage 'Tests completed without both requested result files.' 2
-        }
+    if (-not [System.IO.File]::Exists((Join-Path $script:directory 'unit-test-results.json'))) {
+        Stop-SandboxStage 'Tests completed without the requested JSON result file.' 2
     }
 }
 
 function Export-SandboxEvidence {
-    $names = @('unit-test-results.json', 'unit-test-results.xml')
-    $available = @($names | Where-Object { [System.IO.File]::Exists((Join-Path $script:directory $_)) })
-    if ($available.Count -eq 0) {
-        Write-SandboxSummary "`nUnit-test evidence unavailable: no structured result files were produced. No test results were fabricated.`n"
+    $name = 'unit-test-results.json'
+    $path = Join-Path $script:directory $name
+    if (-not [System.IO.File]::Exists($path)) {
+        Write-SandboxSummary "`nUnit-test evidence unavailable: no structured JSON result file was produced. No test results were fabricated.`n"
         [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "ready=false`n", $script:utf8)
         return
     }
-    foreach ($name in $available) {
-        $path = Join-Path $script:directory $name
-        if ($name.EndsWith('.json')) {
-            $record = Read-SandboxJson $path
-            if ($record -isnot [System.Collections.IDictionary] -or $record.schemaVersion -ne 1 -or
-                $record.exitCode -isnot [long] -or $record.exitCode -notin @(0, 1, 2)) {
-                Stop-SandboxStage 'Invalid unit-test JSON; evidence was not published.'
-            }
-        }
-        else {
-            $settings = [System.Xml.XmlReaderSettings]::new()
-            $settings.DtdProcessing = [System.Xml.DtdProcessing]::Prohibit
-            $reader = [System.Xml.XmlReader]::Create($path, $settings)
-            try {
-                $document = [System.Xml.XmlDocument]::new()
-                $document.Load($reader)
-                if ($document.DocumentElement.Name -cne 'testsuites' -or $document.DocumentElement.NamespaceURI) {
-                    Stop-SandboxStage 'Invalid JUnit XML; evidence was not published.'
-                }
-            }
-            finally { $reader.Dispose() }
-        }
+    $record = Read-SandboxJson $path
+    if ($record -isnot [System.Collections.IDictionary] -or $record.schemaVersion -ne 1 -or
+        $record.exitCode -isnot [long] -or $record.exitCode -notin @(0, 1, 2)) {
+        Stop-SandboxStage 'Invalid unit-test JSON; evidence was not published.'
     }
     $staging = Join-Path $env:RUNNER_TEMP "sandbox-test-evidence-$script:runId-$script:attempt"
     if ([System.IO.Directory]::Exists($staging)) { Stop-SandboxStage 'Evidence staging directory already exists.' }
     $null = [System.IO.Directory]::CreateDirectory($staging)
     [System.IO.File]::SetUnixFileMode($staging, [System.IO.UnixFileMode]448)
-    foreach ($name in $available) { [System.IO.File]::Copy((Join-Path $script:directory $name), (Join-Path $staging $name), $false) }
-    $missing = @($names | Where-Object { $_ -notin $available })
-    if ($missing.Count -gt 0) { Write-SandboxSummary "`nPartial unit-test evidence: not produced: $($missing -join ', ').`n" }
-    $jsonPath = if ($available -contains $names[0]) { Join-Path $staging $names[0] } else { '' }
-    $xmlPath = if ($available -contains $names[1]) { Join-Path $staging $names[1] } else { '' }
+    $jsonPath = Join-Path $staging $name
+    [System.IO.File]::Copy($path, $jsonPath, $false)
     [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT,
-        "json_path=$jsonPath`nxml_path=$xmlPath`nname=unit-test-evidence-$script:deploymentId-$script:runId-$script:attempt`nready=true`n", $script:utf8)
+        "json_path=$jsonPath`nname=unit-test-evidence-$script:deploymentId-$script:runId-$script:attempt`nready=true`n", $script:utf8)
 }
 
 function Write-SandboxReport {
@@ -414,7 +390,7 @@ Preflight PASS is not proof that infrastructure was applied or tests passed.
         Write-SandboxSummary "`nUnit-test counts: passed=$($totals.passed), failed=$($totals.failed), skipped suites=$($totals.suitesSkipped).`n"
     }
     if ($env:UNIT_TEST_ARTIFACT_OUTCOME -eq 'success' -and $env:UNIT_TEST_ARTIFACT_URL) {
-        Write-SandboxSummary "`n[Download sanitized unit-test evidence (JSON/JUnit)]($env:UNIT_TEST_ARTIFACT_URL)`n"
+        Write-SandboxSummary "`n[Download sanitized unit-test evidence (JSON)]($env:UNIT_TEST_ARTIFACT_URL)`n"
     }
     elseif ($env:UNIT_TEST_ARTIFACT_OUTCOME -eq 'failure') {
         Write-SandboxSummary "`nUnit-test evidence upload failed; structured results remain on the runner.`n"
