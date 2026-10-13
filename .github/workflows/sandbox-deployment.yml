@@ -43,17 +43,17 @@ jobs:
         env:
           SANDBOX_BACKEND_HCL: ${{ secrets.SANDBOX_BACKEND_HCL }}
           SANDBOX_TFVARS_HCL: ${{ secrets.SANDBOX_TFVARS_HCL }}
-        run: python3 extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.py preflight
+        run: bash extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.sh preflight
 
       - name: Apply
         id: apply
         if: ${{ success() && inputs.run_through != 'preflight' }}
-        run: python3 extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.py apply
+        run: bash extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.sh apply
 
       - name: Unit-test
         id: unit_test
         if: ${{ success() && inputs.run_through == 'unit-test' }}
-        run: python3 extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.py unit-test
+        run: bash extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.sh unit-test
 
       - name: Publish sanitized unit-test evidence
         id: upload_evidence
@@ -75,8 +75,8 @@ jobs:
           UNIT_TEST_ARTIFACT_OUTCOME: ${{ steps.upload_evidence.outcome }}
           UNIT_TEST_ARTIFACT_URL: ${{ steps.upload_evidence.outputs.artifact-url }}
         run: |
-          if [[ -f extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.py ]]; then
-            python3 extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.py summary
+          if [[ -f extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.sh ]]; then
+            bash extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.sh summary
           else
             printf '## Sandbox deployment\n\nSource checkout did not provide the deployment helper. No completed stages are confirmed.\n' >> "$GITHUB_STEP_SUMMARY"
             exit 1
