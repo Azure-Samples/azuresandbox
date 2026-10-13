@@ -61,9 +61,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ steps.unit_test.outputs.name }}
-          path: |
-            ${{ steps.unit_test.outputs.json_path }}
-            ${{ steps.unit_test.outputs.xml_path }}
+          path: ${{ steps.unit_test.outputs.json_path }}
           if-no-files-found: error
 
       - name: Report stage results
