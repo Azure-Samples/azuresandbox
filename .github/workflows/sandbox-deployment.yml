@@ -1,5 +1,5 @@
 name: Azure Sandbox deployment
-run-name: Sandbox ${{ inputs.deployment_mode == 'new' && format('sandbox-{0}', github.run_id) || inputs.deployment_id }} / ${{ inputs.run_through }}
+run-name: Sandbox sandbox-${{ github.run_id }} / ${{ inputs.run_through }}
 
 on:
   workflow_dispatch:
@@ -9,15 +9,6 @@ on:
         type: choice
         options: [preflight, apply, unit-test]
         default: preflight
-      deployment_mode:
-        description: Explicitly select a new or existing Sandbox
-        type: choice
-        options: [existing, new]
-        default: existing
-      deployment_id:
-        description: Existing Sandbox ID (sandbox-<initial-run-id>); leave empty for new
-        type: string
-        default: ""
 
 permissions:
   contents: read
@@ -40,10 +31,8 @@ jobs:
     timeout-minutes: 180
     env:
       SANDBOX_RUN_THROUGH: ${{ inputs.run_through }}
-      SANDBOX_DEPLOYMENT_MODE: ${{ inputs.deployment_mode }}
-      SANDBOX_EXISTING_ID: ${{ inputs.deployment_id }}
     steps:
-      - name: Check out the approved Sandbox source
+      - name: Repository workspace
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: vnext
@@ -66,20 +55,15 @@ jobs:
         if: ${{ success() && inputs.run_through == 'unit-test' }}
         run: python3 extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.py unit-test
 
-      - name: Prepare sanitized unit-test evidence
-        id: evidence
-        if: ${{ always() && (steps.unit_test.outcome == 'success' || steps.unit_test.outcome == 'failure') }}
-        run: python3 extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.py evidence
-
       - name: Publish sanitized unit-test evidence
         id: upload_evidence
-        if: ${{ always() && steps.evidence.outcome == 'success' && steps.evidence.outputs.ready == 'true' }}
+        if: ${{ always() && steps.unit_test.outputs.ready == 'true' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ${{ steps.evidence.outputs.name }}
+          name: ${{ steps.unit_test.outputs.name }}
           path: |
-            ${{ steps.evidence.outputs.json_path }}
-            ${{ steps.evidence.outputs.xml_path }}
+            ${{ steps.unit_test.outputs.json_path }}
+            ${{ steps.unit_test.outputs.xml_path }}
           if-no-files-found: error
 
       - name: Report stage results
