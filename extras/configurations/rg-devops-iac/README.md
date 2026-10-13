@@ -143,12 +143,19 @@ covers scope, prerequisites, GitHub discovery, publication and approval
 choices, deployment environment protection setup, and smoke-only workflow
 creation, validation, publication to `vnext` and `main`, approval, and verified
 self-hosted execution. The three-stage `preflight`, `apply`, and `unit-test`
-workflow update is implemented locally and awaiting publication and its first
-live preflight. The guide includes sanitized HCL examples for the two protected
+workflow update is published to `vnext` and registered on `main`, with its first
+full deployment and test run verified successful. The guide includes sanitized HCL examples for the two protected
 configuration files, deployment-specific state keys, and private runner logs.
 The unit-test stage publishes default-sanitized JSON and JUnit evidence as
 workflow artifacts on both test success and failure; raw logs and plans stay
 on the runner.
+
+The updated workflow restricts automation to **new Sandboxes only**:
+each dispatch derives a new ID/key, and every preflight attempt rejects an
+existing state blob. Automated updates and recovery of existing Sandboxes are
+not supported. Unit-test also finalizes evidence itself, leaving only Publish
+and Report afterward. See the guide's steps 43 and 44 for behavior and step 45
+for coordinated publication before another deployment.
 
 * [Step 0: Login](#step-0-login)
 * [Step 1: Clone the Repository](#step-1-clone-the-repository)

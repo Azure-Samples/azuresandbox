@@ -6,12 +6,13 @@ by [GitHub Self-Hosted Runner Setup](./github-selfhosted-runner-setup.md).
 The operator executes the commands and reviews each result before proceeding.
 This is not a production deployment guide.
 
-The guide will be expanded as each setup step is completed. It currently
-covers scope, prerequisites, GitHub discovery, publication and approval
-choices, environment protection setup, and creating a smoke-only workflow.
-It also covers validation, publication to `vnext` and `main`, environment
-approval, and verified self-hosted smoke execution. It does not yet contain
-a Sandbox deployment job.
+This guide records setup, publication, protected approval, and the first
+successful full Sandbox deployment with JSON/JUnit evidence.
+Earlier steps retain historical setup decisions and commands.
+The latest policy in step 43 provisions new Sandboxes only, rejecting existing
+state on every attempt. Steps 40 through 44 record changes developed locally
+after the first deployment. Step 45 describes their coordinated publication:
+verify both trusted source and registration before another dispatch.
 
 ## Deployment scope and success criteria
 
@@ -124,7 +125,8 @@ Use the system-assigned identity for the remote-state backend in the
 bootstrap storage account's `tfstate` container. Use a unique, stable state
 blob key for each independent Sandbox, as described in step 22, and verify
 that a newly allocated key does not already belong to another deployment.
-Reuse that same key for subsequent operations on the Sandbox.
+All stages within its provisioning run use that key. Later maintenance or
+teardown must preserve that same state, but is manual and outside this workflow.
 Do not deploy with workstation-local or runner-local Sandbox state.
 
 Immediately after checking out the Sandbox source, create `backend.tf` in
@@ -1538,13 +1540,12 @@ defaulting to `preflight`:
 | `apply` | Preflight, then apply |
 | `unit-test` | Preflight, then apply, then unit-test |
 
-Each dispatch must explicitly distinguish a new Sandbox from an existing
-Sandbox. A new Sandbox receives the initial-run-derived ID from step 22;
-an existing Sandbox requires its stable deployment ID. All stages in a run
-use that same ID and backend key. Selecting `apply` in a later run generates
-a fresh preflight plan for that run rather than consuming an earlier run's
-plan. These controls are implemented in the local workflow update, awaiting
-review and publication.
+Under the latest policy, every dispatch requests a new independent
+Sandbox and receives its run-derived ID from step 22. All stages within that
+run use the same ID and backend key. Selecting `apply` or `unit-test` in a later
+dispatch provisions another Sandbox; it does not continue a preflight-only
+deployment or update existing infrastructure. Existing-target selection from
+the original implementation is removed as described in step 43.
 
 ### Preflight
 
@@ -1639,10 +1640,10 @@ Run only after preflight succeeds, and apply its exact private saved
 `.tfplan`. Apply does not generate a replacement plan, start VMs, or run tests.
 It is complete when `terraform apply` exits successfully.
 
-If apply is dispatched in a separate run, first execute preflight again to
-produce that run's saved plan. Do not automatically reuse a plan from an
-earlier run. Keep the plan private on the same runner throughout the handoff;
-do not use public artifacts for cross-stage transfer.
+Apply consumes preflight's exact saved plan within the same run.
+A separate dispatch creates a different Sandbox; it cannot consume an earlier
+run's plan or continue its deployment. Keep the plan private on the same runner
+throughout the handoff; do not use public artifacts for cross-stage transfer.
 
 #### Apply log and reporting
 
@@ -1715,18 +1716,17 @@ https://github.com/Azure-Samples/azuresandbox/actions/runs/<initial-workflow-run
 ```
 
 GitHub supplies the initial ID through `github.run_id` / `GITHUB_RUN_ID`.
-Do not include the run attempt in the deployment ID: rerunning the initial
-workflow retains its run ID and targets the same Sandbox.
+Do not include the run attempt in the deployment ID: a workflow rerun retains
+its run ID. Under the new-only policy it must fail before initialization if
+that key already exists, even if its state is empty or the previous apply failed.
 Record the allocated ID and originating run link in the GitHub summary before
 backend initialization, so the selection is traceable even if preflight fails.
 
-Later workflow dispatches must explicitly supply the existing deployment ID.
-Reuse it and its backend key for preflight, apply, unit-test, retries, later
-updates, and eventual teardown of that Sandbox. Do not substitute a later
-run's ID or interpret a missing existing ID as a request for a new Sandbox.
-Allocate another ID only when explicitly creating a separate Sandbox.
-Creating a new state key for every workflow run loses the existing resource
-tracking and can create duplicate infrastructure or name collisions.
+Later dispatches allocate separate Sandboxes, not updates to previous ones.
+There is no existing-ID input. Keep every earlier Sandbox's state intact.
+Any manual maintenance or teardown must use its original ID/key; never use
+another dispatch's new key for those operations. Automatic recovery of
+partially deployed Sandboxes is not supported.
 
 Include the stable deployment ID and requested operation in workflow run names
 and stage summaries. Record both the originating and current run links in
@@ -1754,9 +1754,9 @@ and clean per-run Terraform metadata prevents inheritance of an earlier
 backend selection. Terraform backend blocks do not interpolate normal input
 variables.
 
-For a newly allocated ID, check that its key is unused before the first
-initialization. For an existing ID, verify it identifies the intended
-Sandbox and use its existing state. Do not delete, rename, or migrate state
+For the run-derived ID, check that its key is unused before initialization
+on every attempt. An existing blob causes an explicit failure, not recovery,
+even if a private receipt matches. Do not delete, rename, or migrate state
 to make a new deployment appear empty. Keep the standalone bootstrap state
 separate and unchanged.
 
@@ -1830,9 +1830,9 @@ The helpers operate on the repository-root Sandbox configuration and invoke
 its existing VM-management and test scripts; they do not apply the standalone
 runner-bootstrap configuration.
 
-Select `deployment_mode: new` and leave `deployment_id` empty for a separate
-Sandbox. The default mode is `existing`, which requires an ID rather than
-silently allocating new infrastructure. `run_through` defaults to `preflight`.
+Every dispatch requests a new independent Sandbox; there are no
+`deployment_mode` or `deployment_id` inputs in the updated workflow.
+`run_through` defaults to `preflight`.
 The source remains trusted `vnext`; dispatch the registered workflow from
 `main` after publication.
 
@@ -1841,17 +1841,17 @@ Terraform metadata and Azure CLI context, and forces the default Terraform
 workspace. It checks state-blob existence with the system-assigned identity
 before initialization. A private deployment-level `deployment.json` binds the
 stable ID to its backend and repository. Preserve this file alongside the
-state: existing deployments fail closed if their runner receipt is missing.
-If the runner is replaced, restore its approved private deployment records
-before operating on existing Sandboxes; never delete state to bypass this check.
+state for audit and manual maintenance; it does not authorize reuse of existing
+state by this workflow. Never delete state to bypass the new-only check.
 
 Preflight checks the MSI input mode, matching backend tenant/subscription,
 all base-module flags, disabled extras, and Azure CLI/PowerShell authentication.
-If initialized state exposes existing shared resources, it runs the existing
-public-access helper before planning. Raw output remains private, including
+It does not invoke the public-access helper used for updating existing Sandboxes.
+Raw output remains private, including
 the Terraform JSON used to produce safe plan counts.
-Long commands emit generic two-minute progress messages without resource
-details. Unit-test waits up to ten minutes to confirm the deployed VMs running
+Long commands emit two-minute progress messages with bounded, allowlisted
+apply/test previews as described in steps 40 and 41.
+Unit-test waits up to ten minutes to confirm the deployed VMs running
 after the existing start helper, then invokes the orchestrator in the same
 PowerShell process as the UAMI login.
 
@@ -1932,8 +1932,8 @@ unit-test-results.json
 unit-test-results.xml
 ```
 
-After either a successful or failed unit-test step, a separate evidence step
-checks the generated JSON schema and XML document, then copies only these
+In the updated workflow, unit-test finalization checks the generated
+JSON schema and XML document after either successful or failed tests, then copies only these
 two named files to an owner-only staging directory under `RUNNER_TEMP`.
 The upload action receives explicit file paths, not a deployment-directory
 wildcard. Plans, state, backend/input files, receipts, profiles, and raw logs
@@ -1950,6 +1950,9 @@ Evidence upload runs after test failures without changing the test step's
 outcome or exit code. Apply and unit-test results remain separate in the
 summary; successful publication cannot turn failed tests into a successful
 pipeline. Upload failures are surfaced explicitly.
+Preparation failures fail the unit-test step if testing succeeded, or preserve
+its existing nonzero exit code if testing failed. Details remain in its private
+log, and no upload is approved when validation or staging fails.
 If only one format was produced, publish that available file and report the
 missing format as partial evidence. Invalid documents are not uploaded.
 If the VM-start gate, authentication, or another prerequisite prevented results
@@ -1971,9 +1974,9 @@ The download link expires when its artifact expires or the artifact/run is
 deleted. Private runner copies remain subject to the separate retention policy
 that has not yet been selected.
 
-This evidence publication is implemented locally and has not yet been exercised
-on GitHub. Publish the parent/child result-privacy changes and runner helpers
-to `vnext` before registering the updated workflow on `main`.
+The original evidence publication passed on GitHub as recorded in step 42.
+Moving preparation into unit-test finalization is a later
+simplification described in step 44.
 
 ## Step 27: Prepare publication before the first full run
 
@@ -2102,14 +2105,660 @@ Any `FAILED` gate in this clean run still blocks publication.
 Unavailable actionlint or gitleaks gates must be reported as `SKIPPED`,
 not represented as locally verified.
 
-## Remaining setup stages
+## Step 29: Publish the implementation to vnext
 
-Subsequent steps will document:
+The operator published `feat/sandbox-deployment` and opened
+[PR #810](https://github.com/Azure-Samples/azuresandbox/pull/810) against `vnext`.
+Clean committed-source local CI passed Bash, PowerShell, Markdown, and internal
+links. Actionlint and gitleaks were unavailable locally; both passed hosted CI.
+The PR reported 14 successful checks, two skipped Terraform lint checks, and
+no failed or pending checks.
 
-1. Reviewing, committing, checking, and publishing the workflow and helpers.
-2. Confirming the selected Sandbox settings and new/existing deployment target.
-3. Dispatching preflight and reviewing its private saved-plan receipt.
-4. Running the approved apply/test stages and reviewing the test-based
-   success or failure report.
+Required review was the remaining blocker. The operator explicitly authorized
+a one-time review bypass for **this PR only**, then squash-merged the exact
+checked head `7d90b1144bc7f104391c14044f1985d20950f542`.
+GitHub confirmed the merge into `vnext` at
+`60e7e058c2a309d7e15c46f3e2f5d5556597dcc3`.
+This authorization does not apply to subsequent PRs.
+The merge publishes the implementation; it does not run a Sandbox deployment.
 
-Do not start a Sandbox plan, apply, or test run during these discovery steps.
+## Step 30: Inspect the narrow main workflow update
+
+Before creating a new registration branch, inspect current `main` and existing
+worktrees. The approved source below is the verified merge from step 29,
+not an unreviewed moving branch tip. Run from the repository root:
+
+```bash
+(
+  set -euo pipefail
+  git fetch origin main vnext
+  printf '\nRelevant files on main:\n'
+  git ls-tree -r --name-only origin/main -- \
+    .github/workflows/sandbox-deployment.yml \
+    .github/actionlint.yaml \
+    scripts/Invoke-CIChecks.sh
+  printf '\nRegistration-file differences:\n'
+  git diff --name-status origin/main \
+    60e7e058c2a309d7e15c46f3e2f5d5556597dcc3 -- \
+    .github/workflows/sandbox-deployment.yml \
+    .github/actionlint.yaml
+  printf '\nExisting worktrees:\n'
+  git worktree list
+)
+```
+
+Review this output before preparing the branch. Preserve any existing lint
+configuration and worktrees rather than overwriting them. Only necessary
+workflow-registration changes belong in the `main` PR; do not release all of
+`vnext` or cherry-pick the whole implementation commit.
+Use a separate worktree to preserve the original checkout's private deployment
+files and ongoing documentation updates. Those guide updates will be published
+separately to `vnext`, not included in the narrow `main` update.
+Do not dispatch until the updated default-branch workflow is registered.
+
+The attended inspection confirmed that `main` already contains the workflow,
+custom-runner actionlint configuration, and local CI runner. Only the workflow
+differs from the approved implementation. An earlier registration worktree
+still exists; preserve it and use a different branch and worktree below.
+
+## Step 31: Commit the workflow-only main update
+
+Run from the original repository root. This creates a separate worktree from
+`origin/main`, copies only the approved workflow, verifies the staged scope
+and exact source match, commits it, and runs applicable CI afterward:
+
+```bash
+(
+  set -euo pipefail
+  registration_worktree="$(git rev-parse --show-toplevel)-sandbox-pipeline-registration"
+  approved_commit=60e7e058c2a309d7e15c46f3e2f5d5556597dcc3
+  git worktree add -b feat/register-sandbox-pipeline \
+    "$registration_worktree" origin/main
+  cd "$registration_worktree"
+  git restore --source="$approved_commit" -- \
+    .github/workflows/sandbox-deployment.yml
+  git add -- .github/workflows/sandbox-deployment.yml
+  test "$(git diff --cached --name-only)" = ".github/workflows/sandbox-deployment.yml"
+  git diff --cached --check
+  git diff --cached --exit-code "$approved_commit" -- \
+    .github/workflows/sandbox-deployment.yml
+  git --no-pager diff --cached --stat
+  git commit \
+    -m "Register three-stage Sandbox deployment workflow on main" \
+    -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+  ./scripts/Invoke-CIChecks.sh actions secrets
+  git --no-pager status --short
+)
+```
+
+Expect exactly one changed file in the commit. The subshell leaves the
+operator's terminal in the original checkout. Existing worktrees, deployment
+configuration, state, and pending guide updates remain untouched.
+If the new path or branch already exists, stop rather than overwriting it.
+Any failed check blocks publication; report unavailable tools as skipped.
+
+Do not push or create the PR until this output has been reviewed.
+Automatic lint/secrets CI targets `vnext`, so the `main` registration branch
+will additionally require manually dispatched hosted static checks on its
+exact committed source before merging. The #810 review bypass does not apply
+to this new PR. No Sandbox workflow is dispatched by these commands.
+
+The attended preparation produced commit `89200c6`, containing exactly one
+changed workflow file matching the approved source. Both local Actions and
+secret-scanning gates were skipped because their tools were unavailable.
+The check runner reported no failures and the registration worktree was clean.
+These skipped gates are not evidence of successful static analysis.
+
+## Step 32: Publish the narrow main PR
+
+From the original checkout, enter the separate registration worktree inside
+a subshell. Repeat the applicable local checks before each publication action:
+
+```bash
+(
+  set -euo pipefail
+  registration_worktree="$(git rev-parse --show-toplevel)-sandbox-pipeline-registration"
+  cd "$registration_worktree"
+  ./scripts/Invoke-CIChecks.sh actions secrets
+  git push --set-upstream origin feat/register-sandbox-pipeline
+  ./scripts/Invoke-CIChecks.sh actions secrets
+  gh pr create \
+    --repo Azure-Samples/azuresandbox \
+    --base main \
+    --head feat/register-sandbox-pipeline \
+    --title "Register three-stage Sandbox deployment workflow on main" \
+    --body '## Summary
+- Update only the manual Sandbox deployment workflow from the approved #810 merge.
+- Keep protected-environment approval and trusted vnext source checkout.
+- Register preflight, apply, unit-test, and sanitized test-evidence publication without releasing unrelated vnext changes.
+
+## Validation
+- The only changed file exactly matches the approved implementation.
+- Local Actions and secret-scanning gates were skipped because their tools were unavailable.
+- Hosted Actions and secret checks must be manually dispatched on this registration branch before merging.
+- No Sandbox deployment has been dispatched.'
+)
+```
+
+Stop if a check or publication command fails. Share the new PR URL before
+merging or dispatching anything. Publishing this PR does not run Terraform.
+The next step must verify actual hosted actionlint and gitleaks jobs on the
+registration commit; passing checks on #810 are not a substitute.
+Any required review or bypass authorization must be resolved for this PR
+independently.
+
+The operator published the registration branch and opened
+[PR #811](https://github.com/Azure-Samples/azuresandbox/pull/811) against `main`.
+Both pre-publication local checks reported no failures, with Actions and
+secret scanning skipped.
+
+## Step 33: Verify the published registration PR
+
+Inspect the published head, base, file scope, and review requirements:
+
+```bash
+gh pr view 811 \
+  --repo Azure-Samples/azuresandbox \
+  --json baseRefName,headRefName,headRefOid,files,mergeable,mergeStateStatus,reviewDecision,isDraft
+```
+
+Expect base `main`, head `feat/register-sandbox-pipeline`, commit beginning
+`89200c6`, and only `.github/workflows/sandbox-deployment.yml` in the file list.
+Review this output before dispatching hosted CI.
+Automatic `ci-actions` and `ci-secrets` triggers target `vnext`, not `main`;
+the subsequent manual dispatches must use the registration branch, not
+`vnext`. Inspect actual job outcomes and require both actionlint and gitleaks
+to run successfully on the verified head. No review-bypass authorization
+has been granted for #811.
+
+The published PR inspection confirmed `main` as base, exactly one workflow
+file, and head `89200c69bf93d1617a163c105631b9b1967db678`.
+GitHub reported `CLEAN`, `MERGEABLE`, and no required review decision.
+This does not replace verification of the hosted static checks.
+
+## Step 34: Dispatch hosted checks on the registration commit
+
+Run only these static-analysis workflows on the registration branch:
+
+```bash
+gh workflow run ci-actions.yml \
+  --repo Azure-Samples/azuresandbox \
+  --ref feat/register-sandbox-pipeline &&
+gh workflow run ci-secrets.yml \
+  --repo Azure-Samples/azuresandbox \
+  --ref feat/register-sandbox-pipeline &&
+gh run list \
+  --repo Azure-Samples/azuresandbox \
+  --branch feat/register-sandbox-pipeline \
+  --commit 89200c69bf93d1617a163c105631b9b1967db678 \
+  --event workflow_dispatch \
+  --limit 5 \
+  --json workflowName,databaseId,headSha,status,conclusion
+```
+
+These workflows use GitHub-hosted runners and do not deploy Azure resources,
+run live Sandbox tests, or consume the protected deployment environment.
+The list is bound to the verified PR head. If a run has not appeared yet,
+query the list again later instead of dispatching duplicates.
+Record the returned run IDs and inspect their jobs before merging.
+Require the actual `actionlint` and `gitleaks` jobs to succeed; a skipped
+actionlint job or a merely successful dispatch is not sufficient.
+Do not dispatch `sandbox-deployment.yml` in this step.
+
+The operator verified both hosted runs on the exact registration head:
+
+| Check | Run | Actual analysis job |
+|---|---|---|
+| Actions | [38306902897](https://github.com/Azure-Samples/azuresandbox/actions/runs/38306902897) | `actionlint`: completed successfully |
+| Secrets | [38306906653](https://github.com/Azure-Samples/azuresandbox/actions/runs/38306906653) | `gitleaks`: completed successfully |
+
+Both runs reported source `89200c69bf93d1617a163c105631b9b1967db678`.
+Neither analysis job was skipped.
+
+## Step 35: Merge the checked registration PR
+
+Recheck the PR checks, then merge the exact verified head without an admin
+bypass. This is a narrow topic-branch registration update, not a full
+`vnext`-to-`main` release:
+
+```bash
+gh pr checks 811 --repo Azure-Samples/azuresandbox &&
+gh pr merge 811 \
+  --repo Azure-Samples/azuresandbox \
+  --squash \
+  --match-head-commit 89200c69bf93d1617a163c105631b9b1967db678 \
+  --subject "Register three-stage Sandbox deployment workflow on main" \
+  --body 'Register the approved manual deployment workflow while retaining protected-environment approval and trusted vnext checkout.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>' &&
+gh pr view 811 \
+  --repo Azure-Samples/azuresandbox \
+  --json state,mergedAt,mergeCommit,url
+```
+
+If required review or another branch rule blocks the normal merge, stop
+and report it rather than adding `--admin`. No review bypass has been
+authorized for #811. If the head changed, the pinned merge must fail; do not
+substitute an unverified head.
+Share the merge confirmation before dispatching a deployment.
+Merging this manually triggered workflow does not itself create Azure resources.
+
+GitHub confirmed #811 merged normally into `main` at
+`cdbe5517b9cf18c8f0ec9d9f396cc7ff199dbdc9`.
+The PR check list showed only the successful CLA check; the separately
+dispatched hosted static runs above supplied the actionlint/gitleaks evidence.
+No deployment has been dispatched by these publication steps.
+
+## Step 36: Recheck registration and runner availability
+
+Before dispatching the approved new-Sandbox full run, check the registered
+workflow, its source blob, current trusted-source tip, runner availability,
+and environment secret names:
+
+```bash
+(
+  set -euo pipefail
+  gh api repos/Azure-Samples/azuresandbox/actions/workflows/sandbox-deployment.yml \
+    --jq '{name,state,path}'
+  gh api 'repos/Azure-Samples/azuresandbox/contents/.github/workflows/sandbox-deployment.yml?ref=main' \
+    --jq '{path,sha}'
+  printf '\nExpected workflow blob:\n'
+  git rev-parse \
+    60e7e058c2a309d7e15c46f3e2f5d5556597dcc3:.github/workflows/sandbox-deployment.yml
+  printf '\nCurrent trusted source commit:\n'
+  gh api repos/Azure-Samples/azuresandbox/git/ref/heads/vnext \
+    --jq '.object.sha'
+  gh api repos/Azure-Samples/azuresandbox/actions/runners \
+    --jq '.runners[] | select(any(.labels[]; .name == "azuresandbox")) | {status,busy,labels:[.labels[].name]}'
+  gh secret list \
+    --repo Azure-Samples/azuresandbox \
+    --env sandbox-deployment \
+    --json name --jq '.[].name'
+)
+```
+
+Expect an active workflow, matching workflow blob hashes, trusted source
+`60e7e058c2a309d7e15c46f3e2f5d5556597dcc3`, an online idle runner with the required
+labels, and both `SANDBOX_BACKEND_HCL` and `SANDBOX_TFVARS_HCL` secret names.
+If trusted source advanced, inspect and approve the new source before deploying;
+do not silently treat it as the already checked commit.
+The name-only secret check does not read or validate secret contents.
+The operator already approved those complete HCL inputs and the new independent
+Sandbox/full-test scope. No new configuration values are inferred here.
+Share the readiness output before dispatching.
+
+The attended readiness check passed: the workflow was active; its blob
+`5a426f9b732728743c9e6762292d7f411f49cec8` matched the approved definition;
+`vnext` remained at `60e7e058c2a309d7e15c46f3e2f5d5556597dcc3`;
+the runner was online and idle with the required labels; and both HCL
+environment secrets existed.
+
+## Step 37: Dispatch the approved full new-Sandbox run
+
+The command below records the original verified dispatch, before the local
+new-only simplification. For the simplified workflow after publication, use
+the command in step 43, without the removed selector inputs.
+
+The operator already approved a new independent Sandbox using the confirmed
+HCL inputs, all base modules, disabled extras, and all-module unit/integration
+tests. Dispatch once on `main`, explicitly leaving the existing ID empty:
+
+```bash
+gh workflow run sandbox-deployment.yml \
+  --repo Azure-Samples/azuresandbox \
+  --ref main \
+  -f run_through=unit-test \
+  -f deployment_mode=new \
+  -f deployment_id=''
+```
+
+Record the returned run URL/ID and share it before environment approval.
+If needed, identify the run without creating another dispatch:
+
+```bash
+gh run list \
+  --repo Azure-Samples/azuresandbox \
+  --workflow sandbox-deployment.yml \
+  --branch main \
+  --event workflow_dispatch \
+  --limit 3 \
+  --json databaseId,displayTitle,status,conclusion,url
+```
+
+The stable deployment ID is `sandbox-<this-initial-run-id>` and its state key
+is `sandboxes/sandbox-<this-initial-run-id>/terraform.tfstate`.
+Do not supply an existing Sandbox ID or fall back to a shared backend key.
+Dispatch creates the workflow run; the protected environment requires approval
+before its job starts.
+
+Approving this `unit-test` selection authorizes the full sequence:
+preflight, then automatic apply of its exact saved plan, then all-module
+unit/integration tests. There is no separate approval between stages.
+This creates additional billable Azure resources; a successful preflight
+alone is not evidence that apply or tests succeeded.
+Do not run interactive Terraform operations against this target in parallel.
+Do not dispatch again or retry a failed deployment without an explicit decision.
+
+The operator dispatched the requested run once:
+[38307770905](https://github.com/Azure-Samples/azuresandbox/actions/runs/38307770905).
+Its intended stable Sandbox ID is `sandbox-38307770905`; its backend target is
+`sandboxes/sandbox-38307770905/terraform.tfstate`.
+This records the selected target, not confirmation that state or resources
+have already been created.
+
+## Step 38: Verify and approve the protected full run
+
+Inspect the exact run before approving:
+
+```bash
+gh run view 38307770905 \
+  --repo Azure-Samples/azuresandbox \
+  --json displayTitle,event,headBranch,headSha,status,conclusion,url,jobs \
+  --jq '{displayTitle,event,headBranch,headSha,status,conclusion,url,jobs:[.jobs[]|{name,status,conclusion}]}'
+```
+
+Expect title `Sandbox sandbox-38307770905 / unit-test`, event
+`workflow_dispatch`, branch `main`, and workflow source
+`cdbe5517b9cf18c8f0ec9d9f396cc7ff199dbdc9`.
+The runtime checkout will separately use the trusted `vnext` source; its actual
+SHA is recorded by preflight.
+If metadata does not match, stop before approving and report the difference.
+
+Open that exact run URL in the GitHub portal as the configured environment
+reviewer. Select **Review deployments**, select `sandbox-deployment`, and
+choose **Approve and deploy**. This is the existing environment-review gate,
+not an admin bypass or a change to protection rules. Self-approval is allowed
+by the previously confirmed environment configuration.
+
+Approval permits all three stages to proceed automatically. Confirm approval
+and share the metadata output before moving to monitoring.
+If the approval control is absent or an error appears, report that state
+rather than changing environment protections, rerunning, or dispatching again.
+
+The attended metadata check matched the intended run and showed it waiting
+for environment approval. No deployment stage had started.
+
+## Step 39: Set up independent read-only monitoring before approval
+
+At the operator's request, the assistant installed an independent collector on
+the runner VM using Azure VM **Run Command**, before environment approval.
+The VM resource ID was obtained from this standalone configuration's
+`resource_ids["virtual_machine_jumplinux2"]` output, not inferred from names or
+copied into public documentation.
+
+The collector source and privacy/health regression tests are maintained here:
+
+* `scripts/Watch-SandboxRunner.py`
+* `scripts/tests/test_runner_monitor.py`
+* `scripts/sandbox_progress.py` (shared progress filter for subsequent installations)
+
+When installing the current collector source, copy `sandbox_progress.py` into
+the same directory as `Watch-SandboxRunner.py`. The collector already running
+for this first deployment was installed before extraction of the shared filter
+and remains self-contained; local edits do not replace that running process.
+
+The collector runs as a detached systemd service named
+`azuresandbox-monitor-<run-id>-<attempt>`, independent of the Actions job and the
+client connection. Every 120 seconds it records a sanitized snapshot and
+private history under `/var/lib/azuresandbox-monitor/<run-id>-<attempt>/`.
+The directory is owner-only, with a restrictive umask for its files.
+It stops on a recorded stage failure or completed unit-test stage, and has
+a maximum lifetime of six hours.
+
+Monitoring reads the runner service state, process names/counts, and this run's
+private stage logs/status receipts. It extracts only logical Terraform resource
+addresses, operation names, and elapsed heartbeat counters; resource IDs and
+arbitrary diagnostics are not returned as progress text.
+It does not read backend configuration, tfvars, plans, or Terraform state.
+After setup, no Terraform CLI command is needed for monitoring.
+It never starts, retries, repairs, or cancels deployment operations.
+
+The verified initial snapshot reported an active runner service, one listener,
+no worker or Terraform process, and `awaiting-job`/`waiting` health.
+VM Run Command returned `MONITOR_READY` and confirmed the service was active.
+The assistant's client-side timed reads retrieve these snapshots through
+Run Command for approximately two-minute progress updates.
+Approval remains an attended portal action by the operator.
+Public updates must use only the sanitized snapshot, not raw private logs.
+
+Health follows log advancement, not total resource provisioning time:
+advancing output is healthy; four quiet minutes warrant a possible-stall
+warning; ten quiet minutes warrant a suspected-hang warning and a human
+decision. Slow gateway creation with advancing heartbeats is not a hang.
+Monitoring failures must be reported separately from deployment failure.
+
+## Step 40: Add sanitized apply progress to future Actions runs
+
+While the first apply was running, the operator requested a local-only change
+to enrich its two-minute Actions heartbeat with a filtered log tail.
+The local deployment helper now prints up to four distinct logical resource
+progress lines after the existing elapsed-time/health message.
+Only newly written, complete lines are considered, with at most the newest
+64 KiB read per heartbeat. Repeated heartbeats for one resource collapse to
+its latest operation/counter.
+
+Illustrative public output:
+
+```text
+apply: 76 min elapsed; log advancing.
+  module.vwan[0].azurerm_point_to_site_vpn_gateway.this: Still creating... [19m50s elapsed]
+```
+
+`scripts/sandbox_progress.py` shares the allowlisted parser with the local
+independent monitor. It accepts known Terraform resource types, logical labels,
+numeric module/resource indexes, and operation/elapsed-time text. It excludes
+resource-ID suffixes, quoted instance keys, arbitrary messages, hostnames,
+and error details. It is not a raw `tail` or blanket log sanitizer.
+If there is no new output, the helper retains the existing no-new-output
+warning and does not replay old progress as fresh.
+
+Preflight and unit-test logging, subprocess exit semantics, raw private logs,
+and the two-minute interval remain unchanged.
+A preview-read error is reported explicitly with diagnostics kept private;
+it does not interrupt the apply or change its exit result.
+The change and directly related regression coverage are local and uncommitted,
+not pushed or deployed. The current workflow and installed monitor continue
+using their original checked-out/copied code; this enhancement applies to
+future runs after publication.
+
+## Step 41: Add sanitized unit-test progress to future Actions runs
+
+After apply completed successfully and the first unit-test stage began, the
+operator requested an equivalent local-only enhancement for test heartbeats.
+The helper now uses the same bounded, new-lines-only preview for `unit-test`,
+with a test-specific allowlist instead of Terraform operation parsing.
+
+Illustrative public output:
+
+```text
+unit-test: 4 min elapsed; log advancing.
+  Module: vnet-shared
+  vnet-shared: Passed=30 Failed=0 Total=30
+  Integration: SSH connectivity
+```
+
+Only known static module names, friendly allowlisted integration labels,
+numeric suite/overall summaries, and the final `RESULT: PASS`/`FAIL` marker
+are exposed. When individual result lines arrive before a suite summary,
+the preview shows counts labeled **recent result lines** for the current
+preview window, not canonical cumulative test totals.
+It does not expose check descriptions, VM targets, FQDNs, addresses,
+usernames, exception continuations, or arbitrary diagnostics, even if verbose
+details appear in the private log.
+
+The preview remains limited to four lines and does not replay old output as
+fresh. JSON/JUnit artifacts remain the authoritative detailed result evidence.
+Preview-read failures produce an explicit sanitized warning, retain private
+diagnostics, and preserve the test subprocess's original exit code.
+This code and its regression coverage are local and uncommitted; the
+already-running test stage uses the original published helper unchanged.
+
+## Step 42: Verify the first full deployment and evidence
+
+[Run 38307770905](https://github.com/Azure-Samples/azuresandbox/actions/runs/38307770905)
+completed successfully on 2026-10-12. All three stages, evidence preparation,
+artifact upload, and final reporting succeeded. Private stage receipts confirmed:
+
+| Stage | Exit code | Duration |
+|---|---|---|
+| Preflight | 0 | 1m36s |
+| Apply | 0 | 88m00s |
+| Unit-test | 0 | 17m05s |
+
+The receipt binds deployment `sandbox-38307770905`, run `38307770905`,
+attempt `1`, and runtime source
+`60e7e058c2a309d7e15c46f3e2f5d5556597dcc3`.
+The workflow definition used commit
+`cdbe5517b9cf18c8f0ec9d9f396cc7ff199dbdc9` on `main`.
+Manual operations on this same Sandbox must reuse its stable ID and state key;
+the new-only workflow cannot modify it.
+
+### Published result evidence
+
+The verified artifact is
+[unit-test-evidence-sandbox-38307770905-38307770905-1](https://github.com/Azure-Samples/azuresandbox/actions/runs/38307770905/artifacts/11778925440).
+The assistant downloaded it and confirmed it contains exactly:
+
+* `unit-test-results.json`: schema version `1`, exit code `0`.
+* `unit-test-results.xml`: valid JUnit `testsuites` document.
+
+The JSON reports **109 passed checks, zero failed checks**, 13 passed suites,
+and 10 skipped suites. All eight base-module suites and five applicable
+integration suites passed. The skipped suites correspond only to the
+intentionally disabled Petstore, AVD, and on-premises extras and their related
+integrations.
+JUnit reports 119 cases, zero failures/errors, and 10 skipped cases;
+the ten additional cases represent skipped suites rather than extra executed
+checks.
+
+Open the run's **Summary > Artifacts** to download the evidence through the
+GitHub portal, subject to repository access and configured retention.
+For a CLI download, choose a new empty destination and run:
+
+```bash
+gh run download 38307770905 \
+  --repo Azure-Samples/azuresandbox \
+  --name unit-test-evidence-sandbox-38307770905-38307770905-1 \
+  --dir /path/to/empty/evidence-directory
+```
+
+No plans, state, HCL configuration, or raw private logs are in this artifact.
+The detailed evidence remains separate from stage success messages.
+
+### Monitor and local change status
+
+The independent collector recorded exit code zero for every stage and stopped
+normally. Its final snapshot showed an active runner listener, no job worker,
+no Terraform or PowerShell process, and `completed` health.
+No further client polling was scheduled after completion.
+The runner remains available for later approved jobs; no infrastructure was
+torn down.
+
+The richer apply/unit-test heartbeat enhancements requested during this run,
+the monitoring sources/tests, and the ongoing guide updates remain local and
+uncommitted. They did not alter this verified run and are not yet published
+to `vnext`. Publication requires a separate reviewed change and the applicable
+post-commit pre-push CI checks.
+
+## Step 43: Restrict automation to new Sandboxes only
+
+The operator confirmed this change is **local only** and selected strict
+new-only behavior: refuse any existing state blob on every attempt.
+The local workflow removes `deployment_mode` and `deployment_id`; the helper
+always derives `sandbox-<workflow-run-id>` and its unique state key.
+Only `run_through` remains as a manual input.
+
+After this change is published to `vnext` and the registered workflow is updated
+on `main`, a full dispatch will be:
+
+```bash
+gh workflow run sandbox-deployment.yml \
+  --repo Azure-Samples/azuresandbox \
+  --ref main \
+  -f run_through=unit-test
+```
+
+The protected approval remains necessary before execution. Preflight refuses
+an existing blob before `terraform init`, regardless of the attempt number
+or matching private receipt. A rerun may proceed only if the previous attempt
+never created state. A preflight-only run that created even an empty state blob
+cannot later be continued through a rerun; choose the desired terminal stage
+on the initial dispatch, or start another independent Sandbox with a fresh run.
+
+Existing-Sandbox selection, cross-run target reuse, state-based retry recovery,
+and preflight public-access re-enablement have been removed. A stale caller
+requesting an existing target is explicitly rejected, not silently interpreted
+as a billable new deployment.
+Per-attempt private files, plan/receipt verification, sanitized progress,
+single test execution, evidence publication, and stage reporting remain intact.
+
+This change does not delete or alter any deployed resources, remote state,
+private receipts, or published artifacts. All previous Sandboxes remain tracked
+by their original state; manual maintenance or teardown is outside automation.
+The published workflow and source remain unchanged until a separately approved
+publication.
+
+## Step 44: Simplify post-test processing
+
+The operator requested removing the separate preparation step locally.
+Unit-test now runs the orchestrator once, then validates and stages its existing
+JSON/JUnit results before recording the final stage status. Finalization also
+runs after test or prerequisite failures: valid failed-test evidence is retained,
+and missing results are explicitly reported without fabrication.
+
+Only two post-test steps remain:
+
+* **Publish** uploads the explicit validated paths emitted by Unit-test, even
+  when Unit-test failed. It skips upload if preparation produced no approved files.
+* **Report** runs after earlier success or failure, summarizes the existing
+  receipts and results, and links the uploaded artifact without rerunning tests.
+
+Preparation errors are logged privately and surfaced with a sanitized message.
+They cannot turn failed tests into success or replace an existing test failure
+code. If testing succeeded but preparation failed, Unit-test fails.
+Plans, state, configuration, and raw logs remain excluded from the upload.
+
+This change is local and uncommitted; no deployed workflow or Azure resource has
+changed. Before another dispatch after publication, update both the trusted
+helper on `vnext` and the registered workflow on `main`: the old workflow still
+invokes the removed standalone preparation command.
+
+## Step 45: Publish the updated workflow before a second deployment
+
+The operator authorized committing the accumulated changes and preparing
+`vnext` and `main`. This publication includes sanitized apply/test previews,
+new-only state checks, integrated evidence finalization, monitoring sources
+and tests, the first-run evidence record, and the **Repository workspace** label.
+GitHub automatically names its cleanup step **Post Repository workspace**;
+both are provided by the standard checkout action, not custom deployment stages.
+
+Use a clean topic branch based on current `vnext` for the implementation PR.
+The original topic branch was previously squash-merged, so replay only the
+new change rather than reintroducing its old commits. Preserve private
+configuration, state, and existing worktrees.
+Run isolated Python regressions and the applicable local CI gates after
+committing and before every push or PR creation. Hosted checks must pass on
+the exact PR head, and required review must be satisfied.
+Earlier one-time review bypasses do not authorize bypassing this PR.
+
+After the implementation is approved and squash-merged into `vnext`, prepare
+a separate registration topic branch from current `main`. Copy only
+`.github/workflows/sandbox-deployment.yml` from that approved merge.
+Verify the one-file scope and exact blob match; do not release unrelated
+`vnext` changes. Run local Actions/secret checks before publishing and manually
+dispatch the hosted Actions/secret checks on that registration branch.
+Require the actual analysis jobs to pass on the exact committed head before
+the normal squash merge.
+
+Do not dispatch the Sandbox workflow during the transition: the old registered
+workflow invokes the removed preparation command, while the updated helper
+prepares evidence inside Unit-test.
+After both merges, verify the active registration, matching workflow blobs on
+`vnext` and `main`, the approved trusted-source commit, an online idle runner,
+and both protected HCL secret names.
+
+Publication alone does not authorize a new billable deployment or modify
+existing resources. Reconfirm the protected HCL inputs, module/tag scope,
+full-test selection, and fresh independent Sandbox before dispatching.
+Then use the simplified command in step 43 and approve that exact new run
+through the existing environment protection gate.

@@ -14,6 +14,8 @@ import traceback
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 
+from sandbox_progress import read_progress
+
 
 class StageFailure(RuntimeError):
     def __init__(self, message, code=1):
@@ -56,19 +58,12 @@ class Runner:
         self.root = Path(self.env["GITHUB_WORKSPACE"])
         self.run_id = self.env["GITHUB_RUN_ID"]
         self.attempt = self.env["GITHUB_RUN_ATTEMPT"]
-        self.mode = self.env["SANDBOX_DEPLOYMENT_MODE"]
         self.through = self.env["SANDBOX_RUN_THROUGH"]
-        existing_id = self.env.get("SANDBOX_EXISTING_ID", "")
-        if self.mode == "new" and not existing_id:
-            self.deployment_id = f"sandbox-{self.run_id}"
-        elif self.mode == "existing" and existing_id:
-            self.deployment_id = existing_id
-        else:
-            raise StageFailure("Select new with an empty ID, or existing with its stable ID.")
-        if not re.fullmatch(r"sandbox-[1-9][0-9]*", self.deployment_id):
-            raise StageFailure("Deployment ID must be sandbox-<initial-workflow-run-id>.")
+        if self.env.get("SANDBOX_DEPLOYMENT_MODE") not in (None, "", "new") or self.env.get("SANDBOX_EXISTING_ID"):
+            raise StageFailure("Automated deployments provision new Sandboxes only.")
         if not re.fullmatch(r"[1-9][0-9]*", self.run_id) or not re.fullmatch(r"[1-9][0-9]*", self.attempt):
             raise StageFailure("Invalid workflow run metadata.")
+        self.deployment_id = f"sandbox-{self.run_id}"
         if self.through not in ("preflight", "apply", "unit-test"):
             raise StageFailure("Invalid stage selection.")
         self.deployment_dir = Path.home() / ".local/state/azuresandbox/deployments" / self.deployment_id
@@ -115,6 +110,15 @@ class Runner:
                         size = Path(self.log.name).stat().st_size
                         health = "log advancing" if size > last_size else "no new log output; review if persistent"
                         print(f"{self.stage}: {int((time.monotonic() - started) / 60)} min elapsed; {health}.", flush=True)
+                        if self.stage in ("apply", "unit-test") and size > last_size:
+                            try:
+                                for line in read_progress(Path(self.log.name), last_size, stage=self.stage):
+                                    print(f"  {line}", flush=True)
+                            except OSError:
+                                traceback.print_exc(file=self.log)
+                                self.log.flush()
+                                size = Path(self.log.name).stat().st_size
+                                print(f"{self.stage}: sanitized progress preview unavailable; see private diagnostics.", flush=True)
                         last_size = size
         self.log.write(f"[{utc_now()}] Exit code: {code}\n")
         self.log.flush()
@@ -184,19 +188,13 @@ class Runner:
         blob_exists = json.loads(exists)
         if not isinstance(blob_exists, bool):
             raise StageFailure("Storage did not return a valid state-blob existence result.")
+        if blob_exists:
+            raise StageFailure("New-Sandbox automation requires an unused state key on every attempt; dispatch a new run.")
         manifest_path = self.deployment_dir / "deployment.json"
         if manifest_path.exists():
             manifest = json.loads(manifest_path.read_text())
             if manifest != {"deployment_id": self.deployment_id, "backend": backend, "repository": self.env["GITHUB_REPOSITORY"]}:
-                raise StageFailure("Existing deployment receipt does not match the selected backend.")
-        elif self.mode == "existing":
-            raise StageFailure("Existing deployment receipt is missing; restore its private runner records.")
-        if self.mode == "new" and self.attempt == "1" and blob_exists:
-            raise StageFailure("New deployment state key is already in use.")
-        if self.mode == "existing" and not blob_exists:
-            raise StageFailure("Existing deployment state blob is missing.")
-        if self.mode == "new" and self.attempt != "1" and blob_exists and not manifest_path.exists():
-            raise StageFailure("Retry cannot verify ownership of the existing state key.")
+                raise StageFailure("Deployment receipt does not match the selected backend.")
         write_json(manifest_path, {"deployment_id": self.deployment_id, "backend": backend, "repository": self.env["GITHUB_REPOSITORY"]})
         self.command(["terraform", "init", "-input=false", f"-backend-config=key={self.key}"])
         self.command(["terraform", "validate", "-no-color"])
@@ -226,9 +224,6 @@ class Runner:
             "extras/configurations/rg-devops-iac/scripts/Connect-SandboxRunner.ps1",
             "-ProfilePath", str(self.directory / "profile.json"),
         ])
-        outputs = json.loads(self.read_output(["terraform", "output", "-json"], "outputs.json"))
-        if "resource_names" in outputs:
-            self.command(["bash", "scripts/enable-public-access.sh"])
         self.command(["terraform", "plan", "-input=false", "-no-color", f"-out={self.plan}"])
         plan_json = self.directory / "plan.json"
         self.command(["terraform", "show", "-json", str(self.plan)], output=plan_json)
@@ -390,13 +385,6 @@ class Runner:
         if stage == "summary":
             self.report()
             return 0
-        if stage == "evidence":
-            try:
-                self.prepare_evidence()
-            except (StageFailure, OSError, ValueError, ET.ParseError):
-                self.summary("\nUnit-test evidence preparation failed; no artifact was approved for upload. Check the private result files and staging permissions.\n")
-                raise
-            return 0
         if stage not in ("preflight", "apply", "unit-test"):
             raise StageFailure("Invalid stage.")
         if stage == "preflight":
@@ -416,6 +404,13 @@ class Runner:
             except (OSError, ValueError, KeyError, TypeError):
                 traceback.print_exc(file=stream)
                 code = 1
+            if stage == "unit-test":
+                try:
+                    self.prepare_evidence()
+                except (StageFailure, OSError, ValueError, KeyError, TypeError, ET.ParseError):
+                    traceback.print_exc(file=stream)
+                    self.summary("\nUnit-test evidence preparation failed; no artifact was approved for upload. Check the private result files and staging permissions.\n")
+                    code = code or 1
             finished = utc_now()
             stream.write(f"\nFinished: {finished}\nStage exit code: {code}\n")
             stream.flush()
