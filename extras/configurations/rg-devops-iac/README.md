@@ -158,7 +158,7 @@ and Report afterward. See the guide's steps 43 and 44 for behavior and step 45
 for coordinated publication before another deployment.
 
 The deployment/monitor helpers replace the Python implementation
-with Bash entrypoints and PowerShell 7.2+ stage logic. The helper test sources
+with Bash entrypoints and PowerShell 7.3+ stage logic. The helper test sources
 and their `scripts/tests` directory are removed at the operator's request;
 existing Sandbox unit/integration tests remain unchanged. Validation uses
 existing CI gates and real executions. See the guide's steps 51 and 52 for the
