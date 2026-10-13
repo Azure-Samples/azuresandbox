@@ -1,4 +1,4 @@
-#requires -Version 7.2
+#requires -Version 7.3
 
 param(
     [Parameter(Mandatory)][ValidatePattern('^[1-9][0-9]*$')][string]$RunId,

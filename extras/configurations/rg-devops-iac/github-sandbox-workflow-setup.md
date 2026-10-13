@@ -2942,7 +2942,8 @@ Python unittest fixtures and a PowerShell privacy harness, not Pester tests.
 It has been removed without replacement. The repository's existing Sandbox
 unit/integration scripts and the workflow's all-module test phase remain intact.
 
-The Bash entrypoints set `umask 077` before starting PowerShell 7.2 or newer.
+The Bash entrypoints set `umask 077` before starting PowerShell 7.3 or newer.
+The private-file permission APIs require its .NET 7 runtime or newer.
 `Invoke-SandboxDeployment.ps1` owns the stage logic and uses .NET argument lists
 and an explicitly filtered child environment. Its internal Bash command mode
 redirects native stdout/stderr straight to private files, without pipe buffering
