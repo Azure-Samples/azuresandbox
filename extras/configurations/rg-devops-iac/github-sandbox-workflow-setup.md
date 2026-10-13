@@ -13,6 +13,10 @@ The latest policy in step 43 provisions new Sandboxes only, rejecting existing
 state on every attempt. Steps 40 through 44 record changes developed locally
 after the first deployment. Step 45 describes their coordinated publication:
 verify both trusted source and registration before another dispatch.
+Step 51 describes the subsequent Bash + PowerShell port and removal of the
+retained helper test suite. Step 52 records authorization for coordinated
+publication and a fresh full acceptance run. The second deployment used the
+Python implementation; its test failure was correctly reported.
 
 ## Deployment scope and success criteria
 
@@ -1819,11 +1823,12 @@ The local topic branch now contains the workflow and its runner helpers:
 | File | Purpose |
 |---|---|
 | `.github/workflows/sandbox-deployment.yml` | Protected manual dispatch, stage selection, serialized execution, and overall 180-minute timeout |
-| `extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.py` | Private configuration, backend selection, planning, saved-plan verification, apply logging, VM gate, and sanitized reporting |
+| `extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.sh` | Restrictive Linux umask, PowerShell entrypoint, and private native-command redirection |
+| `extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.ps1` | Private configuration, backend selection, planning, saved-plan verification, apply logging, VM gate, and sanitized reporting |
+| `extras/configurations/rg-devops-iac/scripts/SandboxProgress.ps1` | Shared bounded, allowlisted apply/test progress filtering |
 | `extras/configurations/rg-devops-iac/scripts/Connect-SandboxRunner.ps1` | Explicit UAMI authentication and process-local PowerShell context for prerequisite checks and all-module tests |
-| `extras/configurations/rg-devops-iac/scripts/tests/test_sandbox_deployment.py` | Isolated tests using simulated Terraform/Azure commands; no live deployment |
 
-All new helper scripts, tests, and documentation live under
+All new helper scripts and documentation live under
 `extras/configurations/rg-devops-iac`. The existing workflow definition stays
 in `.github/workflows`, as required for GitHub Actions discovery.
 The helpers operate on the repository-root Sandbox configuration and invoke
@@ -1855,12 +1860,12 @@ Unit-test waits up to ten minutes to confirm the deployed VMs running
 after the existing start helper, then invokes the orchestrator in the same
 PowerShell process as the UAMI login.
 
-Before publication, run the isolated helper tests from the repository root:
+Before publication, run the applicable existing CI checks from the repository
+root. The operator removed the retained helper fixtures and regression harnesses;
+do not recreate them or add Pester as part of this port.
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
-  -s extras/configurations/rg-devops-iac/scripts/tests \
-  -p test_sandbox_deployment.py -v
+./scripts/Invoke-CIChecks.sh bash powershell actions markdown links secrets
 ```
 
 Review and publish the topic update to `vnext` first, including both helpers.
@@ -1907,17 +1912,10 @@ is the structured JSON/JUnit results, not arbitrary logs. Do not publish verbose
 results. The runner workflow does not opt into verbose mode.
 Step 26 describes publishing these default structured results as GitHub evidence.
 
-The privacy regression test loads definitions without executing live Azure tests.
-Run it from the repository root:
-
-```bash
-pwsh -NoLogo -NoProfile -File \
-  ./extras/configurations/rg-devops-iac/scripts/tests/Test-UnitResultPrivacy.ps1
-```
-
-It covers all PowerShell child result helpers, static-description coverage,
-sanitized and verbose JSON/JUnit, pass/fail/harness exit-code serialization,
-unrecognized output, and Linux description discovery.
+The original implementation used isolated privacy fixtures to check these
+boundaries. Those helper test sources have since been removed at the operator's
+request. Existing deployed-module unit/integration tests remain unchanged;
+validation now uses existing CI gates and real executions as described in step 51.
 Actual sandbox tests still require the VM-start gate and explicit Azure
 authentication described earlier.
 
@@ -2021,8 +2019,10 @@ needed at that point.
 
 ## Step 28: Commit and check the implementation locally
 
-From the repository root, stage the reviewed tracked scope and the four new
-helper/test files explicitly. Ignored HCL configuration and Terraform state
+This step records the original publication procedure. For the current port,
+do not stage or commit anything until the operator reviews it.
+After approval, stage the reviewed tracked scope and new helper files explicitly
+from the repository root. Ignored HCL configuration and Terraform state
 must not be staged; do not use `git add -f`.
 
 ```bash
@@ -2035,9 +2035,11 @@ must not be staged; do not use `git add -f`.
     modules extras/modules scripts
   git add -- \
     extras/configurations/rg-devops-iac/scripts/Connect-SandboxRunner.ps1 \
-    extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.py \
-    extras/configurations/rg-devops-iac/scripts/tests/test_sandbox_deployment.py \
-    extras/configurations/rg-devops-iac/scripts/tests/Test-UnitResultPrivacy.ps1
+    extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.sh \
+    extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.ps1 \
+    extras/configurations/rg-devops-iac/scripts/SandboxProgress.ps1 \
+    extras/configurations/rg-devops-iac/scripts/Watch-SandboxRunner.sh \
+    extras/configurations/rg-devops-iac/scripts/Watch-SandboxRunner.ps1
   git --no-pager diff --cached --check
   git --no-pager diff --cached --stat
   git commit \
@@ -2046,25 +2048,20 @@ must not be staged; do not use `git add -f`.
 )
 ```
 
-Then run the isolated regression tests and applicable CI gates **after the
+Then run the applicable existing CI gates **after the
 commit**, before any push or PR creation:
 
 ```bash
 (
   set -euo pipefail
   cd "$(git rev-parse --show-toplevel)"
-  PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
-    -s extras/configurations/rg-devops-iac/scripts/tests \
-    -p test_sandbox_deployment.py -v
-  pwsh -NoLogo -NoProfile -File \
-    extras/configurations/rg-devops-iac/scripts/tests/Test-UnitResultPrivacy.ps1
   ./scripts/Invoke-CIChecks.sh bash actions powershell markdown links secrets
   git --no-pager status --short
 )
 ```
 
-These regression tests use isolated fixtures and mocks; they do not deploy
-resources or invoke live Sandbox unit/integration tests. Stop on any failure
+These CI checks do not deploy resources or invoke live Sandbox unit/integration
+tests. Stop on any failure
 and review the output before publishing. A `SKIPPED` gate is not a failure,
 but record which checks were unavailable locally; the hosted gate remains
 necessary. Review actual error output as well as the final CI summary.
@@ -2486,16 +2483,26 @@ The VM resource ID was obtained from this standalone configuration's
 `resource_ids["virtual_machine_jumplinux2"]` output, not inferred from names or
 copied into public documentation.
 
-The collector source and privacy/health regression tests are maintained here:
+The current port's collector source is maintained here:
 
-* `scripts/Watch-SandboxRunner.py`
-* `scripts/tests/test_runner_monitor.py`
-* `scripts/sandbox_progress.py` (shared progress filter for subsequent installations)
+* `scripts/Watch-SandboxRunner.sh`
+* `scripts/Watch-SandboxRunner.ps1`
+* `scripts/SandboxProgress.ps1` (shared progress filter)
 
-When installing the current collector source, copy `sandbox_progress.py` into
-the same directory as `Watch-SandboxRunner.py`. The collector already running
-for this first deployment was installed before extraction of the shared filter
-and remains self-contained; local edits do not replace that running process.
+When installing the reviewed port, copy all three files into the same
+owner-only directory. Start it through the Bash launcher so the restrictive
+umask applies to files created by PowerShell. For example, its systemd
+`ExecStart` can invoke:
+
+```bash
+bash /path/to/private-monitor/Watch-SandboxRunner.sh \
+  -RunId <run-id> -Attempt 1 \
+  -OutputDirectory /var/lib/azuresandbox-monitor/<run-id>-1
+```
+
+The collector installed for the first deployment used the original Python
+implementation and completed normally. Local edits do not replace an installed
+collector or alter the active Actions job.
 
 The collector runs as a detached systemd service named
 `azuresandbox-monitor-<run-id>-<attempt>`, independent of the Actions job and the
@@ -2544,7 +2551,7 @@ apply: 76 min elapsed; log advancing.
   module.vwan[0].azurerm_point_to_site_vpn_gateway.this: Still creating... [19m50s elapsed]
 ```
 
-`scripts/sandbox_progress.py` shares the allowlisted parser with the local
+The port's `scripts/SandboxProgress.ps1` shares the allowlisted parser with the local
 independent monitor. It accepts known Terraform resource types, logical labels,
 numeric module/resource indexes, and operation/elapsed-time text. It excludes
 resource-ID suffixes, quoted instance keys, arbitrary messages, hostnames,
@@ -2736,7 +2743,7 @@ Use a clean topic branch based on current `vnext` for the implementation PR.
 The original topic branch was previously squash-merged, so replay only the
 new change rather than reintroducing its old commits. Preserve private
 configuration, state, and existing worktrees.
-Run isolated Python regressions and the applicable local CI gates after
+For subsequent publication, run the applicable existing local CI gates after
 committing and before every push or PR creation. Hosted checks must pass on
 the exact PR head, and required review must be satisfied.
 Earlier one-time review bypasses do not authorize bypassing this PR.
@@ -2762,3 +2769,276 @@ existing resources. Reconfirm the protected HCL inputs, module/tag scope,
 full-test selection, and fresh independent Sandbox before dispatching.
 Then use the simplified command in step 43 and approve that exact new run
 through the existing environment protection gate.
+
+## Step 46: Confirm inputs and readiness for the second deployment
+
+The operator reconfirmed the existing protected HCL inputs, correct identities
+and backend, complete required tags, all base modules with extras disabled,
+and all-module unit/integration testing. The requested deployment is another
+independent, billable Sandbox; the first deployment and its state remain intact.
+No secret contents were read or changed during this confirmation.
+
+Implementation PR #826 merged into `vnext` at
+`4e837eb295f771dfe5ac139bba12e78b3288394e` with an explicitly authorized,
+one-time review bypass for that PR only. Registration PR #827 merged normally
+into `main` at `559447d62f4756eb92ba3a720d804e3499db44b6`.
+The workflow blob on both branches is
+`7fbb75b0f42fd5f286455b2a44ab4a376d8bb08c`.
+Hosted checks passed; local secret scanning was unavailable.
+
+The runner was offline at publication readiness. The operator reported starting
+it, so recheck that it is online and idle before dispatch. From the operator's
+Bash terminal, inspect the trusted source, registered definition, runner,
+protected secret names, and recent deployment runs:
+
+```bash
+(
+  set -euo pipefail
+  gh api repos/Azure-Samples/azuresandbox/git/ref/heads/vnext \
+    --jq '{ref,sha:.object.sha}'
+  gh api repos/Azure-Samples/azuresandbox/git/ref/heads/main \
+    --jq '{ref,sha:.object.sha}'
+  gh api repos/Azure-Samples/azuresandbox/actions/workflows/sandbox-deployment.yml \
+    --jq '{name,state,path}'
+  gh api 'repos/Azure-Samples/azuresandbox/contents/.github/workflows/sandbox-deployment.yml?ref=main' \
+    --jq '{path,sha}'
+  gh api repos/Azure-Samples/azuresandbox/actions/runners \
+    --jq '.runners[] | select(any(.labels[]; .name == "azuresandbox")) | {status,busy,labels:[.labels[].name]}'
+  gh secret list \
+    --repo Azure-Samples/azuresandbox \
+    --env sandbox-deployment \
+    --json name --jq '.[].name'
+  gh run list \
+    --repo Azure-Samples/azuresandbox \
+    --workflow sandbox-deployment.yml \
+    --limit 5 \
+    --json databaseId,displayTitle,status,conclusion
+)
+```
+
+Review the output before dispatch. Expect the exact commits/blob above,
+an active workflow, an online idle runner with all required labels,
+both HCL secret names, and no queued, waiting, or in-progress deployment.
+If the trusted source changed, approve the new revision before continuing.
+This inspection does not dispatch a workflow or start Terraform.
+
+The operator's readiness output matched the approved source and registered
+workflow commits and blob. The workflow was active, the runner online and idle
+with all required labels, and both protected HCL secret names present.
+The recent deployment runs were completed successfully; none was active.
+
+## Step 47: Dispatch the second full new-Sandbox run
+
+After the confirmed inputs and readiness check, dispatch once from the
+operator's Bash terminal:
+
+```bash
+gh workflow run sandbox-deployment.yml \
+  --repo Azure-Samples/azuresandbox \
+  --ref main \
+  -f run_through=unit-test
+```
+
+Do not supply the removed `deployment_mode` or `deployment_id` inputs.
+Record and share the returned run URL before approving the protected environment.
+Do not repeat the dispatch to check progress: another dispatch allocates
+another independent Sandbox.
+The new run derives `sandbox-<run-id>` and
+`sandboxes/sandbox-<run-id>/terraform.tfstate`, leaving the first deployment
+unchanged. Environment approval permits preflight, saved-plan apply, and
+all-module unit/integration tests to proceed without another interstage prompt.
+
+The operator dispatched the second run once:
+[38334479593](https://github.com/Azure-Samples/azuresandbox/actions/runs/38334479593).
+Its allocated deployment ID is `sandbox-38334479593`, and the state key is
+`sandboxes/sandbox-38334479593/terraform.tfstate`.
+Dispatch confirms selection of the target, not successful creation of state
+or resources.
+
+## Step 48: Verify the second run before approval
+
+Inspect the exact run from the operator's Bash terminal:
+
+```bash
+gh run view 38334479593 \
+  --repo Azure-Samples/azuresandbox \
+  --json displayTitle,event,headBranch,headSha,status,conclusion,url,jobs \
+  --jq '{displayTitle,event,headBranch,headSha,status,conclusion,url,jobs:[.jobs[]|{name,status,conclusion}]}'
+```
+
+Expect title `Sandbox sandbox-38334479593 / unit-test`, event
+`workflow_dispatch`, branch `main`, definition commit
+`559447d62f4756eb92ba3a720d804e3499db44b6`, and a job waiting for environment
+approval. The trusted runtime source is separately checked out from `vnext`;
+preflight records its actual revision.
+Review this output before approving. A successful dispatch alone does not
+confirm these settings or authorize bypassing the protection gate.
+
+The operator's metadata output matched the expected title, event, branch,
+and definition commit. The run and its deployment job were waiting for
+environment approval; no deployment stage had started.
+
+## Step 49: Approve the second full deployment
+
+Open [run 38334479593](https://github.com/Azure-Samples/azuresandbox/actions/runs/38334479593)
+as the configured environment reviewer. Select **Review deployments**, select
+`sandbox-deployment`, and choose **Approve and deploy**.
+This uses the existing environment protection gate, not an admin bypass.
+
+Approval authorizes preflight, apply of its exact saved plan, and all-module
+unit/integration tests for the confirmed new Sandbox. There is no separate
+approval between stages. The first Sandbox and its state remain unchanged.
+Do not run concurrent interactive Terraform commands against the new target.
+
+After approving, inspect this same run rather than dispatching another:
+
+```bash
+gh run view 38334479593 \
+  --repo Azure-Samples/azuresandbox \
+  --json status,conclusion,jobs \
+  --jq '{status,conclusion,jobs:[.jobs[]|{name,status,conclusion,steps:[.steps[]|{name,status,conclusion}]}]}'
+```
+
+The updated step list should show **Repository workspace**, **Preflight**,
+**Apply**, **Unit-test**, **Publish sanitized unit-test evidence**, and
+**Report stage results**, without a separate evidence-preparation step.
+Two-minute apply/test previews begin only when the corresponding subprocess
+has been running long enough for its heartbeat.
+
+The operator approved the run. Its first execution snapshot showed
+**Repository workspace** completed successfully and **Preflight** in progress.
+The pending steps matched the updated layout, including Publish and Report
+without a standalone preparation step, followed by **Post Repository workspace**.
+
+## Step 50: Observe the second deployment without redispatching
+
+Follow the existing run from the operator's Bash terminal:
+
+```bash
+gh run watch 38334479593 \
+  --repo Azure-Samples/azuresandbox \
+  --interval 120 \
+  --exit-status
+```
+
+This refreshes GitHub step status every two minutes; it does not stream the
+private Terraform log. To inspect the changed progress previews, keep the
+run open in GitHub and expand **Apply**, then **Unit-test** when it starts.
+Long-running subprocesses emit their sanitized previews at the two-minute
+heartbeat. Short commands may finish without emitting a preview.
+
+The terminal watch reports completion and exits nonzero for an unsuccessful
+run. Stopping this local watch does not cancel the deployment.
+If deployment fails, preserve and report the failure; do not retry, dispatch
+another run, or alter configuration to work around it.
+After completion, review stage outcomes, the artifact link, and JSON/JUnit
+results separately; a successful checkout or apply does not prove tests passed.
+
+## Step 51: Port the deployment helpers to Bash + PowerShell
+
+The operator requested a local, uncommitted port and removal of the helper
+test sources and their empty `scripts/tests` directory. That directory held
+Python unittest fixtures and a PowerShell privacy harness, not Pester tests.
+It has been removed without replacement. The repository's existing Sandbox
+unit/integration scripts and the workflow's all-module test phase remain intact.
+
+The Bash entrypoints set `umask 077` before starting PowerShell 7.2 or newer.
+`Invoke-SandboxDeployment.ps1` owns the stage logic and uses .NET argument lists
+and an explicitly filtered child environment. Its internal Bash command mode
+redirects native stdout/stderr straight to private files, without pipe buffering
+or shell evaluation of command text. The shared PowerShell filter retains
+bounded previews, static allowlists, fresh complete lines, and a four-line limit.
+
+The port retains new-only state rejection, backend/provider identity separation,
+private per-attempt records, saved-plan/configuration hashes, two-minute command
+heartbeats, the VM-start gate, one test invocation, failed-test evidence
+finalization, explicit artifact paths, and always-run reporting.
+The independent monitor keeps its systemd lifecycle and private JSON snapshot
+format. It does not inspect Terraform state or change infrastructure.
+
+No Python dependency remains in the deployment/monitor helpers.
+Existing bootstrap JWT decoding and unrelated diagram-generation tooling are
+outside this port and remain unchanged.
+
+### Validation and publication boundaries
+
+Use the existing Bash, PowerShell, Actions, Markdown, internal-link, and secret
+checks. PowerShell analysis must include the new files before staging; an
+unstaged file is not yet available in a committed-source worktree.
+Do not change shared analyzer rules or delete initialized Terraform dependencies
+to hide local-only findings. Inspect applicable changed scripts directly while
+the port is uncommitted; after review/commit, run the unchanged umbrella checks
+from a clean committed-source worktree if necessary.
+
+No helper test suite, mock framework, or Pester dependency is retained.
+Non-deploying real command executions can check argument forwarding, private
+redirection, exit codes, progress filtering, and reporting. End-to-end acceptance
+requires a separately approved fresh Sandbox run after publication; static CI
+alone does not prove deployment parity.
+
+Review the local diff before any staging, commit, push, or PR creation.
+Until separately authorized, keep the published Python workflow/source and
+the active deployment untouched. After review, publish the helpers to `vnext`
+and register the matching workflow on `main` before dispatching the port.
+Do not mix a Bash/PowerShell registration with a Python-only trusted checkout,
+or the old Python registration with a checkout that has removed its entrypoint.
+
+## Step 52: Publish the port and prepare a fresh full acceptance run
+
+The operator reported that the second run completed with a
+`vm_jumpbox_linux` integration-test failure. The workflow correctly marked
+Unit-test as failed and published the failed result in its structured artifact.
+That test failure will be investigated separately; it does not establish
+end-to-end parity of the new helpers.
+
+The operator deleted that Sandbox's resource group and authorized publication
+of the port. Deleting a resource group does not necessarily delete its remote
+state blob. Leave previous state and runner records untouched: a new dispatch
+derives an independent Sandbox ID and state key.
+
+The operator reconfirmed both protected HCL configurations, their identities,
+backend, subscription, tenant, and required tags. The approved scope is all
+base modules, disabled extras, and full deployed-module unit/integration tests.
+The operator also approved another independent, billable Sandbox.
+
+Publish the implementation through a PR to `vnext`, with the applicable local
+CI gates clean before every push and PR creation. Then register only the
+matching workflow through a separate PR to `main`; do not release unrelated
+`vnext` changes. Honor branch protections and obtain separate authorization
+for any review bypass. Do not dispatch during the transition.
+
+Before dispatch, verify that the workflow blobs on `main` and `vnext` match,
+the trusted `vnext` source contains all five Bash/PowerShell helper files,
+the registered workflow is active, the approved runner is online and idle,
+both protected secret names exist, and no deployment is active. Query secret
+names only, never their values.
+
+After publication and readiness confirmation, the operator manually runs:
+
+```bash
+gh workflow run sandbox-deployment.yml \
+  --repo Azure-Samples/azuresandbox \
+  --ref main \
+  -f run_through=unit-test
+```
+
+Record the exact run URL returned by this command. Inspect that run's definition
+SHA, title, and pending protected-environment approval before approving it.
+Approval covers preflight, its saved-plan apply, and the full test suite.
+Do not rerun a previous dispatch or delete its state to reuse it.
+
+After approval, follow the exact returned run ID:
+
+```bash
+gh run watch <new-run-id> \
+  --repo Azure-Samples/azuresandbox \
+  --interval 120 \
+  --exit-status
+```
+
+Review all stage outcomes and the JSON/JUnit artifact. Explicitly distinguish
+a reproducible Sandbox test failure from a helper/runtime failure. A correct
+failed stage with matching failed-test evidence validates failure propagation,
+not a fully passing deployment. Raw Terraform and orchestrator diagnostics
+remain private on the runner. Stop and report infrastructure/helper errors
+without automatically retrying or modifying the deployment.

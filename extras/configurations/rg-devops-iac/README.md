@@ -157,6 +157,13 @@ not supported. Unit-test also finalizes evidence itself, leaving only Publish
 and Report afterward. See the guide's steps 43 and 44 for behavior and step 45
 for coordinated publication before another deployment.
 
+The deployment/monitor helpers replace the Python implementation
+with Bash entrypoints and PowerShell 7.2+ stage logic. The helper test sources
+and their `scripts/tests` directory are removed at the operator's request;
+existing Sandbox unit/integration tests remain unchanged. Validation uses
+existing CI gates and real executions. See the guide's steps 51 and 52 for the
+port, coordinated publication, and a fresh full acceptance run.
+
 * [Step 0: Login](#step-0-login)
 * [Step 1: Clone the Repository](#step-1-clone-the-repository)
 * [Step 2: Initialize Terraform](#step-2-initialize-terraform)
