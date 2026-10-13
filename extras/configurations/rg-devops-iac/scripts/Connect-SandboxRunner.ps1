@@ -8,10 +8,7 @@ param(
     [switch]$RunTests,
 
     [Parameter(Mandatory = $false)]
-    [string]$ResultsJsonPath,
-
-    [Parameter(Mandatory = $false)]
-    [string]$JUnitXmlPath
+    [string]$ResultsJsonPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -33,6 +30,6 @@ catch {
 
 if ($RunTests) {
     # The orchestrator must run in this process to inherit the explicit MSI context.
-    & (Join-Path $env:GITHUB_WORKSPACE 'scripts/Invoke-UnitTests.ps1') -ResultsJsonPath $ResultsJsonPath -JUnitXmlPath $JUnitXmlPath
+    & (Join-Path $env:GITHUB_WORKSPACE 'scripts/Invoke-UnitTests.ps1') -ResultsJsonPath $ResultsJsonPath
     exit $LASTEXITCODE
 }

@@ -146,7 +146,7 @@ self-hosted execution. The three-stage `preflight`, `apply`, and `unit-test`
 workflow update is published to `vnext` and registered on `main`, with its first
 full deployment and test run verified successful. The guide includes sanitized HCL examples for the two protected
 configuration files, deployment-specific state keys, and private runner logs.
-The unit-test stage publishes default-sanitized JSON and JUnit evidence as
+The unit-test stage publishes default-sanitized JSON evidence as
 workflow artifacts on both test success and failure; raw logs and plans stay
 on the runner.
 

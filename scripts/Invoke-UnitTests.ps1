@@ -38,18 +38,18 @@
 #   Valid module names: vnet_shared, vnet_app, vm_jumpbox_linux, vm_mssql_win, mssql, mysql,
 #                       vwan, vnet_onprem, avd, petstore (ai_foundry is not currently supported)
 #
-#   Optional: emit machine-readable results for CI/CD (either or both; any scope above)
-#     From bash:       pwsh -File ./scripts/Invoke-UnitTests.ps1 -ResultsJsonPath ./test-results.json -JUnitXmlPath ./test-results.xml
-#     From PowerShell: .\scripts\Invoke-UnitTests.ps1 -Module vnet_app -JUnitXmlPath .\test-results.xml
+#   Optional: emit machine-readable JSON results for CI/CD (any scope above)
+#     From bash:       pwsh -File ./scripts/Invoke-UnitTests.ps1 -ResultsJsonPath ./test-results.json
+#     From PowerShell: .\scripts\Invoke-UnitTests.ps1 -Module vnet_app -ResultsJsonPath .\test-results.json
 #   Results are sanitized by default. Add -VerboseResults for the original
 #   environment-specific check text and diagnostics (private use only).
 #
 # Exit codes: 0 = all tests passed, 1 = one or more tests failed, 2 = harness error (bad
 #   parameters, missing Azure auth / terraform state, etc. - no or partial tests ran).
 #
-# Machine-readable results (-ResultsJsonPath / -JUnitXmlPath):
-#   Off by default; supplying either path does not change the exit code, log file, or console
-#   output. Files are written on every exit (0, 1, and 2), relative paths resolve against the
+# Machine-readable results (-ResultsJsonPath):
+#   Off by default; supplying the path does not change the exit code, log file, or console
+#   output. JSON is written on every exit (0, 1, and 2), relative paths resolve against the
 #   current directory, and missing parent directories are created. Per-check detail is parsed
 #   from the '[MODULE:<name>] [PASS|FAIL|SKIP] <message>' lines every test script emits; a
 #   following 'FAIL Exception: ...' line is attached as detail to the preceding failed check.
@@ -61,12 +61,9 @@
 #     passed/failed counts mirror the log's [SUMMARY] counts (the exit-code source of truth).
 #     If a test script reports more failures than [FAIL] lines, an 'Unattributed failures'
 #     check is added; if a script cannot be run or parsed, a 'Test harness' check is added.
-#   - JUnit XML: <testsuites>/<testsuite>/<testcase> with <failure> for failed checks,
-#     <skipped> for skipped checks or undeployed modules, and an <error> 'harness' suite on
-#     exit code 2 - consumable by standard GitHub test-reporter actions.
-#   Default JSON and JUnit preserve counts/statuses and static child check descriptions,
+#   Default JSON preserves counts/statuses and static child check descriptions,
 #   excluding runtime values and exception text. -VerboseResults restores full detail
-#   in both formats. General console/log diagnostics remain private.
+#   in JSON. General console/log diagnostics remain private.
 #
 # Prerequisites:
 #   - PowerShell 7.x (pwsh) with Az.Accounts, Az.Compute, Az.Resources, Az.Sql, Az.Network,
@@ -86,9 +83,6 @@ param(
 
     [Parameter(Mandatory = $false)]
     [string]$ResultsJsonPath,
-
-    [Parameter(Mandatory = $false)]
-    [string]$JUnitXmlPath,
 
     [Parameter(Mandatory = $false)]
     [switch]$VerboseResults
@@ -278,125 +272,6 @@ function Add-SkippedSuite {
         })
 }
 
-function Get-XmlSafeString {
-    param([string]$Value)
-    if ($null -eq $Value) { return '' }
-    return ($Value -replace '[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]', '')
-}
-
-function Write-JUnitXml {
-    param(
-        [string]$Path,
-        [object[]]$Suites,
-        [string]$ErrorMessage,
-        [string]$StartedAt,
-        [double]$DurationSeconds
-    )
-
-    $inv = [cultureinfo]::InvariantCulture
-    $totalTests = 0; $totalFailures = 0; $totalSkipped = 0
-    foreach ($s in $Suites) {
-        if ($s.status -eq 'skipped') { $totalTests++; $totalSkipped++; continue }
-        $totalTests += $s.checks.Count
-        $totalFailures += @($s.checks | Where-Object { $_.status -eq 'failed' }).Count
-        $totalSkipped += @($s.checks | Where-Object { $_.status -eq 'skipped' }).Count
-    }
-    $totalErrors = if ($ErrorMessage) { 1 } else { 0 }
-    $totalTests += $totalErrors
-
-    $settings = [System.Xml.XmlWriterSettings]::new()
-    $settings.Indent = $true
-    $settings.Encoding = [System.Text.UTF8Encoding]::new($false)
-    $writer = [System.Xml.XmlWriter]::Create($Path, $settings)
-    try {
-        $writer.WriteStartDocument()
-        $writer.WriteStartElement('testsuites')
-        $writer.WriteAttributeString('name', 'Invoke-UnitTests')
-        $writer.WriteAttributeString('tests', [string]$totalTests)
-        $writer.WriteAttributeString('failures', [string]$totalFailures)
-        $writer.WriteAttributeString('errors', [string]$totalErrors)
-        $writer.WriteAttributeString('skipped', [string]$totalSkipped)
-        $writer.WriteAttributeString('time', $DurationSeconds.ToString('0.###', $inv))
-        $writer.WriteAttributeString('timestamp', $StartedAt)
-
-        if ($ErrorMessage) {
-            $writer.WriteStartElement('testsuite')
-            $writer.WriteAttributeString('name', 'harness')
-            foreach ($a in @(@('tests', '1'), @('failures', '0'), @('errors', '1'), @('skipped', '0'), @('time', '0'))) {
-                $writer.WriteAttributeString($a[0], $a[1])
-            }
-            $writer.WriteAttributeString('timestamp', $StartedAt)
-            $writer.WriteStartElement('testcase')
-            $writer.WriteAttributeString('name', 'Invoke-UnitTests.ps1')
-            $writer.WriteAttributeString('classname', 'harness')
-            $writer.WriteAttributeString('time', '0')
-            $writer.WriteStartElement('error')
-            $writer.WriteAttributeString('message', (Get-XmlSafeString $ErrorMessage))
-            $writer.WriteAttributeString('type', 'HarnessError')
-            $writer.WriteString((Get-XmlSafeString $ErrorMessage))
-            $writer.WriteEndElement()
-            $writer.WriteEndElement()
-            $writer.WriteEndElement()
-        }
-
-        foreach ($s in $Suites) {
-            $suiteName = Get-XmlSafeString $s.name
-            $isSkippedSuite = $s.status -eq 'skipped'
-            $failures = @($s.checks | Where-Object { $_.status -eq 'failed' }).Count
-            $skipped = if ($isSkippedSuite) { 1 } else { @($s.checks | Where-Object { $_.status -eq 'skipped' }).Count }
-            $tests = if ($isSkippedSuite) { 1 } else { $s.checks.Count }
-
-            $writer.WriteStartElement('testsuite')
-            $writer.WriteAttributeString('name', $suiteName)
-            $writer.WriteAttributeString('tests', [string]$tests)
-            $writer.WriteAttributeString('failures', [string]$failures)
-            $writer.WriteAttributeString('errors', '0')
-            $writer.WriteAttributeString('skipped', [string]$skipped)
-            $writer.WriteAttributeString('time', ([double]$s.durationSeconds).ToString('0.###', $inv))
-            $writer.WriteAttributeString('timestamp', $s.startedAt)
-
-            if ($isSkippedSuite) {
-                $writer.WriteStartElement('testcase')
-                $writer.WriteAttributeString('name', $suiteName)
-                $writer.WriteAttributeString('classname', $suiteName)
-                $writer.WriteAttributeString('time', '0')
-                $writer.WriteStartElement('skipped')
-                $writer.WriteAttributeString('message', (Get-XmlSafeString $s.skipReason))
-                $writer.WriteEndElement()
-                $writer.WriteEndElement()
-            }
-
-            foreach ($c in $s.checks) {
-                $writer.WriteStartElement('testcase')
-                $writer.WriteAttributeString('name', (Get-XmlSafeString $c.name))
-                $writer.WriteAttributeString('classname', $suiteName)
-                $writer.WriteAttributeString('time', '0')
-                if ($c.status -eq 'failed') {
-                    $writer.WriteStartElement('failure')
-                    $writer.WriteAttributeString('message', (Get-XmlSafeString $c.name))
-                    $writer.WriteAttributeString('type', $(if ($c.name -eq 'Test harness') { 'HarnessError' } else { 'TestFailure' }))
-                    if ($c.message) { $writer.WriteString((Get-XmlSafeString $c.message)) }
-                    $writer.WriteEndElement()
-                }
-                elseif ($c.status -eq 'skipped') {
-                    $writer.WriteStartElement('skipped')
-                    $writer.WriteAttributeString('message', (Get-XmlSafeString $c.name))
-                    $writer.WriteEndElement()
-                }
-                $writer.WriteEndElement()
-            }
-
-            $writer.WriteEndElement()
-        }
-
-        $writer.WriteEndElement()
-        $writer.WriteEndDocument()
-    }
-    finally {
-        $writer.Dispose()
-    }
-}
-
 function Write-ResultFiles {
     # Best-effort: a failure to write results is logged but never changes the exit code.
     param(
@@ -404,7 +279,7 @@ function Write-ResultFiles {
         [string]$ErrorMessage
     )
 
-    if (-not $script:resultsJsonFullPath -and -not $script:junitXmlFullPath) { return }
+    if (-not $script:resultsJsonFullPath) { return }
 
     $ErrorMessage = Remove-AnsiEscape $ErrorMessage
     if ($ErrorMessage -and -not $VerboseResults) {
@@ -447,18 +322,6 @@ function Write-ResultFiles {
         }
         catch {
             Write-Log "[WARNING] Failed to write results JSON '$($script:resultsJsonFullPath)': $_"
-        }
-    }
-
-    if ($script:junitXmlFullPath) {
-        try {
-            $dir = Split-Path $script:junitXmlFullPath -Parent
-            if ($dir -and -not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
-            Write-JUnitXml -Path $script:junitXmlFullPath -Suites $suites -ErrorMessage $ErrorMessage -StartedAt (Get-UtcTimestamp $startedAt) -DurationSeconds $durationSeconds
-            Write-Log "Results JUnit XML: $($script:junitXmlFullPath)"
-        }
-        catch {
-            Write-Log "[WARNING] Failed to write results JUnit XML '$($script:junitXmlFullPath)': $_"
         }
     }
 }
@@ -664,7 +527,6 @@ $repoRoot = Split-Path $PSScriptRoot -Parent
 $script:runStartedAt = Get-Date
 $script:suiteResults = [System.Collections.Generic.List[object]]::new()
 $script:resultsJsonFullPath = if ($ResultsJsonPath) { $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($ResultsJsonPath) } else { $null }
-$script:junitXmlFullPath = if ($JUnitXmlPath) { $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($JUnitXmlPath) } else { $null }
 
 # Clear previous log
 if (Test-Path $script:logPath) { Remove-Item $script:logPath -Force }
