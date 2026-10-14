@@ -25,11 +25,6 @@ jobs:
     name: Validate deployment entry
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions:
-      statuses: write
-    concurrency:
-      group: sandbox-deployment-status-${{ github.event.pull_request.head.sha || github.run_id }}
-      cancel-in-progress: false
     outputs:
       deploy: ${{ steps.select.outputs.deploy }}
       source_ref: ${{ steps.select.outputs.source_ref }}
@@ -41,7 +36,6 @@ jobs:
         id: select
         env:
           MANUAL_RUN_THROUGH: ${{ inputs.run_through }}
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if [[ "$GITHUB_REF" != refs/heads/main ]]; then
@@ -85,13 +79,6 @@ jobs:
                 exit 0
               fi
               head_sha="$(jq -er '.pull_request.head.sha' "$GITHUB_EVENT_PATH")"
-              gh api --method POST \
-                "repos/$GITHUB_REPOSITORY/statuses/$head_sha" \
-                -f context=sandbox-deployment-gate \
-                -f state=pending \
-                -f description="Awaiting approval and the full deployment result." \
-                -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT" \
-                --silent
               {
                 printf 'source_ref=%s\n' "$head_sha"
                 echo "run_through=unit-test"
@@ -105,10 +92,40 @@ jobs:
               ;;
           esac
 
+  pending_status:
+    name: Publish pending release deployment status
+    needs: selection
+    if: ${{ github.event_name == 'pull_request_target' && needs.selection.outputs.deploy == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      statuses: write
+    concurrency:
+      group: sandbox-deployment-status-${{ github.event.pull_request.head.sha }}
+      cancel-in-progress: false
+    steps:
+      - name: Mark the candidate pending before environment approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ needs.selection.outputs.source_ref }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Invalid release candidate SHA."
+            exit 1
+          fi
+          gh api --method POST \
+            "repos/$GITHUB_REPOSITORY/statuses/$SOURCE_SHA" \
+            -f context=sandbox-deployment-gate \
+            -f state=pending \
+            -f description="Awaiting approval and the full deployment result." \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT" \
+            --silent
+
   sandbox:
     name: Sandbox preflight / apply / unit-test
-    needs: selection
-    if: ${{ needs.selection.outputs.deploy == 'true' }}
+    needs: [selection, pending_status]
+    if: ${{ !cancelled() && needs.selection.result == 'success' && needs.selection.outputs.deploy == 'true' && (github.event_name == 'workflow_dispatch' || needs.pending_status.result == 'success') }}
     concurrency:
       group: azure-sandbox-deployment
       cancel-in-progress: false
@@ -181,7 +198,7 @@ jobs:
 
   deployment_status:
     name: Publish release deployment status
-    needs: [selection, sandbox]
+    needs: [selection, pending_status, sandbox]
     if: ${{ always() && github.event_name == 'pull_request_target' && needs.selection.outputs.deploy == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -195,6 +212,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ needs.selection.outputs.source_ref }}
+          PENDING_STATUS_RESULT: ${{ needs.pending_status.result }}
           DEPLOYMENT_RESULT: ${{ needs.sandbox.result }}
           PREFLIGHT_OUTCOME: ${{ needs.sandbox.outputs.preflight_outcome }}
           APPLY_OUTCOME: ${{ needs.sandbox.outputs.apply_outcome }}
@@ -210,9 +228,17 @@ jobs:
             echo "::error::Invalid release candidate SHA; no passing status was published."
             exit 1
           fi
+          if [[ "$PENDING_STATUS_RESULT" != success ]]; then
+            echo "::error::Pending status publication failed or was incomplete; no passing result was published."
+            exit 1
+          fi
           attempt_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT"
           latest_url="$(gh api "repos/$GITHUB_REPOSITORY/commits/$SOURCE_SHA/status" \
             --jq '[.statuses[] | select(.context == "sandbox-deployment-gate")][0].target_url // empty')"
+          if [[ -z "$latest_url" ]]; then
+            echo "::error::The candidate's pending status is missing; no passing result was published."
+            exit 1
+          fi
           # Both status writers share a lock; older attempts cannot overwrite a newer pending result.
           if [[ "$latest_url" != "$attempt_url" ]]; then
             echo "This attempt no longer owns the candidate status; no result was overwritten." >> "$GITHUB_STEP_SUMMARY"

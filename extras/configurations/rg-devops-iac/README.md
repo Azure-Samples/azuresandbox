@@ -189,6 +189,12 @@ Missing evidence, skipped required stages, failures, and cancellations cannot
 produce success. If cancellation or an API outage prevents final reporting,
 the status can remain pending rather than falsely passing.
 
+The deployment job waits for successful pending-status publication on PR runs;
+an API failure at that point does not schedule an Azure deployment. Manual
+runs explicitly bypass the PR-only pending job without losing their deployment.
+Metadata-only validation does not share the status-writer lock, so it cannot
+displace a queued reporter.
+
 Status writers have a separate per-SHA lock and attempt-specific run links;
 an older attempt cannot overwrite the pending result of a newer attempt on
 the same SHA. Only the hosted status jobs have status-write permission.
