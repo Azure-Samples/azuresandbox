@@ -38,6 +38,17 @@ function Read-SandboxJson {
     ConvertFrom-Json -AsHashtable -InputObject ([System.IO.File]::ReadAllText($Path))
 }
 
+function Get-SandboxResourceGroupName {
+    param($ResourceNames)
+    if ($ResourceNames -isnot [System.Collections.IDictionary] -or
+        $ResourceNames['resource_group'] -isnot [string] -or
+        [string]::IsNullOrWhiteSpace($ResourceNames['resource_group']) -or
+        $ResourceNames['resource_group'] -match '[\p{C}`]') {
+        Stop-SandboxStage 'Terraform resource_names did not provide a reportable resource group name.'
+    }
+    $ResourceNames['resource_group']
+}
+
 function Get-SandboxHash {
     param([string]$Path)
     (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -317,6 +328,10 @@ function Invoke-SandboxApply {
     Write-SandboxLog "Verified plan SHA-256: $($record.plan_sha256)`n"
     Connect-SandboxProvider (Read-SandboxJson (Join-Path $script:directory 'profile.json'))
     Invoke-SandboxCommand @('terraform', 'apply', '-input=false', '-no-color', $script:plan)
+    $names = Get-SandboxOutput @('terraform', 'output', '-json', 'resource_names') 'resource-names.json' | ConvertFrom-Json -AsHashtable
+    Write-SandboxJson (Join-Path $script:directory 'resource-group.json') @{
+        resource_group = Get-SandboxResourceGroupName $names
+    }
 }
 
 function Invoke-SandboxUnitTest {
@@ -328,11 +343,12 @@ function Invoke-SandboxUnitTest {
     Connect-SandboxProvider (Read-SandboxJson (Join-Path $script:directory 'profile.json'))
     Invoke-SandboxCommand @('bash', 'scripts/manage-vms.sh', 'start')
     $names = Get-SandboxOutput @('terraform', 'output', '-json', 'resource_names') 'resource-names.json' | ConvertFrom-Json -AsHashtable
+    $resourceGroup = Get-SandboxResourceGroupName $names
     $vmNames = @($names.Keys | Where-Object { $_.StartsWith('virtual_machine_', [StringComparison]::Ordinal) } | ForEach-Object { $names[$_] })
     if ($vmNames.Count -eq 0) { Stop-SandboxStage 'Approved all-module scope must contain VMs.' }
     $timer = [System.Diagnostics.Stopwatch]::StartNew()
     while ($true) {
-        $vms = @(Get-SandboxOutput @('az', 'vm', 'list', '-g', $names.resource_group, '-d', '--output', 'json') 'vm-status.json' | ConvertFrom-Json -AsHashtable)
+        $vms = @(Get-SandboxOutput @('az', 'vm', 'list', '-g', $resourceGroup, '-d', '--output', 'json') 'vm-status.json' | ConvertFrom-Json -AsHashtable)
         $states = @{}
         foreach ($vm in $vms) { $states[$vm['name']] = $vm['powerState'] }
         if (@($vmNames | Where-Object { $states[$_] -cne 'VM running' }).Count -eq 0) { break }
@@ -400,6 +416,14 @@ function Write-SandboxReport {
         $outcome = [Environment]::GetEnvironmentVariable($stages[$name])
         $result = if ($outcome -and $results.ContainsKey($outcome)) { $results[$outcome] } else { 'NOT COMPLETED' }
         Write-SandboxSummary "| $name | $result |`n"
+    }
+    $resourceGroupPath = Join-Path $script:directory 'resource-group.json'
+    if ([System.IO.File]::Exists($resourceGroupPath)) {
+        $resourceGroup = Get-SandboxResourceGroupName (Read-SandboxJson $resourceGroupPath)
+        Write-SandboxSummary "`nResource group: ``$resourceGroup```n"
+    }
+    else {
+        Write-SandboxSummary "`nResource group: unavailable (no verified post-apply output was captured).`n"
     }
     foreach ($name in $stages.Keys) {
         $statusPath = Join-Path $script:directory "$name-status.json"

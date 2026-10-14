@@ -3661,3 +3661,530 @@ Approve the protected environment for that new run, then watch its returned
 run ID. Full acceptance requires successful Preflight, Apply, Unit-test, JSON
 artifact publication, and final reporting. Passing test counts alone are not
 sufficient if evidence validation or upload fails.
+
+## Step 75: Verify coordinated JSON-only publication
+
+Source PR #834 merged into `vnext` as
+`adba2c1a9b355d7590b1f0da631ff50ed49f6853`. All applicable PR checks passed
+on its exact topic head before the operator-authorized one-time independent
+review override was used. No protection settings were changed or failed
+checks bypassed.
+
+Workflow-only PR #835 merged normally into `main` as
+`757784f976358c3b4a71db1b7be65545047af00e`, after hosted actionlint and
+gitleaks passed on its exact topic head. The published workflow blob on both
+branches is `0f2cc2f6329480e8af5f3a76a313938105f6123d`.
+
+All six post-merge `vnext` CI workflows completed successfully. Local gitleaks
+was unavailable and reported SKIPPED; hosted secret scanning passed.
+The operator's checkout stayed on `feat/sandbox-deployment`, committed and
+clean, with a source tree matching published `vnext`. Only the two worktrees
+created for this publication were removed; older worktrees were preserved.
+No deployment was dispatched or approved by the assistant.
+
+## Step 76: Record the first JSON-only acceptance dispatch
+
+The operator manually dispatched
+[run 38486222399](https://github.com/Azure-Samples/azuresandbox/actions/runs/38486222399)
+from `main` with `run_through=unit-test`. GitHub confirmed the expected title
+`Sandbox sandbox-38486222399 / unit-test`, the `workflow_dispatch` event, and
+workflow definition revision `757784f976358c3b4a71db1b7be65545047af00e`.
+The independent state key is
+`sandboxes/sandbox-38486222399/terraform.tfstate`.
+
+The initial snapshot showed the job waiting for protected-environment approval.
+The expected trusted source is the published `vnext` revision recorded above;
+its actual checked-out revision must be verified once checkout executes.
+No completed stage or acceptance outcome has yet been observed for this run.
+
+At `23:48:21 UTC`, the operator confirmed protected-environment approval and
+reported that workflow status messages were now flowing. This is consistent
+with a transient reporting problem affecting the earlier runs; it does not
+establish a confirmed GitHub service incident or its underlying cause.
+
+After approving the protected environment, watch this exact dispatch:
+
+```bash
+gh run watch 38486222399 \
+  --repo Azure-Samples/azuresandbox \
+  --interval 120 \
+  --exit-status
+```
+
+## Step 77: Capture the JSON-only acceptance run's Apply failure
+
+The operator reported an Apply failure approximately 35 minutes into execution
+and requested read-only capture of the runner's Apply log, explicitly directing
+that no issue be filed. GitHub confirmed run `38486222399` completed with
+conclusion `failure`: Preflight passed, Apply failed, Unit-test and artifact
+publication were skipped, and reporting and checkout cleanup passed.
+
+The captured private Apply-log tail showed these failures:
+
+| Resource | Sanitized diagnostic |
+| --- | --- |
+| `module.vnet_app[0].azurerm_virtual_machine_extension.configure_azure_files` | `VMExtensionProvisioningError`, Custom Script Extension code `71`: the message mentioned managed-identity permissions but reported HTTP `404 Not Found` and "The specified blob does not exist." |
+| `module.vnet_app[0].azurerm_storage_blob.remote_scripts["orchestrator"]` | Checking `Invoke-AzureFilesConfiguration.ps1` failed because `<storage-account>.blob.core.windows.net` could not be resolved: `no such host`. |
+| `module.vnet_app[0].azurerm_storage_blob.remote_scripts["worker"]` | Uploading `Set-AzureFilesConfiguration.ps1` failed with `HTTP response was nil; connection may have been reset`. |
+
+The affected resource declarations are `modules/vnet-app/compute.tf:113`
+and `modules/vnet-app/storage.tf:92`. Apply finished with exit code `1` at
+`00:24:22 UTC`. The observed upload failures and missing-blob response concern
+Azure Files script publication/access; the outer managed-identity wording
+alone does not establish an RBAC defect. No root cause was confirmed, no
+configuration was changed, and no retry or issue creation was attempted.
+The new JSON-only test/evidence path was not exercised because Unit-test
+did not run.
+
+## Step 78: Record the transient-failure assessment and related issues
+
+The operator subsequently requested issue creation, assessed the failure as
+transient, and stated that the failed Sandbox would be deleted before another
+deployment. The sanitized recurrence was filed as #836, linking these verified
+closed issues:
+
+* #771 is the closest match: the same `vnet_app` script-blob DNS failure and
+  Azure Files extension code `71`/missing-blob `404`. It was closed as not
+  reproducible after a fresh deployment completed those resources and passed
+  `109/109` checks; the original DNS cause was not diagnosed.
+* #167 records a related storage-endpoint `no such host` error during Azure
+  Files directory creation, attributed in its closing comment to client DNS.
+  Its operation and environment differ from this run.
+
+The operator's transient assessment is recorded separately from a confirmed
+root cause. No automatic repair, retry, resource deletion, or reopening of
+historical issues was performed by the assistant.
+
+## Step 79: Record the next fresh JSON-only acceptance dispatch
+
+The operator manually dispatched
+[run 38491545341](https://github.com/Azure-Samples/azuresandbox/actions/runs/38491545341)
+from `main` with `run_through=unit-test`. GitHub confirmed the expected title
+`Sandbox sandbox-38491545341 / unit-test`, the `workflow_dispatch` event, and
+workflow definition revision `757784f976358c3b4a71db1b7be65545047af00e`.
+The independent state key is
+`sandboxes/sandbox-38491545341/terraform.tfstate`.
+
+The first snapshot showed the job waiting for protected-environment approval.
+No execution outcome has yet been observed. After approval, watch this exact
+run:
+
+```bash
+gh run watch 38491545341 \
+  --repo Azure-Samples/azuresandbox \
+  --interval 120 \
+  --exit-status
+```
+
+## Step 80: Capture runner shutdown during the next Apply
+
+The operator reported another Apply failure and requested private runner-log
+inspection without issue creation. GitHub confirmed run `38491545341`
+completed with conclusion `failure`, but the Apply step itself was
+`cancelled`, not a normally completed Terraform error.
+
+Apply started at `00:43:42 UTC`. Public logs showed advancing resource creation
+at `00:45:44 UTC`, followed by:
+
+```text
+00:47:14 UTC: The runner has received a shutdown signal.
+00:47:27 UTC: The operation was canceled.
+```
+
+Runner cleanup logged termination of the PowerShell supervisor, Terraform,
+and provider processes. Unit-test, artifact publication, stage reporting,
+and post-checkout cleanup were skipped.
+
+The requested private-log read could not execute: VM Run Command returned
+`OperationNotAllowed`, requiring the VM to be running. Read-only Azure instance
+view confirmed that the execution VM was deallocated, and GitHub reported the
+runner offline and idle. The captured public log contains no Terraform resource
+error explaining this interruption; the initiator of the shutdown remains
+unknown.
+
+The private Apply log remains uninspected until the runner is available.
+No VM start, deployment retry, Terraform state inspection, or issue creation
+was attempted.
+
+At `00:51:24 UTC`, the operator identified an environment-specific
+cost-optimization policy as the cause of the runner shutdown and stated that
+they would manually restart the runner and create a new dispatch. This cause
+is operator-confirmed, not independently verified through Azure activity logs.
+No policy identifiers or internal details are recorded here.
+
+Before dispatching again, confirm the runner is online and idle. Use a new
+dispatch rather than rerunning the interrupted attempt against its existing
+state key. The interrupted Apply may have left partial Sandbox resources;
+restarting the runner or creating a new run does not clean them up.
+
+## Step 81: Record the fresh dispatch after the policy-related shutdown
+
+The operator manually dispatched
+[run 38492739205](https://github.com/Azure-Samples/azuresandbox/actions/runs/38492739205)
+from `main` with `run_through=unit-test`. GitHub confirmed the expected title
+`Sandbox sandbox-38492739205 / unit-test`, the `workflow_dispatch` event, and
+workflow definition revision `757784f976358c3b4a71db1b7be65545047af00e`.
+The independent state key is
+`sandboxes/sandbox-38492739205/terraform.tfstate`.
+
+The initial snapshot showed the job waiting for protected-environment approval.
+No stage result has yet been observed for this run. After approval, watch
+this exact dispatch:
+
+```bash
+gh run watch 38492739205 \
+  --repo Azure-Samples/azuresandbox \
+  --interval 120 \
+  --exit-status
+```
+
+## Step 82: Verify whether main accepts only vnext release PRs
+
+The operator requested read-only verification of repository policies. Live
+branch-protection and effective-rules APIs showed no enforced PR source-branch
+restriction on `main`:
+
+* Classic protection restricts which actor can push/merge, not which PR head
+  branch is allowed.
+* Pull-request protection is configured with zero required approvals.
+* No required status checks were returned for `main`, and administrator
+  enforcement is disabled.
+* The effective ruleset list for `main` was empty. The active
+  `vnext-require-review` ruleset targets only `refs/heads/vnext`.
+* The live `main` workflow inventory contained no PR source-eligibility gate.
+
+PR #835 is a concrete example: it merged normally from
+`feat/register-sandbox-json-only` into `main`, without the one-time override
+used for the separate source PR.
+
+Enforcing the intended release policy requires a required, fail-closed check
+for PRs targeting `main` that accepts only a same-repository `vnext` head.
+Skipping the deployment job for other source branches is not sufficient
+because skipped jobs can satisfy required checks. Administrator bypass
+behavior must also be deliberately selected. No repository settings or
+workflow code were changed during this verification.
+
+## Step 83: Implement the main release-source policy and owner exception
+
+The operator authorized a metadata-only GitHub Actions workflow and GitHub
+settings changes, while the manually dispatched deployment remained running.
+PR #837 registered `.github/workflows/main-source-policy.yml` on `main` and
+updated `CONTRIBUTING.md`. Local workflow, Markdown, and internal-link checks
+passed. Local secret scanning was unavailable; hosted secret scanning and the
+other applicable hosted checks passed before the bootstrap PR merged.
+
+The new `main-release-source` ruleset is active only on `refs/heads/main`.
+It requires a PR and the `main-source-eligibility` status from the GitHub
+Actions integration. The trusted workflow runs on a GitHub-hosted runner,
+does not check out PR code, and publishes the status on the exact PR head SHA:
+same-repository `vnext` passes; other branches and fork sources fail.
+
+The new `azuresandbox-main-bypass` team has one member, the repository owner,
+and maintain access to this repository. Its bypass on this ruleset is
+**For pull requests only**, not **Always**. Maintenance exceptions require
+an explicit bypass with justification recorded in the PR; this does not
+waive unrelated protections or create a passing source result.
+
+Temporary verification PR #838 from `vnext` received a successful source
+status and a clean merge state. Temporary topic PR #839 received a failed
+source status and a blocked merge state. Both were closed without merging.
+The API confirmed the owner's PR-only bypass permission; no exception merge
+was performed merely to test that permission.
+
+Classic `main` protection, the existing `vnext` review ruleset, and the
+`vnext` source revision were unchanged. The deployment workflow file and
+running deployment were untouched. This implements source eligibility only,
+not the future Azure deployment/CD gate.
+
+## Step 84: Prepare the release environment and publish the PR-entry path
+
+The operator authorized a separate `sandbox-release-gate` environment with
+owner approval, self-review permitted, and a `main` deployment branch policy.
+The operator supplied `SANDBOX_BACKEND_HCL` and `SANDBOX_TFVARS_HCL` directly
+in GitHub; verification inspected secret names only, never secret values.
+The existing `sandbox-deployment` environment remains the manual path.
+
+Active Actions event policies now explicitly allow `pull_request_target`
+only for `.github/workflows/main-source-policy.yml`, and
+`pull_request_target` plus `workflow_dispatch` only for
+`.github/workflows/sandbox-deployment.yml`. Neither policy is a repository-wide
+event allowance.
+
+The first release-gate increment was published through runtime PR #841 to
+`vnext` and workflow-registration PR #840 to `main`:
+
+* Runtime commit: `e61b1ac061826927b25f7edd9e48d49b75b649a2`.
+* Workflow registration commit: `f272929e29b9f62bb3a8f2bc46f59207fb3c1b7b`.
+* Matching workflow blob: `a6017d9c5f3f30e0b17da28aa70c8b8418f0993f`.
+
+A GitHub-hosted metadata-only selection job accepts ready same-repository
+`vnext` PRs targeting `main`. Opening/reopening a ready PR, marking it ready,
+updating its head, or changing its base to `main` requests a deployment.
+Drafts and ordinary title/description edits do not deploy. Other source
+branches and forks fail before self-hosted scheduling.
+
+Eligible PR deployments require approval in `sandbox-release-gate`, check out
+the exact captured PR head SHA, and always run through unit/integration
+testing and JSON publication. Manual dispatch retains `sandbox-deployment`,
+the `vnext` checkout, and the stage selector. The helper verifies PR metadata,
+full stage selection, and the checked-out SHA before writing configuration.
+
+The existing `azure-sandbox-deployment` concurrency group now belongs to the
+deployment job rather than the whole workflow. Hosted validation does not
+occupy its pending slot; active-run cancellation remains disabled.
+
+The actual selection script passed 21 isolated cases and the actual helper
+guard passed 15 isolated cases without Azure or Terraform execution. Local
+workflow, PowerShell, Markdown, and internal-link gates passed; local secret
+scanning was unavailable, and applicable hosted checks passed before merging.
+No helper test files were retained. The runtime PR used the existing
+maintainer self-merge path; workflow registration used the authorized PR-only
+main maintenance exception with its source check still correctly failed.
+
+The required `main` check remains source eligibility only. No required
+deployment result, retry identifiers, or cleanup automation was added.
+No release PR was opened, deployment dispatched, environment approval granted,
+or Azure/runner/state operation performed during publication. The existing
+manual run remained in progress on its original workflow revision. Live
+release-PR deployment acceptance is still a separate, attended step.
+
+## Step 85: Publish fail-closed deployment status without closing PRs
+
+The operator authorized item 2: explicit PR-head deployment status publication,
+while retaining protected-environment approval and serialized applies.
+Runtime PR #843 and workflow-registration PR #844 published the increment:
+
+* Runtime commit: `c0160c82e9bebda6f6b272ec2a90ef0c1c699727`.
+* Workflow registration commit: `a5fad4a29a8c0f96e415f7ae74bde2b141e56226`.
+* Matching workflow blob: `b4bbc4c50c86d42c2124f1e58af3ec77921588b4`.
+
+After hosted eligibility validation, a separate GitHub-hosted publisher marks
+`sandbox-deployment-gate` pending on the exact candidate SHA before environment
+approval. A PR deployment cannot start unless that publication succeeds.
+Manual dispatch explicitly skips the pending-status dependency and retains
+its original environment and stage selection.
+
+A hosted final reporter requires successful deployment-job completion,
+Preflight, Apply, Unit-test, artifact upload, stage reporting, and valid passing
+JSON evidence. The JSON must have native exit code zero, `result = "pass"`,
+positive passing counts, zero failed tests/suites, and consistent nonnegative
+integer totals. Existing optional-suite skip semantics are unchanged.
+Failed, skipped, cancelled, missing, or malformed results cannot produce a
+new successful deployment status. Hard cancellation or unavailable final
+reporting may leave the previously published pending status unresolved.
+
+The two status publishers alone have status-write permissions. They share a
+per-SHA concurrency lock and use attempt-specific run URLs as ownership
+markers; an older reporter cannot replace a newer attempt's pending result.
+Metadata-only selection does not occupy that lock. Workflow code neither
+closes nor merges PRs, so failures leave the release PR open for correction.
+
+The actual selector/publisher scripts passed 46 isolated cases and the evidence
+exporter passed 17, without Azure or Terraform execution. Applicable local and
+hosted static gates passed before merge; local secret scanning was unavailable
+and hosted scanning passed. No helper test files were retained. Publication
+used the existing maintainer self-merge path for `vnext` and the authorized
+PR-only main maintenance exception. The registration topic was correctly
+rejected by the source/entry validators, and its self-hosted job was skipped.
+
+The `main` ruleset still requires source eligibility only. Deployment
+enforcement is a separate step after live release-path acceptance; require the
+hosted final-reporter check alongside the SHA status so a failure to publish
+pending cannot make an older same-SHA success sufficient. No retry/state-ID
+or cleanup automation was added, and no release PR, deployment dispatch,
+environment approval, or Azure/runner/state operation was performed.
+
+## Step 86: Confirm successful JSON-only manual deployment acceptance
+
+During publication verification, the original manual run
+`38492739205` was observed completed successfully on its original workflow
+revision `757784f976358c3b4a71db1b7be65545047af00e`. GitHub reported successful
+Preflight, Apply, Unit-test, and sanitized evidence publication.
+
+The run published one artifact. Read-only artifact validation confirmed its
+ZIP contains only `unit-test-results.json`, with schema version 1,
+`result = "pass"`, native exit code zero, and totals:
+
+* Passed: 109.
+* Failed: 0.
+* Total: 109.
+* Failed suites: 0.
+* Skipped suites: 10, retained under the existing native discovery behavior.
+
+Only structural metadata and numeric totals were inspected/reported; raw
+diagnostics were not printed and no artifact file was persisted locally.
+This completes the manual JSON-only end-to-end acceptance milestone.
+It does not exercise the newly added PR-status publishers, which still need
+an explicitly approved release-PR acceptance run before enforcement.
+
+## Step 87: Confirm successful release-PR deployment acceptance
+
+Maintenance PR #847 was merged into `vnext`. Release PR #848 was then opened
+as a draft from `vnext` to `main`, using the repository template, with candidate
+SHA `b12279415b156d6a46f33f607ed4bcaabc1da964`.
+
+Draft-event run `38591391869` completed successfully. Hosted entry validation
+passed; pending-status publication, the self-hosted deployment job, and final
+status publication were all skipped. Applicable hosted static checks and
+`main-source-eligibility` passed.
+
+After the operator marked the PR ready for review, run `38591955844` published
+`sandbox-deployment-gate = pending` on that exact candidate SHA before requesting
+approval for `sandbox-release-gate`. The pending status linked to this run's
+attempt-specific URL. The operator confirmed capacity for a fresh sandbox and
+runner availability before approving the deployment.
+
+The operator monitored the run from a separate terminal:
+
+```bash
+gh run watch 38591955844 \
+  --repo Azure-Samples/azuresandbox \
+  --interval 120 \
+  --exit-status
+```
+
+The run completed successfully. Entry validation, pending-status publication,
+Preflight, Apply, Unit-test, sanitized evidence publication, stage reporting,
+and the hosted final reporter all passed. The self-hosted job took 1 hour,
+48 minutes, 37 seconds.
+
+Read-only verification confirmed that the PR head remained unchanged and that
+`sandbox-deployment-gate = success` on the candidate SHA linked to
+run `38591955844`, attempt 1. The hosted `Publish release deployment status`
+check also succeeded on that SHA, with GitHub Actions integration ID `15368`.
+
+The run published one artifact,
+`unit-test-evidence-sandbox-38591955844-38591955844-1`.
+In-memory ZIP validation confirmed it contains only `unit-test-results.json`,
+with schema version 1, `result = "pass"`, native exit code zero, and totals:
+
+* Passed: 109.
+* Failed: 0.
+* Total: 109.
+* Suites: 23.
+* Failed suites: 0.
+* Skipped suites: 10, retained under the existing native discovery behavior.
+
+No raw diagnostics were printed, no artifact file was persisted locally, and
+no Terraform state was inspected. PR #848 remained open and unmerged.
+
+This completes successful-path release-PR acceptance, including the draft skip,
+pending-before-approval behavior, and final status on the exact candidate SHA.
+No deliberate failure or cancellation run was performed. The active `main`
+ruleset still required only `main-source-eligibility` at verification;
+mandatory deployment enforcement remains a separate authorized settings step.
+Azure cleanup remains manual, and runner-local cleanup remains deferred.
+
+## Step 88: Require deployment status and final reporting before release merge
+
+After successful-path acceptance, the operator authorized adding both
+deployment checks to the active `main-release-source` ruleset. The required
+checks are now:
+
+* `main-source-eligibility`.
+* `sandbox-deployment-gate`.
+* `Publish release deployment status`.
+
+All three are bound to GitHub Actions integration ID `15368`. The final
+reporter's successful native check was verified on the exact candidate SHA
+before adding the requirement. Requiring it alongside the explicit SHA status
+also covers a failed pending-status publication that leaves an older same-SHA
+status unchanged.
+
+The settings update preserved the `main` branch scope, active enforcement,
+existing PR requirement, non-strict required-check policy, and sole
+owner-team PR-only maintenance bypass. Read-back verification confirmed the
+complete requested ruleset without changing any other settings.
+
+PR #848 remained open, unmerged, and reported a clean merge state. No additional
+deployment, environment approval, Azure cleanup, or runner cleanup was started.
+Ordinary release merges now require the deployment checks; failed checks do not
+close the PR. The explicit owner-only maintenance exception remains available.
+
+## Step 89: Add the deployed resource group to future run summaries
+
+The operator requested the actual resource group name in the deployment-job
+summary to distinguish active Sandboxes. The operator explicitly approved
+publishing this single name as an exception to deployment-name sanitization.
+Other resource names, IDs, raw Terraform outputs, and diagnostics remain private.
+
+The change was prepared locally on `feat/sandbox-summary-resource-group`,
+based on the validated `vnext` candidate. After a successful apply, the helper
+queries only the existing `resource_names` output:
+
+```bash
+terraform output -json resource_names
+```
+
+It validates the `resource_group` entry and stores that name in a private
+per-run record for the final summary. It does not infer the name from tags,
+read Terraform state while apply is running, or publish the entire output map.
+Unit-test failure does not hide a name already captured after successful apply.
+Without verified post-apply output, the summary explicitly reports the name as
+unavailable. Invalid or missing output fails the capture rather than inventing
+a name.
+
+Isolated checks exercised the actual apply, validation, and reporting functions
+without executing Terraform or Azure commands. PowerShell analysis and Markdown
+checks passed. No test harness files were retained.
+
+At this step the implementation and related README update remained local and
+uncommitted in a separate worktree. Neither `vnext` nor PR #848 was changed,
+and no additional deployment was triggered. Completed run summaries, including
+run `38591955844`, are not rewritten by this change.
+
+## Step 90: Merge the accepted release while preserving branch lineage
+
+After all three required release checks passed, the operator merged PR #848
+from `vnext` to `main` using a regular merge commit:
+
+* Merge commit: `180b468333ed5c7dbcceb409fec93e54057af8a8`.
+* Previous `main` parent: `a5fad4a29a8c0f96e415f7ae74bde2b141e56226`.
+* Accepted `vnext` parent: `b12279415b156d6a46f33f607ed4bcaabc1da964`.
+
+Read-only GitHub verification confirmed the PR was merged and that the merge
+commit has both parents, preserving the release branch lineage rather than
+squashing it.
+
+The accepted deployment runtime and dependency maintenance are now on `main`.
+The subsequent resource-group summary enhancement from step 89 remains local,
+uncommitted, and unpublished; it was not part of this release. The ongoing
+walkthrough updates also remain local and uncommitted. No additional deployment
+or cleanup was performed during merge verification.
+
+## Step 91: Verify the published release tag
+
+The operator published
+[v5.14.2](https://github.com/Azure-Samples/azuresandbox/releases/tag/v5.14.2)
+as a non-draft, non-prerelease release targeting `main`.
+
+Read-only verification confirmed the tag points directly to merge commit
+`180b468333ed5c7dbcceb409fec93e54057af8a8`, the accepted release from PR #848.
+The local resource-group summary enhancement and uncommitted walkthrough
+updates are not included in this release.
+
+## Step 92: Consolidate remaining changes and retire publication branches
+
+The operator requested that all remaining session changes be published to
+`vnext` and that only local `main` and `vnext` branches remain afterward.
+The full uncommitted walkthrough was first copied to the fresh summary-change
+branch and verified byte-for-byte before any cleanup.
+
+Main-to-vnext synchronization PR #849 passed applicable local and hosted checks
+and merged with a regular merge commit,
+`4b786a4f2e022527a2eaf3cc73b0f73f2e189e94`. This preserves the release ancestry
+and brings the main-source policy and contribution guidance into `vnext`
+without changing the accepted deployment runtime.
+
+The remaining topic publication includes the preserved walkthrough,
+the resource-group summary enhancement, and documentation of the now-required
+release checks. Publish these changes through a checked topic PR targeting
+`vnext`, using the normal squash-merge path. This does not create a release PR,
+authorize another deployment, or modify the published v5.14.2 tag.
+
+After the topic PR is merged, verify that its files are present on `vnext`
+before removing the original uncommitted copies. Then fast-forward local
+`main` and `vnext`, switch the primary checkout to `vnext`, and remove only the
+verified obsolete publication branches and clean auxiliary worktrees.
+Keep ignored configuration, credentials, Terraform state, and Azure resources
+untouched. Azure cleanup and runner-local retention cleanup remain separate.

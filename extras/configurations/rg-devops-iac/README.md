@@ -150,6 +150,14 @@ The unit-test stage publishes default-sanitized JSON evidence as
 workflow artifacts on both test success and failure; raw logs and plans stay
 on the runner.
 
+After a successful apply, the helper reads `terraform output -json resource_names`
+and records its actual `resource_group` value for the stage-results summary.
+The exact resource group name is an operator-approved exception to public
+deployment-name sanitization; other resource names, IDs, and raw outputs remain
+private. The summary retains the name even if subsequent unit testing fails.
+Preflight-only runs and runs without a verified post-apply name explicitly report
+it as unavailable rather than guessing. Completed run summaries are not rewritten.
+
 The updated workflow restricts automation to **new Sandboxes only**:
 each workflow run derives a new ID/key, and every preflight attempt rejects an
 existing state blob. Automated updates and recovery of existing Sandboxes are
@@ -200,8 +208,11 @@ an older attempt cannot overwrite the pending result of a newer attempt on
 the same SHA. Only the hosted status jobs have status-write permission.
 Manual dispatch does not publish this PR status. Drafts and metadata-only
 edits do not overwrite it, and no workflow closes or merges a PR.
-The status is not yet required by the `main` ruleset: making it mandatory
-requires a separately approved enforcement step after release-path acceptance.
+After successful release-path acceptance and operator-approved enforcement,
+the `main-release-source` ruleset requires `main-source-eligibility`,
+`sandbox-deployment-gate`, and the hosted `Publish release deployment status`
+check, all from GitHub Actions. Failed checks block ordinary release merges
+without closing the PR; the explicit owner-only maintenance bypass is unchanged.
 
 The deployment/monitor helpers replace the Python implementation
 with Bash entrypoints and PowerShell 7.3+ stage logic. The helper test sources
