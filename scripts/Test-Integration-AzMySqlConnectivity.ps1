@@ -6,7 +6,10 @@ param(
     [string]$MysqlDatabaseName,
 
     [Parameter(Mandatory = $true)]
-    [string]$KeyVaultName
+    [string]$KeyVaultName,
+
+    [ValidateSet('true', 'false')]
+    [string]$VerboseResults = 'false'
 )
 
 #region functions
@@ -21,8 +24,12 @@ function Write-TestResult {
     param(
         [string]$module,
         [string]$status,
-        [string]$msg
+        [string]$msg,
+        [string]$SanitizedMessage = 'Check result'
     )
+    if ($status -ne 'SUMMARY' -and $VerboseResults -ne 'true') {
+        $msg = $SanitizedMessage
+    }
     Write-Log ("[MODULE:$module] [$status] $msg")
 }
 #endregion
@@ -53,16 +60,16 @@ try {
     $dnsResult = Resolve-DnsName -Name $MysqlServerFqdn -Type A -ErrorAction Stop
     $ipAddress = ($dnsResult | Where-Object { $_.QueryType -eq 'A' } | Select-Object -First 1).IPAddress
     if ($ipAddress -match '^10\.') {
-        Write-TestResult $moduleName 'PASS' "MySQL: DNS resolved to private IP $ipAddress"
+        Write-TestResult $moduleName 'PASS' "MySQL: DNS resolved to private IP $ipAddress" -SanitizedMessage 'MySQL: DNS resolved to private IP <value>'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "MySQL: DNS resolved to non-private IP $ipAddress (expected 10.x.x.x)"
+        Write-TestResult $moduleName 'FAIL' "MySQL: DNS resolved to non-private IP $ipAddress (expected 10.x.x.x)" -SanitizedMessage 'MySQL: DNS resolved to non-private IP <value> (expected 10.x.x.x)'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "MySQL: DNS resolution failed for '$MysqlServerFqdn': $_"
+    Write-TestResult $moduleName 'FAIL' "MySQL: DNS resolution failed for '$MysqlServerFqdn': $_" -SanitizedMessage 'MySQL: DNS resolution failed for ''<value>'': <value>'
     $failed++
 }
 
@@ -71,17 +78,17 @@ try {
     $tcp = New-Object System.Net.Sockets.TcpClient
     $tcp.Connect($MysqlServerFqdn, 3306)
     if ($tcp.Connected) {
-        Write-TestResult $moduleName 'PASS' "MySQL: TCP connection to port 3306 succeeded"
+        Write-TestResult $moduleName 'PASS' "MySQL: TCP connection to port 3306 succeeded" -SanitizedMessage 'MySQL: TCP connection to port 3306 succeeded'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "MySQL: TCP connection to port 3306 failed"
+        Write-TestResult $moduleName 'FAIL' "MySQL: TCP connection to port 3306 failed" -SanitizedMessage 'MySQL: TCP connection to port 3306 failed'
         $failed++
     }
     $tcp.Close()
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "MySQL: TCP connection to port 3306 failed: $_"
+    Write-TestResult $moduleName 'FAIL' "MySQL: TCP connection to port 3306 failed: $_" -SanitizedMessage 'MySQL: TCP connection to port 3306 failed: <value>'
     $failed++
 }
 
@@ -93,11 +100,11 @@ try {
     Connect-AzAccount -Identity -ErrorAction Stop | Out-Null
     $adminUsername = Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name 'adminuser' -AsPlainText -ErrorAction Stop
     $adminPassword = Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name 'adminpassword' -AsPlainText -ErrorAction Stop
-    Write-TestResult $moduleName 'PASS' "MySQL: Retrieved credentials from Key Vault '$KeyVaultName'"
+    Write-TestResult $moduleName 'PASS' "MySQL: Retrieved credentials from Key Vault '$KeyVaultName'" -SanitizedMessage 'MySQL: Retrieved credentials from Key Vault ''<value>'''
     $passed++
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "MySQL: Failed to retrieve credentials from Key Vault '$KeyVaultName': $_"
+    Write-TestResult $moduleName 'FAIL' "MySQL: Failed to retrieve credentials from Key Vault '$KeyVaultName': $_" -SanitizedMessage 'MySQL: Failed to retrieve credentials from Key Vault ''<value>'': <value>'
     $failed++
 }
 
@@ -142,33 +149,33 @@ if ($adminUsername -and $adminPassword) {
             Disconnect-AzAccount -ErrorAction SilentlyContinue | Out-Null
 
             if ($exitCode -eq 0 -and $result -eq $MysqlDatabaseName) {
-                Write-TestResult $moduleName 'PASS' "MySQL: Connected to '$result' as '$adminUsername' via private endpoint using $mysqlExeName"
+                Write-TestResult $moduleName 'PASS' "MySQL: Connected to '$result' as '$adminUsername' via private endpoint using $mysqlExeName" -SanitizedMessage 'MySQL: Connected to ''<value>'' as ''<value>'' via private endpoint using <value>'
                 $passed++
             }
             elseif ($exitCode -ne 0) {
-                Write-TestResult $moduleName 'FAIL' "MySQL: $mysqlExeName exited with code $exitCode`: $($output -join ' ')"
+                Write-TestResult $moduleName 'FAIL' "MySQL: $mysqlExeName exited with code $exitCode`: $($output -join ' ')" -SanitizedMessage 'MySQL: <value> exited with code <value>: <value>'
                 $failed++
             }
             else {
-                Write-TestResult $moduleName 'FAIL' "MySQL: Expected database name '$MysqlDatabaseName' not found in $mysqlExeName output: $($output -join ' ')"
+                Write-TestResult $moduleName 'FAIL' "MySQL: Expected database name '$MysqlDatabaseName' not found in $mysqlExeName output: $($output -join ' ')" -SanitizedMessage 'MySQL: Expected database name ''<value>'' not found in <value> output: <value>'
                 $failed++
             }
         }
         catch {
             $env:MYSQL_PWD = $null
-            Write-TestResult $moduleName 'FAIL' "MySQL: SQL query failed: $_"
+            Write-TestResult $moduleName 'FAIL' "MySQL: SQL query failed: $_" -SanitizedMessage 'MySQL: SQL query failed: <value>'
             $failed++
             Disconnect-AzAccount -ErrorAction SilentlyContinue | Out-Null
         }
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "MySQL: mysql.exe or mysqlsh.exe not found in standard MySQL installation paths"
+        Write-TestResult $moduleName 'FAIL' "MySQL: mysql.exe or mysqlsh.exe not found in standard MySQL installation paths" -SanitizedMessage 'MySQL: mysql.exe or mysqlsh.exe not found in standard MySQL installation paths'
         $failed++
         Disconnect-AzAccount -ErrorAction SilentlyContinue | Out-Null
     }
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "MySQL: Skipped SQL query - no credentials available"
+    Write-TestResult $moduleName 'FAIL' "MySQL: Skipped SQL query - no credentials available" -SanitizedMessage 'MySQL: Skipped SQL query - no credentials available'
     $failed++
 }
 

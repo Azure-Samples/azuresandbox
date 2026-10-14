@@ -46,7 +46,10 @@ param(
     [string]$MysqlServerFqdn,
 
     [Parameter(Mandatory = $false)]
-    [string]$MysqlDatabaseName
+    [string]$MysqlDatabaseName,
+
+    [ValidateSet('true', 'false')]
+    [string]$VerboseResults = 'false'
 )
 
 #region functions
@@ -59,8 +62,12 @@ function Write-TestResult {
     param(
         [string]$module,
         [string]$status,
-        [string]$msg
+        [string]$msg,
+        [string]$SanitizedMessage = 'Check result'
     )
+    if ($status -ne 'SUMMARY' -and $VerboseResults -ne 'true') {
+        $msg = $SanitizedMessage
+    }
     Write-Log ("[MODULE:$module] [$status] $msg")
 }
 
@@ -165,7 +172,7 @@ $dnsServer = '10.1.1.4'
 # Verify dig is available on Linux/macOS (prerequisite for DNS resolution against the sandbox DNS server)
 if (-not $IsWindows) {
     if (-not (Get-Command dig -ErrorAction SilentlyContinue)) {
-        Write-TestResult $moduleName 'FAIL' "P2S VPN: dig command not found in PATH. Install dnsutils (Debian/Ubuntu: sudo apt-get install -y dnsutils) or bind-utils (RHEL/CentOS: sudo yum install -y bind-utils)."
+        Write-TestResult $moduleName 'FAIL' "P2S VPN: dig command not found in PATH. Install dnsutils (Debian/Ubuntu: sudo apt-get install -y dnsutils) or bind-utils (RHEL/CentOS: sudo yum install -y bind-utils)." -SanitizedMessage 'P2S VPN: dig command not found in PATH. Install dnsutils (Debian/Ubuntu: sudo apt-get install -y dnsutils) or bind-utils (RHEL/CentOS: sudo yum install -y bind-utils).'
         Write-TestResult $moduleName 'SUMMARY' "Passed: 0 Failed: 1 Total: 1"
         exit 1
     }
@@ -192,13 +199,13 @@ if ($IsLinux -or $IsMacOS) {
             Write-Log 'Passwordless sudo not available, requesting credentials...'
             & sudo -v 2>&1
             if ($LASTEXITCODE -ne 0) {
-                Write-TestResult $moduleName 'FAIL' 'P2S VPN: sudo access required but authentication failed.'
+                Write-TestResult $moduleName 'FAIL' 'P2S VPN: sudo access required but authentication failed.' -SanitizedMessage 'P2S VPN: sudo access required but authentication failed.'
                 Write-TestResult $moduleName 'SUMMARY' "Passed: 0 Failed: 1 Total: 1"
                 exit 1
             }
         }
         else {
-            Write-TestResult $moduleName 'FAIL' 'P2S VPN: sudo access required but not available (non-interactive, no passwordless sudo). Configure NOPASSWD in sudoers for this user.'
+            Write-TestResult $moduleName 'FAIL' 'P2S VPN: sudo access required but not available (non-interactive, no passwordless sudo). Configure NOPASSWD in sudoers for this user.' -SanitizedMessage 'P2S VPN: sudo access required but not available (non-interactive, no passwordless sudo). Configure NOPASSWD in sudoers for this user.'
             Write-TestResult $moduleName 'SUMMARY' "Passed: 0 Failed: 1 Total: 1"
             exit 1
         }
@@ -207,7 +214,7 @@ if ($IsLinux -or $IsMacOS) {
 
 # Verify openvpn is installed
 if (-not (Get-Command openvpn -ErrorAction SilentlyContinue)) {
-    Write-TestResult $moduleName 'FAIL' 'P2S VPN: openvpn command not found in PATH. Install OpenVPN and retry.'
+    Write-TestResult $moduleName 'FAIL' 'P2S VPN: openvpn command not found in PATH. Install OpenVPN and retry.' -SanitizedMessage 'P2S VPN: openvpn command not found in PATH. Install OpenVPN and retry.'
     $failed++
     $total = $passed + $failed
     Write-TestResult $moduleName 'SUMMARY' "Passed: $passed Failed: $failed Total: $total"
@@ -246,13 +253,13 @@ try {
     Pop-Location
 
     if ($rootCertExitCode -ne 0) {
-        Write-TestResult $moduleName 'FAIL' "P2S VPN: Failed to read root_cert_pem from terraform output: $rootCertPem"
+        Write-TestResult $moduleName 'FAIL' "P2S VPN: Failed to read root_cert_pem from terraform output: $rootCertPem" -SanitizedMessage 'P2S VPN: Failed to read root_cert_pem from terraform output: <value>'
         $failed++
         throw 'Terraform output root_cert_pem not available'
     }
 
     if ($clientCertExitCode -ne 0) {
-        Write-TestResult $moduleName 'FAIL' "P2S VPN: Failed to read client_cert_pem from terraform output: $clientCertPem"
+        Write-TestResult $moduleName 'FAIL' "P2S VPN: Failed to read client_cert_pem from terraform output: $clientCertPem" -SanitizedMessage 'P2S VPN: Failed to read client_cert_pem from terraform output: <value>'
         $failed++
         throw 'Terraform output client_cert_pem not available'
     }
@@ -316,7 +323,7 @@ try {
         Select-Object -First 1
 
     if (-not $p2sGateway) {
-        Write-TestResult $moduleName 'FAIL' "P2S VPN: No P2S VPN gateway found for hub '$VirtualHubName'"
+        Write-TestResult $moduleName 'FAIL' "P2S VPN: No P2S VPN gateway found for hub '$VirtualHubName'" -SanitizedMessage 'P2S VPN: No P2S VPN gateway found for hub ''<value>'''
         $failed++
         throw 'P2S VPN gateway not found'
     }
@@ -326,7 +333,7 @@ try {
     $profileUrl = $profileResponse.ProfileUrl
 
     if (-not $profileUrl) {
-        Write-TestResult $moduleName 'FAIL' 'P2S VPN: Failed to generate VPN profile URL'
+        Write-TestResult $moduleName 'FAIL' 'P2S VPN: Failed to generate VPN profile URL' -SanitizedMessage 'P2S VPN: Failed to generate VPN profile URL'
         $failed++
         throw 'VPN profile generation failed'
     }
@@ -371,7 +378,7 @@ try {
         $azureVpnConfigPath = Get-ChildItem -Path $profileExtractPath -Recurse -Filter 'azurevpnconfig.xml' | Select-Object -First 1 -ExpandProperty FullName
 
         if (-not $azureVpnConfigPath) {
-            Write-TestResult $moduleName 'FAIL' 'P2S VPN: Could not find VPN config in downloaded profile'
+            Write-TestResult $moduleName 'FAIL' 'P2S VPN: Could not find VPN config in downloaded profile' -SanitizedMessage 'P2S VPN: Could not find VPN config in downloaded profile'
             $failed++
             throw 'VPN config not found in profile'
         }
@@ -380,7 +387,7 @@ try {
         $vpnServerHostname = $vpnConfig.AzVpnProfile.ServerAddress
 
         if (-not $vpnServerHostname) {
-            Write-TestResult $moduleName 'FAIL' 'P2S VPN: Could not parse server address from VPN profile'
+            Write-TestResult $moduleName 'FAIL' 'P2S VPN: Could not parse server address from VPN profile' -SanitizedMessage 'P2S VPN: Could not parse server address from VPN profile'
             $failed++
             throw 'Server address not found in VPN config'
         }
@@ -438,7 +445,7 @@ key $clientKeyPath
 
     if ($ovpnExitCode -ne 0) {
         $stderrContent = if (Test-Path $ovpnStderrPath) { Get-Content -Path $ovpnStderrPath -Raw -ErrorAction SilentlyContinue } else { '' }
-        Write-TestResult $moduleName 'FAIL' "P2S VPN: OpenVPN failed to start (exit code $ovpnExitCode). Stderr: $stderrContent"
+        Write-TestResult $moduleName 'FAIL' "P2S VPN: OpenVPN failed to start (exit code $ovpnExitCode). Stderr: $stderrContent" -SanitizedMessage 'P2S VPN: OpenVPN failed to start (exit code <value>). Stderr: <value>'
         $failed++
         throw 'OpenVPN failed to start'
     }
@@ -463,7 +470,7 @@ key $clientKeyPath
         # Also dump the config for debugging
         $configContent = Get-Content -Path $ovpnConfigPath -Raw -ErrorAction SilentlyContinue
         Write-Log "OpenVPN config contents:`n$configContent"
-        Write-TestResult $moduleName 'FAIL' "P2S VPN: $diagMsg"
+        Write-TestResult $moduleName 'FAIL' "P2S VPN: $diagMsg" -SanitizedMessage 'P2S VPN: <value>'
         $failed++
         throw 'OpenVPN log file not created'
     }
@@ -510,7 +517,8 @@ key $clientKeyPath
                 Get-Content -Path $ovpnLogPath -Tail 20 -ErrorAction SilentlyContinue | Out-String
             }
         }
-        Write-TestResult $moduleName 'FAIL' "P2S VPN: Tunnel did not establish within $maxWaitSeconds seconds. Log tail:`n$logTail"
+        Write-TestResult $moduleName 'FAIL' "P2S VPN: Tunnel did not establish within $maxWaitSeconds seconds. Log tail:`n$logTail" -SanitizedMessage 'P2S VPN: Tunnel did not establish within <value> seconds. Log tail:
+<value>'
         $failed++
         throw 'VPN tunnel establishment timed out'
     }
@@ -526,15 +534,15 @@ key $clientKeyPath
         $vpnIp = Get-TunInterfaceIp
 
         if ($vpnIp -and $vpnIp -match '^10\.4\.') {
-            Write-TestResult $moduleName 'PASS' "P2S VPN: Tunnel established with client IP $vpnIp (in 10.4.0.0/16)"
+            Write-TestResult $moduleName 'PASS' "P2S VPN: Tunnel established with client IP $vpnIp (in 10.4.0.0/16)" -SanitizedMessage 'P2S VPN: Tunnel established with client IP <value> (in <address>/16)'
             $passed++
         }
         elseif ($vpnIp) {
-            Write-TestResult $moduleName 'FAIL' "P2S VPN: Client IP $vpnIp is not in expected range 10.4.0.0/16"
+            Write-TestResult $moduleName 'FAIL' "P2S VPN: Client IP $vpnIp is not in expected range 10.4.0.0/16" -SanitizedMessage 'P2S VPN: Client IP <value> is not in expected range <address>/16'
             $failed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' 'P2S VPN: Could not determine VPN client IP address'
+            Write-TestResult $moduleName 'FAIL' 'P2S VPN: Could not determine VPN client IP address' -SanitizedMessage 'P2S VPN: Could not determine VPN client IP address'
             $failed++
         }
 
@@ -547,16 +555,16 @@ key $clientKeyPath
         }
 
         if ($routeIssues.Count -eq 0) {
-            Write-TestResult $moduleName 'PASS' 'P2S VPN: Routes to 10.1.0.0/16, 10.2.0.0/16, 10.3.0.0/16 are present'
+            Write-TestResult $moduleName 'PASS' 'P2S VPN: Routes to 10.1.0.0/16, 10.2.0.0/16, 10.3.0.0/16 are present' -SanitizedMessage 'P2S VPN: Routes to <address>/16, <address>/16, <address>/16 are present'
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' "P2S VPN: Missing routes: $($routeIssues -join ', ')"
+            Write-TestResult $moduleName 'FAIL' "P2S VPN: Missing routes: $($routeIssues -join ', ')" -SanitizedMessage 'P2S VPN: Missing routes: <value>'
             $failed++
         }
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "P2S VPN: Test 1 exception: $_"
+        Write-TestResult $moduleName 'FAIL' "P2S VPN: Test 1 exception: $_" -SanitizedMessage 'P2S VPN: Test 1 exception: <value>'
         $failed++
     }
 
@@ -579,20 +587,20 @@ key $clientKeyPath
         try {
             $ip = Resolve-DnsViaServer -Name 'jumpwin1.mysandbox.local' -DnsServer $dnsServer -PreferSubnet '10.2.*'
             if ($ip -and $ip -match '^10\.2\.') {
-                Write-TestResult $moduleName 'PASS' "P2S VPN: jumpwin1.mysandbox.local resolved to $ip (in 10.2.0.0/16)"
+                Write-TestResult $moduleName 'PASS' "P2S VPN: jumpwin1.mysandbox.local resolved to $ip (in 10.2.0.0/16)" -SanitizedMessage 'P2S VPN: jumpwin1.mysandbox.local resolved to <value> (in <address>/16)'
                 $passed++
             }
             elseif ($ip) {
-                Write-TestResult $moduleName 'FAIL' "P2S VPN: jumpwin1.mysandbox.local resolved to $ip (expected 10.2.x.x)"
+                Write-TestResult $moduleName 'FAIL' "P2S VPN: jumpwin1.mysandbox.local resolved to $ip (expected 10.2.x.x)" -SanitizedMessage 'P2S VPN: jumpwin1.mysandbox.local resolved to <value> (expected 10.2.x.x)'
                 $failed++
             }
             else {
-                Write-TestResult $moduleName 'FAIL' 'P2S VPN: jumpwin1.mysandbox.local DNS resolution returned no result'
+                Write-TestResult $moduleName 'FAIL' 'P2S VPN: jumpwin1.mysandbox.local DNS resolution returned no result' -SanitizedMessage 'P2S VPN: jumpwin1.mysandbox.local DNS resolution returned no result'
                 $failed++
             }
         }
         catch {
-            Write-TestResult $moduleName 'FAIL' "P2S VPN: jumpwin1.mysandbox.local DNS resolution failed: $_"
+            Write-TestResult $moduleName 'FAIL' "P2S VPN: jumpwin1.mysandbox.local DNS resolution failed: $_" -SanitizedMessage 'P2S VPN: jumpwin1.mysandbox.local DNS resolution failed: <value>'
             $failed++
         }
     }
@@ -609,20 +617,20 @@ key $clientKeyPath
         try {
             $ip = Resolve-DnsViaServer -Name 'jumplinux1.mysandbox.local' -DnsServer $dnsServer -PreferSubnet '10.2.*'
             if ($ip -and $ip -match '^10\.2\.') {
-                Write-TestResult $moduleName 'PASS' "P2S VPN: jumplinux1.mysandbox.local resolved to $ip (in 10.2.0.0/16)"
+                Write-TestResult $moduleName 'PASS' "P2S VPN: jumplinux1.mysandbox.local resolved to $ip (in 10.2.0.0/16)" -SanitizedMessage 'P2S VPN: jumplinux1.mysandbox.local resolved to <value> (in <address>/16)'
                 $passed++
             }
             elseif ($ip) {
-                Write-TestResult $moduleName 'FAIL' "P2S VPN: jumplinux1.mysandbox.local resolved to $ip (expected 10.2.x.x)"
+                Write-TestResult $moduleName 'FAIL' "P2S VPN: jumplinux1.mysandbox.local resolved to $ip (expected 10.2.x.x)" -SanitizedMessage 'P2S VPN: jumplinux1.mysandbox.local resolved to <value> (expected 10.2.x.x)'
                 $failed++
             }
             else {
-                Write-TestResult $moduleName 'FAIL' 'P2S VPN: jumplinux1.mysandbox.local DNS resolution returned no result'
+                Write-TestResult $moduleName 'FAIL' 'P2S VPN: jumplinux1.mysandbox.local DNS resolution returned no result' -SanitizedMessage 'P2S VPN: jumplinux1.mysandbox.local DNS resolution returned no result'
                 $failed++
             }
         }
         catch {
-            Write-TestResult $moduleName 'FAIL' "P2S VPN: jumplinux1.mysandbox.local DNS resolution failed: $_"
+            Write-TestResult $moduleName 'FAIL' "P2S VPN: jumplinux1.mysandbox.local DNS resolution failed: $_" -SanitizedMessage 'P2S VPN: jumplinux1.mysandbox.local DNS resolution failed: <value>'
             $failed++
         }
     }
@@ -639,23 +647,23 @@ key $clientKeyPath
         try {
             $jumpwin1Ip = Resolve-DnsViaServer -Name 'jumpwin1.mysandbox.local' -DnsServer $dnsServer -PreferSubnet '10.2.*'
             if (-not $jumpwin1Ip) {
-                Write-TestResult $moduleName 'FAIL' 'P2S VPN: jumpwin1.mysandbox.local DNS resolution failed for TCP test'
+                Write-TestResult $moduleName 'FAIL' 'P2S VPN: jumpwin1.mysandbox.local DNS resolution failed for TCP test' -SanitizedMessage 'P2S VPN: jumpwin1.mysandbox.local DNS resolution failed for TCP test'
                 $failed++
             }
             else {
                 $rdpReachable = Test-TcpPort -HostName $jumpwin1Ip -Port 3389
                 if ($rdpReachable) {
-                    Write-TestResult $moduleName 'PASS' "P2S VPN: TCP connection to jumpwin1.mysandbox.local:3389 succeeded (via $jumpwin1Ip)"
+                    Write-TestResult $moduleName 'PASS' "P2S VPN: TCP connection to jumpwin1.mysandbox.local:3389 succeeded (via $jumpwin1Ip)" -SanitizedMessage 'P2S VPN: TCP connection to jumpwin1.mysandbox.local:3389 succeeded (via <value>)'
                     $passed++
                 }
                 else {
-                    Write-TestResult $moduleName 'FAIL' "P2S VPN: TCP connection to jumpwin1.mysandbox.local:3389 failed (tried $jumpwin1Ip)"
+                    Write-TestResult $moduleName 'FAIL' "P2S VPN: TCP connection to jumpwin1.mysandbox.local:3389 failed (tried $jumpwin1Ip)" -SanitizedMessage 'P2S VPN: TCP connection to jumpwin1.mysandbox.local:3389 failed (tried <value>)'
                     $failed++
                 }
             }
         }
         catch {
-            Write-TestResult $moduleName 'FAIL' "P2S VPN: RDP connectivity test failed: $_"
+            Write-TestResult $moduleName 'FAIL' "P2S VPN: RDP connectivity test failed: $_" -SanitizedMessage 'P2S VPN: RDP connectivity test failed: <value>'
             $failed++
         }
     }
@@ -672,23 +680,23 @@ key $clientKeyPath
         try {
             $jumplinux1Ip = Resolve-DnsViaServer -Name 'jumplinux1.mysandbox.local' -DnsServer $dnsServer -PreferSubnet '10.2.*'
             if (-not $jumplinux1Ip) {
-                Write-TestResult $moduleName 'FAIL' 'P2S VPN: jumplinux1.mysandbox.local DNS resolution failed for TCP test'
+                Write-TestResult $moduleName 'FAIL' 'P2S VPN: jumplinux1.mysandbox.local DNS resolution failed for TCP test' -SanitizedMessage 'P2S VPN: jumplinux1.mysandbox.local DNS resolution failed for TCP test'
                 $failed++
             }
             else {
                 $sshReachable = Test-TcpPort -HostName $jumplinux1Ip -Port 22
                 if ($sshReachable) {
-                    Write-TestResult $moduleName 'PASS' "P2S VPN: TCP connection to jumplinux1.mysandbox.local:22 succeeded (via $jumplinux1Ip)"
+                    Write-TestResult $moduleName 'PASS' "P2S VPN: TCP connection to jumplinux1.mysandbox.local:22 succeeded (via $jumplinux1Ip)" -SanitizedMessage 'P2S VPN: TCP connection to jumplinux1.mysandbox.local:22 succeeded (via <value>)'
                     $passed++
                 }
                 else {
-                    Write-TestResult $moduleName 'FAIL' "P2S VPN: TCP connection to jumplinux1.mysandbox.local:22 failed (tried $jumplinux1Ip)"
+                    Write-TestResult $moduleName 'FAIL' "P2S VPN: TCP connection to jumplinux1.mysandbox.local:22 failed (tried $jumplinux1Ip)" -SanitizedMessage 'P2S VPN: TCP connection to jumplinux1.mysandbox.local:22 failed (tried <value>)'
                     $failed++
                 }
             }
         }
         catch {
-            Write-TestResult $moduleName 'FAIL' "P2S VPN: SSH connectivity test failed: $_"
+            Write-TestResult $moduleName 'FAIL' "P2S VPN: SSH connectivity test failed: $_" -SanitizedMessage 'P2S VPN: SSH connectivity test failed: <value>'
             $failed++
         }
     }
@@ -707,15 +715,15 @@ key $clientKeyPath
             # DNS resolution
             $ip = Resolve-DnsViaServer -Name $storageFqdn -DnsServer $dnsServer
             if ($ip -and $ip -match '^10\.1\.5\.') {
-                Write-TestResult $moduleName 'PASS' "P2S VPN: $storageFqdn resolved to private IP $ip"
+                Write-TestResult $moduleName 'PASS' "P2S VPN: $storageFqdn resolved to private IP $ip" -SanitizedMessage 'P2S VPN: <value> resolved to private IP <value>'
                 $passed++
             }
             elseif ($ip) {
-                Write-TestResult $moduleName 'FAIL' "P2S VPN: $storageFqdn resolved to $ip (expected 10.1.5.x privatelink IP in the centralized snet-privatelink-01 subnet)"
+                Write-TestResult $moduleName 'FAIL' "P2S VPN: $storageFqdn resolved to $ip (expected 10.1.5.x privatelink IP in the centralized snet-privatelink-01 subnet)" -SanitizedMessage 'P2S VPN: <value> resolved to <value> (expected 10.1.5.x privatelink IP in the centralized snet-privatelink-01 subnet)'
                 $failed++
             }
             else {
-                Write-TestResult $moduleName 'FAIL' "P2S VPN: $storageFqdn DNS resolution returned no result"
+                Write-TestResult $moduleName 'FAIL' "P2S VPN: $storageFqdn DNS resolution returned no result" -SanitizedMessage 'P2S VPN: <value> DNS resolution returned no result'
                 $failed++
             }
 
@@ -723,16 +731,16 @@ key $clientKeyPath
             $smbTarget = if ($ip) { $ip } else { $storageFqdn }
             $smbReachable = Test-TcpPort -HostName $smbTarget -Port 445
             if ($smbReachable) {
-                Write-TestResult $moduleName 'PASS' "P2S VPN: TCP connection to ${storageFqdn}:445 succeeded"
+                Write-TestResult $moduleName 'PASS' "P2S VPN: TCP connection to ${storageFqdn}:445 succeeded" -SanitizedMessage 'P2S VPN: TCP connection to <value>:445 succeeded'
                 $passed++
             }
             else {
-                Write-TestResult $moduleName 'FAIL' "P2S VPN: TCP connection to ${storageFqdn}:445 failed"
+                Write-TestResult $moduleName 'FAIL' "P2S VPN: TCP connection to ${storageFqdn}:445 failed" -SanitizedMessage 'P2S VPN: TCP connection to <value>:445 failed'
                 $failed++
             }
         }
         catch {
-            Write-TestResult $moduleName 'FAIL' "P2S VPN: SMB connectivity test failed: $_"
+            Write-TestResult $moduleName 'FAIL' "P2S VPN: SMB connectivity test failed: $_" -SanitizedMessage 'P2S VPN: SMB connectivity test failed: <value>'
             $failed++
         }
     }
@@ -750,15 +758,15 @@ key $clientKeyPath
             # DNS resolution
             $ip = Resolve-DnsViaServer -Name $MssqlServerFqdn -DnsServer $dnsServer
             if ($ip -and $ip -match '^10\.') {
-                Write-TestResult $moduleName 'PASS' "P2S VPN: $MssqlServerFqdn resolved to private IP $ip"
+                Write-TestResult $moduleName 'PASS' "P2S VPN: $MssqlServerFqdn resolved to private IP $ip" -SanitizedMessage 'P2S VPN: <value> resolved to private IP <value>'
                 $passed++
             }
             elseif ($ip) {
-                Write-TestResult $moduleName 'FAIL' "P2S VPN: $MssqlServerFqdn resolved to $ip (expected private IP)"
+                Write-TestResult $moduleName 'FAIL' "P2S VPN: $MssqlServerFqdn resolved to $ip (expected private IP)" -SanitizedMessage 'P2S VPN: <value> resolved to <value> (expected private IP)'
                 $failed++
             }
             else {
-                Write-TestResult $moduleName 'FAIL' "P2S VPN: $MssqlServerFqdn DNS resolution returned no result"
+                Write-TestResult $moduleName 'FAIL' "P2S VPN: $MssqlServerFqdn DNS resolution returned no result" -SanitizedMessage 'P2S VPN: <value> DNS resolution returned no result'
                 $failed++
             }
 
@@ -766,16 +774,16 @@ key $clientKeyPath
             $tdsTarget = if ($ip) { $ip } else { $MssqlServerFqdn }
             $tdsReachable = Test-TcpPort -HostName $tdsTarget -Port 1433
             if ($tdsReachable) {
-                Write-TestResult $moduleName 'PASS' "P2S VPN: TCP connection to ${MssqlServerFqdn}:1433 succeeded"
+                Write-TestResult $moduleName 'PASS' "P2S VPN: TCP connection to ${MssqlServerFqdn}:1433 succeeded" -SanitizedMessage 'P2S VPN: TCP connection to <value>:1433 succeeded'
                 $passed++
             }
             else {
-                Write-TestResult $moduleName 'FAIL' "P2S VPN: TCP connection to ${MssqlServerFqdn}:1433 failed"
+                Write-TestResult $moduleName 'FAIL' "P2S VPN: TCP connection to ${MssqlServerFqdn}:1433 failed" -SanitizedMessage 'P2S VPN: TCP connection to <value>:1433 failed'
                 $failed++
             }
         }
         catch {
-            Write-TestResult $moduleName 'FAIL' "P2S VPN: Azure SQL connectivity test failed: $_"
+            Write-TestResult $moduleName 'FAIL' "P2S VPN: Azure SQL connectivity test failed: $_" -SanitizedMessage 'P2S VPN: Azure SQL connectivity test failed: <value>'
             $failed++
         }
     }
@@ -793,15 +801,15 @@ key $clientKeyPath
             # DNS resolution
             $ip = Resolve-DnsViaServer -Name $MysqlServerFqdn -DnsServer $dnsServer
             if ($ip -and $ip -match '^10\.') {
-                Write-TestResult $moduleName 'PASS' "P2S VPN: $MysqlServerFqdn resolved to private IP $ip"
+                Write-TestResult $moduleName 'PASS' "P2S VPN: $MysqlServerFqdn resolved to private IP $ip" -SanitizedMessage 'P2S VPN: <value> resolved to private IP <value>'
                 $passed++
             }
             elseif ($ip) {
-                Write-TestResult $moduleName 'FAIL' "P2S VPN: $MysqlServerFqdn resolved to $ip (expected private IP)"
+                Write-TestResult $moduleName 'FAIL' "P2S VPN: $MysqlServerFqdn resolved to $ip (expected private IP)" -SanitizedMessage 'P2S VPN: <value> resolved to <value> (expected private IP)'
                 $failed++
             }
             else {
-                Write-TestResult $moduleName 'FAIL' "P2S VPN: $MysqlServerFqdn DNS resolution returned no result"
+                Write-TestResult $moduleName 'FAIL' "P2S VPN: $MysqlServerFqdn DNS resolution returned no result" -SanitizedMessage 'P2S VPN: <value> DNS resolution returned no result'
                 $failed++
             }
 
@@ -809,16 +817,16 @@ key $clientKeyPath
             $mysqlTarget = if ($ip) { $ip } else { $MysqlServerFqdn }
             $mysqlReachable = Test-TcpPort -HostName $mysqlTarget -Port 3306
             if ($mysqlReachable) {
-                Write-TestResult $moduleName 'PASS' "P2S VPN: TCP connection to ${MysqlServerFqdn}:3306 succeeded"
+                Write-TestResult $moduleName 'PASS' "P2S VPN: TCP connection to ${MysqlServerFqdn}:3306 succeeded" -SanitizedMessage 'P2S VPN: TCP connection to <value>:3306 succeeded'
                 $passed++
             }
             else {
-                Write-TestResult $moduleName 'FAIL' "P2S VPN: TCP connection to ${MysqlServerFqdn}:3306 failed"
+                Write-TestResult $moduleName 'FAIL' "P2S VPN: TCP connection to ${MysqlServerFqdn}:3306 failed" -SanitizedMessage 'P2S VPN: TCP connection to <value>:3306 failed'
                 $failed++
             }
         }
         catch {
-            Write-TestResult $moduleName 'FAIL' "P2S VPN: MySQL connectivity test failed: $_"
+            Write-TestResult $moduleName 'FAIL' "P2S VPN: MySQL connectivity test failed: $_" -SanitizedMessage 'P2S VPN: MySQL connectivity test failed: <value>'
             $failed++
         }
     }
@@ -828,7 +836,7 @@ key $clientKeyPath
 }
 catch {
     if ($_.Exception.Message -notmatch 'VPN tunnel establishment timed out|Terraform output|P2S VPN gateway not found|VPN profile generation failed|VPN config not found') {
-        Write-TestResult $moduleName 'FAIL' "P2S VPN: Unexpected exception: $_"
+        Write-TestResult $moduleName 'FAIL' "P2S VPN: Unexpected exception: $_" -SanitizedMessage 'P2S VPN: Unexpected exception: <value>'
         $failed++
     }
 }

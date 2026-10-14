@@ -3,6 +3,13 @@
 # Unit tests for vm-jumpbox-linux module
 # Runs on jumplinux1 via Invoke-AzVMRunCommand -CommandId RunShellScript
 
+verbosity="${1:-false}"
+case "${verbosity,,}" in
+    ""|false|verboseresults=false) verbose_results=false ;;
+    true|verboseresults=true|--verbose-results) verbose_results=true ;;
+    *) printf 'Invalid verbose-results option.\n' >&2; exit 2 ;;
+esac
+
 module_name='vm-jumpbox-linux'
 log_dir="/var/log/unit-tests/$module_name"
 log_file="$log_dir/test-vm-jumpbox-linux.log"
@@ -22,6 +29,9 @@ write_log() {
 write_test_result() {
     local status="$1"
     local msg="$2"
+    if [ "$status" != 'SUMMARY' ] && [ "$verbose_results" != true ]; then
+        msg="${3:-Check result}"
+    fi
     write_log "[MODULE:$module_name] [$status] $msg"
 }
 
@@ -30,7 +40,7 @@ write_log "Starting unit tests for module '$module_name' on '$(hostname)'..."
 # Read configuration from cloud-init generated config file
 config_file='/etc/azuresandbox-conf.json'
 if [ ! -f "$config_file" ]; then
-    write_test_result 'FAIL' "Config file '$config_file' not found"
+    write_test_result 'FAIL' "Config file '$config_file' not found" 'Config file <value> not found'
     failed=$((failed + 1))
     total=$((passed + failed))
     write_test_result 'SUMMARY' "Passed: $passed Failed: $failed Total: $total"
@@ -47,19 +57,19 @@ write_log "Config: domain='$adds_domain_name' storage_account='$storage_account_
 # Test 1: cloud-init status is done
 cloud_init_status=$(cloud-init status 2>/dev/null | grep -oP '(?<=status: )\S+')
 if [ "$cloud_init_status" = "done" ]; then
-    write_test_result 'PASS' "cloud-init: status is 'done'"
+    write_test_result 'PASS' "cloud-init: status is 'done'" 'cloud-init: status is done'
     passed=$((passed + 1))
 else
-    write_test_result 'FAIL' "cloud-init: status is '$cloud_init_status' (expected 'done')"
+    write_test_result 'FAIL' "cloud-init: status is '$cloud_init_status' (expected 'done')" 'cloud-init: status is <value> (expected done)'
     failed=$((failed + 1))
 fi
 
 # Test 2: AD domain joined (winbind trust check)
 if wbinfo -t &>/dev/null; then
-    write_test_result 'PASS' "AD: Domain trust check succeeded (wbinfo -t)"
+    write_test_result 'PASS' "AD: Domain trust check succeeded (wbinfo -t)" 'AD: Domain trust check succeeded (wbinfo -t)'
     passed=$((passed + 1))
 else
-    write_test_result 'FAIL' "AD: Domain trust check failed (wbinfo -t)"
+    write_test_result 'FAIL' "AD: Domain trust check failed (wbinfo -t)" 'AD: Domain trust check failed (wbinfo -t)'
     failed=$((failed + 1))
 fi
 
@@ -68,64 +78,64 @@ if [ -n "$adds_domain_name" ]; then
     dns_result=$(getent hosts "$adds_domain_name" 2>/dev/null)
     if [ -n "$dns_result" ]; then
         dns_ip=$(echo "$dns_result" | awk '{print $1}' | head -1)
-        write_test_result 'PASS' "DNS: '$adds_domain_name' resolves to '$dns_ip'"
+        write_test_result 'PASS' "DNS: '$adds_domain_name' resolves to '$dns_ip'" 'DNS: <value> resolves to <value>'
         passed=$((passed + 1))
     else
-        write_test_result 'FAIL' "DNS: '$adds_domain_name' does not resolve"
+        write_test_result 'FAIL' "DNS: '$adds_domain_name' does not resolve" 'DNS: <value> does not resolve'
         failed=$((failed + 1))
     fi
 else
-    write_test_result 'FAIL' "DNS: Skipped - domain name not available from config"
+    write_test_result 'FAIL' "DNS: Skipped - domain name not available from config" 'DNS: Skipped - domain name not available from config'
     failed=$((failed + 1))
 fi
 
 # Test 4: Software - Azure CLI
 if command -v az &>/dev/null; then
     az_version=$(az version --output tsv 2>/dev/null | head -1 | awk '{print $1}')
-    write_test_result 'PASS' "Software: az CLI installed (version: $az_version)"
+    write_test_result 'PASS' "Software: az CLI installed (version: $az_version)" 'Software: az CLI installed (version: <value>)'
     passed=$((passed + 1))
 else
-    write_test_result 'FAIL' "Software: az CLI not found"
+    write_test_result 'FAIL' "Software: az CLI not found" 'Software: az CLI not found'
     failed=$((failed + 1))
 fi
 
 # Test 5: Software - PowerShell
 if command -v pwsh &>/dev/null; then
     pwsh_version=$(pwsh --version 2>/dev/null)
-    write_test_result 'PASS' "Software: pwsh installed ($pwsh_version)"
+    write_test_result 'PASS' "Software: pwsh installed ($pwsh_version)" 'Software: pwsh installed (<value>)'
     passed=$((passed + 1))
 else
-    write_test_result 'FAIL' "Software: pwsh not found"
+    write_test_result 'FAIL' "Software: pwsh not found" 'Software: pwsh not found'
     failed=$((failed + 1))
 fi
 
 # Test 6: Software - Terraform
 if command -v terraform &>/dev/null; then
     tf_version=$(terraform --version 2>/dev/null | head -1)
-    write_test_result 'PASS' "Software: terraform installed ($tf_version)"
+    write_test_result 'PASS' "Software: terraform installed ($tf_version)" 'Software: terraform installed (<value>)'
     passed=$((passed + 1))
 else
-    write_test_result 'FAIL' "Software: terraform not found"
+    write_test_result 'FAIL' "Software: terraform not found" 'Software: terraform not found'
     failed=$((failed + 1))
 fi
 
 # Test 7: Software - Docker
 if command -v docker &>/dev/null; then
     docker_version=$(docker --version 2>/dev/null)
-    write_test_result 'PASS' "Software: docker installed ($docker_version)"
+    write_test_result 'PASS' "Software: docker installed ($docker_version)" 'Software: docker installed (<value>)'
     passed=$((passed + 1))
 else
-    write_test_result 'FAIL' "Software: docker not found"
+    write_test_result 'FAIL' "Software: docker not found" 'Software: docker not found'
     failed=$((failed + 1))
 fi
 
 # Test 8: Software - Helm
 if command -v helm &>/dev/null; then
     helm_version=$(helm version --short 2>/dev/null)
-    write_test_result 'PASS' "Software: helm installed ($helm_version)"
+    write_test_result 'PASS' "Software: helm installed ($helm_version)" 'Software: helm installed (<value>)'
     passed=$((passed + 1))
 else
-    write_test_result 'FAIL' "Software: helm not found"
+    write_test_result 'FAIL' "Software: helm not found" 'Software: helm not found'
     failed=$((failed + 1))
 fi
 
@@ -172,18 +182,18 @@ fi
 if [ -n "$storage_share_name" ]; then
     if [ "$has_krb_ticket" = true ]; then
         if [ -d "$cifs_mount" ]; then
-            write_test_result 'PASS' "CIFS: Mount point '$cifs_mount' is accessible"
+            write_test_result 'PASS' "CIFS: Mount point '$cifs_mount' is accessible" 'CIFS: Mount point <value> is accessible'
             passed=$((passed + 1))
         else
-            write_test_result 'FAIL' "CIFS: Mount point '$cifs_mount' not accessible (autofs mount may have failed)"
+            write_test_result 'FAIL' "CIFS: Mount point '$cifs_mount' not accessible (autofs mount may have failed)" 'CIFS: Mount point <value> not accessible (autofs mount may have failed)'
             failed=$((failed + 1))
         fi
     else
-        write_test_result 'FAIL' "CIFS: Skipped mount test - no Kerberos TGT available"
+        write_test_result 'FAIL' "CIFS: Skipped mount test - no Kerberos TGT available" 'CIFS: Skipped mount test - no Kerberos TGT available'
         failed=$((failed + 1))
     fi
 else
-    write_test_result 'FAIL' "CIFS: Skipped - storage_share_name not available from config"
+    write_test_result 'FAIL' "CIFS: Skipped - storage_share_name not available from config" 'CIFS: Skipped - storage_share_name not available from config'
     failed=$((failed + 1))
 fi
 
@@ -197,21 +207,21 @@ if [ -n "$storage_share_name" ] && [ "$has_krb_ticket" = true ] && [ -d "$cifs_m
         rm -f "$test_file" 2>/dev/null
 
         if [ "$read_back" = "$test_content" ]; then
-            write_test_result 'PASS' "CIFS: Read/write test succeeded on '$cifs_mount'"
+            write_test_result 'PASS' "CIFS: Read/write test succeeded on '$cifs_mount'" 'CIFS: Read/write test succeeded on <value>'
             passed=$((passed + 1))
         else
-            write_test_result 'FAIL' "CIFS: Read-back mismatch on '$cifs_mount'"
+            write_test_result 'FAIL' "CIFS: Read-back mismatch on '$cifs_mount'" 'CIFS: Read-back mismatch on <value>'
             failed=$((failed + 1))
         fi
     else
-        write_test_result 'FAIL' "CIFS: Write failed on '$cifs_mount'"
+        write_test_result 'FAIL' "CIFS: Write failed on '$cifs_mount'" 'CIFS: Write failed on <value>'
         failed=$((failed + 1))
     fi
 else
     if [ "$has_krb_ticket" != true ]; then
-        write_test_result 'FAIL' "CIFS: Skipped read/write - no Kerberos TGT available"
+        write_test_result 'FAIL' "CIFS: Skipped read/write - no Kerberos TGT available" 'CIFS: Skipped read/write - no Kerberos TGT available'
     else
-        write_test_result 'FAIL' "CIFS: Skipped read/write - mount point not available"
+        write_test_result 'FAIL' "CIFS: Skipped read/write - mount point not available" 'CIFS: Skipped read/write - mount point not available'
     fi
     failed=$((failed + 1))
 fi
@@ -247,7 +257,7 @@ if [ "$ama_status" = "active" ]; then
     if [ -z "$ama_version" ]; then
         ama_version='unknown'
     fi
-    write_test_result 'PASS' "AMA: azuremonitoragent.service is active (version $ama_version, waited ${ama_waited}s)"
+    write_test_result 'PASS' "AMA: azuremonitoragent.service is active (version $ama_version, waited ${ama_waited}s)" 'AMA: azuremonitoragent.service is active (version <value>, waited <value>s)'
     passed=$((passed + 1))
 else
     # Distinguish a slow extension cold-start from a real extension failure: report VM uptime
@@ -263,7 +273,7 @@ else
             [ -z "$ama_ext_status" ] && ama_ext_status="see $ama_status_file"
         fi
     fi
-    write_test_result 'FAIL' "AMA: azuremonitoragent.service is '$ama_status' after ${ama_waited}s (expected 'active'; vm_uptime=${ama_uptime}s, ext: $ama_ext_status)"
+    write_test_result 'FAIL' "AMA: azuremonitoragent.service is '$ama_status' after ${ama_waited}s (expected 'active'; vm_uptime=${ama_uptime}s, ext: $ama_ext_status)" 'AMA: azuremonitoragent.service is <value> after <value>s (expected active; vm_uptime=<value>s, ext: <value>)'
     failed=$((failed + 1))
 fi
 
@@ -275,23 +285,23 @@ ampls_fqdn='global.handler.control.monitor.azure.com'
 ampls_ip=$(getent hosts "$ampls_fqdn" 2>/dev/null | awk '{print $1}' | head -1)
 if [ -n "$ampls_ip" ]; then
     if echo "$ampls_ip" | grep -qE '^10\.'; then
-        write_test_result 'PASS' "AMPLS DNS: '$ampls_fqdn' resolves to private IP '$ampls_ip'"
+        write_test_result 'PASS' "AMPLS DNS: '$ampls_fqdn' resolves to private IP '$ampls_ip'" 'AMPLS DNS: <value> resolves to private IP <value>'
         passed=$((passed + 1))
     else
-        write_test_result 'FAIL' "AMPLS DNS: '$ampls_fqdn' resolved to '$ampls_ip' (expected private IP 10.x.x.x)"
+        write_test_result 'FAIL' "AMPLS DNS: '$ampls_fqdn' resolved to '$ampls_ip' (expected private IP 10.x.x.x)" 'AMPLS DNS: <value> resolved to <value> (expected private IP 10.x.x.x)'
         failed=$((failed + 1))
     fi
 else
-    write_test_result 'FAIL' "AMPLS DNS: '$ampls_fqdn' does not resolve"
+    write_test_result 'FAIL' "AMPLS DNS: '$ampls_fqdn' does not resolve" 'AMPLS DNS: <value> does not resolve'
     failed=$((failed + 1))
 fi
 
 # AMPLS - TCP port 443 reachable on AMPLS private endpoint.
 if timeout 5 bash -c ">/dev/tcp/$ampls_fqdn/443" 2>/dev/null; then
-    write_test_result 'PASS' "AMPLS: TCP port 443 reachable on '$ampls_fqdn'"
+    write_test_result 'PASS' "AMPLS: TCP port 443 reachable on '$ampls_fqdn'" 'AMPLS: TCP port 443 reachable on <value>'
     passed=$((passed + 1))
 else
-    write_test_result 'FAIL' "AMPLS: TCP port 443 not reachable on '$ampls_fqdn'"
+    write_test_result 'FAIL' "AMPLS: TCP port 443 not reachable on '$ampls_fqdn'" 'AMPLS: TCP port 443 not reachable on <value>'
     failed=$((failed + 1))
 fi
 

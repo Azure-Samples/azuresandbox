@@ -15,7 +15,10 @@ param(
     [string]$StorageAccountName,
 
     [Parameter(Mandatory = $false)]
-    [string]$JumpWinCloudFqdn
+    [string]$JumpWinCloudFqdn,
+
+    [ValidateSet('true', 'false')]
+    [string]$VerboseResults = 'false'
 )
 
 #region functions
@@ -30,8 +33,12 @@ function Write-TestResult {
     param(
         [string]$module,
         [string]$status,
-        [string]$msg
+        [string]$msg,
+        [string]$SanitizedMessage = 'Check result'
     )
+    if ($status -ne 'SUMMARY' -and $VerboseResults -ne 'true') {
+        $msg = $SanitizedMessage
+    }
     Write-Log ("[MODULE:$module] [$status] $msg")
 }
 
@@ -66,18 +73,18 @@ function Test-DnsAndPort {
         }
 
         if ($ip -match '^10\.' -or $ip -match '^192\.168\.') {
-            Write-TestResult $Module 'PASS' "${TestName}: DNS '$Fqdn' resolves to private IP '$ip'"
+            Write-TestResult $Module 'PASS' "${TestName}: DNS '$Fqdn' resolves to private IP '$ip'" -SanitizedMessage '<value>: DNS ''<value>'' resolves to private IP ''<value>'''
             $Passed.Value++
         }
         else {
-            Write-TestResult $Module 'FAIL' "${TestName}: DNS '$Fqdn' resolved to '$ip' (expected private IP)"
+            Write-TestResult $Module 'FAIL' "${TestName}: DNS '$Fqdn' resolved to '$ip' (expected private IP)" -SanitizedMessage '<value>: DNS ''<value>'' resolved to ''<value>'' (expected private IP)'
             $Failed.Value++
             return
         }
     }
     catch {
-        Write-TestResult $Module 'FAIL' "${TestName}: DNS '$Fqdn' does not resolve"
-        Write-TestResult $Module 'FAIL' "Exception: $_"
+        Write-TestResult $Module 'FAIL' "${TestName}: DNS '$Fqdn' does not resolve" -SanitizedMessage '<value>: DNS ''<value>'' does not resolve'
+        Write-TestResult $Module 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
         $Failed.Value++
         return
     }
@@ -87,17 +94,17 @@ function Test-DnsAndPort {
         $tcpTest = Test-NetConnection -ComputerName $Fqdn -Port $Port -ErrorAction Stop
 
         if ($tcpTest.TcpTestSucceeded) {
-            Write-TestResult $Module 'PASS' ("${TestName}: TCP port $Port reachable on '$Fqdn' (remote IP: " + $tcpTest.RemoteAddress + ")")
+            Write-TestResult $Module 'PASS' ("${TestName}: TCP port $Port reachable on '$Fqdn' (remote IP: " + $tcpTest.RemoteAddress + ")") -SanitizedMessage '<value>: TCP port <value> reachable on ''<value>'' (remote IP: <value>)'
             $Passed.Value++
         }
         else {
-            Write-TestResult $Module 'FAIL' "${TestName}: TCP port $Port not reachable on '$Fqdn'"
+            Write-TestResult $Module 'FAIL' "${TestName}: TCP port $Port not reachable on '$Fqdn'" -SanitizedMessage '<value>: TCP port <value> not reachable on ''<value>'''
             $Failed.Value++
         }
     }
     catch {
-        Write-TestResult $Module 'FAIL' "${TestName}: Failed to test TCP connectivity to '${Fqdn}':${Port}"
-        Write-TestResult $Module 'FAIL' "Exception: $_"
+        Write-TestResult $Module 'FAIL' "${TestName}: Failed to test TCP connectivity to '${Fqdn}':${Port}" -SanitizedMessage '<value>: Failed to test TCP connectivity to ''<value>'':<value>'
+        Write-TestResult $Module 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
         $Failed.Value++
     }
 }

@@ -1,3 +1,8 @@
+param(
+    [ValidateSet('true', 'false')]
+    [string]$VerboseResults = 'false'
+)
+
 #region functions
 function Write-Log {
     param([string]$msg)
@@ -10,8 +15,12 @@ function Write-TestResult {
     param(
         [string]$module,
         [string]$status,
-        [string]$msg
+        [string]$msg,
+        [string]$SanitizedMessage = 'Check result'
     )
+    if ($status -ne 'SUMMARY' -and $VerboseResults -ne 'true') {
+        $msg = $SanitizedMessage
+    }
     Write-Log ("[MODULE:$module] [$status] $msg")
 }
 #endregion
@@ -41,17 +50,17 @@ try {
     $ip = ($dnsResult | Where-Object { $_.QueryType -eq 'A' } | Select-Object -First 1).IPAddress
 
     if ($ip -match '^192\.168\.2\.') {
-        Write-TestResult $moduleName 'PASS' "DNS: '$fqdn' resolves to '$ip' (in snet-misc-04 subnet)"
+        Write-TestResult $moduleName 'PASS' "DNS: '$fqdn' resolves to '$ip' (in snet-misc-04 subnet)" -SanitizedMessage 'DNS: ''<value>'' resolves to ''<value>'' (in snet-misc-04 subnet)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "DNS: '$fqdn' resolved to '$ip' (expected IP in 192.168.2.0/24)"
+        Write-TestResult $moduleName 'FAIL' "DNS: '$fqdn' resolved to '$ip' (expected IP in 192.168.2.0/24)" -SanitizedMessage 'DNS: ''<value>'' resolved to ''<value>'' (expected IP in <address>/24)'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "DNS: '$fqdn' does not resolve"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "DNS: '$fqdn' does not resolve" -SanitizedMessage 'DNS: ''<value>'' does not resolve'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -62,17 +71,17 @@ try {
     $ip = ($dnsResult | Where-Object { $_.QueryType -eq 'A' } | Select-Object -First 1).IPAddress
 
     if ($ip -match '^192\.168\.1\.') {
-        Write-TestResult $moduleName 'PASS' "DNS: '$fqdn' resolves to '$ip' (in snet-adds-02 subnet)"
+        Write-TestResult $moduleName 'PASS' "DNS: '$fqdn' resolves to '$ip' (in snet-adds-02 subnet)" -SanitizedMessage 'DNS: ''<value>'' resolves to ''<value>'' (in snet-adds-02 subnet)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "DNS: '$fqdn' resolved to '$ip' (expected IP in 192.168.1.0/24)"
+        Write-TestResult $moduleName 'FAIL' "DNS: '$fqdn' resolved to '$ip' (expected IP in 192.168.1.0/24)" -SanitizedMessage 'DNS: ''<value>'' resolved to ''<value>'' (expected IP in <address>/24)'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "DNS: '$fqdn' does not resolve"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "DNS: '$fqdn' does not resolve" -SanitizedMessage 'DNS: ''<value>'' does not resolve'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -82,17 +91,17 @@ try {
     $tcpTest = Test-NetConnection -ComputerName $fqdn -Port 3389 -ErrorAction Stop
 
     if ($tcpTest.TcpTestSucceeded) {
-        Write-TestResult $moduleName 'PASS' ("RDP: TCP port 3389 reachable on '$fqdn' (remote IP: " + $tcpTest.RemoteAddress + ")")
+        Write-TestResult $moduleName 'PASS' ("RDP: TCP port 3389 reachable on '$fqdn' (remote IP: " + $tcpTest.RemoteAddress + ")") -SanitizedMessage 'RDP: TCP port 3389 reachable on ''<value>'' (remote IP: <value>)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "RDP: TCP port 3389 not reachable on '$fqdn'"
+        Write-TestResult $moduleName 'FAIL' "RDP: TCP port 3389 not reachable on '$fqdn'" -SanitizedMessage 'RDP: TCP port 3389 not reachable on ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "RDP: Failed to test TCP connectivity to '${fqdn}':3389"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "RDP: Failed to test TCP connectivity to '${fqdn}':3389" -SanitizedMessage 'RDP: Failed to test TCP connectivity to ''<value>'':3389'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 

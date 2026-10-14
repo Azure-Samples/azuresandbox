@@ -6,7 +6,10 @@ param(
     [string]$VirtualWanName,
 
     [Parameter(Mandatory = $true)]
-    [string]$VirtualHubName
+    [string]$VirtualHubName,
+
+    [ValidateSet('true', 'false')]
+    [string]$VerboseResults = 'false'
 )
 
 #region functions
@@ -19,8 +22,12 @@ function Write-TestResult {
     param(
         [string]$module,
         [string]$status,
-        [string]$msg
+        [string]$msg,
+        [string]$SanitizedMessage = 'Check result'
     )
+    if ($status -ne 'SUMMARY' -and $VerboseResults -ne 'true') {
+        $msg = $SanitizedMessage
+    }
     Write-Log ("[MODULE:$module] [$status] $msg")
 }
 #endregion
@@ -42,17 +49,17 @@ try {
     $vwan = Get-AzVirtualWan -ResourceGroupName $ResourceGroupName -Name $VirtualWanName -ErrorAction Stop
 
     if ($vwan.ProvisioningState -eq 'Succeeded') {
-        Write-TestResult $moduleName 'PASS' ("Virtual WAN '$VirtualWanName' exists (ProvisioningState: Succeeded)")
+        Write-TestResult $moduleName 'PASS' ("Virtual WAN '$VirtualWanName' exists (ProvisioningState: Succeeded)") -SanitizedMessage 'Virtual WAN ''<value>'' exists (ProvisioningState: Succeeded)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("Virtual WAN '$VirtualWanName' provisioning state is '$($vwan.ProvisioningState)' (expected 'Succeeded')")
+        Write-TestResult $moduleName 'FAIL' ("Virtual WAN '$VirtualWanName' provisioning state is '$($vwan.ProvisioningState)' (expected 'Succeeded')") -SanitizedMessage 'Virtual WAN ''<value>'' provisioning state is ''<value>'' (expected ''Succeeded'')'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Virtual WAN '$VirtualWanName' not found or not accessible"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Virtual WAN '$VirtualWanName' not found or not accessible" -SanitizedMessage 'Virtual WAN ''<value>'' not found or not accessible'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -71,17 +78,17 @@ try {
     }
 
     if ($issues.Count -eq 0) {
-        Write-TestResult $moduleName 'PASS' ("Virtual Hub '$VirtualHubName' exists with expected configuration (Succeeded, AddressPrefix: $($hub.AddressPrefix))")
+        Write-TestResult $moduleName 'PASS' ("Virtual Hub '$VirtualHubName' exists with expected configuration (Succeeded, AddressPrefix: $($hub.AddressPrefix))") -SanitizedMessage 'Virtual Hub ''<value>'' exists with expected configuration (Succeeded, AddressPrefix: <value>)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("Virtual Hub '$VirtualHubName' configuration issues: " + ($issues -join '; '))
+        Write-TestResult $moduleName 'FAIL' ("Virtual Hub '$VirtualHubName' configuration issues: " + ($issues -join '; ')) -SanitizedMessage 'Virtual Hub ''<value>'' configuration issues: <value>'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Virtual Hub '$VirtualHubName' not found or not accessible"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Virtual Hub '$VirtualHubName' not found or not accessible" -SanitizedMessage 'Virtual Hub ''<value>'' not found or not accessible'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -102,22 +109,22 @@ try {
 
         if ($allSucceeded) {
             $connNames = ($connections | ForEach-Object { $_.Name }) -join ', '
-            Write-TestResult $moduleName 'PASS' ("Virtual Hub '$VirtualHubName' has $($connections.Count) VNet connections, all Succeeded ($connNames)")
+            Write-TestResult $moduleName 'PASS' ("Virtual Hub '$VirtualHubName' has $($connections.Count) VNet connections, all Succeeded ($connNames)") -SanitizedMessage 'Virtual Hub ''<value>'' has <value> VNet connections, all Succeeded (<value>)'
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' ("Virtual Hub '$VirtualHubName' has connections with non-Succeeded state: " + ($failedConnections -join '; '))
+            Write-TestResult $moduleName 'FAIL' ("Virtual Hub '$VirtualHubName' has connections with non-Succeeded state: " + ($failedConnections -join '; ')) -SanitizedMessage 'Virtual Hub ''<value>'' has connections with non-Succeeded state: <value>'
             $failed++
         }
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("Virtual Hub '$VirtualHubName' has $($connections.Count) VNet connections (expected at least 2)")
+        Write-TestResult $moduleName 'FAIL' ("Virtual Hub '$VirtualHubName' has $($connections.Count) VNet connections (expected at least 2)") -SanitizedMessage 'Virtual Hub ''<value>'' has <value> VNet connections (expected at least 2)'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query VNet connections for Virtual Hub '$VirtualHubName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query VNet connections for Virtual Hub '$VirtualHubName'" -SanitizedMessage 'Failed to query VNet connections for Virtual Hub ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -139,22 +146,22 @@ try {
         }
 
         if ($issues.Count -eq 0) {
-            Write-TestResult $moduleName 'PASS' ("P2S VPN gateway '$($gateway.Name)' exists with expected configuration (Succeeded, ClientAddressPool: 10.4.0.0/16)")
+            Write-TestResult $moduleName 'PASS' ("P2S VPN gateway '$($gateway.Name)' exists with expected configuration (Succeeded, ClientAddressPool: 10.4.0.0/16)") -SanitizedMessage 'P2S VPN gateway ''<value>'' exists with expected configuration (Succeeded, ClientAddressPool: <address>/16)'
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' ("P2S VPN gateway '$($gateway.Name)' configuration issues: " + ($issues -join '; '))
+            Write-TestResult $moduleName 'FAIL' ("P2S VPN gateway '$($gateway.Name)' configuration issues: " + ($issues -join '; ')) -SanitizedMessage 'P2S VPN gateway ''<value>'' configuration issues: <value>'
             $failed++
         }
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "No P2S VPN gateway found associated with Virtual Hub '$VirtualHubName'"
+        Write-TestResult $moduleName 'FAIL' "No P2S VPN gateway found associated with Virtual Hub '$VirtualHubName'" -SanitizedMessage 'No P2S VPN gateway found associated with Virtual Hub ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query P2S VPN gateways in resource group '$ResourceGroupName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query P2S VPN gateways in resource group '$ResourceGroupName'" -SanitizedMessage 'Failed to query P2S VPN gateways in resource group ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -187,22 +194,22 @@ try {
         }
 
         if ($issues.Count -eq 0) {
-            Write-TestResult $moduleName 'PASS' ("VPN server configuration '$($config.Name)' exists with certificate authentication")
+            Write-TestResult $moduleName 'PASS' ("VPN server configuration '$($config.Name)' exists with certificate authentication") -SanitizedMessage 'VPN server configuration ''<value>'' exists with certificate authentication'
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' ("VPN server configuration '$($config.Name)' issues: " + ($issues -join '; '))
+            Write-TestResult $moduleName 'FAIL' ("VPN server configuration '$($config.Name)' issues: " + ($issues -join '; ')) -SanitizedMessage 'VPN server configuration ''<value>'' issues: <value>'
             $failed++
         }
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "No VPN server configuration found in resource group '$ResourceGroupName'"
+        Write-TestResult $moduleName 'FAIL' "No VPN server configuration found in resource group '$ResourceGroupName'" -SanitizedMessage 'No VPN server configuration found in resource group ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query VPN server configurations in resource group '$ResourceGroupName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query VPN server configurations in resource group '$ResourceGroupName'" -SanitizedMessage 'Failed to query VPN server configurations in resource group ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -212,7 +219,7 @@ try {
     $gateway = $gateways | Where-Object { $_.VirtualHub.Id -match $VirtualHubName }
 
     if (-not $gateway) {
-        Write-TestResult $moduleName 'FAIL' "No P2S VPN gateway found associated with Virtual Hub '$VirtualHubName' to verify diagnostic settings"
+        Write-TestResult $moduleName 'FAIL' "No P2S VPN gateway found associated with Virtual Hub '$VirtualHubName' to verify diagnostic settings" -SanitizedMessage 'No P2S VPN gateway found associated with Virtual Hub ''<value>'' to verify diagnostic settings'
         $failed++
     }
     else {
@@ -244,18 +251,18 @@ try {
         }
 
         if ($diagIssues.Count -eq 0) {
-            Write-TestResult $moduleName 'PASS' ("Diagnostic setting '$($laSetting.name)' streams 'GatewayDiagnosticLog', 'IKEDiagnosticLog', 'P2SDiagnosticLog', and 'AllMetrics' to Log Analytics")
+            Write-TestResult $moduleName 'PASS' ("Diagnostic setting '$($laSetting.name)' streams 'GatewayDiagnosticLog', 'IKEDiagnosticLog', 'P2SDiagnosticLog', and 'AllMetrics' to Log Analytics") -SanitizedMessage 'Diagnostic setting ''<value>'' streams ''GatewayDiagnosticLog'', ''IKEDiagnosticLog'', ''P2SDiagnosticLog'', and ''AllMetrics'' to Log Analytics'
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' ("Diagnostic setting issues: " + ($diagIssues -join '; '))
+            Write-TestResult $moduleName 'FAIL' ("Diagnostic setting issues: " + ($diagIssues -join '; ')) -SanitizedMessage 'Diagnostic setting issues: <value>'
             $failed++
         }
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to verify diagnostic setting for the P2S VPN gateway in resource group '$ResourceGroupName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to verify diagnostic setting for the P2S VPN gateway in resource group '$ResourceGroupName'" -SanitizedMessage 'Failed to verify diagnostic setting for the P2S VPN gateway in resource group ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 

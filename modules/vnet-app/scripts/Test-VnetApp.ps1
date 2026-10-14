@@ -26,7 +26,10 @@ param(
     # Run-command parameters arrive as strings; parsed to bool below.
     [string]$ExpectSsms = 'false',
 
-    [string]$ExpectMysqlWorkbench = 'false'
+    [string]$ExpectMysqlWorkbench = 'false',
+
+    [ValidateSet('true', 'false')]
+    [string]$VerboseResults = 'false'
 )
 
 #region functions
@@ -41,8 +44,12 @@ function Write-TestResult {
     param(
         [string]$module,
         [string]$status,
-        [string]$msg
+        [string]$msg,
+        [string]$SanitizedMessage = 'Check result'
     )
+    if ($status -ne 'SUMMARY' -and $VerboseResults -ne 'true') {
+        $msg = $SanitizedMessage
+    }
     Write-Log ("[MODULE:$module] [$status] $msg")
 }
 #endregion
@@ -83,24 +90,24 @@ catch {
 # Test 1: AD - Storage account computer object exists in AD
 try {
     $stComputer = Get-ADComputer -Identity $StorageAccountName -ErrorAction Stop
-    Write-TestResult $moduleName 'PASS' ("AD: Storage account computer object '$StorageAccountName' exists (DN: " + $stComputer.DistinguishedName + ")")
+    Write-TestResult $moduleName 'PASS' ("AD: Storage account computer object '$StorageAccountName' exists (DN: " + $stComputer.DistinguishedName + ")") -SanitizedMessage 'AD: Storage account computer object ''<value>'' exists (DN: <value>)'
     $passed++
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "AD: Storage account computer object '$StorageAccountName' not found"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "AD: Storage account computer object '$StorageAccountName' not found" -SanitizedMessage 'AD: Storage account computer object ''<value>'' not found'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
 # Test 2: AD - This machine's computer object exists in AD
 try {
     $myComputer = Get-ADComputer -Identity $env:COMPUTERNAME -ErrorAction Stop
-    Write-TestResult $moduleName 'PASS' ("AD: Computer object '$env:COMPUTERNAME' exists (DN: " + $myComputer.DistinguishedName + ")")
+    Write-TestResult $moduleName 'PASS' ("AD: Computer object '$env:COMPUTERNAME' exists (DN: " + $myComputer.DistinguishedName + ")") -SanitizedMessage 'AD: Computer object ''<value>'' exists (DN: <value>)'
     $passed++
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "AD: Computer object '$env:COMPUTERNAME' not found"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "AD: Computer object '$env:COMPUTERNAME' not found" -SanitizedMessage 'AD: Computer object ''<value>'' not found'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -110,17 +117,17 @@ if ($domainName) {
         $fqdn = "$env:COMPUTERNAME.$domainName"
         $dnsResult = Resolve-DnsName $fqdn -ErrorAction Stop
         $ip = ($dnsResult | Where-Object { $_.QueryType -eq 'A' } | Select-Object -First 1).IPAddress
-        Write-TestResult $moduleName 'PASS' "DNS: '$fqdn' resolves to '$ip'"
+        Write-TestResult $moduleName 'PASS' "DNS: '$fqdn' resolves to '$ip'" -SanitizedMessage 'DNS: ''<value>'' resolves to ''<value>'''
         $passed++
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "DNS: '$fqdn' does not resolve"
-        Write-TestResult $moduleName 'FAIL' "Exception: $_"
+        Write-TestResult $moduleName 'FAIL' "DNS: '$fqdn' does not resolve" -SanitizedMessage 'DNS: ''<value>'' does not resolve'
+        Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
         $failed++
     }
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "DNS: Skipped - domain name not available"
+    Write-TestResult $moduleName 'FAIL' "DNS: Skipped - domain name not available" -SanitizedMessage 'DNS: Skipped - domain name not available'
     $failed++
 }
 
@@ -131,17 +138,17 @@ try {
     $ip = ($dnsResult | Where-Object { $_.QueryType -eq 'A' } | Select-Object -First 1).IPAddress
 
     if ($ip -match '^10\.') {
-        Write-TestResult $moduleName 'PASS' "DNS: '$filesFqdn' resolves to private IP '$ip'"
+        Write-TestResult $moduleName 'PASS' "DNS: '$filesFqdn' resolves to private IP '$ip'" -SanitizedMessage 'DNS: ''<value>'' resolves to private IP ''<value>'''
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "DNS: '$filesFqdn' resolved to '$ip' (expected private IP 10.x.x.x)"
+        Write-TestResult $moduleName 'FAIL' "DNS: '$filesFqdn' resolved to '$ip' (expected private IP 10.x.x.x)" -SanitizedMessage 'DNS: ''<value>'' resolved to ''<value>'' (expected private IP 10.x.x.x)'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "DNS: '$filesFqdn' does not resolve"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "DNS: '$filesFqdn' does not resolve" -SanitizedMessage 'DNS: ''<value>'' does not resolve'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -150,12 +157,12 @@ $azConnected = $false
 try {
     Connect-AzAccount -Identity -ErrorAction Stop | Out-Null
     $azConnected = $true
-    Write-TestResult $moduleName 'PASS' "Key Vault: Connected to Azure via managed identity"
+    Write-TestResult $moduleName 'PASS' "Key Vault: Connected to Azure via managed identity" -SanitizedMessage 'Key Vault: Connected to Azure via managed identity'
     $passed++
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Key Vault: Failed to connect via managed identity"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Key Vault: Failed to connect via managed identity" -SanitizedMessage 'Key Vault: Failed to connect via managed identity'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -165,22 +172,22 @@ if ($azConnected) {
         $adminUser = Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name 'adminuser' -AsPlainText -ErrorAction Stop
 
         if (-not [string]::IsNullOrEmpty($adminUser)) {
-            Write-TestResult $moduleName 'PASS' "Key Vault: Retrieved 'adminuser' secret (value='$adminUser')"
+            Write-TestResult $moduleName 'PASS' "Key Vault: Retrieved 'adminuser' secret (value='$adminUser')" -SanitizedMessage 'Key Vault: Retrieved ''adminuser'' secret (value=''<value>'')'
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' "Key Vault: 'adminuser' secret is empty"
+            Write-TestResult $moduleName 'FAIL' "Key Vault: 'adminuser' secret is empty" -SanitizedMessage 'Key Vault: ''adminuser'' secret is empty'
             $failed++
         }
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "Key Vault: Failed to retrieve 'adminuser' secret from '$KeyVaultName'"
-        Write-TestResult $moduleName 'FAIL' "Exception: $_"
+        Write-TestResult $moduleName 'FAIL' "Key Vault: Failed to retrieve 'adminuser' secret from '$KeyVaultName'" -SanitizedMessage 'Key Vault: Failed to retrieve ''adminuser'' secret from ''<value>'''
+        Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
         $failed++
     }
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "Key Vault: Skipped adminuser - managed identity not connected"
+    Write-TestResult $moduleName 'FAIL' "Key Vault: Skipped adminuser - managed identity not connected" -SanitizedMessage 'Key Vault: Skipped adminuser - managed identity not connected'
     $failed++
 }
 
@@ -190,22 +197,22 @@ if ($azConnected) {
         $adminPwd = Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name 'adminpassword' -AsPlainText -ErrorAction Stop
 
         if (-not [string]::IsNullOrEmpty($adminPwd)) {
-            Write-TestResult $moduleName 'PASS' ("Key Vault: Retrieved 'adminpassword' secret (length=" + $adminPwd.Length + ")")
+            Write-TestResult $moduleName 'PASS' ("Key Vault: Retrieved 'adminpassword' secret (length=" + $adminPwd.Length + ")") -SanitizedMessage 'Key Vault: Retrieved ''adminpassword'' secret (length=<value>)'
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' "Key Vault: 'adminpassword' secret is empty"
+            Write-TestResult $moduleName 'FAIL' "Key Vault: 'adminpassword' secret is empty" -SanitizedMessage 'Key Vault: ''adminpassword'' secret is empty'
             $failed++
         }
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "Key Vault: Failed to retrieve 'adminpassword' secret from '$KeyVaultName'"
-        Write-TestResult $moduleName 'FAIL' "Exception: $_"
+        Write-TestResult $moduleName 'FAIL' "Key Vault: Failed to retrieve 'adminpassword' secret from '$KeyVaultName'" -SanitizedMessage 'Key Vault: Failed to retrieve ''adminpassword'' secret from ''<value>'''
+        Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
         $failed++
     }
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "Key Vault: Skipped adminpassword - managed identity not connected"
+    Write-TestResult $moduleName 'FAIL' "Key Vault: Skipped adminpassword - managed identity not connected" -SanitizedMessage 'Key Vault: Skipped adminpassword - managed identity not connected'
     $failed++
 }
 
@@ -231,11 +238,11 @@ foreach ($featureName in $requiredFeatures) {
 }
 
 if ($allFeaturesInstalled) {
-    Write-TestResult $moduleName 'PASS' ("Windows Features: All required features installed ($($featureDetails -join ', '))")
+    Write-TestResult $moduleName 'PASS' ("Windows Features: All required features installed ($($featureDetails -join ', '))") -SanitizedMessage 'Windows Features: All required features installed (<value>)'
     $passed++
 }
 else {
-    Write-TestResult $moduleName 'FAIL' ("Windows Features: One or more features missing ($($featureDetails -join ', '))")
+    Write-TestResult $moduleName 'FAIL' ("Windows Features: One or more features missing ($($featureDetails -join ', '))") -SanitizedMessage 'Windows Features: One or more features missing (<value>)'
     $failed++
 }
 
@@ -243,11 +250,11 @@ else {
 $vscodePath = 'C:\Program Files\Microsoft VS Code\Code.exe'
 if (Test-Path $vscodePath) {
     $vscodeVersion = (Get-Item $vscodePath).VersionInfo.ProductVersion
-    Write-TestResult $moduleName 'PASS' "Software: Visual Studio Code installed (version: $vscodeVersion)"
+    Write-TestResult $moduleName 'PASS' "Software: Visual Studio Code installed (version: $vscodeVersion)" -SanitizedMessage 'Software: Visual Studio Code installed (version: <value>)'
     $passed++
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "Software: Visual Studio Code not found at '$vscodePath'"
+    Write-TestResult $moduleName 'FAIL' "Software: Visual Studio Code not found at '$vscodePath'" -SanitizedMessage 'Software: Visual Studio Code not found at ''<value>'''
     $failed++
 }
 
@@ -258,16 +265,16 @@ if ([System.Convert]::ToBoolean($ExpectSsms)) {
         Select-Object -First 1
     if ($ssmsPath) {
         $ssmsVersion = $ssmsPath.VersionInfo.ProductVersion
-        Write-TestResult $moduleName 'PASS' ("Software: SSMS installed at '" + $ssmsPath.FullName + "' (version: $ssmsVersion)")
+        Write-TestResult $moduleName 'PASS' ("Software: SSMS installed at '" + $ssmsPath.FullName + "' (version: $ssmsVersion)") -SanitizedMessage 'Software: SSMS installed at ''<value>'' (version: <value>)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "Software: SQL Server Management Studio not found"
+        Write-TestResult $moduleName 'FAIL' "Software: SQL Server Management Studio not found" -SanitizedMessage 'Software: SQL Server Management Studio not found'
         $failed++
     }
 }
 else {
-    Write-TestResult $moduleName 'SKIP' "Software: SSMS check skipped (mssql and vm_mssql_win modules not enabled)"
+    Write-TestResult $moduleName 'SKIP' "Software: SSMS check skipped (mssql and vm_mssql_win modules not enabled)" -SanitizedMessage 'Software: SSMS check skipped (mssql and vm_mssql_win modules not enabled)'
 }
 
 # Test 11: Software - MySQL Workbench installed (only when mysql is enabled)
@@ -276,16 +283,16 @@ if ([System.Convert]::ToBoolean($ExpectMysqlWorkbench)) {
         Select-Object -First 1
     if ($mysqlWbPath) {
         $mysqlWbVersion = $mysqlWbPath.VersionInfo.ProductVersion
-        Write-TestResult $moduleName 'PASS' ("Software: MySQL Workbench installed at '" + $mysqlWbPath.FullName + "' (version: $mysqlWbVersion)")
+        Write-TestResult $moduleName 'PASS' ("Software: MySQL Workbench installed at '" + $mysqlWbPath.FullName + "' (version: $mysqlWbVersion)") -SanitizedMessage 'Software: MySQL Workbench installed at ''<value>'' (version: <value>)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "Software: MySQL Workbench not found"
+        Write-TestResult $moduleName 'FAIL' "Software: MySQL Workbench not found" -SanitizedMessage 'Software: MySQL Workbench not found'
         $failed++
     }
 }
 else {
-    Write-TestResult $moduleName 'SKIP' "Software: MySQL Workbench check skipped (mysql module not enabled)"
+    Write-TestResult $moduleName 'SKIP' "Software: MySQL Workbench check skipped (mysql module not enabled)" -SanitizedMessage 'Software: MySQL Workbench check skipped (mysql module not enabled)'
 }
 
 # Test 12: SMB - TCP port 445 reachable on Azure Files private endpoint
@@ -294,17 +301,17 @@ try {
     $tcpTest = Test-NetConnection -ComputerName $filesFqdn -Port 445 -ErrorAction Stop
 
     if ($tcpTest.TcpTestSucceeded) {
-        Write-TestResult $moduleName 'PASS' ("SMB: TCP port 445 reachable on '$filesFqdn' (remote IP: " + $tcpTest.RemoteAddress + ")")
+        Write-TestResult $moduleName 'PASS' ("SMB: TCP port 445 reachable on '$filesFqdn' (remote IP: " + $tcpTest.RemoteAddress + ")") -SanitizedMessage 'SMB: TCP port 445 reachable on ''<value>'' (remote IP: <value>)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "SMB: TCP port 445 not reachable on '$filesFqdn'"
+        Write-TestResult $moduleName 'FAIL' "SMB: TCP port 445 not reachable on '$filesFqdn'" -SanitizedMessage 'SMB: TCP port 445 not reachable on ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "SMB: Failed to test TCP connectivity to '$filesFqdn':445"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "SMB: Failed to test TCP connectivity to '$filesFqdn':445" -SanitizedMessage 'SMB: Failed to test TCP connectivity to ''<value>'':445'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -412,11 +419,11 @@ else {
 }
 
 if ($smbTestPassed) {
-    Write-TestResult $moduleName 'PASS' $smbTestReason
+    Write-TestResult $moduleName 'PASS' $smbTestReason -SanitizedMessage '<value>'
     $passed++
 }
 else {
-    Write-TestResult $moduleName 'FAIL' $smbTestReason
+    Write-TestResult $moduleName 'FAIL' $smbTestReason -SanitizedMessage '<value>'
     $failed++
 }
 
@@ -460,7 +467,7 @@ try {
             Select-Object -First 1
         $version = if ($amaDir) { $amaDir.Name } else { 'unknown' }
         $names = ($amaProcs | Select-Object -ExpandProperty Name -Unique) -join ', '
-        Write-TestResult $moduleName 'PASS' "AMA: Running (version $version, processes: $names, waited ${waited}s)"
+        Write-TestResult $moduleName 'PASS' "AMA: Running (version $version, processes: $names, waited ${waited}s)" -SanitizedMessage 'AMA: Running (version <value>, processes: <value>, waited <value>s)'
         $passed++
     }
     else {
@@ -487,12 +494,12 @@ try {
                 $extStatus = "status=$s message=$m"
             }
         } catch { $extStatus = "status file error: $_" }
-        Write-TestResult $moduleName 'FAIL' "AMA: MonAgentCore not running after ${waited}s (found: $found, vm_uptime=$uptime, extension: $extStatus)"
+        Write-TestResult $moduleName 'FAIL' "AMA: MonAgentCore not running after ${waited}s (found: $found, vm_uptime=$uptime, extension: $extStatus)" -SanitizedMessage 'AMA: MonAgentCore not running after <value>s (found: <value>, vm_uptime=<value>, extension: <value>)'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "AMA: Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "AMA: Exception: $_" -SanitizedMessage 'AMA: Exception: <value>'
     $failed++
 }
 
@@ -506,17 +513,17 @@ try {
     $ip = ($dnsResult | Where-Object { $_.QueryType -eq 'A' } | Select-Object -First 1).IPAddress
 
     if ($ip -match '^10\.') {
-        Write-TestResult $moduleName 'PASS' "AMPLS DNS: '$amplsFqdn' resolves to private IP '$ip'"
+        Write-TestResult $moduleName 'PASS' "AMPLS DNS: '$amplsFqdn' resolves to private IP '$ip'" -SanitizedMessage 'AMPLS DNS: ''<value>'' resolves to private IP ''<value>'''
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "AMPLS DNS: '$amplsFqdn' resolved to '$ip' (expected private IP 10.x.x.x)"
+        Write-TestResult $moduleName 'FAIL' "AMPLS DNS: '$amplsFqdn' resolved to '$ip' (expected private IP 10.x.x.x)" -SanitizedMessage 'AMPLS DNS: ''<value>'' resolved to ''<value>'' (expected private IP 10.x.x.x)'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "AMPLS DNS: '$amplsFqdn' does not resolve"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "AMPLS DNS: '$amplsFqdn' does not resolve" -SanitizedMessage 'AMPLS DNS: ''<value>'' does not resolve'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -526,17 +533,17 @@ try {
     $tcpTest = Test-NetConnection -ComputerName $amplsFqdn -Port 443 -ErrorAction Stop
 
     if ($tcpTest.TcpTestSucceeded) {
-        Write-TestResult $moduleName 'PASS' ("AMPLS: TCP port 443 reachable on '$amplsFqdn' (remote IP: " + $tcpTest.RemoteAddress + ")")
+        Write-TestResult $moduleName 'PASS' ("AMPLS: TCP port 443 reachable on '$amplsFqdn' (remote IP: " + $tcpTest.RemoteAddress + ")") -SanitizedMessage 'AMPLS: TCP port 443 reachable on ''<value>'' (remote IP: <value>)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "AMPLS: TCP port 443 not reachable on '$amplsFqdn'"
+        Write-TestResult $moduleName 'FAIL' "AMPLS: TCP port 443 not reachable on '$amplsFqdn'" -SanitizedMessage 'AMPLS: TCP port 443 not reachable on ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "AMPLS: Failed to test TCP connectivity to '$amplsFqdn':443"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "AMPLS: Failed to test TCP connectivity to '$amplsFqdn':443" -SanitizedMessage 'AMPLS: Failed to test TCP connectivity to ''<value>'':443'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -549,8 +556,8 @@ try {
     Write-Log "Acquired managed identity token for ARM (expires: $($tokenResponse.expires_on))"
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "ARM token: Failed to acquire managed identity token from IMDS"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "ARM token: Failed to acquire managed identity token from IMDS" -SanitizedMessage 'ARM token: Failed to acquire managed identity token from IMDS'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -579,22 +586,22 @@ if ($armToken) {
         if ($pnaQry -eq 'Disabled') { $checks += 'publicNetworkAccessForQuery=Disabled' } else { $checks += "FAIL publicNetworkAccessForQuery='$pnaQry'" }
 
         if ($checks -match '^FAIL') {
-            Write-TestResult $moduleName 'FAIL' ("Application Insights: " + ($checks -join '; '))
+            Write-TestResult $moduleName 'FAIL' ("Application Insights: " + ($checks -join '; ')) -SanitizedMessage 'Application Insights: <value>'
             $failed++
         }
         else {
-            Write-TestResult $moduleName 'PASS' ("Application Insights: " + ($checks -join '; '))
+            Write-TestResult $moduleName 'PASS' ("Application Insights: " + ($checks -join '; ')) -SanitizedMessage 'Application Insights: <value>'
             $passed++
         }
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "Application Insights: ARM GET failed for '$ApplicationInsightsName'"
-        Write-TestResult $moduleName 'FAIL' "Exception: $_"
+        Write-TestResult $moduleName 'FAIL' "Application Insights: ARM GET failed for '$ApplicationInsightsName'" -SanitizedMessage 'Application Insights: ARM GET failed for ''<value>'''
+        Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
         $failed++
     }
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "Application Insights: Skipped - no ARM token"
+    Write-TestResult $moduleName 'FAIL' "Application Insights: Skipped - no ARM token" -SanitizedMessage 'Application Insights: Skipped - no ARM token'
     $failed++
 }
 
@@ -609,22 +616,22 @@ if ($armToken) {
         $linked = $ss.properties.linkedResourceId
         $expected = "/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.Insights/components/$ApplicationInsightsName"
         if ($linked -ieq $expected) {
-            Write-TestResult $moduleName 'PASS' "AMPLS scoped service: '$scopedName' exists and links to '$ApplicationInsightsName'"
+            Write-TestResult $moduleName 'PASS' "AMPLS scoped service: '$scopedName' exists and links to '$ApplicationInsightsName'" -SanitizedMessage 'AMPLS scoped service: ''<value>'' exists and links to ''<value>'''
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' "AMPLS scoped service: '$scopedName' linkedResourceId='$linked' (expected '$expected')"
+            Write-TestResult $moduleName 'FAIL' "AMPLS scoped service: '$scopedName' linkedResourceId='$linked' (expected '$expected')" -SanitizedMessage 'AMPLS scoped service: ''<value>'' linkedResourceId=''<value>'' (expected ''<value>'')'
             $failed++
         }
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "AMPLS scoped service: ARM GET failed for 'ampls-scope-app-insights' on AMPLS '$MonitorPrivateLinkScopeName'"
-        Write-TestResult $moduleName 'FAIL' "Exception: $_"
+        Write-TestResult $moduleName 'FAIL' "AMPLS scoped service: ARM GET failed for 'ampls-scope-app-insights' on AMPLS '$MonitorPrivateLinkScopeName'" -SanitizedMessage 'AMPLS scoped service: ARM GET failed for ''ampls-scope-app-insights'' on AMPLS ''<value>'''
+        Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
         $failed++
     }
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "AMPLS scoped service: Skipped - no ARM token"
+    Write-TestResult $moduleName 'FAIL' "AMPLS scoped service: Skipped - no ARM token" -SanitizedMessage 'AMPLS scoped service: Skipped - no ARM token'
     $failed++
 }
 
@@ -657,23 +664,23 @@ if ($armToken) {
             }
 
             if ($issues.Count -eq 0) {
-                Write-TestResult $moduleName 'PASS' ("Storage diagnostics ($($svc.Label)): '$($laSetting.name)' streams 'StorageWrite', 'StorageDelete', and 'Transaction' to Log Analytics")
+                Write-TestResult $moduleName 'PASS' ("Storage diagnostics ($($svc.Label)): '$($laSetting.name)' streams 'StorageWrite', 'StorageDelete', and 'Transaction' to Log Analytics") -SanitizedMessage 'Storage diagnostics (<value>): ''<value>'' streams ''StorageWrite'', ''StorageDelete'', and ''Transaction'' to Log Analytics'
                 $passed++
             }
             else {
-                Write-TestResult $moduleName 'FAIL' ("Storage diagnostics ($($svc.Label)): " + ($issues -join '; '))
+                Write-TestResult $moduleName 'FAIL' ("Storage diagnostics ($($svc.Label)): " + ($issues -join '; ')) -SanitizedMessage 'Storage diagnostics (<value>): <value>'
                 $failed++
             }
         }
         catch {
-            Write-TestResult $moduleName 'FAIL' "Storage diagnostics ($($svc.Label)): ARM GET failed for '$StorageAccountName' $($svc.Path)"
-            Write-TestResult $moduleName 'FAIL' "Exception: $_"
+            Write-TestResult $moduleName 'FAIL' "Storage diagnostics ($($svc.Label)): ARM GET failed for '$StorageAccountName' $($svc.Path)" -SanitizedMessage 'Storage diagnostics (<value>): ARM GET failed for ''<value>'' <value>'
+            Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
             $failed++
         }
     }
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "Storage diagnostics: Skipped - no ARM token"
+    Write-TestResult $moduleName 'FAIL' "Storage diagnostics: Skipped - no ARM token" -SanitizedMessage 'Storage diagnostics: Skipped - no ARM token'
     $failed++
 }
 

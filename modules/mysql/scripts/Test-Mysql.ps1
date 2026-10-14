@@ -6,7 +6,10 @@ param(
     [string]$MysqlServerName,
 
     [Parameter(Mandatory = $true)]
-    [string]$MysqlDatabaseName
+    [string]$MysqlDatabaseName,
+
+    [ValidateSet('true', 'false')]
+    [string]$VerboseResults = 'false'
 )
 
 #region functions
@@ -19,8 +22,12 @@ function Write-TestResult {
     param(
         [string]$module,
         [string]$status,
-        [string]$msg
+        [string]$msg,
+        [string]$SanitizedMessage = 'Check result'
     )
+    if ($status -ne 'SUMMARY' -and $VerboseResults -ne 'true') {
+        $msg = $SanitizedMessage
+    }
     Write-Log ("[MODULE:$module] [$status] $msg")
 }
 #endregion
@@ -52,29 +59,29 @@ try {
     }
 
     if ($issues.Count -eq 0) {
-        Write-TestResult $moduleName 'PASS' ("MySQL Flexible Server '$MysqlServerName' exists with expected configuration (public access disabled)")
+        Write-TestResult $moduleName 'PASS' ("MySQL Flexible Server '$MysqlServerName' exists with expected configuration (public access disabled)") -SanitizedMessage 'MySQL Flexible Server ''<value>'' exists with expected configuration (public access disabled)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("MySQL Flexible Server '$MysqlServerName' configuration issues: " + ($issues -join '; '))
+        Write-TestResult $moduleName 'FAIL' ("MySQL Flexible Server '$MysqlServerName' configuration issues: " + ($issues -join '; ')) -SanitizedMessage 'MySQL Flexible Server ''<value>'' configuration issues: <value>'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "MySQL Flexible Server '$MysqlServerName' not found or not accessible"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "MySQL Flexible Server '$MysqlServerName' not found or not accessible" -SanitizedMessage 'MySQL Flexible Server ''<value>'' not found or not accessible'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
 # Test 2: Database exists
 try {
     $null = Get-AzMySqlFlexibleServerDatabase -ResourceGroupName $ResourceGroupName -ServerName $MysqlServerName -Name $MysqlDatabaseName -ErrorAction Stop
-    Write-TestResult $moduleName 'PASS' ("Database '$MysqlDatabaseName' exists on server '$MysqlServerName'")
+    Write-TestResult $moduleName 'PASS' ("Database '$MysqlDatabaseName' exists on server '$MysqlServerName'") -SanitizedMessage 'Database ''<value>'' exists on server ''<value>'''
     $passed++
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Database '$MysqlDatabaseName' not found on server '$MysqlServerName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Database '$MysqlDatabaseName' not found on server '$MysqlServerName'" -SanitizedMessage 'Database ''<value>'' not found on server ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -90,22 +97,22 @@ try {
         $status = $connection.PrivateLinkServiceConnectionState.Status
 
         if ($status -eq 'Approved') {
-            Write-TestResult $moduleName 'PASS' ("Private endpoint '$($endpoints[0].Name)' is connected with status 'Approved'")
+            Write-TestResult $moduleName 'PASS' ("Private endpoint '$($endpoints[0].Name)' is connected with status 'Approved'") -SanitizedMessage 'Private endpoint ''<value>'' is connected with status ''Approved'''
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' ("Private endpoint '$($endpoints[0].Name)' connection status is '$status' (expected 'Approved')")
+            Write-TestResult $moduleName 'FAIL' ("Private endpoint '$($endpoints[0].Name)' connection status is '$status' (expected 'Approved')") -SanitizedMessage 'Private endpoint ''<value>'' connection status is ''<value>'' (expected ''Approved'')'
             $failed++
         }
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "No private endpoint found for MySQL Flexible Server '$MysqlServerName'"
+        Write-TestResult $moduleName 'FAIL' "No private endpoint found for MySQL Flexible Server '$MysqlServerName'" -SanitizedMessage 'No private endpoint found for MySQL Flexible Server ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query private endpoints for MySQL Flexible Server '$MysqlServerName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query private endpoints for MySQL Flexible Server '$MysqlServerName'" -SanitizedMessage 'Failed to query private endpoints for MySQL Flexible Server ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -117,17 +124,17 @@ try {
 
     if ($recordSets) {
         $ip = $recordSets[0].Records[0].Ipv4Address
-        Write-TestResult $moduleName 'PASS' ("Private DNS A record '$MysqlServerName.$zoneName' exists (IP: $ip)")
+        Write-TestResult $moduleName 'PASS' ("Private DNS A record '$MysqlServerName.$zoneName' exists (IP: $ip)") -SanitizedMessage 'Private DNS A record ''<value>.<value>'' exists (IP: <value>)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "Private DNS A record '$MysqlServerName' not found in zone '$zoneName'"
+        Write-TestResult $moduleName 'FAIL' "Private DNS A record '$MysqlServerName' not found in zone '$zoneName'" -SanitizedMessage 'Private DNS A record ''<value>'' not found in zone ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query private DNS zone '$zoneName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query private DNS zone '$zoneName'" -SanitizedMessage 'Failed to query private DNS zone ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -136,17 +143,17 @@ try {
     $server = Get-AzMySqlFlexibleServer -ResourceGroupName $ResourceGroupName -Name $MysqlServerName -ErrorAction Stop
 
     if ($server.AdministratorLogin) {
-        Write-TestResult $moduleName 'PASS' ("SQL auth admin login is configured (AdministratorLogin: '$($server.AdministratorLogin)')")
+        Write-TestResult $moduleName 'PASS' ("SQL auth admin login is configured (AdministratorLogin: '$($server.AdministratorLogin)')") -SanitizedMessage 'SQL auth admin login is configured (AdministratorLogin: ''<value>'')'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' 'No administrator login configured on MySQL Flexible Server'
+        Write-TestResult $moduleName 'FAIL' 'No administrator login configured on MySQL Flexible Server' -SanitizedMessage 'No administrator login configured on MySQL Flexible Server'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query administrator login for MySQL Flexible Server '$MysqlServerName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query administrator login for MySQL Flexible Server '$MysqlServerName'" -SanitizedMessage 'Failed to query administrator login for MySQL Flexible Server ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -182,17 +189,17 @@ try {
     }
 
     if ($diagIssues.Count -eq 0) {
-        Write-TestResult $moduleName 'PASS' ("Diagnostic setting '$($laSetting.name)' streams 'MySqlSlowLogs', 'MySqlAuditLogs', and 'AllMetrics' to Log Analytics")
+        Write-TestResult $moduleName 'PASS' ("Diagnostic setting '$($laSetting.name)' streams 'MySqlSlowLogs', 'MySqlAuditLogs', and 'AllMetrics' to Log Analytics") -SanitizedMessage 'Diagnostic setting ''<value>'' streams ''MySqlSlowLogs'', ''MySqlAuditLogs'', and ''AllMetrics'' to Log Analytics'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("Diagnostic setting issues: " + ($diagIssues -join '; '))
+        Write-TestResult $moduleName 'FAIL' ("Diagnostic setting issues: " + ($diagIssues -join '; ')) -SanitizedMessage 'Diagnostic setting issues: <value>'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to verify diagnostic setting for MySQL Flexible Server '$MysqlServerName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to verify diagnostic setting for MySQL Flexible Server '$MysqlServerName'" -SanitizedMessage 'Failed to verify diagnostic setting for MySQL Flexible Server ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 

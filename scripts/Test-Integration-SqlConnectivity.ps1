@@ -3,7 +3,10 @@ param(
     [string]$KeyVaultName,
 
     [Parameter(Mandatory = $true)]
-    [string]$TargetVmName
+    [string]$TargetVmName,
+
+    [ValidateSet('true', 'false')]
+    [string]$VerboseResults = 'false'
 )
 
 #region functions
@@ -18,8 +21,12 @@ function Write-TestResult {
     param(
         [string]$module,
         [string]$status,
-        [string]$msg
+        [string]$msg,
+        [string]$SanitizedMessage = 'Check result'
     )
+    if ($status -ne 'SUMMARY' -and $VerboseResults -ne 'true') {
+        $msg = $SanitizedMessage
+    }
     Write-Log ("[MODULE:$module] [$status] $msg")
 }
 #endregion
@@ -68,7 +75,7 @@ try {
     Write-Log "Retrieved domain admin credentials from Key Vault."
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "SQL: Failed to retrieve credentials from Key Vault: $_"
+    Write-TestResult $moduleName 'FAIL' "SQL: Failed to retrieve credentials from Key Vault: $_" -SanitizedMessage 'SQL: Failed to retrieve credentials from Key Vault: <value>'
     $failed++
     $total = $passed + $failed
     Write-TestResult $moduleName 'SUMMARY' "Passed: $passed Failed: $failed Total: $total"
@@ -76,7 +83,7 @@ catch {
 }
 
 if (-not $domainName -or -not $adminUser -or -not $adminPwd) {
-    Write-TestResult $moduleName 'FAIL' "SQL: Missing prerequisites (domain='$domainName', user='$adminUser')"
+    Write-TestResult $moduleName 'FAIL' "SQL: Missing prerequisites (domain='$domainName', user='$adminUser')" -SanitizedMessage 'SQL: Missing prerequisites (domain=''<value>'', user=''<value>'')'
     $failed++
     $total = $passed + $failed
     Write-TestResult $moduleName 'SUMMARY' "Passed: $passed Failed: $failed Total: $total"
@@ -157,21 +164,21 @@ try {
         $resultDetail = if ($parts.Count -gt 1) { $parts[1] } else { '' }
 
         if ($resultStatus -eq 'PASS') {
-            Write-TestResult $moduleName 'PASS' "SQL: $resultDetail"
+            Write-TestResult $moduleName 'PASS' "SQL: $resultDetail" -SanitizedMessage 'SQL: <value>'
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' "SQL: $resultDetail"
+            Write-TestResult $moduleName 'FAIL' "SQL: $resultDetail" -SanitizedMessage 'SQL: <value>'
             $failed++
         }
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "SQL: Scheduled task completed (exit code: $($taskInfo.LastTaskResult)) but result file not found"
+        Write-TestResult $moduleName 'FAIL' "SQL: Scheduled task completed (exit code: $($taskInfo.LastTaskResult)) but result file not found" -SanitizedMessage 'SQL: Scheduled task completed (exit code: <value>) but result file not found'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "SQL: Scheduled task failed: $_"
+    Write-TestResult $moduleName 'FAIL' "SQL: Scheduled task failed: $_" -SanitizedMessage 'SQL: Scheduled task failed: <value>'
     $failed++
 }
 finally {

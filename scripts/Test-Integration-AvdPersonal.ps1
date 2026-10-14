@@ -9,7 +9,10 @@ param(
     [string]$StorageShareName,
 
     [Parameter(Mandatory = $true)]
-    [string]$DomainName
+    [string]$DomainName,
+
+    [ValidateSet('true', 'false')]
+    [string]$VerboseResults = 'false'
 )
 
 #region functions
@@ -24,8 +27,12 @@ function Write-TestResult {
     param(
         [string]$module,
         [string]$status,
-        [string]$msg
+        [string]$msg,
+        [string]$SanitizedMessage = 'Check result'
     )
+    if ($status -ne 'SUMMARY' -and $VerboseResults -ne 'true') {
+        $msg = $SanitizedMessage
+    }
     Write-Log ("[MODULE:$module] [$status] $msg")
 }
 #endregion
@@ -59,17 +66,17 @@ try {
     $ip = ($dnsResult | Where-Object { $_.QueryType -eq 'A' } | Select-Object -First 1).IPAddress
 
     if ($ip -match '^10\.') {
-        Write-TestResult $moduleName 'PASS' "DNS: '$filesFqdn' resolves to private IP '$ip'"
+        Write-TestResult $moduleName 'PASS' "DNS: '$filesFqdn' resolves to private IP '$ip'" -SanitizedMessage 'DNS: ''<value>'' resolves to private IP ''<value>'''
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "DNS: '$filesFqdn' resolved to '$ip' (expected private IP 10.x.x.x)"
+        Write-TestResult $moduleName 'FAIL' "DNS: '$filesFqdn' resolved to '$ip' (expected private IP 10.x.x.x)" -SanitizedMessage 'DNS: ''<value>'' resolved to ''<value>'' (expected private IP 10.x.x.x)'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "DNS: '$filesFqdn' does not resolve"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "DNS: '$filesFqdn' does not resolve" -SanitizedMessage 'DNS: ''<value>'' does not resolve'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -80,17 +87,17 @@ try {
     $ip = ($dnsResult | Where-Object { $_.QueryType -eq 'A' } | Select-Object -First 1).IPAddress
 
     if ($ip -match '^10\.') {
-        Write-TestResult $moduleName 'PASS' "DNS: '$kvFqdn' resolves to private IP '$ip'"
+        Write-TestResult $moduleName 'PASS' "DNS: '$kvFqdn' resolves to private IP '$ip'" -SanitizedMessage 'DNS: ''<value>'' resolves to private IP ''<value>'''
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "DNS: '$kvFqdn' resolved to '$ip' (expected private IP 10.x.x.x)"
+        Write-TestResult $moduleName 'FAIL' "DNS: '$kvFqdn' resolved to '$ip' (expected private IP 10.x.x.x)" -SanitizedMessage 'DNS: ''<value>'' resolved to ''<value>'' (expected private IP 10.x.x.x)'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "DNS: '$kvFqdn' does not resolve"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "DNS: '$kvFqdn' does not resolve" -SanitizedMessage 'DNS: ''<value>'' does not resolve'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -100,17 +107,17 @@ try {
     $tcpTest = Test-NetConnection -ComputerName $filesFqdn -Port 445 -ErrorAction Stop
 
     if ($tcpTest.TcpTestSucceeded) {
-        Write-TestResult $moduleName 'PASS' ("SMB: TCP port 445 reachable on '$filesFqdn' (remote IP: " + $tcpTest.RemoteAddress + ")")
+        Write-TestResult $moduleName 'PASS' ("SMB: TCP port 445 reachable on '$filesFqdn' (remote IP: " + $tcpTest.RemoteAddress + ")") -SanitizedMessage 'SMB: TCP port 445 reachable on ''<value>'' (remote IP: <value>)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "SMB: TCP port 445 not reachable on '$filesFqdn'"
+        Write-TestResult $moduleName 'FAIL' "SMB: TCP port 445 not reachable on '$filesFqdn'" -SanitizedMessage 'SMB: TCP port 445 not reachable on ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "SMB: Failed to test TCP connectivity to '$filesFqdn':445"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "SMB: Failed to test TCP connectivity to '$filesFqdn':445" -SanitizedMessage 'SMB: Failed to test TCP connectivity to ''<value>'':445'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -120,17 +127,17 @@ try {
     $tcpTest = Test-NetConnection -ComputerName $kvFqdn -Port 443 -ErrorAction Stop
 
     if ($tcpTest.TcpTestSucceeded) {
-        Write-TestResult $moduleName 'PASS' ("Key Vault: TCP port 443 reachable on '$kvFqdn' (remote IP: " + $tcpTest.RemoteAddress + ")")
+        Write-TestResult $moduleName 'PASS' ("Key Vault: TCP port 443 reachable on '$kvFqdn' (remote IP: " + $tcpTest.RemoteAddress + ")") -SanitizedMessage 'Key Vault: TCP port 443 reachable on ''<value>'' (remote IP: <value>)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "Key Vault: TCP port 443 not reachable on '$kvFqdn'"
+        Write-TestResult $moduleName 'FAIL' "Key Vault: TCP port 443 not reachable on '$kvFqdn'" -SanitizedMessage 'Key Vault: TCP port 443 not reachable on ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Key Vault: Failed to test TCP connectivity to '$kvFqdn':443"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Key Vault: Failed to test TCP connectivity to '$kvFqdn':443" -SanitizedMessage 'Key Vault: Failed to test TCP connectivity to ''<value>'':443'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -143,8 +150,8 @@ try {
     Write-Log "Acquired managed identity token for Key Vault (expires: $($tokenResponse.expires_on))"
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Key Vault: Failed to acquire managed identity token from IMDS"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Key Vault: Failed to acquire managed identity token from IMDS" -SanitizedMessage 'Key Vault: Failed to acquire managed identity token from IMDS'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -159,22 +166,22 @@ if ($kvToken) {
         $smbAdminUser = $secretResponse.value
 
         if (-not [string]::IsNullOrEmpty($smbAdminUser)) {
-            Write-TestResult $moduleName 'PASS' "Key Vault: Retrieved 'adminuser' secret (value='$smbAdminUser')"
+            Write-TestResult $moduleName 'PASS' "Key Vault: Retrieved 'adminuser' secret (value='$smbAdminUser')" -SanitizedMessage 'Key Vault: Retrieved ''adminuser'' secret (value=''<value>'')'
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' "Key Vault: 'adminuser' secret is empty"
+            Write-TestResult $moduleName 'FAIL' "Key Vault: 'adminuser' secret is empty" -SanitizedMessage 'Key Vault: ''adminuser'' secret is empty'
             $failed++
         }
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "Key Vault: Failed to retrieve 'adminuser' secret from '$KeyVaultName'"
-        Write-TestResult $moduleName 'FAIL' "Exception: $_"
+        Write-TestResult $moduleName 'FAIL' "Key Vault: Failed to retrieve 'adminuser' secret from '$KeyVaultName'" -SanitizedMessage 'Key Vault: Failed to retrieve ''adminuser'' secret from ''<value>'''
+        Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
         $failed++
     }
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "Key Vault: Skipped adminuser - no IMDS token"
+    Write-TestResult $moduleName 'FAIL' "Key Vault: Skipped adminuser - no IMDS token" -SanitizedMessage 'Key Vault: Skipped adminuser - no IMDS token'
     $failed++
 }
 
@@ -186,22 +193,22 @@ if ($kvToken) {
         $smbAdminPwd = $secretResponse.value
 
         if (-not [string]::IsNullOrEmpty($smbAdminPwd)) {
-            Write-TestResult $moduleName 'PASS' ("Key Vault: Retrieved 'adminpassword' secret (length=" + $smbAdminPwd.Length + ")")
+            Write-TestResult $moduleName 'PASS' ("Key Vault: Retrieved 'adminpassword' secret (length=" + $smbAdminPwd.Length + ")") -SanitizedMessage 'Key Vault: Retrieved ''adminpassword'' secret (length=<value>)'
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' "Key Vault: 'adminpassword' secret is empty"
+            Write-TestResult $moduleName 'FAIL' "Key Vault: 'adminpassword' secret is empty" -SanitizedMessage 'Key Vault: ''adminpassword'' secret is empty'
             $failed++
         }
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "Key Vault: Failed to retrieve 'adminpassword' secret from '$KeyVaultName'"
-        Write-TestResult $moduleName 'FAIL' "Exception: $_"
+        Write-TestResult $moduleName 'FAIL' "Key Vault: Failed to retrieve 'adminpassword' secret from '$KeyVaultName'" -SanitizedMessage 'Key Vault: Failed to retrieve ''adminpassword'' secret from ''<value>'''
+        Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
         $failed++
     }
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "Key Vault: Skipped adminpassword - no IMDS token"
+    Write-TestResult $moduleName 'FAIL' "Key Vault: Skipped adminpassword - no IMDS token" -SanitizedMessage 'Key Vault: Skipped adminpassword - no IMDS token'
     $failed++
 }
 
@@ -257,11 +264,11 @@ else {
 }
 
 if ($smbTestPassed) {
-    Write-TestResult $moduleName 'PASS' $smbTestReason
+    Write-TestResult $moduleName 'PASS' $smbTestReason -SanitizedMessage '<value>'
     $passed++
 }
 else {
-    Write-TestResult $moduleName 'FAIL' $smbTestReason
+    Write-TestResult $moduleName 'FAIL' $smbTestReason -SanitizedMessage '<value>'
     $failed++
 }
 

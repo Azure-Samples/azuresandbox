@@ -128,6 +128,88 @@ A variety of Terraform execution environments can be used to provision this conf
 
 This section covers the steps to get started with this configuration using an interactive Terraform execution environment. The steps include logging into Azure, cloning the repository, initializing Terraform, configuring variables, validating and applying the configuration, and smoke testing.
 
+For an attended Bash walkthrough focused on using the VM as a GitHub Actions
+self-hosted runner for Azure Sandbox deployments, see the
+[GitHub self-hosted runner setup guide](./github-selfhosted-runner-setup.md). It covers preparation,
+runner settings, initialization, validation, planning and applying a fresh
+bootstrap, runner-readiness checks, the optional Microsoft Graph permission
+grant, and cleanup. Configuring and dispatching a Sandbox deployment workflow
+is a separate concern.
+
+Continue with the [GitHub Sandbox workflow setup guide](./github-sandbox-workflow-setup.md)
+to configure a manually triggered deployment with all base modules enabled
+and post-deployment unit/integration testing. That walkthrough currently
+covers scope, prerequisites, GitHub discovery, publication and approval
+choices, deployment environment protection setup, and smoke-only workflow
+creation, validation, publication to `vnext` and `main`, approval, and verified
+self-hosted execution. The three-stage `preflight`, `apply`, and `unit-test`
+workflow update is published to `vnext` and registered on `main`, with its first
+full deployment and test run verified successful. The guide includes sanitized HCL examples for the two protected
+configuration files, deployment-specific state keys, and private runner logs.
+The unit-test stage publishes default-sanitized JSON evidence as
+workflow artifacts on both test success and failure; raw logs and plans stay
+on the runner.
+
+The updated workflow restricts automation to **new Sandboxes only**:
+each workflow run derives a new ID/key, and every preflight attempt rejects an
+existing state blob. Automated updates and recovery of existing Sandboxes are
+not supported. Unit-test also finalizes evidence itself, leaving only Publish
+and Report afterward. See the guide's steps 43 and 44 for behavior and step 45
+for coordinated publication before another deployment.
+
+The workflow also supports a release-PR entry path through
+`pull_request_target` for same-repository `vnext` PRs targeting `main`.
+A GitHub-hosted job validates the event without checkout or environment secrets
+before scheduling the self-hosted deployment. Drafts and title/description-only
+edits do not deploy; opening or reopening a ready PR, marking it ready,
+updating its head, or retargeting it to `main` requests a deployment.
+PR runs use the separate `sandbox-release-gate` environment and always run
+all stages with checkout pinned to the exact PR head SHA. Manual dispatch
+retains `sandbox-deployment`, the `vnext` checkout, and its stage selector.
+Both environments require `SANDBOX_BACKEND_HCL` and `SANDBOX_TFVARS_HCL`
+and owner approval. Keep their deployment branch restrictions on `main`,
+the trusted workflow context, and explicitly allow `pull_request_target`
+and `workflow_dispatch` in an Actions event policy scoped only to
+`.github/workflows/sandbox-deployment.yml`.
+
+Both entry paths share the existing concurrency group with active-run
+cancellation disabled. Advancing `vnext` does not change an already captured
+PR candidate or interrupt an active apply. This entry-path change does **not**
+make deployment a required merge check or implement cleanup/recovery.
+The existing run-ID state keys and unused-state requirement still apply;
+re-running an attempt with existing state is not a supported retry.
+
+Eligible PR runs publish `sandbox-deployment-gate` as pending on the exact head
+SHA before environment approval. A separate GitHub-hosted reporter publishes
+success only after Preflight, Apply, Unit-test, stage reporting, and JSON
+artifact upload all succeed. The validated JSON must also report native exit
+code zero, `result = "pass"`, positive passing counts, and no failed tests or
+failed suites. Native test-scope/optional-suite skip behavior is unchanged.
+Missing evidence, skipped required stages, failures, and cancellations cannot
+produce success. If cancellation or an API outage prevents final reporting,
+the status can remain pending rather than falsely passing.
+
+The deployment job waits for successful pending-status publication on PR runs;
+an API failure at that point does not schedule an Azure deployment. Manual
+runs explicitly bypass the PR-only pending job without losing their deployment.
+Metadata-only validation does not share the status-writer lock, so it cannot
+displace a queued reporter.
+
+Status writers have a separate per-SHA lock and attempt-specific run links;
+an older attempt cannot overwrite the pending result of a newer attempt on
+the same SHA. Only the hosted status jobs have status-write permission.
+Manual dispatch does not publish this PR status. Drafts and metadata-only
+edits do not overwrite it, and no workflow closes or merges a PR.
+The status is not yet required by the `main` ruleset: making it mandatory
+requires a separately approved enforcement step after release-path acceptance.
+
+The deployment/monitor helpers replace the Python implementation
+with Bash entrypoints and PowerShell 7.3+ stage logic. The helper test sources
+and their `scripts/tests` directory are removed at the operator's request;
+existing Sandbox unit/integration tests remain unchanged. Validation uses
+existing CI gates and real executions. See the guide's steps 51 and 52 for the
+port, coordinated publication, and a fresh full acceptance run.
+
 * [Step 0: Login](#step-0-login)
 * [Step 1: Clone the Repository](#step-1-clone-the-repository)
 * [Step 2: Initialize Terraform](#step-2-initialize-terraform)

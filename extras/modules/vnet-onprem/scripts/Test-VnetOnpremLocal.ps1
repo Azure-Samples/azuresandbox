@@ -6,7 +6,10 @@ param(
     [string]$VnetOnpremName,
 
     [Parameter(Mandatory = $true)]
-    [string]$PrivateDnsResolverName
+    [string]$PrivateDnsResolverName,
+
+    [ValidateSet('true', 'false')]
+    [string]$VerboseResults = 'false'
 )
 
 #region functions
@@ -19,8 +22,12 @@ function Write-TestResult {
     param(
         [string]$module,
         [string]$status,
-        [string]$msg
+        [string]$msg,
+        [string]$SanitizedMessage = 'Check result'
     )
+    if ($status -ne 'SUMMARY' -and $VerboseResults -ne 'true') {
+        $msg = $SanitizedMessage
+    }
     Write-Log ("[MODULE:$module] [$status] $msg")
 }
 #endregion
@@ -53,17 +60,17 @@ try {
     }
 
     if ($issues.Count -eq 0) {
-        Write-TestResult $moduleName 'PASS' "VNet '$VnetOnpremName' exists (Succeeded, AddressSpace: $($vnet.AddressSpace.AddressPrefixes -join ', '))"
+        Write-TestResult $moduleName 'PASS' "VNet '$VnetOnpremName' exists (Succeeded, AddressSpace: $($vnet.AddressSpace.AddressPrefixes -join ', '))" -SanitizedMessage 'VNet ''<value>'' exists (Succeeded, AddressSpace: <value>)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("VNet '$VnetOnpremName' issues: " + ($issues -join '; '))
+        Write-TestResult $moduleName 'FAIL' ("VNet '$VnetOnpremName' issues: " + ($issues -join '; ')) -SanitizedMessage 'VNet ''<value>'' issues: <value>'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "VNet '$VnetOnpremName' not found or not accessible"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "VNet '$VnetOnpremName' not found or not accessible" -SanitizedMessage 'VNet ''<value>'' not found or not accessible'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -74,16 +81,16 @@ if ($vnet) {
     $missing = $expectedSubnets | Where-Object { $_ -notin $actualSubnets }
 
     if ($missing.Count -eq 0) {
-        Write-TestResult $moduleName 'PASS' ("Subnets: All expected subnets exist ($($expectedSubnets -join ', '))")
+        Write-TestResult $moduleName 'PASS' ("Subnets: All expected subnets exist ($($expectedSubnets -join ', '))") -SanitizedMessage 'Subnets: All expected subnets exist (<value>)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' ("Subnets: Missing subnets: $($missing -join ', '). Found: $($actualSubnets -join ', ')")
+        Write-TestResult $moduleName 'FAIL' ("Subnets: Missing subnets: $($missing -join ', '). Found: $($actualSubnets -join ', ')") -SanitizedMessage 'Subnets: Missing subnets: <value>. Found: <value>'
         $failed++
     }
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "Subnets: Skipped - VNet not available"
+    Write-TestResult $moduleName 'FAIL' "Subnets: Skipped - VNet not available" -SanitizedMessage 'Subnets: Skipped - VNet not available'
     $failed++
 }
 
@@ -97,21 +104,21 @@ try {
     }
 
     if ($natGateway -and $natGateway.ProvisioningState -eq 'Succeeded') {
-        Write-TestResult $moduleName 'PASS' "NAT Gateway '$($natGateway.Name)' exists (ProvisioningState: Succeeded)"
+        Write-TestResult $moduleName 'PASS' "NAT Gateway '$($natGateway.Name)' exists (ProvisioningState: Succeeded)" -SanitizedMessage 'NAT Gateway ''<value>'' exists (ProvisioningState: Succeeded)'
         $passed++
     }
     elseif ($natGateway) {
-        Write-TestResult $moduleName 'FAIL' "NAT Gateway '$($natGateway.Name)' provisioning state is '$($natGateway.ProvisioningState)' (expected 'Succeeded')"
+        Write-TestResult $moduleName 'FAIL' "NAT Gateway '$($natGateway.Name)' provisioning state is '$($natGateway.ProvisioningState)' (expected 'Succeeded')" -SanitizedMessage 'NAT Gateway ''<value>'' provisioning state is ''<value>'' (expected ''Succeeded'')'
         $failed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "No NAT gateway found in resource group '$ResourceGroupName'"
+        Write-TestResult $moduleName 'FAIL' "No NAT gateway found in resource group '$ResourceGroupName'" -SanitizedMessage 'No NAT gateway found in resource group ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query NAT gateways in resource group '$ResourceGroupName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query NAT gateways in resource group '$ResourceGroupName'" -SanitizedMessage 'Failed to query NAT gateways in resource group ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -137,22 +144,22 @@ try {
         }
 
         if ($issues.Count -eq 0) {
-            Write-TestResult $moduleName 'PASS' "VPN Gateway '$($vpnGateway.Name)' exists (Succeeded, RouteBased, BGP enabled)"
+            Write-TestResult $moduleName 'PASS' "VPN Gateway '$($vpnGateway.Name)' exists (Succeeded, RouteBased, BGP enabled)" -SanitizedMessage 'VPN Gateway ''<value>'' exists (Succeeded, RouteBased, BGP enabled)'
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' ("VPN Gateway '$($vpnGateway.Name)' issues: " + ($issues -join '; '))
+            Write-TestResult $moduleName 'FAIL' ("VPN Gateway '$($vpnGateway.Name)' issues: " + ($issues -join '; ')) -SanitizedMessage 'VPN Gateway ''<value>'' issues: <value>'
             $failed++
         }
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "No VPN gateway found in resource group '$ResourceGroupName'"
+        Write-TestResult $moduleName 'FAIL' "No VPN gateway found in resource group '$ResourceGroupName'" -SanitizedMessage 'No VPN gateway found in resource group ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query VPN gateways in resource group '$ResourceGroupName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query VPN gateways in resource group '$ResourceGroupName'" -SanitizedMessage 'Failed to query VPN gateways in resource group ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -165,22 +172,22 @@ try {
         # Re-fetch by name to populate ConnectionStatus (list mode does not include it)
         $connection = Get-AzVirtualNetworkGatewayConnection -ResourceGroupName $ResourceGroupName -Name $connection.Name -ErrorAction Stop
         if ($connection.ConnectionStatus -eq 'Connected') {
-            Write-TestResult $moduleName 'PASS' "VPN Connection '$($connection.Name)' status is 'Connected'"
+            Write-TestResult $moduleName 'PASS' "VPN Connection '$($connection.Name)' status is 'Connected'" -SanitizedMessage 'VPN Connection ''<value>'' status is ''Connected'''
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' "VPN Connection '$($connection.Name)' status is '$($connection.ConnectionStatus)' (expected 'Connected')"
+            Write-TestResult $moduleName 'FAIL' "VPN Connection '$($connection.Name)' status is '$($connection.ConnectionStatus)' (expected 'Connected')" -SanitizedMessage 'VPN Connection ''<value>'' status is ''<value>'' (expected ''Connected'')'
             $failed++
         }
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "No VPN gateway connection found in resource group '$ResourceGroupName'"
+        Write-TestResult $moduleName 'FAIL' "No VPN gateway connection found in resource group '$ResourceGroupName'" -SanitizedMessage 'No VPN gateway connection found in resource group ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query VPN gateway connections in resource group '$ResourceGroupName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query VPN gateway connections in resource group '$ResourceGroupName'" -SanitizedMessage 'Failed to query VPN gateway connections in resource group ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -190,17 +197,17 @@ try {
     $resolver = Get-AzDnsResolver -ResourceGroupName $ResourceGroupName -Name $PrivateDnsResolverName -ErrorAction Stop
 
     if ($resolver.ProvisioningState -eq 'Succeeded') {
-        Write-TestResult $moduleName 'PASS' "Private DNS Resolver '$PrivateDnsResolverName' exists (ProvisioningState: Succeeded)"
+        Write-TestResult $moduleName 'PASS' "Private DNS Resolver '$PrivateDnsResolverName' exists (ProvisioningState: Succeeded)" -SanitizedMessage 'Private DNS Resolver ''<value>'' exists (ProvisioningState: Succeeded)'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "Private DNS Resolver '$PrivateDnsResolverName' provisioning state is '$($resolver.ProvisioningState)' (expected 'Succeeded')"
+        Write-TestResult $moduleName 'FAIL' "Private DNS Resolver '$PrivateDnsResolverName' provisioning state is '$($resolver.ProvisioningState)' (expected 'Succeeded')" -SanitizedMessage 'Private DNS Resolver ''<value>'' provisioning state is ''<value>'' (expected ''Succeeded'')'
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Private DNS Resolver '$PrivateDnsResolverName' not found or not accessible"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Private DNS Resolver '$PrivateDnsResolverName' not found or not accessible" -SanitizedMessage 'Private DNS Resolver ''<value>'' not found or not accessible'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -212,22 +219,22 @@ try {
         $endpoint = $inboundEndpoints | Select-Object -First 1
 
         if ($endpoint.ProvisioningState -eq 'Succeeded') {
-            Write-TestResult $moduleName 'PASS' "DNS Resolver inbound endpoint '$($endpoint.Name)' exists (ProvisioningState: Succeeded)"
+            Write-TestResult $moduleName 'PASS' "DNS Resolver inbound endpoint '$($endpoint.Name)' exists (ProvisioningState: Succeeded)" -SanitizedMessage 'DNS Resolver inbound endpoint ''<value>'' exists (ProvisioningState: Succeeded)'
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' "DNS Resolver inbound endpoint '$($endpoint.Name)' provisioning state is '$($endpoint.ProvisioningState)' (expected 'Succeeded')"
+            Write-TestResult $moduleName 'FAIL' "DNS Resolver inbound endpoint '$($endpoint.Name)' provisioning state is '$($endpoint.ProvisioningState)' (expected 'Succeeded')" -SanitizedMessage 'DNS Resolver inbound endpoint ''<value>'' provisioning state is ''<value>'' (expected ''Succeeded'')'
             $failed++
         }
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "No inbound endpoints found for DNS Resolver '$PrivateDnsResolverName'"
+        Write-TestResult $moduleName 'FAIL' "No inbound endpoints found for DNS Resolver '$PrivateDnsResolverName'" -SanitizedMessage 'No inbound endpoints found for DNS Resolver ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query inbound endpoints for DNS Resolver '$PrivateDnsResolverName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query inbound endpoints for DNS Resolver '$PrivateDnsResolverName'" -SanitizedMessage 'Failed to query inbound endpoints for DNS Resolver ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -239,22 +246,22 @@ try {
         $endpoint = $outboundEndpoints | Select-Object -First 1
 
         if ($endpoint.ProvisioningState -eq 'Succeeded') {
-            Write-TestResult $moduleName 'PASS' "DNS Resolver outbound endpoint '$($endpoint.Name)' exists (ProvisioningState: Succeeded)"
+            Write-TestResult $moduleName 'PASS' "DNS Resolver outbound endpoint '$($endpoint.Name)' exists (ProvisioningState: Succeeded)" -SanitizedMessage 'DNS Resolver outbound endpoint ''<value>'' exists (ProvisioningState: Succeeded)'
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' "DNS Resolver outbound endpoint '$($endpoint.Name)' provisioning state is '$($endpoint.ProvisioningState)' (expected 'Succeeded')"
+            Write-TestResult $moduleName 'FAIL' "DNS Resolver outbound endpoint '$($endpoint.Name)' provisioning state is '$($endpoint.ProvisioningState)' (expected 'Succeeded')" -SanitizedMessage 'DNS Resolver outbound endpoint ''<value>'' provisioning state is ''<value>'' (expected ''Succeeded'')'
             $failed++
         }
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "No outbound endpoints found for DNS Resolver '$PrivateDnsResolverName'"
+        Write-TestResult $moduleName 'FAIL' "No outbound endpoints found for DNS Resolver '$PrivateDnsResolverName'" -SanitizedMessage 'No outbound endpoints found for DNS Resolver ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query outbound endpoints for DNS Resolver '$PrivateDnsResolverName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query outbound endpoints for DNS Resolver '$PrivateDnsResolverName'" -SanitizedMessage 'Failed to query outbound endpoints for DNS Resolver ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -265,17 +272,17 @@ try {
     $ruleset = $rulesets | Select-Object -First 1
 
     if ($ruleset) {
-        Write-TestResult $moduleName 'PASS' "DNS Forwarding Ruleset '$($ruleset.Name)' exists"
+        Write-TestResult $moduleName 'PASS' "DNS Forwarding Ruleset '$($ruleset.Name)' exists" -SanitizedMessage 'DNS Forwarding Ruleset ''<value>'' exists'
         $passed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "No DNS forwarding ruleset found in resource group '$ResourceGroupName'"
+        Write-TestResult $moduleName 'FAIL' "No DNS forwarding ruleset found in resource group '$ResourceGroupName'" -SanitizedMessage 'No DNS forwarding ruleset found in resource group ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query DNS forwarding rulesets in resource group '$ResourceGroupName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query DNS forwarding rulesets in resource group '$ResourceGroupName'" -SanitizedMessage 'Failed to query DNS forwarding rulesets in resource group ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -290,27 +297,27 @@ if ($ruleset) {
             $targetPort = $onpremRule.TargetDnsServer[0].Port
 
             if ($targetIp -match '^192\.168\.1\.' -and $targetPort -eq 53) {
-                Write-TestResult $moduleName 'PASS' "Forwarding rule for on-prem domain exists (target: ${targetIp}:${targetPort})"
+                Write-TestResult $moduleName 'PASS' "Forwarding rule for on-prem domain exists (target: ${targetIp}:${targetPort})" -SanitizedMessage 'Forwarding rule for on-prem domain exists (target: <value>:<value>)'
                 $passed++
             }
             else {
-                Write-TestResult $moduleName 'FAIL' "Forwarding rule for on-prem domain has unexpected target: ${targetIp}:${targetPort} (expected 192.168.1.x:53)"
+                Write-TestResult $moduleName 'FAIL' "Forwarding rule for on-prem domain has unexpected target: ${targetIp}:${targetPort} (expected 192.168.1.x:53)" -SanitizedMessage 'Forwarding rule for on-prem domain has unexpected target: <value>:<value> (expected 192.168.1.x:53)'
                 $failed++
             }
         }
         else {
-            Write-TestResult $moduleName 'FAIL' "Forwarding rule for on-prem domain (myonprem.local) not found"
+            Write-TestResult $moduleName 'FAIL' "Forwarding rule for on-prem domain (myonprem.local) not found" -SanitizedMessage 'Forwarding rule for on-prem domain (myonprem.local) not found'
             $failed++
         }
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "Failed to query forwarding rules for ruleset '$($ruleset.Name)'"
-        Write-TestResult $moduleName 'FAIL' "Exception: $_"
+        Write-TestResult $moduleName 'FAIL' "Failed to query forwarding rules for ruleset '$($ruleset.Name)'" -SanitizedMessage 'Failed to query forwarding rules for ruleset ''<value>'''
+        Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
         $failed++
     }
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "Forwarding rule: Skipped - ruleset not available"
+    Write-TestResult $moduleName 'FAIL' "Forwarding rule: Skipped - ruleset not available" -SanitizedMessage 'Forwarding rule: Skipped - ruleset not available'
     $failed++
 }
 
@@ -325,27 +332,27 @@ if ($ruleset) {
             $targetPort = $cloudRule.TargetDnsServer[0].Port
 
             if ($targetIp -match '^10\.' -and $targetPort -eq 53) {
-                Write-TestResult $moduleName 'PASS' "Forwarding rule for cloud domain exists (target: ${targetIp}:${targetPort})"
+                Write-TestResult $moduleName 'PASS' "Forwarding rule for cloud domain exists (target: ${targetIp}:${targetPort})" -SanitizedMessage 'Forwarding rule for cloud domain exists (target: <value>:<value>)'
                 $passed++
             }
             else {
-                Write-TestResult $moduleName 'FAIL' "Forwarding rule for cloud domain has unexpected target: ${targetIp}:${targetPort} (expected 10.x.x.x:53)"
+                Write-TestResult $moduleName 'FAIL' "Forwarding rule for cloud domain has unexpected target: ${targetIp}:${targetPort} (expected 10.x.x.x:53)" -SanitizedMessage 'Forwarding rule for cloud domain has unexpected target: <value>:<value> (expected 10.x.x.x:53)'
                 $failed++
             }
         }
         else {
-            Write-TestResult $moduleName 'FAIL' "Forwarding rule for cloud domain (mysandbox.local) not found"
+            Write-TestResult $moduleName 'FAIL' "Forwarding rule for cloud domain (mysandbox.local) not found" -SanitizedMessage 'Forwarding rule for cloud domain (mysandbox.local) not found'
             $failed++
         }
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "Failed to query forwarding rules for ruleset '$($ruleset.Name)'"
-        Write-TestResult $moduleName 'FAIL' "Exception: $_"
+        Write-TestResult $moduleName 'FAIL' "Failed to query forwarding rules for ruleset '$($ruleset.Name)'" -SanitizedMessage 'Failed to query forwarding rules for ruleset ''<value>'''
+        Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
         $failed++
     }
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "Forwarding rule: Skipped - ruleset not available"
+    Write-TestResult $moduleName 'FAIL' "Forwarding rule: Skipped - ruleset not available" -SanitizedMessage 'Forwarding rule: Skipped - ruleset not available'
     $failed++
 }
 
@@ -356,23 +363,23 @@ if ($ruleset) {
 
         if ($links -and $links.Count -ge 2) {
             $linkNames = ($links | ForEach-Object { $_.Name }) -join ', '
-            Write-TestResult $moduleName 'PASS' "DNS Forwarding Ruleset has $($links.Count) VNet links ($linkNames)"
+            Write-TestResult $moduleName 'PASS' "DNS Forwarding Ruleset has $($links.Count) VNet links ($linkNames)" -SanitizedMessage 'DNS Forwarding Ruleset has <value> VNet links (<value>)'
             $passed++
         }
         else {
             $count = if ($links) { $links.Count } else { 0 }
-            Write-TestResult $moduleName 'FAIL' "DNS Forwarding Ruleset has $count VNet links (expected at least 2)"
+            Write-TestResult $moduleName 'FAIL' "DNS Forwarding Ruleset has $count VNet links (expected at least 2)" -SanitizedMessage 'DNS Forwarding Ruleset has <value> VNet links (expected at least 2)'
             $failed++
         }
     }
     catch {
-        Write-TestResult $moduleName 'FAIL' "Failed to query VNet links for ruleset '$($ruleset.Name)'"
-        Write-TestResult $moduleName 'FAIL' "Exception: $_"
+        Write-TestResult $moduleName 'FAIL' "Failed to query VNet links for ruleset '$($ruleset.Name)'" -SanitizedMessage 'Failed to query VNet links for ruleset ''<value>'''
+        Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
         $failed++
     }
 }
 else {
-    Write-TestResult $moduleName 'FAIL' "VNet links: Skipped - ruleset not available"
+    Write-TestResult $moduleName 'FAIL' "VNet links: Skipped - ruleset not available" -SanitizedMessage 'VNet links: Skipped - ruleset not available'
     $failed++
 }
 
@@ -382,21 +389,21 @@ try {
     $s2sGateway = $vpnGateways | Select-Object -First 1
 
     if ($s2sGateway -and $s2sGateway.ProvisioningState -eq 'Succeeded') {
-        Write-TestResult $moduleName 'PASS' "S2S VPN Gateway '$($s2sGateway.Name)' exists (ProvisioningState: Succeeded)"
+        Write-TestResult $moduleName 'PASS' "S2S VPN Gateway '$($s2sGateway.Name)' exists (ProvisioningState: Succeeded)" -SanitizedMessage 'S2S VPN Gateway ''<value>'' exists (ProvisioningState: Succeeded)'
         $passed++
     }
     elseif ($s2sGateway) {
-        Write-TestResult $moduleName 'FAIL' "S2S VPN Gateway '$($s2sGateway.Name)' provisioning state is '$($s2sGateway.ProvisioningState)' (expected 'Succeeded')"
+        Write-TestResult $moduleName 'FAIL' "S2S VPN Gateway '$($s2sGateway.Name)' provisioning state is '$($s2sGateway.ProvisioningState)' (expected 'Succeeded')" -SanitizedMessage 'S2S VPN Gateway ''<value>'' provisioning state is ''<value>'' (expected ''Succeeded'')'
         $failed++
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "No S2S VPN gateway found in resource group '$ResourceGroupName'"
+        Write-TestResult $moduleName 'FAIL' "No S2S VPN gateway found in resource group '$ResourceGroupName'" -SanitizedMessage 'No S2S VPN gateway found in resource group ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query S2S VPN gateways in resource group '$ResourceGroupName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query S2S VPN gateways in resource group '$ResourceGroupName'" -SanitizedMessage 'Failed to query S2S VPN gateways in resource group ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -409,22 +416,22 @@ try {
         $siteAsn = $vpnSite.VpnSiteLinks[0].BgpProperties.Asn
 
         if ($siteAsn -eq 65123) {
-            Write-TestResult $moduleName 'PASS' "VPN Site '$($vpnSite.Name)' exists with BGP ASN $siteAsn"
+            Write-TestResult $moduleName 'PASS' "VPN Site '$($vpnSite.Name)' exists with BGP ASN $siteAsn" -SanitizedMessage 'VPN Site ''<value>'' exists with BGP ASN <value>'
             $passed++
         }
         else {
-            Write-TestResult $moduleName 'FAIL' "VPN Site '$($vpnSite.Name)' has ASN '$siteAsn' (expected '65123')"
+            Write-TestResult $moduleName 'FAIL' "VPN Site '$($vpnSite.Name)' has ASN '$siteAsn' (expected '65123')" -SanitizedMessage 'VPN Site ''<value>'' has ASN ''<value>'' (expected ''65123'')'
             $failed++
         }
     }
     else {
-        Write-TestResult $moduleName 'FAIL' "No VPN site found in resource group '$ResourceGroupName'"
+        Write-TestResult $moduleName 'FAIL' "No VPN site found in resource group '$ResourceGroupName'" -SanitizedMessage 'No VPN site found in resource group ''<value>'''
         $failed++
     }
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "Failed to query VPN sites in resource group '$ResourceGroupName'"
-    Write-TestResult $moduleName 'FAIL' "Exception: $_"
+    Write-TestResult $moduleName 'FAIL' "Failed to query VPN sites in resource group '$ResourceGroupName'" -SanitizedMessage 'Failed to query VPN sites in resource group ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 

@@ -3,7 +3,10 @@ param(
     [string]$KeyVaultName,
 
     [Parameter(Mandatory = $true)]
-    [string]$TargetVmName
+    [string]$TargetVmName,
+
+    [ValidateSet('true', 'false')]
+    [string]$VerboseResults = 'false'
 )
 
 #region functions
@@ -18,8 +21,12 @@ function Write-TestResult {
     param(
         [string]$module,
         [string]$status,
-        [string]$msg
+        [string]$msg,
+        [string]$SanitizedMessage = 'Check result'
     )
+    if ($status -ne 'SUMMARY' -and $VerboseResults -ne 'true') {
+        $msg = $SanitizedMessage
+    }
     Write-Log ("[MODULE:$module] [$status] $msg")
 }
 #endregion
@@ -68,7 +75,7 @@ try {
     Write-Log "Retrieved domain admin credentials from Key Vault."
 }
 catch {
-    Write-TestResult $moduleName 'FAIL' "SSH: Failed to retrieve credentials from Key Vault: $_"
+    Write-TestResult $moduleName 'FAIL' "SSH: Failed to retrieve credentials from Key Vault: $_" -SanitizedMessage 'SSH: Failed to retrieve credentials from Key Vault: <value>'
     $failed++
     $total = $passed + $failed
     Write-TestResult $moduleName 'SUMMARY' "Passed: $passed Failed: $failed Total: $total"
@@ -76,7 +83,7 @@ catch {
 }
 
 if (-not $domainName -or -not $adminUser -or -not $adminPwd) {
-    Write-TestResult $moduleName 'FAIL' "SSH: Missing prerequisites (domain='$domainName', user='$adminUser')"
+    Write-TestResult $moduleName 'FAIL' "SSH: Missing prerequisites (domain='$domainName', user='$adminUser')" -SanitizedMessage 'SSH: Missing prerequisites (domain=''<value>'', user=''<value>'')'
     $failed++
     $total = $passed + $failed
     Write-TestResult $moduleName 'SUMMARY' "Passed: $passed Failed: $failed Total: $total"
@@ -158,11 +165,11 @@ finally {
 }
 
 if ($sshTestPassed) {
-    Write-TestResult $moduleName 'PASS' $sshTestReason
+    Write-TestResult $moduleName 'PASS' $sshTestReason -SanitizedMessage '<value>'
     $passed++
 }
 else {
-    Write-TestResult $moduleName 'FAIL' $sshTestReason
+    Write-TestResult $moduleName 'FAIL' $sshTestReason -SanitizedMessage '<value>'
     $failed++
 }
 
