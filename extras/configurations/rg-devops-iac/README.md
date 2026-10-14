@@ -151,11 +151,33 @@ workflow artifacts on both test success and failure; raw logs and plans stay
 on the runner.
 
 The updated workflow restricts automation to **new Sandboxes only**:
-each dispatch derives a new ID/key, and every preflight attempt rejects an
+each workflow run derives a new ID/key, and every preflight attempt rejects an
 existing state blob. Automated updates and recovery of existing Sandboxes are
 not supported. Unit-test also finalizes evidence itself, leaving only Publish
 and Report afterward. See the guide's steps 43 and 44 for behavior and step 45
 for coordinated publication before another deployment.
+
+The workflow also supports a release-PR entry path through
+`pull_request_target` for same-repository `vnext` PRs targeting `main`.
+A GitHub-hosted job validates the event without checkout or environment secrets
+before scheduling the self-hosted deployment. Drafts and title/description-only
+edits do not deploy; opening or reopening a ready PR, marking it ready,
+updating its head, or retargeting it to `main` requests a deployment.
+PR runs use the separate `sandbox-release-gate` environment and always run
+all stages with checkout pinned to the exact PR head SHA. Manual dispatch
+retains `sandbox-deployment`, the `vnext` checkout, and its stage selector.
+Both environments require `SANDBOX_BACKEND_HCL` and `SANDBOX_TFVARS_HCL`
+and owner approval. Keep their deployment branch restrictions on `main`,
+the trusted workflow context, and explicitly allow `pull_request_target`
+and `workflow_dispatch` in an Actions event policy scoped only to
+`.github/workflows/sandbox-deployment.yml`.
+
+Both entry paths share the existing concurrency group with active-run
+cancellation disabled. Advancing `vnext` does not change an already captured
+PR candidate or interrupt an active apply. This entry-path change does **not**
+make deployment a required merge check or implement cleanup/recovery.
+The existing run-ID state keys and unused-state requirement still apply;
+re-running an attempt with existing state is not a supported retry.
 
 The deployment/monitor helpers replace the Python implementation
 with Bash entrypoints and PowerShell 7.3+ stage logic. The helper test sources

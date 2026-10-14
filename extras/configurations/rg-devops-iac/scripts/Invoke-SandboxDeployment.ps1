@@ -185,8 +185,47 @@ function Connect-SandboxProvider {
     }
 }
 
+function Confirm-SandboxInvocation {
+    if ($env:GITHUB_REF -cne 'refs/heads/main') { Stop-SandboxStage 'Run the registered workflow in the trusted main context.' }
+    if ($env:GITHUB_EVENT_NAME -ceq 'workflow_dispatch') { return }
+    if ($env:GITHUB_EVENT_NAME -cne 'pull_request_target' -or
+        [string]::IsNullOrWhiteSpace($env:GITHUB_EVENT_PATH) -or
+        $env:SANDBOX_RUN_THROUGH -cne 'unit-test' -or
+        $env:SANDBOX_SOURCE_SHA -cnotmatch '^[0-9a-f]{40}$') {
+        Stop-SandboxStage 'Invalid deployment event or release stage/source selection.'
+    }
+    $invocation = Read-SandboxJson $env:GITHUB_EVENT_PATH
+    $pr = $invocation['pull_request']
+    if ($pr -isnot [System.Collections.IDictionary] -or
+        $pr['head'] -isnot [System.Collections.IDictionary] -or
+        $pr['base'] -isnot [System.Collections.IDictionary]) {
+        Stop-SandboxStage 'Release PR metadata is missing.'
+    }
+    $head = $pr['head']
+    $base = $pr['base']
+    if ($head['repo'] -isnot [System.Collections.IDictionary] -or
+        $base['repo'] -isnot [System.Collections.IDictionary] -or
+        $head['repo']['full_name'] -cne $env:GITHUB_REPOSITORY -or
+        $base['repo']['full_name'] -cne $env:GITHUB_REPOSITORY -or
+        $head['ref'] -cne 'vnext' -or $base['ref'] -cne 'main' -or
+        $pr['draft'] -isnot [bool] -or $pr['draft'] -or
+        $head['sha'] -cne $env:SANDBOX_SOURCE_SHA -or
+        $invocation['action'] -cnotin @('opened', 'reopened', 'synchronize', 'ready_for_review', 'edited')) {
+        Stop-SandboxStage 'Only ready same-repository vnext to main release PRs may deploy.'
+    }
+    if ($invocation['action'] -ceq 'edited' -and
+        ($invocation['changes'] -isnot [System.Collections.IDictionary] -or
+            $invocation['changes']['base'] -isnot [System.Collections.IDictionary] -or
+            $invocation['changes']['base']['ref'] -isnot [System.Collections.IDictionary])) {
+        Stop-SandboxStage 'PR metadata-only edits do not request a deployment.'
+    }
+    if ((Get-SandboxSource) -cne $env:SANDBOX_SOURCE_SHA) {
+        Stop-SandboxStage 'Checked-out source does not match the release PR head SHA.'
+    }
+}
+
 function Invoke-SandboxPreflight {
-    if ($env:GITHUB_REF -cne 'refs/heads/main') { Stop-SandboxStage 'Dispatch the registered workflow from main.' }
+    Confirm-SandboxInvocation
     if ($env:RUNNER_NAME -cne 'jumplinux2') { Stop-SandboxStage 'Job did not run on the approved runner.' }
     if ([string]::IsNullOrWhiteSpace($env:SANDBOX_BACKEND_HCL) -or [string]::IsNullOrWhiteSpace($env:SANDBOX_TFVARS_HCL)) {
         Stop-SandboxStage 'Both environment HCL secrets are required.'
@@ -478,6 +517,6 @@ try {
     exit $code
 }
 catch {
-    Write-Host '::error::Runner setup/reporting failed; check dispatch inputs, private records, and filesystem permissions.'
+    Write-Host '::error::Runner setup/reporting failed; check workflow inputs, private records, and filesystem permissions.'
     exit 1
 }
