@@ -119,6 +119,14 @@ or executing PR code. It publishes success on the exact PR head SHA only when
 the source is this repository's `vnext` branch; other sources, including a fork's
 `vnext`, fail. This is a source-policy check, not an Azure deployment/CD gate.
 
+After successful release-path acceptance, the same ruleset also requires
+`sandbox-deployment-gate` and the hosted `Publish release deployment status`
+check from GitHub Actions. Ready `vnext` to `main` PRs request a fresh deployment
+with protected-environment approval and serialized applies; draft PRs do not
+deploy. Deployment or test failures block ordinary merging without closing the
+PR. See the [deployment workflow guide](extras/configurations/rg-devops-iac/README.md)
+for the exact-SHA status and evidence requirements.
+
 #### Main maintenance exceptions
 
 The `azuresandbox-main-bypass` organization team contains only the repository
