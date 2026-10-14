@@ -361,14 +361,27 @@ function Export-SandboxEvidence {
     $path = Join-Path $script:directory $name
     if (-not [System.IO.File]::Exists($path)) {
         Write-SandboxSummary "`nUnit-test evidence unavailable: no structured JSON result file was produced. No test results were fabricated.`n"
-        [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "ready=false`n", $script:utf8)
+        [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "ready=false`ntests_passed=false`n", $script:utf8)
         return
     }
     $record = Read-SandboxJson $path
     if ($record -isnot [System.Collections.IDictionary] -or $record.schemaVersion -ne 1 -or
-        $record.exitCode -isnot [long] -or $record.exitCode -notin @(0, 1, 2)) {
+        $record.exitCode -isnot [long] -or $record.exitCode -notin @(0, 1, 2) -or
+        $record['result'] -cnotin @('pass', 'fail', 'error') -or
+        $record['totals'] -isnot [System.Collections.IDictionary]) {
         Stop-SandboxStage 'Invalid unit-test JSON; evidence was not published.'
     }
+    $totals = $record['totals']
+    foreach ($field in @('passed', 'failed', 'total', 'suitesFailed', 'suitesSkipped')) {
+        if ($totals[$field] -isnot [long] -or $totals[$field] -lt 0) {
+            Stop-SandboxStage 'Invalid unit-test totals; evidence was not published.'
+        }
+    }
+    if ($totals['total'] -ne $totals['passed'] + $totals['failed']) {
+        Stop-SandboxStage 'Inconsistent unit-test totals; evidence was not published.'
+    }
+    $testsPassed = ($record.exitCode -eq 0 -and $record['result'] -ceq 'pass' -and
+        $totals['passed'] -gt 0 -and $totals['failed'] -eq 0 -and $totals['suitesFailed'] -eq 0).ToString().ToLowerInvariant()
     $staging = Join-Path $env:RUNNER_TEMP "sandbox-test-evidence-$script:runId-$script:attempt"
     if ([System.IO.Directory]::Exists($staging)) { Stop-SandboxStage 'Evidence staging directory already exists.' }
     $null = [System.IO.Directory]::CreateDirectory($staging)
@@ -376,7 +389,7 @@ function Export-SandboxEvidence {
     $jsonPath = Join-Path $staging $name
     [System.IO.File]::Copy($path, $jsonPath, $false)
     [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT,
-        "json_path=$jsonPath`nname=unit-test-evidence-$script:deploymentId-$script:runId-$script:attempt`nready=true`n", $script:utf8)
+        "json_path=$jsonPath`nname=unit-test-evidence-$script:deploymentId-$script:runId-$script:attempt`nready=true`ntests_passed=$testsPassed`n", $script:utf8)
 }
 
 function Write-SandboxReport {

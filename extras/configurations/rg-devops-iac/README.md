@@ -179,6 +179,24 @@ make deployment a required merge check or implement cleanup/recovery.
 The existing run-ID state keys and unused-state requirement still apply;
 re-running an attempt with existing state is not a supported retry.
 
+Eligible PR runs publish `sandbox-deployment-gate` as pending on the exact head
+SHA before environment approval. A separate GitHub-hosted reporter publishes
+success only after Preflight, Apply, Unit-test, stage reporting, and JSON
+artifact upload all succeed. The validated JSON must also report native exit
+code zero, `result = "pass"`, positive passing counts, and no failed tests or
+failed suites. Native test-scope/optional-suite skip behavior is unchanged.
+Missing evidence, skipped required stages, failures, and cancellations cannot
+produce success. If cancellation or an API outage prevents final reporting,
+the status can remain pending rather than falsely passing.
+
+Status writers have a separate per-SHA lock and attempt-specific run links;
+an older attempt cannot overwrite the pending result of a newer attempt on
+the same SHA. Only the hosted status jobs have status-write permission.
+Manual dispatch does not publish this PR status. Drafts and metadata-only
+edits do not overwrite it, and no workflow closes or merges a PR.
+The status is not yet required by the `main` ruleset: making it mandatory
+requires a separately approved enforcement step after release-path acceptance.
+
 The deployment/monitor helpers replace the Python implementation
 with Bash entrypoints and PowerShell 7.3+ stage logic. The helper test sources
 and their `scripts/tests` directory are removed at the operator's request;
