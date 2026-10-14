@@ -1,0 +1,58 @@
+name: main-source-policy
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened, synchronize, edited, ready_for_review]
+
+permissions:
+  statuses: write
+
+concurrency:
+  group: main-source-policy-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  source:
+    name: Validate main PR source
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Use trusted workflow code only; never check out or execute the PR head.
+      - name: Publish source eligibility on the PR head
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          head_sha="$(jq -er '.pull_request.head.sha' "$GITHUB_EVENT_PATH")"
+          if [[ ! "$head_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Invalid PR head SHA."
+            exit 1
+          fi
+
+          publish_status() {
+            gh api --method POST \
+              "repos/$GITHUB_REPOSITORY/statuses/$head_sha" \
+              -f context=main-source-eligibility \
+              -f state="$1" \
+              -f description="$2" \
+              -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+              --silent
+          }
+
+          # pull_request_target's own job check is not on the PR head SHA.
+          publish_status pending "Validating the release source."
+          if jq -e --arg repository "$GITHUB_REPOSITORY" '
+            .pull_request.base.repo.full_name == $repository and
+            .pull_request.base.ref == "main" and
+            .pull_request.head.repo.full_name == $repository and
+            .pull_request.head.ref == "vnext"
+          ' "$GITHUB_EVENT_PATH" > /dev/null; then
+            publish_status success "Same-repository vnext release candidate."
+            echo "Main source eligibility: PASS."
+          else
+            publish_status failure "Only same-repository vnext PRs are eligible; maintenance requires an authorized bypass."
+            echo "::error::Main source eligibility failed. Only same-repository vnext PRs are eligible."
+            exit 1
+          fi

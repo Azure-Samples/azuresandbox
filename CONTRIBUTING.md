@@ -45,11 +45,11 @@ This repository uses a two-branch model to keep `main` stable and releasable at 
 | Branch | Purpose | Who can update it | How it is updated |
 | --- | --- | --- | --- |
 | `vnext` | Active development / integration branch. All day-to-day work lands here. | Any collaborator with write access | Pull requests only (direct pushes are blocked) |
-| `main` | Stable, released code. | Repository owner **@doherty100** only | Pull request merging `vnext` → `main` |
+| `main` | Stable, released code. | Repository owner **@doherty100** only | Pull request merging `vnext` → `main`, or an explicitly authorized maintenance exception |
 
 ### Workflow
 
-1. **Target `vnext` for all contributions.** Open every pull request — features, bug fixes, and documentation — against the `vnext` branch. Do not open pull requests directly against `main`.
+1. **Target `vnext` for all contributions.** Open every pull request — features, bug fixes, and documentation — against the `vnext` branch. Direct PRs to `main` are reserved for explicitly authorized maintenance exceptions described below.
 2. **Integration happens on `vnext`.** Reviews, status checks (including the CLA bot), and testing occur here.
 3. **Promotion to `main` is restricted.** Only the repository owner (**@doherty100**) opens and merges the `vnext` → `main` pull request that promotes accumulated changes to the stable branch. No other collaborator can merge into `main`.
 
@@ -110,6 +110,29 @@ The policy above is enforced by [branch protection](https://docs.github.com/repo
 - `main` can only be updated through a pull request (no direct contributor pushes).
 - Push/merge access to `main` is restricted to **@doherty100**, so only the owner can complete a `vnext` → `main` pull request.
 - Force pushes and branch deletion are disabled on `main`.
+
+The separate `main-release-source` ruleset requires the
+`main-source-eligibility` commit status, reported by GitHub Actions, for PRs
+targeting `main`. The [source-policy workflow](.github/workflows/main-source-policy.yml)
+runs trusted default-branch code on a GitHub-hosted runner without checking out
+or executing PR code. It publishes success on the exact PR head SHA only when
+the source is this repository's `vnext` branch; other sources, including a fork's
+`vnext`, fail. This is a source-policy check, not an Azure deployment/CD gate.
+
+#### Main maintenance exceptions
+
+The `azuresandbox-main-bypass` organization team contains only the repository
+owner and has **For pull requests only** bypass on `main-release-source`.
+For an exceptional workflow-registration or maintenance PR, record the reason
+in the PR, complete the applicable static checks, and explicitly select
+**Bypass rules and merge**. The source check remains failed; the exception does
+not manufacture a passing release result.
+
+This bypass does not permit direct pushes and does not waive protections in
+other rulesets or classic branch protection. It does not change the separate
+`azuresandbox-vnext-bypass` team or `vnext` review ruleset. GitHub's native bypass
+applies to the whole selected ruleset, not a file allowlist, so maintainers must
+review the exception's scope.
 
 Code ownership is declared in [`.github/CODEOWNERS`](.github/CODEOWNERS) (`* @doherty100`), which automatically requests the owner as a reviewer on pull requests.
 
