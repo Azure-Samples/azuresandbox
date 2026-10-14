@@ -1,7 +1,10 @@
 name: Azure Sandbox deployment
-run-name: Sandbox sandbox-${{ github.run_id }} / ${{ inputs.run_through }}
+run-name: Sandbox sandbox-${{ github.run_id }} / ${{ github.event_name == 'pull_request_target' && 'unit-test' || inputs.run_through }}
 
 on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review, edited]
   workflow_dispatch:
     inputs:
       run_through:
@@ -13,29 +16,101 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: azure-sandbox-deployment
-  cancel-in-progress: false
-
 defaults:
   run:
     shell: bash
 
 jobs:
+  selection:
+    name: Validate deployment entry
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      deploy: ${{ steps.select.outputs.deploy }}
+      source_ref: ${{ steps.select.outputs.source_ref }}
+      run_through: ${{ steps.select.outputs.run_through }}
+      environment: ${{ steps.select.outputs.environment }}
+    steps:
+      # No checkout or environment secrets until the event is eligible.
+      - name: Select trusted deployment path
+        id: select
+        env:
+          MANUAL_RUN_THROUGH: ${{ inputs.run_through }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != refs/heads/main ]]; then
+            echo "::error::Run the registered workflow in the trusted main context."
+            exit 1
+          fi
+          case "$GITHUB_EVENT_NAME" in
+            workflow_dispatch)
+              case "$MANUAL_RUN_THROUGH" in
+                preflight|apply|unit-test) ;;
+                *) echo "::error::Invalid manual stage selection."; exit 1 ;;
+              esac
+              {
+                echo "source_ref=vnext"
+                echo "run_through=$MANUAL_RUN_THROUGH"
+                echo "environment=sandbox-deployment"
+                echo "deploy=true"
+              } >> "$GITHUB_OUTPUT"
+              ;;
+            pull_request_target)
+              if ! jq -e --arg repository "$GITHUB_REPOSITORY" '
+                .pull_request.base.repo.full_name == $repository and
+                .pull_request.base.ref == "main" and
+                .pull_request.head.repo.full_name == $repository and
+                .pull_request.head.ref == "vnext" and
+                (.pull_request.head.sha | type == "string" and test("^[0-9a-f]{40}$")) and
+                (.pull_request.draft | type == "boolean")
+              ' "$GITHUB_EVENT_PATH" > /dev/null; then
+                echo "::error::Only same-repository vnext to main release PRs are eligible."
+                exit 1
+              fi
+              action="$(jq -er '.action' "$GITHUB_EVENT_PATH")"
+              case "$action" in
+                opened|reopened|synchronize|ready_for_review|edited) ;;
+                *) echo "::error::Unsupported release PR activity."; exit 1 ;;
+              esac
+              if jq -e '.pull_request.draft == true' "$GITHUB_EVENT_PATH" > /dev/null ||
+                { [[ "$action" == edited ]] && ! jq -e '.changes.base.ref? != null' "$GITHUB_EVENT_PATH" > /dev/null; }; then
+                echo "deploy=false" >> "$GITHUB_OUTPUT"
+                echo "No deployment requested: draft PR or metadata-only edit." >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+              fi
+              {
+                printf 'source_ref=%s\n' "$(jq -er '.pull_request.head.sha' "$GITHUB_EVENT_PATH")"
+                echo "run_through=unit-test"
+                echo "environment=sandbox-release-gate"
+                echo "deploy=true"
+              } >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::Unsupported deployment event."
+              exit 1
+              ;;
+          esac
+
   sandbox:
     name: Sandbox preflight / apply / unit-test
+    needs: selection
+    if: ${{ needs.selection.outputs.deploy == 'true' }}
+    concurrency:
+      group: azure-sandbox-deployment
+      cancel-in-progress: false
     runs-on: [self-hosted, linux, x64, azuresandbox]
     environment:
-      name: sandbox-deployment
+      name: ${{ needs.selection.outputs.environment }}
       url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     timeout-minutes: 180
     env:
-      SANDBOX_RUN_THROUGH: ${{ inputs.run_through }}
+      SANDBOX_RUN_THROUGH: ${{ needs.selection.outputs.run_through }}
+      SANDBOX_SOURCE_SHA: ${{ github.event_name == 'pull_request_target' && needs.selection.outputs.source_ref || '' }}
     steps:
       - name: Repository workspace
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: vnext
+          ref: ${{ needs.selection.outputs.source_ref }}
           persist-credentials: false
 
       - name: Preflight
@@ -47,12 +122,12 @@ jobs:
 
       - name: Apply
         id: apply
-        if: ${{ success() && inputs.run_through != 'preflight' }}
+        if: ${{ success() && env.SANDBOX_RUN_THROUGH != 'preflight' }}
         run: bash extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.sh apply
 
       - name: Unit-test
         id: unit_test
-        if: ${{ success() && inputs.run_through == 'unit-test' }}
+        if: ${{ success() && env.SANDBOX_RUN_THROUGH == 'unit-test' }}
         run: bash extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.sh unit-test
 
       - name: Publish sanitized unit-test evidence
