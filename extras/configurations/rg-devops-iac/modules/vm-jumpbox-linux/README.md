@@ -132,8 +132,6 @@ When `github_runner_enable_vwan_sudoers` is true (the default), the configuratio
 
 This section describes how to test the module after deployment.
 
-**IMPORTANT:** Wait for 5 minutes to proceed to allow time for cloud-init configurations to complete.
-
 * [Download SSH private key from Azure Key Vault](#download-ssh-private-key-from-azure-key-vault)
 * [Determine public IP address of *jumplinux2*](#determine-public-ip-address-of-jumplinux2)
 * [Connect to *jumplinux2* using SSH](#connect-to-jumplinux2-using-ssh)
@@ -171,9 +169,6 @@ This section describes how to test the module after deployment.
 * Verify *jumplinux2* cloud-init configuration is complete using the following commands:
 
   ```bash
-  # Check to see if cloud-init configuration is complete
-  cloud-init status
-
   # Check software versions
   lsb_release -a
   az --version
@@ -301,7 +296,8 @@ This module is organized as follows:
 |   ├── configure-github-runner.sh          # cloud-init shell script to install/register the GitHub Actions runner
 |   ├── configure-github-runner.yaml        # cloud-init cloud-config file with GitHub Actions runner settings
 |   ├── configure-powershell.ps1            # cloud-init shell script to configure PowerShell
-|   └── configure-vm-jumpbox-linux.yaml     # cloud-init cloud-config file to configure the VM
+|   ├── configure-vm-jumpbox-linux.yaml     # cloud-init cloud-config file to configure the VM
+|   └── wait-for-cloud-init.sh              # Managed Run Command completion and package-manager wait
 ├── compute.tf                              # Compute resource configurations
 ├── main.tf                                 # Resource configurations
 ├── network.tf                              # Network resource configurations
@@ -362,6 +358,7 @@ module.vm_jumpbox_linux[0].azurerm_network_interface.this | nic&#8209;devops&#82
 module.vm_jumpbox_linux.azurerm_public_ip.this[0] | pip&#8209;devops&#8209;dev&#8209;jumplinux2 | The public IP address associated with the Linux virtual machine, if `var.enable_public_access` is enabled.
 module.vm_jumpbox_linux.azurerm_role_assignment.github_runner_key_vault[0] | | Grants `Key Vault Secrets User` role to the managed identity of jumplinux2 so cloud-init can read the GitHub registration token. Created only when `var.enable_github_runner` is enabled.
 module.vm_jumpbox_linux.azurerm_role_assignment.this | | Grants `Storage Blob Data Contributor` role to the managed identity of jumplinux2. This is intended to be used for accessing a Terraform state backend hosted in Azure Blob Storage.
+module.vm_jumpbox_linux.azurerm_virtual_machine_run_command.wait_for_cloud_init | | Waits for cloud-init termination and dpkg/apt idle checks, with or without the optional runner.
 module.vm_jumpbox_linux[0].tls_private_key.ssh_key | | The TLS private key used for SSH authentication.
 
 ### Output Variables
