@@ -37,6 +37,21 @@ resource "azurerm_linux_virtual_machine" "this" {
   depends_on = [azurerm_key_vault_secret.github_runner_token]
 }
 
+resource "azurerm_virtual_machine_run_command" "wait_for_cloud_init" {
+  name               = "${module.naming.virtual_machine_extension.name}-${var.vm_jumpbox_linux_name}-WaitForCloudInit"
+  location           = var.location
+  virtual_machine_id = azurerm_linux_virtual_machine.this.id
+
+  source {
+    script = file("${path.module}/scripts/wait-for-cloud-init.sh")
+  }
+
+  timeouts {
+    create = "90m"
+    update = "90m"
+  }
+}
+
 resource "azurerm_role_assignment" "this" {
   principal_id         = azurerm_linux_virtual_machine.this.identity[0].principal_id
   principal_type       = "ServicePrincipal"
