@@ -34,6 +34,7 @@ re-deploys all of this content can be generalized into these steps:
 * Generate a baseline `terraform.tfvars` file.
 
   ```bash
+  az login --use-device-code
   ./scripts/bootstrap.sh
   ```
 
@@ -92,7 +93,7 @@ re-deploys all of this content can be generalized into these steps:
   user_assigned_identity_principal_id = "<uami-principal-id-here>"
   ```
 
-* Ensure the operator has Entra ID Global Administor role privilieges. This may require PIM activation.
+* Ensure the operator has a at least a `Privileged Role Administrator` Entra ID role assignment. This may require PIM activation.
 
 * Grant UAMI Entra ID Graph Privileges. This is required for creation of Entra ID groups used by `mssql` module.
 
@@ -103,7 +104,7 @@ re-deploys all of this content can be generalized into these steps:
   You should see output similar to this:
 
   ```text
-  Managed identity: uai-devops-dev-<xxxxxxxx> (<uami-client-id-here>)
+  Managed identity: uai-devops-dev-<xxxxxxxx> (<uami-principal-id-here>)
     Group.ReadWrite.All: granting...
     Group.ReadWrite.All: granted.
   Microsoft Graph permission grant complete.
