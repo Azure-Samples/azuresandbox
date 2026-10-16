@@ -26,13 +26,21 @@ on:
         description: Release PR base (main) commit SHA captured with the event.
         type: string
         required: true
+    # Raw job results; the Release static CI job in sandbox-deployment.yml
+    # decides pass, not-applicable, or fail from them.
     outputs:
-      verdict:
-        description: pass, not-applicable, or fail.
-        value: ${{ jobs.gate.outputs.verdict }}
-      head_sha:
-        description: Head SHA the verdict applies to.
-        value: ${{ jobs.gate.outputs.head_sha }}
+      changes:
+        description: Result of change detection.
+        value: ${{ jobs.report.outputs.changes }}
+      applicable:
+        description: Whether the path filters matched (true or false).
+        value: ${{ jobs.report.outputs.applicable }}
+      gated:
+        description: Space-separated results of the path-gated checks.
+        value: ${{ jobs.report.outputs.gated }}
+      always:
+        description: Space-separated results of the always-run checks.
+        value: ${{ jobs.report.outputs.always }}
 
 permissions:
   contents: read
@@ -128,48 +136,24 @@ jobs:
       - name: Run actionlint
         run: ./actionlint -color
 
-  # Release mode only: turn the job results above into one explicit verdict
-  # for sandbox-deployment.yml. "pass" needs every applicable check to
-  # succeed; "not-applicable" needs change detection to succeed and prove the
-  # filters match nothing, with the path-gated checks skipped. Anything else
-  # (failed, cancelled, missing, or unexpectedly skipped) is "fail".
-  gate:
-    name: release gate
+  # Release mode only: pass the raw job results back to sandbox-deployment.yml.
+  # This job has no logic; the Release static CI job there applies the one
+  # pass / not-applicable / fail rule to all six workflows.
+  report:
+    name: release report
     needs: [changes, actionlint]
     if: ${{ always() && github.event_name == 'pull_request_target' }}
     runs-on: ubuntu-latest
     outputs:
-      verdict: ${{ steps.verdict.outputs.verdict }}
-      head_sha: ${{ steps.verdict.outputs.head_sha }}
+      changes: ${{ needs.changes.result }}
+      applicable: ${{ needs.changes.outputs.actions }}
+      gated: ${{ needs.actionlint.result }}
+      always: ''
     steps:
-      - name: Decide verdict
-        id: verdict
+      - name: Show results
         env:
-          HEAD_SHA: ${{ inputs.head_sha }}
-          CHANGES_RESULT: ${{ needs.changes.result }}
+          CHANGES: ${{ needs.changes.result }}
           APPLICABLE: ${{ needs.changes.outputs.actions }}
-          GATED_RESULTS: ${{ needs.actionlint.result }}
-          ALWAYS_RESULTS: ''
-        run: |
-          set -euo pipefail
-          verdict=fail
-          all_are() { local want=$1; shift; for r in "$@"; do [ "$r" = "$want" ] || return 1; done; }
-          read -ra gated <<< "$GATED_RESULTS"
-          read -ra always <<< "$ALWAYS_RESULTS"
-          if [[ ! "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-            echo '::error::Invalid release head SHA.'
-          elif [ "$CHANGES_RESULT" != success ]; then
-            echo "::error::Change detection did not succeed ($CHANGES_RESULT)."
-          elif ! all_are success "${always[@]}"; then
-            echo "::error::An always-applicable check did not succeed: $ALWAYS_RESULTS"
-          elif [ "$APPLICABLE" = true ] && all_are success "${gated[@]}"; then
-            verdict=pass
-          elif [ "$APPLICABLE" = false ] && all_are skipped "${gated[@]}"; then
-            verdict=not-applicable
-          else
-            echo "::error::Unexpected results (applicable=$APPLICABLE): $GATED_RESULTS"
-          fi
-          echo "Verdict for $HEAD_SHA: $verdict"
-          echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
-          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
-          [ "$verdict" != fail ]
+          GATED: ${{ needs.actionlint.result }}
+          ALWAYS: ''
+        run: echo "changes=$CHANGES applicable=$APPLICABLE gated=[$GATED] always=[$ALWAYS]"
