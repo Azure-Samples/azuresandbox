@@ -9,7 +9,7 @@
 # with no manifest, or an input parameter to a setup action. This script closes
 # that gap: for each pinned tool it reads the version currently pinned in the
 # workflow (and the mirrored copies in scripts/Invoke-CIChecks.sh, .tflint.hcl,
-# terraform.tf, CONTRIBUTING.md), queries the upstream latest release, and
+# terraform.tf), queries the upstream latest release, and
 # reports any drift.
 #
 # It is consumed by the scheduled ci-tool-versions.yml workflow, which turns the
@@ -43,7 +43,7 @@ tools=(
   'actionlint|actionlint|gh:rhysd/actionlint|.github/workflows/ci-actions.yml::ACTIONLINT_VERSION:\s*\K[0-9.]+|.github/workflows/ci-actions.yml,scripts/Invoke-CIChecks.sh'
   'gitleaks|gitleaks|gh:gitleaks/gitleaks|.github/workflows/ci-secrets.yml::GITLEAKS_VERSION:\s*\K[0-9.]+|.github/workflows/ci-secrets.yml,scripts/Invoke-CIChecks.sh'
   'psscriptanalyzer|PSScriptAnalyzer|psg:PSScriptAnalyzer|.github/workflows/ci-powershell.yml::-RequiredVersion\s*\K[0-9.]+|.github/workflows/ci-powershell.yml,scripts/Invoke-CIChecks.sh'
-  'markdownlint-cli2|markdownlint-cli2|npm:markdownlint-cli2|.github/workflows/ci-docs.yml::markdownlint-cli2@\K[0-9.]+|.github/workflows/ci-docs.yml,scripts/Invoke-CIChecks.sh,CONTRIBUTING.md'
+  'markdownlint-cli2|markdownlint-cli2|npm:markdownlint-cli2|.github/workflows/ci-docs.yml::markdownlint-cli2@\K[0-9.]+|.github/workflows/ci-docs.yml,scripts/Invoke-CIChecks.sh'
   'tflint|tflint|gh:terraform-linters/tflint|.github/workflows/ci-terraform.yml::tflint_version:\s*v?\K[0-9.]+|.github/workflows/ci-terraform.yml,scripts/Invoke-CIChecks.sh'
   'tflint-azurerm|tflint azurerm ruleset|gh:terraform-linters/tflint-ruleset-azurerm|.tflint.hcl::version\s*=\s*"\K[0-9.]+|.tflint.hcl'
   'terraform|Terraform CLI|gh:hashicorp/terraform|.github/workflows/ci-terraform.yml::terraform_version:\s*\K[0-9.]+|.github/workflows/ci-terraform.yml (fmt + validate jobs),terraform.tf (required_version)'
