@@ -930,10 +930,10 @@ first.
 
 Before running the command, the operator must explicitly confirm:
 
-- Sandbox deployments will enable `mssql`.
-- The workstation Azure CLI is signed in to the correct tenant as an Entra
+* Sandbox deployments will enable `mssql`.
+* The workstation Azure CLI is signed in to the correct tenant as an Entra
   **Privileged Role Administrator** or **Global Administrator**.
-- That role is active. If activated through PIM after sign-in, sign in again
+* That role is active. If activated through PIM after sign-in, sign in again
   so the current session reflects the role activation.
 
 Subscription `Owner` is not sufficient. Do not run the grant on the VM using
@@ -997,14 +997,14 @@ workflow. Those remain separate from this standalone infrastructure bootstrap.
 After completing the preceding checks, the standalone runner infrastructure
 is provisioned and its prerequisites are verified:
 
-- Cloud-init completed without reported errors.
-- The runner service is active and GitHub reports the expected runner online,
+* Cloud-init completed without reported errors.
+* The runner service is active and GitHub reports the expected runner online,
   idle, and labeled for Azure Sandbox.
-- The runner account can use the required deployment toolchain.
-- The system-assigned identity can read the state container from the VM.
-- The user-assigned identity authenticates to the intended subscription and
+* The runner account can use the required deployment toolchain.
+* The system-assigned identity can read the state container from the VM.
+* The user-assigned identity authenticates to the intended subscription and
   has subscription `Owner`.
-- If `mssql` will be enabled, an authorized administrator completed the
+* If `mssql` will be enabled, an authorized administrator completed the
   Microsoft Graph `Group.ReadWrite.All` grant.
 
 This does not mean an Azure Sandbox has been deployed or that a deployment
