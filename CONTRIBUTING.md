@@ -69,7 +69,7 @@ Open every PR as a **draft** while you work. Draft PRs run no CI checks; marking
 | `vnext` | Open a draft PR → mark it ready for review → the [static CI checks](#continuous-integration) run → once they pass and the review and conversation requirements are met, the PR can be merged. |
 | `main` | The owner opens a draft `vnext` → `main` release PR → marks it ready for review → the release workflow runs the same static CI checks against the release's exact head commit and its full diff from `main` → once they pass, the deployment is queued awaiting approval → the owner approves → a fresh sandbox is deployed and the existing unit and integration tests run → if they pass, the PR can be merged. |
 
-No Azure deployment starts before approval. Pushing a new commit to a ready PR, or marking a draft ready again, starts a fresh run; results from an earlier commit or run are never reused. CI also runs on `vnext` after every merge, to check the combined code.
+No Azure deployment starts before approval. Pushing a new commit to a ready PR, or marking a draft ready again, starts a fresh run; results from an earlier commit or run are never reused. CI also runs on `vnext` after every merge, to check the combined code. On a release PR, **Re-run failed jobs** is not supported: if static CI or the deployment fails (for example, during a GitHub outage), mark the PR as a draft and then ready again, or close and reopen it, to start a fresh run.
 
 ### Merging into `vnext`
 

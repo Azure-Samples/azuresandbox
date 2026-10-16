@@ -4211,12 +4211,14 @@ Workflow changes:
   `base_sha` inputs. In that release mode it checks out the exact head SHA
   without persisted credentials, diffs the full release against its merge base
   with `main`, keys concurrency on the PR number and head SHA, and ends with a
-  `release gate` job that returns an explicit `pass`, `not-applicable`, or
-  `fail` verdict. Native PR, push, and manual runs behave as before.
+  no-logic `release report` job that passes back its raw job results. Native
+  PR, push, and manual runs behave as before.
 * `sandbox-deployment.yml` publishes `release-static-ci` and
   `sandbox-deployment-gate` as pending, calls the six workflows from the
   trusted `main` revision, and runs a hosted `Release static CI` job that
-  requires all six verdicts for the same head and a live recheck of the PR.
+  applies one `pass` / `not-applicable` / `fail` rule to every workflow's
+  results and rechecks the live PR. "Re-run failed jobs" is not supported;
+  a fresh run (draft then ready, or close and reopen) is the retry path.
   Only after it publishes `release-static-ci = success` can the deployment job
   request approval. After approval, the deployment job repeats the live and
   status-ownership check before checking out candidate code.
@@ -4236,7 +4238,7 @@ and the emergency-merge rules. After hosted verification, `release-static-ci`
 is added to the `main-release-source` ruleset.
 
 Validation used temporary, session-only logic tests of the actual workflow
-scripts (release gate verdicts, full-diff staging, the static CI aggregate,
+scripts (the verdict rule, full-diff staging, the static CI aggregate,
 and the post-approval guard) with stubbed GitHub API responses. No test
 sources were committed. Hosted acceptance on a real release PR, confirming
 that static CI runs and passes before any deployment approval request

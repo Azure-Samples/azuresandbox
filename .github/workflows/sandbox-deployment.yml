@@ -253,35 +253,42 @@ jobs:
           attempt_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT"
           owner_url="$(gh api "repos/$GITHUB_REPOSITORY/commits/$SOURCE_SHA/status" \
             --jq '[.statuses[] | select(.context == "release-static-ci")][0].target_url // empty')"
-          run_prefix="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/"
+          # Only the attempt that published the pending statuses may continue.
+          # "Re-run failed jobs" does not rerun pending_status, so a re-run stops
+          # here; start a fresh run instead (draft then ready, or close and reopen).
           if [[ "$owner_url" != "$attempt_url" ]]; then
-            owner_attempt="${owner_url#"$run_prefix"}"
-            # "Re-run failed jobs" does not rerun pending_status, so reclaim both
-            # statuses from an earlier attempt of this same run. Any other run
-            # (a newer event for this SHA) keeps ownership.
-            if [[ "$owner_url" == "$run_prefix"* && "$owner_attempt" =~ ^[0-9]+$ && "$owner_attempt" -lt "$GITHUB_RUN_ATTEMPT" ]]; then
-              for context in release-static-ci sandbox-deployment-gate; do
-                gh api --method POST \
-                  "repos/$GITHUB_REPOSITORY/statuses/$SOURCE_SHA" \
-                  -f context="$context" \
-                  -f state=pending \
-                  -f description="Re-run attempt $GITHUB_RUN_ATTEMPT is checking static CI." \
-                  -f target_url="$attempt_url" \
-                  --silent
-              done
-            else
-              echo "::error::Another run owns this candidate's status; this attempt cannot deploy."
-              exit 1
-            fi
+            echo "::error::This attempt does not own the candidate's status (a newer run took over, or this is a re-run). Start a fresh run: mark the PR draft then ready, or close and reopen it."
+            exit 1
           fi
+          # The one verdict rule for every static workflow (each ends with a
+          # no-logic "release report" job that passes back these raw results):
+          #   pass           = workflow succeeded, change detection succeeded,
+          #                    always-run checks succeeded, filters matched, and
+          #                    every path-gated check succeeded.
+          #   not-applicable = the same, except the filters matched nothing and
+          #                    every path-gated check was skipped.
+          #   fail           = anything else (failed, cancelled, missing, or an
+          #                    unexpectedly skipped check).
+          all_are() { local want=$1; shift; for r in "$@"; do [[ "$r" == "$want" ]] || return 1; done; }
+          field() { jq -r --arg c "$1" --arg f "$2" \
+            'if $f == "result" then .[$c].result else .[$c].outputs[$f] end // ""' <<< "$NEEDS_JSON"; }
           problems=()
           for call in $STATIC_CALLS; do
-            read -r result verdict head < <(jq -r --arg c "$call" \
-              '.[$c] | "\(.result // "missing") \(.outputs.verdict // "missing") \(.outputs.head_sha // "missing")"' <<< "$NEEDS_JSON")
-            echo "$call: result=$result verdict=$verdict head=$head"
-            if [[ "$result" != success || ! "$verdict" =~ ^(pass|not-applicable)$ || "$head" != "$SOURCE_SHA" ]]; then
-              problems+=("$call")
+            result="$(field "$call" result)"
+            changes="$(field "$call" changes)"
+            applicable="$(field "$call" applicable)"
+            read -ra gated <<< "$(field "$call" gated)"
+            read -ra always <<< "$(field "$call" always)"
+            verdict=fail
+            if [[ "$result" == success && "$changes" == success ]] && all_are success "${always[@]}"; then
+              if [[ "$applicable" == true ]] && all_are success "${gated[@]}"; then
+                verdict=pass
+              elif [[ "$applicable" == false ]] && all_are skipped "${gated[@]}"; then
+                verdict=not-applicable
+              fi
             fi
+            echo "$call: $verdict (result=$result changes=$changes applicable=$applicable gated=[${gated[*]}] always=[${always[*]}])"
+            [[ "$verdict" != fail ]] || problems+=("$call")
           done
           if ! gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" | jq -e \
             --arg repo "$GITHUB_REPOSITORY" --arg head "$SOURCE_SHA" --arg base "$BASE_SHA" '
@@ -369,7 +376,7 @@ jobs:
           $gate = @($statuses | Where-Object context -ceq 'sandbox-deployment-gate')[0]
           if ($null -eq $static -or $static.state -cne 'success' -or $static.target_url -cne $attemptUrl -or
               $null -eq $gate -or $gate.target_url -cne $attemptUrl) {
-            Write-Output '::error::This attempt no longer owns passing static CI for the candidate (re-running only the deployment job is not supported; start a fresh run). No deployment was started.'
+            Write-Output '::error::This attempt no longer owns passing static CI for the candidate (re-running failed jobs is not supported; mark the PR draft then ready, or close and reopen it, to start a fresh run). No deployment was started.'
             exit 1
           }
           Write-Output "Release PR #$env:PR_NUMBER still targets $env:SOURCE_SHA with passing static CI."
