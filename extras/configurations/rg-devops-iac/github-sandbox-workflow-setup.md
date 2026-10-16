@@ -4235,7 +4235,7 @@ are in baseline rulesets with no bypass. The required CI checks on `vnext`,
 the review requirement on `vnext`, the owner-only update restriction on
 `main`, and the release checks on `main` each allow the owner's team to
 bypass **for pull requests only**. See
-[CONTRIBUTING.md](../../../CONTRIBUTING.md#enforcement) for the ruleset table
+[CONTRIBUTING.md](../../../CONTRIBUTING.md#branch-protection) for the ruleset table
 and the emergency-merge rules. After hosted verification, `release-static-ci`
 is added to the `main-release-source` ruleset.
 
@@ -4276,5 +4276,5 @@ Each bypass now appears under its own ruleset in Settings → Rules → Insights
 review, CI, release source, release static CI, or deployment. While there's
 only one owner, an owner's own `vnext` PR still needs a review-only bypass,
 because GitHub doesn't let authors approve their own PRs. See
-[CONTRIBUTING.md](../../../CONTRIBUTING.md#who-can-contribute-and-who-can-merge)
+[CONTRIBUTING.md](../../../CONTRIBUTING.md#who-can-do-what)
 for the resulting contribution and merge rules.
