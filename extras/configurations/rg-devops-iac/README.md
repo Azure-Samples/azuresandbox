@@ -190,12 +190,15 @@ and `ci-terraform`) as reusable workflows from the trusted `main` revision.
 Each checks out the exact PR head SHA read-only, with no secrets, write
 tokens, or caches, and applies its usual path filters to the **full release
 diff**: everything `vnext` adds since its merge base with `main`, not just the
-last commit. Each returns an explicit verdict: `pass` when its applicable
-checks succeed, or `not-applicable` when change detection succeeded and proved
-no relevant files changed (`gitleaks` and both `terraform validate` contexts
-always apply). The hosted `Release static CI` job requires every one of the six
-verdicts for the same head SHA, then rereads the live PR and requires it to be
-open, not a draft, and unchanged in head, base, and source. Only then does it
+last commit. Each ends with a no-logic `release report` job that passes back
+its raw job results. The hosted `Release static CI` job applies one rule to all
+six: `pass` when every applicable check succeeded, or `not-applicable` when
+change detection succeeded, proved no relevant files changed, and the
+path-gated checks were skipped (`gitleaks` and both `terraform validate`
+contexts always run and must succeed). Anything else fails. It requires a
+`pass` or `not-applicable` verdict from every workflow, then rereads the live
+PR and requires it to be open, not a draft, and unchanged in head, base, and
+source. Only then does it
 publish `release-static-ci = success` and let the environment-protected
 deployment job request approval. A failed, cancelled, missing, or unexpected
 result publishes `release-static-ci = failure` and no deployment is requested.
@@ -213,8 +216,10 @@ Both entry paths share the existing concurrency group with active-run
 cancellation disabled. Advancing `vnext` does not change an already captured
 PR candidate or interrupt an active apply. The workflow does not implement
 cleanup/recovery. The existing run-ID state keys and unused-state requirement
-still apply; re-running an attempt with existing state is not a supported
-retry.
+still apply. **Re-run failed jobs** is not supported for release PRs: a re-run
+attempt doesn't own the PR statuses, so it stops before static CI is accepted
+or any deployment starts. To retry after any failure, mark the PR as a draft
+and then ready again, or close and reopen it, to start a fresh run.
 
 Eligible PR runs publish `release-static-ci` and `sandbox-deployment-gate` as
 pending on the exact head SHA before static CI starts. A separate
