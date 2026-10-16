@@ -21,8 +21,10 @@ Step 73 changes the unit-test stage to JSON-only output and consumption.
 Earlier JUnit artifact observations describe historical runs, not the current
 output contract.
 Step 93 makes release static CI a prerequisite for deployment approval and
-moves both branches from classic branch protection to rulesets. Earlier
-descriptions of classic protection are historical, not current policy.
+moves both branches from classic branch protection to rulesets. Step 94
+introduces the `azuresandbox-owners` team, splits the release checks into
+separate rulesets, and restores a classic push restriction on `main`. Earlier
+descriptions of branch protection are historical, not current policy.
 
 ## Deployment scope and success criteria
 
@@ -4243,3 +4245,36 @@ and the post-approval guard) with stubbed GitHub API responses. No test
 sources were committed. Hosted acceptance on a real release PR, confirming
 that static CI runs and passes before any deployment approval request
 appears, is recorded on issue #854.
+
+## Step 94: Define repository owners and separate bypass types
+
+After Step 93, every merge to `main` counted as a bypass, even a release PR
+whose checks all passed. A ruleset can't list who is allowed to update a
+branch, so the owner-only update restriction applied to the owner too. The
+owner also wanted contributions to require an owner's review, and each type
+of bypass to be identifiable in the merge history.
+
+Settings changes:
+
+* A new `azuresandbox-owners` team (maintain role) replaces the two bypass
+  teams. It is the only bypass actor on every ruleset, the code owner for the
+  whole repository, and the required reviewer for the `sandbox-release-gate`
+  environment. Adding an owner means adding them to this team.
+* `vnext-require-review` now requires the approval to come from a code owner,
+  after the PR's latest commit, from someone other than the person who pushed
+  it. Any account with write access can merge an approved PR once CI passes.
+* `main-release-source` now requires only `main-source-eligibility`. New
+  `main-release-static-ci` and `main-release-deployment` rulesets require
+  `release-static-ci`, and `sandbox-deployment-gate` plus
+  `Publish release deployment status`, respectively.
+* The `main-restrict-updates` ruleset is replaced by a classic branch
+  protection rule on `main` whose only setting restricts pushes to the
+  `azuresandbox-owners` team, enforced for administrators. Owners now merge a
+  release PR that passes every check without a bypass.
+
+Each bypass now appears under its own ruleset in Settings → Rules → Insights:
+review, CI, release source, release static CI, or deployment. While there's
+only one owner, an owner's own `vnext` PR still needs a review-only bypass,
+because GitHub doesn't let authors approve their own PRs. See
+[CONTRIBUTING.md](../../../CONTRIBUTING.md#who-can-contribute-and-who-can-merge)
+for the resulting contribution and merge rules.
