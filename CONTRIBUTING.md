@@ -44,14 +44,14 @@ This repository uses a two-branch model to keep `main` stable and releasable at 
 
 | Branch | Purpose | Who can update it | How it is updated |
 | --- | --- | --- | --- |
-| `vnext` | Active development / integration branch. All day-to-day work lands here. | Any collaborator with write access | Pull requests only (direct pushes are blocked) |
-| `main` | Stable, released code. | Repository owner **@doherty100** only | Pull request merging `vnext` → `main`, or an explicitly authorized maintenance exception |
+| `vnext` | Active development / integration branch. All day-to-day work lands here. | Any collaborator with write access, after a repository owner approves the PR | Pull requests only (direct pushes are blocked) |
+| `main` | Stable, released code. | Repository owners (the `azuresandbox-owners` team) only | Pull request merging `vnext` → `main`, or an explicitly authorized maintenance exception |
 
 ### Workflow
 
 1. **Target `vnext` for all contributions.** Open every pull request — features, bug fixes, and documentation — against the `vnext` branch. Direct PRs to `main` are reserved for explicitly authorized maintenance exceptions described below.
 2. **Integration happens on `vnext`.** Reviews, status checks (including the CLA bot), and testing occur here.
-3. **Promotion to `main` is restricted.** Only the repository owner (**@doherty100**) opens and merges the `vnext` → `main` pull request that promotes accumulated changes to the stable branch. No other collaborator can merge into `main`.
+3. **Promotion to `main` is restricted.** Only repository owners (members of the **`azuresandbox-owners`** team) open and merge the `vnext` → `main` pull request that promotes accumulated changes to the stable branch. No other collaborator can merge into `main`.
 
 ### Merge strategy
 
@@ -70,6 +70,13 @@ Open every PR as a **draft** while you work. Draft PRs run no CI checks; marking
 | `main` | The owner opens a draft `vnext` → `main` release PR → marks it ready for review → the release workflow runs the same static CI checks against the release's exact head commit and its full diff from `main` → once they pass, the deployment is queued awaiting approval → the owner approves → a fresh sandbox is deployed and the existing unit and integration tests run → if they pass, the PR can be merged. |
 
 No Azure deployment starts before approval. Pushing a new commit to a ready PR, or marking a draft ready again, starts a fresh run; results from an earlier commit or run are never reused. CI also runs on `vnext` after every merge, to check the combined code. On a release PR, **Re-run failed jobs** is not supported: if static CI or the deployment fails (for example, during a GitHub outage), mark the PR as a draft and then ready again, or close and reopen it, to start a fresh run.
+
+### Who can contribute and who can merge
+
+- **Anyone with a GitHub account** can contribute: fork the repository and open a PR against `vnext`. GitHub may ask a maintainer to approve workflow runs for a first-time contributor. Every PR must pass CI and be approved by a repository owner, who is requested automatically through [`.github/CODEOWNERS`](.github/CODEOWNERS). Commits pushed after that approval need a fresh approval. A contributor without write access can't merge their own PR; someone with write access merges it once it's approved.
+- **Accounts with write access** (granted through the Azure-Samples organization) can also create branches directly in this repository instead of forking. Once an owner has approved a PR's latest commit and CI has passed, they can merge it into `vnext`. They can't push directly to `vnext` or `main`, can't merge into `main`, and can't bypass any check.
+- **Repository owners** (members of the `azuresandbox-owners` team) are the only accounts that can merge into `main`, and only release PRs from `vnext` are eligible. Owners also have a [PR-only bypass](#emergency-merges) for failed CI or deployment checks, for maintenance PRs to `main`, and, while there's only one owner, for approving their own `vnext` PRs (GitHub never lets authors approve their own PRs). The reason for every bypass is recorded in the PR.
+- **Nobody** can push directly to `vnext` or `main`, force-push to them, delete them, or bypass merge conflicts or unresolved conversations.
 
 ### Merging into `vnext`
 
@@ -90,7 +97,7 @@ gh pr ready
 A PR into `vnext` can be merged once:
 
 - every required CI check passes on the PR's latest commit, and the branch is up to date with `vnext`;
-- it has **one approval** from someone other than the author (the repository owner is requested automatically through [`.github/CODEOWNERS`](.github/CODEOWNERS)); and
+- it has **one approval from a repository owner**, given after its latest commit, from someone other than the person who pushed that commit (owners are requested automatically through [`.github/CODEOWNERS`](.github/CODEOWNERS)); and
 - all review conversations are resolved.
 
 Then squash-merge it, consistent with the [merge strategy](#merge-strategy) above:
@@ -100,20 +107,25 @@ gh pr merge <pr-number> --squash
 git checkout vnext && git pull
 ```
 
-GitHub never lets authors approve their own PRs. Members of the **`azuresandbox-vnext-bypass`** team (currently only the repository owner) can merge their own PRs without an approval by selecting **Bypass rules and merge** (`gh pr merge <pr-number> --squash --admin`), after the required checks pass.
+GitHub never lets authors approve their own PRs. While there's only one owner, an owner merges their own PR without an approval by selecting **Bypass rules and merge** (`gh pr merge <pr-number> --squash --admin`), after the required checks pass. That bypass applies only to the `vnext-require-review` ruleset and is logged separately from a CI bypass. Once a second owner exists, owners review each other's PRs instead.
 
 ### Enforcement
 
-Both branches are protected entirely by [rulesets](https://docs.github.com/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets) (Settings → Rules); neither uses a classic branch protection rule. Every applicable ruleset must pass, and each ruleset's bypass list applies only to that ruleset. Rules that must never be bypassed are in rulesets with no bypass list. Every bypass is **For pull requests only**, so nobody can push directly to either branch.
+Both branches are protected by [rulesets](https://docs.github.com/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets) (Settings → Rules). Every applicable ruleset must pass, and each ruleset's bypass list applies only to that ruleset. Rules that must never be bypassed are in rulesets with no bypass list. Every bypass is **For pull requests only**, so nobody can push directly to either branch. The only bypass actor is the `azuresandbox-owners` team.
+
+`main` also has a classic branch protection rule (Settings → Branches) whose only setting is **Restrict who can push**, limited to the `azuresandbox-owners` team and enforced for administrators. Rulesets can't list who is allowed to update a branch, so this classic rule lets owners merge release PRs that pass every check without using a bypass.
 
 | Branch | Ruleset | Rules | Bypass |
 | --- | --- | --- | --- |
 | `vnext` | `vnext-baseline` | Require a PR, require conversation resolution, block force pushes and deletion | None |
-| `vnext` | `vnext-required-checks` | Require the ten static CI checks from GitHub Actions, with the branch up to date | `azuresandbox-vnext-bypass`, PRs only |
-| `vnext` | `vnext-require-review` | Require one approval | `azuresandbox-vnext-bypass`, PRs only |
+| `vnext` | `vnext-required-checks` | Require the ten static CI checks from GitHub Actions, with the branch up to date | `azuresandbox-owners`, PRs only |
+| `vnext` | `vnext-require-review` | Require one approval from a code owner, given after the latest commit by someone other than its pusher | `azuresandbox-owners`, PRs only |
 | `main` | `main-baseline` | Require a PR, block force pushes and deletion | None |
-| `main` | `main-restrict-updates` | Only the repository owner can update `main` | `azuresandbox-main-bypass`, PRs only |
-| `main` | `main-release-source` | Require `main-source-eligibility`, `release-static-ci`, `sandbox-deployment-gate`, and `Publish release deployment status` | `azuresandbox-main-bypass`, PRs only |
+| `main` | `main-release-source` | Require `main-source-eligibility` | `azuresandbox-owners`, PRs only |
+| `main` | `main-release-static-ci` | Require `release-static-ci` | `azuresandbox-owners`, PRs only |
+| `main` | `main-release-deployment` | Require `sandbox-deployment-gate` and `Publish release deployment status` | `azuresandbox-owners`, PRs only |
+
+Each kind of bypass is in its own ruleset, so the merge's entry in **Settings → Rules → Insights** shows which kind was used: review, CI, release source, release static CI, or deployment.
 
 The [source-policy workflow](.github/workflows/main-source-policy.yml) publishes
 `main-source-eligibility`. It runs trusted default-branch code on a
@@ -135,7 +147,7 @@ organization, not this repository. No ruleset or workflow here depends on it.
 
 #### Emergency merges
 
-For urgent situations where waiting isn't practical, the repository owner can
+For urgent situations where waiting isn't practical, a repository owner can
 merge an existing PR to either branch when its CI checks or, on `main`, its
 deployment haven't passed. Examples include a GitHub outage that delays CI, a
 deployment that isn't possible because of time or cost constraints, or an
@@ -150,7 +162,7 @@ authorized workflow-registration or maintenance PR to `main` that is not from
 - GitHub's bypass applies to the whole selected ruleset, not to a list of
   files, so review the PR's full scope before using it.
 
-Code ownership is declared in [`.github/CODEOWNERS`](.github/CODEOWNERS) (`* @doherty100`), which automatically requests the owner as a reviewer on pull requests.
+Code ownership is declared in [`.github/CODEOWNERS`](.github/CODEOWNERS) (`* @Azure-Samples/azuresandbox-owners`), which automatically requests the owners as reviewers on pull requests. The same team approves release deployments in the `sandbox-release-gate` environment.
 
 ## Collaborator Access and Issue Assignment
 
