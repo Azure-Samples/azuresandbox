@@ -1,13 +1,36 @@
 # CI: PowerShell static analysis (PSScriptAnalyzer).
-# Runs on every pull request targeting vnext and on pushes to vnext.
+# Runs on ready (non-draft) pull requests targeting vnext and on pushes to vnext.
+# sandbox-deployment.yml also calls it (workflow_call) to check the exact head
+# SHA and full diff of a vnext -> main release PR before any deployment.
 name: ci-powershell
 
 on:
   pull_request:
     branches: [vnext]
+    # Drafts do not run checks (see the draft guard below); ready_for_review
+    # starts a fresh run when a draft is marked ready.
+    types: [opened, reopened, synchronize, ready_for_review]
   push:
     branches: [vnext]
   workflow_dispatch:
+  # Release mode: called by sandbox-deployment.yml for a vnext -> main release PR.
+  workflow_call:
+    inputs:
+      head_sha:
+        description: Release PR head commit SHA to check.
+        type: string
+        required: true
+      base_sha:
+        description: Release PR base (main) commit SHA captured with the event.
+        type: string
+        required: true
+    outputs:
+      verdict:
+        description: pass, not-applicable, or fail.
+        value: ${{ jobs.gate.outputs.verdict }}
+      head_sha:
+        description: Head SHA the verdict applies to.
+        value: ${{ jobs.gate.outputs.head_sha }}
 
 permissions:
   contents: read
@@ -16,7 +39,9 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: ci-powershell-${{ github.workflow }}-${{ github.ref }}
+  # In release mode github.workflow/github.ref resolve to the caller and main,
+  # so key on the PR number and head SHA to keep release attempts separate.
+  group: ci-powershell-${{ github.workflow }}-${{ github.event_name == 'pull_request_target' && format('release-{0}-{1}', github.event.pull_request.number, inputs.head_sha) || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -27,17 +52,42 @@ jobs:
   # `paths:` filter while PSScriptAnalyzer is a required check on vnext.
   changes:
     name: detect changes
+    # Draft PRs run no checks; every job below needs this one, so they skip too.
+    # Drafts cannot merge, and marking the PR ready starts a fresh run.
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     outputs:
       powershell: ${{ steps.filter.outputs.powershell }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # Empty except in release mode, where it pins the release PR head.
+          ref: ${{ inputs.head_sha }}
+          persist-credentials: false
           fetch-depth: 0
+
+      # Release mode: diff the full release (everything vnext adds since its
+      # merge base with main), not just the last commit. A soft reset to the
+      # merge base stages that diff so `base: HEAD` below compares it locally,
+      # instead of the PR files API the action would otherwise use.
+      - name: Stage full release diff
+        if: ${{ github.event_name == 'pull_request_target' }}
+        env:
+          HEAD_SHA: ${{ inputs.head_sha }}
+          BASE_SHA: ${{ inputs.base_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ && "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo '::error::Invalid release SHA input.'; exit 1; }
+          [ "$(git rev-parse HEAD)" = "$HEAD_SHA" ] || { echo '::error::Checked-out commit is not the release head.'; exit 1; }
+          merge_base=$(git merge-base "$BASE_SHA" "$HEAD_SHA")
+          echo "Comparing $HEAD_SHA against merge base $merge_base"
+          git reset --soft "$merge_base"
 
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
+          # Empty (default behavior) except in release mode; see the step above.
+          base: ${{ github.event_name == 'pull_request_target' && 'HEAD' || '' }}
           filters: |
             powershell:
               - '**/*.ps1'
@@ -52,6 +102,10 @@ jobs:
     if: ${{ needs.changes.outputs.powershell == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Empty except in release mode, where it pins the release PR head.
+          ref: ${{ inputs.head_sha }}
+          persist-credentials: false
 
       - name: Install PSScriptAnalyzer
         shell: pwsh
@@ -82,3 +136,49 @@ jobs:
           }
 
           Write-Host 'PSScriptAnalyzer: no issues found.'
+
+  # Release mode only: turn the job results above into one explicit verdict
+  # for sandbox-deployment.yml. "pass" needs every applicable check to
+  # succeed; "not-applicable" needs change detection to succeed and prove the
+  # filters match nothing, with the path-gated checks skipped. Anything else
+  # (failed, cancelled, missing, or unexpectedly skipped) is "fail".
+  gate:
+    name: release gate
+    needs: [changes, psscriptanalyzer]
+    if: ${{ always() && github.event_name == 'pull_request_target' }}
+    runs-on: ubuntu-latest
+    outputs:
+      verdict: ${{ steps.verdict.outputs.verdict }}
+      head_sha: ${{ steps.verdict.outputs.head_sha }}
+    steps:
+      - name: Decide verdict
+        id: verdict
+        env:
+          HEAD_SHA: ${{ inputs.head_sha }}
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          APPLICABLE: ${{ needs.changes.outputs.powershell }}
+          GATED_RESULTS: ${{ needs.psscriptanalyzer.result }}
+          ALWAYS_RESULTS: ''
+        run: |
+          set -euo pipefail
+          verdict=fail
+          all_are() { local want=$1; shift; for r in "$@"; do [ "$r" = "$want" ] || return 1; done; }
+          read -ra gated <<< "$GATED_RESULTS"
+          read -ra always <<< "$ALWAYS_RESULTS"
+          if [[ ! "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo '::error::Invalid release head SHA.'
+          elif [ "$CHANGES_RESULT" != success ]; then
+            echo "::error::Change detection did not succeed ($CHANGES_RESULT)."
+          elif ! all_are success "${always[@]}"; then
+            echo "::error::An always-applicable check did not succeed: $ALWAYS_RESULTS"
+          elif [ "$APPLICABLE" = true ] && all_are success "${gated[@]}"; then
+            verdict=pass
+          elif [ "$APPLICABLE" = false ] && all_are skipped "${gated[@]}"; then
+            verdict=not-applicable
+          else
+            echo "::error::Unexpected results (applicable=$APPLICABLE): $GATED_RESULTS"
+          fi
+          echo "Verdict for $HEAD_SHA: $verdict"
+          echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          [ "$verdict" != fail ]

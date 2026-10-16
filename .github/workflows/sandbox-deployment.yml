@@ -1,3 +1,9 @@
+# Azure Sandbox deployment.
+# Release path (pull_request_target on main): a ready vnext -> main release PR
+# first runs the six static CI workflows (ci-*.yml, called below) against its
+# exact head SHA and full diff. Only after they pass and a live recheck of the PR
+# succeeds does the environment-protected deployment job request approval.
+# Manual path (workflow_dispatch): unchanged; no static CI dependency.
 name: Azure Sandbox deployment
 run-name: Sandbox sandbox-${{ github.run_id }} / ${{ github.event_name == 'pull_request_target' && 'unit-test' || inputs.run_through }}
 
@@ -28,6 +34,7 @@ jobs:
     outputs:
       deploy: ${{ steps.select.outputs.deploy }}
       source_ref: ${{ steps.select.outputs.source_ref }}
+      base_sha: ${{ steps.select.outputs.base_sha }}
       run_through: ${{ steps.select.outputs.run_through }}
       environment: ${{ steps.select.outputs.environment }}
     steps:
@@ -62,6 +69,7 @@ jobs:
                 .pull_request.head.repo.full_name == $repository and
                 .pull_request.head.ref == "vnext" and
                 (.pull_request.head.sha | type == "string" and test("^[0-9a-f]{40}$")) and
+                (.pull_request.base.sha | type == "string" and test("^[0-9a-f]{40}$")) and
                 (.pull_request.draft | type == "boolean")
               ' "$GITHUB_EVENT_PATH" > /dev/null; then
                 echo "::error::Only same-repository vnext to main release PRs are eligible."
@@ -79,8 +87,10 @@ jobs:
                 exit 0
               fi
               head_sha="$(jq -er '.pull_request.head.sha' "$GITHUB_EVENT_PATH")"
+              base_sha="$(jq -er '.pull_request.base.sha' "$GITHUB_EVENT_PATH")"
               {
                 printf 'source_ref=%s\n' "$head_sha"
+                printf 'base_sha=%s\n' "$base_sha"
                 echo "run_through=unit-test"
                 echo "environment=sandbox-release-gate"
                 echo "deploy=true"
@@ -104,7 +114,10 @@ jobs:
       group: sandbox-deployment-status-${{ github.event.pull_request.head.sha }}
       cancel-in-progress: false
     steps:
-      - name: Mark the candidate pending before environment approval
+      # Each new eligible attempt takes ownership of both statuses (via its
+      # attempt URL) before static CI starts, so older evidence for the same SHA
+      # cannot authorize this attempt and older attempts cannot overwrite it.
+      - name: Mark the candidate pending before static CI and approval
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ needs.selection.outputs.source_ref }}
@@ -114,18 +127,195 @@ jobs:
             echo "::error::Invalid release candidate SHA."
             exit 1
           fi
+          attempt_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT"
+          gh api --method POST \
+            "repos/$GITHUB_REPOSITORY/statuses/$SOURCE_SHA" \
+            -f context=release-static-ci \
+            -f state=pending \
+            -f description="Static CI is running on the release head." \
+            -f target_url="$attempt_url" \
+            --silent
           gh api --method POST \
             "repos/$GITHUB_REPOSITORY/statuses/$SOURCE_SHA" \
             -f context=sandbox-deployment-gate \
             -f state=pending \
-            -f description="Awaiting approval and the full deployment result." \
-            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT" \
+            -f description="Waiting for static CI, then approval and the full deployment result." \
+            -f target_url="$attempt_url" \
             --silent
+
+  # Release static CI: the explicit allowlist of trusted static workflows, loaded
+  # from this (main) revision and run read-only against the release head SHA.
+  # Adding or removing a call here must be mirrored in static_ci below.
+  ci_bash:
+    name: Static CI (bash)
+    needs: [selection, pending_status]
+    if: ${{ github.event_name == 'pull_request_target' && needs.selection.outputs.deploy == 'true' && needs.pending_status.result == 'success' }}
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/ci-bash.yml
+    with:
+      head_sha: ${{ needs.selection.outputs.source_ref }}
+      base_sha: ${{ needs.selection.outputs.base_sha }}
+
+  ci_powershell:
+    name: Static CI (powershell)
+    needs: [selection, pending_status]
+    if: ${{ github.event_name == 'pull_request_target' && needs.selection.outputs.deploy == 'true' && needs.pending_status.result == 'success' }}
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/ci-powershell.yml
+    with:
+      head_sha: ${{ needs.selection.outputs.source_ref }}
+      base_sha: ${{ needs.selection.outputs.base_sha }}
+
+  ci_docs:
+    name: Static CI (docs)
+    needs: [selection, pending_status]
+    if: ${{ github.event_name == 'pull_request_target' && needs.selection.outputs.deploy == 'true' && needs.pending_status.result == 'success' }}
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/ci-docs.yml
+    with:
+      head_sha: ${{ needs.selection.outputs.source_ref }}
+      base_sha: ${{ needs.selection.outputs.base_sha }}
+
+  ci_actions:
+    name: Static CI (actions)
+    needs: [selection, pending_status]
+    if: ${{ github.event_name == 'pull_request_target' && needs.selection.outputs.deploy == 'true' && needs.pending_status.result == 'success' }}
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/ci-actions.yml
+    with:
+      head_sha: ${{ needs.selection.outputs.source_ref }}
+      base_sha: ${{ needs.selection.outputs.base_sha }}
+
+  ci_secrets:
+    name: Static CI (secrets)
+    needs: [selection, pending_status]
+    if: ${{ github.event_name == 'pull_request_target' && needs.selection.outputs.deploy == 'true' && needs.pending_status.result == 'success' }}
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/ci-secrets.yml
+    with:
+      head_sha: ${{ needs.selection.outputs.source_ref }}
+      base_sha: ${{ needs.selection.outputs.base_sha }}
+
+  ci_terraform:
+    name: Static CI (terraform)
+    needs: [selection, pending_status]
+    if: ${{ github.event_name == 'pull_request_target' && needs.selection.outputs.deploy == 'true' && needs.pending_status.result == 'success' }}
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/ci-terraform.yml
+    with:
+      head_sha: ${{ needs.selection.outputs.source_ref }}
+      base_sha: ${{ needs.selection.outputs.base_sha }}
+
+  static_ci:
+    name: Release static CI
+    needs: [selection, pending_status, ci_bash, ci_powershell, ci_docs, ci_actions, ci_secrets, ci_terraform]
+    if: ${{ always() && github.event_name == 'pull_request_target' && needs.selection.outputs.deploy == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      statuses: write
+      pull-requests: read
+    concurrency:
+      group: sandbox-deployment-status-${{ github.event.pull_request.head.sha }}
+      cancel-in-progress: false
+    steps:
+      # Deployment depends on this job, never on deployment-produced checks.
+      - name: Verify static results and live PR eligibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEEDS_JSON: ${{ toJSON(needs) }}
+          SOURCE_SHA: ${{ needs.selection.outputs.source_ref }}
+          BASE_SHA: ${{ needs.selection.outputs.base_sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          STATIC_CALLS: ci_bash ci_powershell ci_docs ci_actions ci_secrets ci_terraform
+        run: |
+          set -euo pipefail
+          if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ || ! "$BASE_SHA" =~ ^[0-9a-f]{40}$ || ! "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "::error::Invalid release candidate identity; no status was published."
+            exit 1
+          fi
+          if [[ "$(jq -r '.pending_status.result' <<< "$NEEDS_JSON")" != success ]]; then
+            echo "::error::Pending status publication failed; no status was published."
+            exit 1
+          fi
+          attempt_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT"
+          owner_url="$(gh api "repos/$GITHUB_REPOSITORY/commits/$SOURCE_SHA/status" \
+            --jq '[.statuses[] | select(.context == "release-static-ci")][0].target_url // empty')"
+          run_prefix="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/"
+          if [[ "$owner_url" != "$attempt_url" ]]; then
+            owner_attempt="${owner_url#"$run_prefix"}"
+            # "Re-run failed jobs" does not rerun pending_status, so reclaim both
+            # statuses from an earlier attempt of this same run. Any other run
+            # (a newer event for this SHA) keeps ownership.
+            if [[ "$owner_url" == "$run_prefix"* && "$owner_attempt" =~ ^[0-9]+$ && "$owner_attempt" -lt "$GITHUB_RUN_ATTEMPT" ]]; then
+              for context in release-static-ci sandbox-deployment-gate; do
+                gh api --method POST \
+                  "repos/$GITHUB_REPOSITORY/statuses/$SOURCE_SHA" \
+                  -f context="$context" \
+                  -f state=pending \
+                  -f description="Re-run attempt $GITHUB_RUN_ATTEMPT is checking static CI." \
+                  -f target_url="$attempt_url" \
+                  --silent
+              done
+            else
+              echo "::error::Another run owns this candidate's status; this attempt cannot deploy."
+              exit 1
+            fi
+          fi
+          problems=()
+          for call in $STATIC_CALLS; do
+            read -r result verdict head < <(jq -r --arg c "$call" \
+              '.[$c] | "\(.result // "missing") \(.outputs.verdict // "missing") \(.outputs.head_sha // "missing")"' <<< "$NEEDS_JSON")
+            echo "$call: result=$result verdict=$verdict head=$head"
+            if [[ "$result" != success || ! "$verdict" =~ ^(pass|not-applicable)$ || "$head" != "$SOURCE_SHA" ]]; then
+              problems+=("$call")
+            fi
+          done
+          if ! gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" | jq -e \
+            --arg repo "$GITHUB_REPOSITORY" --arg head "$SOURCE_SHA" --arg base "$BASE_SHA" '
+              .state == "open" and .draft == false and
+              .head.sha == $head and .head.ref == "vnext" and .head.repo.full_name == $repo and
+              .base.sha == $base and .base.ref == "main" and .base.repo.full_name == $repo
+            ' > /dev/null; then
+            problems+=("live PR no longer matches the checked head/base, is closed, or is a draft")
+          fi
+          state=success
+          description="All static CI passed on this exact head."
+          if [[ "${#problems[@]}" -gt 0 ]]; then
+            state=failure
+            description="Static CI or live PR eligibility failed. No deployment requested."
+          fi
+          gh api --method POST \
+            "repos/$GITHUB_REPOSITORY/statuses/$SOURCE_SHA" \
+            -f context=release-static-ci \
+            -f state="$state" \
+            -f description="$description" \
+            -f target_url="$attempt_url" \
+            --silent
+          printf '## Release static CI\n\nrelease-static-ci: **%s** on %s.\n' "$state" "$SOURCE_SHA" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$state" != success ]]; then
+            printf -- '- Blocked: %s\n' "${problems[@]}" >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Release static CI did not pass: ${problems[*]}"
+            exit 1
+          fi
 
   sandbox:
     name: Sandbox preflight / apply / unit-test
-    needs: [selection, pending_status]
-    if: ${{ !cancelled() && needs.selection.result == 'success' && needs.selection.outputs.deploy == 'true' && (github.event_name == 'workflow_dispatch' || needs.pending_status.result == 'success') }}
+    # Release PRs wait for static_ci; manual runs ignore it (it is skipped).
+    needs: [selection, pending_status, static_ci]
+    if: ${{ !cancelled() && needs.selection.result == 'success' && needs.selection.outputs.deploy == 'true' && (github.event_name == 'workflow_dispatch' || (needs.pending_status.result == 'success' && needs.static_ci.result == 'success')) }}
     concurrency:
       group: azure-sandbox-deployment
       cancel-in-progress: false
@@ -134,6 +324,10 @@ jobs:
       name: ${{ needs.selection.outputs.environment }}
       url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     timeout-minutes: 180
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: read
     env:
       SANDBOX_RUN_THROUGH: ${{ needs.selection.outputs.run_through }}
       SANDBOX_SOURCE_SHA: ${{ github.event_name == 'pull_request_target' && needs.selection.outputs.source_ref || '' }}
@@ -147,6 +341,39 @@ jobs:
       artifact_url: ${{ steps.upload_evidence.outputs.artifact-url }}
       report_outcome: ${{ steps.report.outcome }}
     steps:
+      # After approval and any wait for the serialized runner, recheck the live
+      # PR and status ownership before checking out candidate code. A changed,
+      # closed, drafted, or superseded candidate stops here, before Azure.
+      - name: Recheck release eligibility before checkout
+        if: ${{ github.event_name == 'pull_request_target' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ needs.selection.outputs.source_ref }}
+          BASE_SHA: ${{ needs.selection.outputs.base_sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $headers = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json' }
+          $api = "$env:GITHUB_API_URL/repos/$env:GITHUB_REPOSITORY"
+          $pr = Invoke-RestMethod -Headers $headers -Uri "$api/pulls/$env:PR_NUMBER"
+          if ($pr.state -cne 'open' -or $pr.draft -ne $false -or
+              $pr.head.sha -cne $env:SOURCE_SHA -or $pr.head.ref -cne 'vnext' -or $pr.head.repo.full_name -cne $env:GITHUB_REPOSITORY -or
+              $pr.base.sha -cne $env:BASE_SHA -or $pr.base.ref -cne 'main' -or $pr.base.repo.full_name -cne $env:GITHUB_REPOSITORY) {
+            Write-Output '::error::The release PR changed, closed, or became a draft after static CI. No deployment was started.'
+            exit 1
+          }
+          $attemptUrl = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID/attempts/$env:GITHUB_RUN_ATTEMPT"
+          $statuses = (Invoke-RestMethod -Headers $headers -Uri "$api/commits/$env:SOURCE_SHA/status").statuses
+          $static = @($statuses | Where-Object context -ceq 'release-static-ci')[0]
+          $gate = @($statuses | Where-Object context -ceq 'sandbox-deployment-gate')[0]
+          if ($null -eq $static -or $static.state -cne 'success' -or $static.target_url -cne $attemptUrl -or
+              $null -eq $gate -or $gate.target_url -cne $attemptUrl) {
+            Write-Output '::error::This attempt no longer owns passing static CI for the candidate (re-running only the deployment job is not supported; start a fresh run). No deployment was started.'
+            exit 1
+          }
+          Write-Output "Release PR #$env:PR_NUMBER still targets $env:SOURCE_SHA with passing static CI."
+
       - name: Repository workspace
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -198,7 +425,7 @@ jobs:
 
   deployment_status:
     name: Publish release deployment status
-    needs: [selection, pending_status, sandbox]
+    needs: [selection, pending_status, static_ci, sandbox]
     if: ${{ always() && github.event_name == 'pull_request_target' && needs.selection.outputs.deploy == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -213,6 +440,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ needs.selection.outputs.source_ref }}
           PENDING_STATUS_RESULT: ${{ needs.pending_status.result }}
+          STATIC_CI_RESULT: ${{ needs.static_ci.result }}
           DEPLOYMENT_RESULT: ${{ needs.sandbox.result }}
           PREFLIGHT_OUTCOME: ${{ needs.sandbox.outputs.preflight_outcome }}
           APPLY_OUTCOME: ${{ needs.sandbox.outputs.apply_outcome }}
@@ -246,6 +474,9 @@ jobs:
           fi
           state=failure
           description="Deployment failed or incomplete. The PR remains open."
+          if [[ "$STATIC_CI_RESULT" != success ]]; then
+            description="Static CI did not pass, so no deployment ran. The PR remains open."
+          fi
           if [[ "$DEPLOYMENT_RESULT" == success &&
                 "$PREFLIGHT_OUTCOME" == success &&
                 "$APPLY_OUTCOME" == success &&
