@@ -243,11 +243,14 @@ an older attempt cannot overwrite the pending result of a newer attempt on
 the same SHA, or deploy on the strength of it. Only the hosted status jobs
 have status-write permission. Manual dispatch does not publish these PR
 statuses. Drafts and metadata-only edits do not overwrite them, and no
-workflow closes or merges a PR. The `main-release-source` ruleset requires
-`main-source-eligibility`, `release-static-ci`, `sandbox-deployment-gate`, and
-the hosted `Publish release deployment status` check, all from GitHub Actions.
-Failed checks block ordinary release merges without closing the PR. The
-owner's PR-only emergency bypass is described in
+workflow closes or merges a PR. Three rulesets on `main` require these checks,
+all from GitHub Actions: `main-release-source` requires
+`main-source-eligibility`, `main-release-static-ci` requires
+`release-static-ci`, and `main-release-deployment` requires
+`sandbox-deployment-gate` and the hosted `Publish release deployment status`
+check. Failed checks block ordinary release merges without closing the PR.
+Release deployments are approved by the `azuresandbox-owners` team. The
+owners' PR-only emergency bypass is described in
 [CONTRIBUTING.md](../../../CONTRIBUTING.md#emergency-merges); it never creates
 a passing result or approves a deployment.
 
