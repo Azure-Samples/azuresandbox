@@ -167,52 +167,84 @@ for coordinated publication before another deployment.
 
 The workflow also supports a release-PR entry path through
 `pull_request_target` for same-repository `vnext` PRs targeting `main`.
-A GitHub-hosted job validates the event without checkout or environment secrets
-before scheduling the self-hosted deployment. Drafts and title/description-only
-edits do not deploy; opening or reopening a ready PR, marking it ready,
-updating its head, or retargeting it to `main` requests a deployment.
+The normal release flow is: open a draft `vnext` → `main` PR → mark it ready
+for review → static CI runs → the deployment is queued awaiting approval →
+the owner approves → deploy and unit/integration tests → if they pass, the PR
+can be merged. A GitHub-hosted job validates the event without checkout or
+environment secrets. Drafts and title/description-only edits run no static CI
+and do not deploy; opening or reopening a ready PR, marking it ready, updating
+its head, or retargeting it to `main` starts a fresh run.
 PR runs use the separate `sandbox-release-gate` environment and always run
 all stages with checkout pinned to the exact PR head SHA. Manual dispatch
-retains `sandbox-deployment`, the `vnext` checkout, and its stage selector.
+retains `sandbox-deployment`, the `vnext` checkout, and its stage selector,
+and does not run or wait for static CI.
 Both environments require `SANDBOX_BACKEND_HCL` and `SANDBOX_TFVARS_HCL`
 and owner approval. Keep their deployment branch restrictions on `main`,
 the trusted workflow context, and explicitly allow `pull_request_target`
 and `workflow_dispatch` in an Actions event policy scoped only to
 `.github/workflows/sandbox-deployment.yml`.
 
+Before any approval request, a release PR run calls the six static CI
+workflows (`ci-bash`, `ci-powershell`, `ci-docs`, `ci-actions`, `ci-secrets`,
+and `ci-terraform`) as reusable workflows from the trusted `main` revision.
+Each checks out the exact PR head SHA read-only, with no secrets, write
+tokens, or caches, and applies its usual path filters to the **full release
+diff**: everything `vnext` adds since its merge base with `main`, not just the
+last commit. Each returns an explicit verdict: `pass` when its applicable
+checks succeed, or `not-applicable` when change detection succeeded and proved
+no relevant files changed (`gitleaks` and both `terraform validate` contexts
+always apply). The hosted `Release static CI` job requires every one of the six
+verdicts for the same head SHA, then rereads the live PR and requires it to be
+open, not a draft, and unchanged in head, base, and source. Only then does it
+publish `release-static-ci = success` and let the environment-protected
+deployment job request approval. A failed, cancelled, missing, or unexpected
+result publishes `release-static-ci = failure` and no deployment is requested.
+Static CI never depends on deployment-produced checks, and the organization's
+CLA check is not part of it. Results from earlier topic-PR, push, or manual
+CI runs are never reused.
+
+After approval, and after any wait for the serialized runner, the deployment
+job's first step rechecks the live PR and confirms this attempt still owns a
+passing `release-static-ci` status, before checking out candidate code or
+touching Azure. A PR that changed, closed, became a draft, or was superseded
+in the meantime stops there.
+
 Both entry paths share the existing concurrency group with active-run
 cancellation disabled. Advancing `vnext` does not change an already captured
-PR candidate or interrupt an active apply. This entry-path change does **not**
-make deployment a required merge check or implement cleanup/recovery.
-The existing run-ID state keys and unused-state requirement still apply;
-re-running an attempt with existing state is not a supported retry.
+PR candidate or interrupt an active apply. The workflow does not implement
+cleanup/recovery. The existing run-ID state keys and unused-state requirement
+still apply; re-running an attempt with existing state is not a supported
+retry.
 
-Eligible PR runs publish `sandbox-deployment-gate` as pending on the exact head
-SHA before environment approval. A separate GitHub-hosted reporter publishes
-success only after Preflight, Apply, Unit-test, stage reporting, and JSON
-artifact upload all succeed. The validated JSON must also report native exit
-code zero, `result = "pass"`, positive passing counts, and no failed tests or
-failed suites. Native test-scope/optional-suite skip behavior is unchanged.
-Missing evidence, skipped required stages, failures, and cancellations cannot
-produce success. If cancellation or an API outage prevents final reporting,
-the status can remain pending rather than falsely passing.
+Eligible PR runs publish `release-static-ci` and `sandbox-deployment-gate` as
+pending on the exact head SHA before static CI starts. A separate
+GitHub-hosted reporter publishes `sandbox-deployment-gate = success` only after
+Preflight, Apply, Unit-test, stage reporting, and JSON artifact upload all
+succeed. The validated JSON must also report native exit code zero,
+`result = "pass"`, positive passing counts, and no failed tests or failed
+suites. Native test-scope/optional-suite skip behavior is unchanged. Missing
+evidence, skipped required stages, failures, and cancellations cannot produce
+success. If cancellation or an API outage prevents final reporting, the status
+can remain pending rather than falsely passing.
 
-The deployment job waits for successful pending-status publication on PR runs;
-an API failure at that point does not schedule an Azure deployment. Manual
-runs explicitly bypass the PR-only pending job without losing their deployment.
-Metadata-only validation does not share the status-writer lock, so it cannot
-displace a queued reporter.
+The deployment job waits for successful pending-status publication and static
+CI on PR runs; an API failure at either point does not schedule an Azure
+deployment. Manual runs explicitly skip the PR-only jobs without losing their
+deployment. Metadata-only validation does not share the status-writer lock, so
+it cannot displace a queued reporter.
 
 Status writers have a separate per-SHA lock and attempt-specific run links;
 an older attempt cannot overwrite the pending result of a newer attempt on
-the same SHA. Only the hosted status jobs have status-write permission.
-Manual dispatch does not publish this PR status. Drafts and metadata-only
-edits do not overwrite it, and no workflow closes or merges a PR.
-After successful release-path acceptance and operator-approved enforcement,
-the `main-release-source` ruleset requires `main-source-eligibility`,
-`sandbox-deployment-gate`, and the hosted `Publish release deployment status`
-check, all from GitHub Actions. Failed checks block ordinary release merges
-without closing the PR; the explicit owner-only maintenance bypass is unchanged.
+the same SHA, or deploy on the strength of it. Only the hosted status jobs
+have status-write permission. Manual dispatch does not publish these PR
+statuses. Drafts and metadata-only edits do not overwrite them, and no
+workflow closes or merges a PR. The `main-release-source` ruleset requires
+`main-source-eligibility`, `release-static-ci`, `sandbox-deployment-gate`, and
+the hosted `Publish release deployment status` check, all from GitHub Actions.
+Failed checks block ordinary release merges without closing the PR. The
+owner's PR-only emergency bypass is described in
+[CONTRIBUTING.md](../../../CONTRIBUTING.md#emergency-merges); it never creates
+a passing result or approves a deployment.
 
 The deployment/monitor helpers replace the Python implementation
 with Bash entrypoints and PowerShell 7.3+ stage logic. The helper test sources

@@ -60,9 +60,20 @@ This repository uses a two-branch model to keep `main` stable and releasable at 
 - **Topic/contributor PRs → `vnext`:** **squash merge**, so each PR lands as one tidy commit on `vnext`.
 - **`vnext` → `main` (release promotion):** **regular merge commit (do not squash)**, so the individual `vnext` commits and the branch lineage are preserved on `main`. Squashing this promotion flattens all the work into a single commit and loses that history.
 
+### Pull request flow
+
+Open every PR as a **draft** while you work. Draft PRs run no CI checks; marking a PR **Ready for review** starts them.
+
+| Target | Normal path |
+| --- | --- |
+| `vnext` | Open a draft PR → mark it ready for review → the [static CI checks](#continuous-integration) run → once they pass and the review and conversation requirements are met, the PR can be merged. |
+| `main` | The owner opens a draft `vnext` → `main` release PR → marks it ready for review → the release workflow runs the same static CI checks against the release's exact head commit and its full diff from `main` → once they pass, the deployment is queued awaiting approval → the owner approves → a fresh sandbox is deployed and the existing unit and integration tests run → if they pass, the PR can be merged. |
+
+No Azure deployment starts before approval. Pushing a new commit to a ready PR, or marking a draft ready again, starts a fresh run; results from an earlier commit or run are never reused. CI also runs on `vnext` after every merge, to check the combined code.
+
 ### Merging into `vnext`
 
-How a PR lands on `vnext` depends on who you are. Both paths start the same way — push a branch and open a PR against `vnext`:
+Push a branch and open a draft PR against `vnext`:
 
 ```bash
 # Put your edits on a branch (uncommitted changes come with you).
@@ -71,76 +82,73 @@ git add -A
 git commit -m "describe my change"
 git push -u origin feature/my-change
 
-# Open the PR against vnext.
-gh pr create --base vnext --fill
+# Open the PR against vnext as a draft, then mark it ready when done.
+gh pr create --base vnext --fill --draft
+gh pr ready
 ```
 
-#### Path 1 — Contributors (merge queue + review)
+A PR into `vnext` can be merged once:
 
-All contributors **except** members of the `azuresandbox-vnext-bypass` team merge through a **merge queue** and need **one approval**. You do not use the "Squash and merge" button or merge directly — you queue the PR and the queue squash-merges it once it is up to date and green:
+- every required CI check passes on the PR's latest commit, and the branch is up to date with `vnext`;
+- it has **one approval** from someone other than the author (the repository owner is requested automatically through [`.github/CODEOWNERS`](.github/CODEOWNERS)); and
+- all review conversations are resolved.
+
+Then squash-merge it, consistent with the [merge strategy](#merge-strategy) above:
 
 ```bash
-# After required checks pass and the PR has 1 approval, queue it:
-gh pr merge --squash --auto
-
-# The queue rebases your branch on the latest vnext, re-runs checks, and
-# squash-merges it. Then sync your local vnext:
+gh pr merge <pr-number> --squash
 git checkout vnext && git pull
 ```
 
-You do **not** need to manually click "Update branch" when your PR falls behind — the merge queue rebases it on the latest `vnext` automatically. Expect a short delay (rather than an instant merge) while the queue builds and tests your PR. The required approval comes from the repository owner (declared in [`.github/CODEOWNERS`](.github/CODEOWNERS)).
-
-#### Path 2 — Maintainers in the `azuresandbox-vnext-bypass` team
-
-Members of the **`azuresandbox-vnext-bypass`** team (currently the repository owner) can **self-merge without an approval** and may **bypass the merge queue**, merging directly once required checks are green:
-
-```bash
-# Direct squash merge, bypassing both the review requirement and the queue:
-gh pr merge <pr-number> --squash --admin
-```
-
-In the GitHub UI this appears as a **"Bypass rules and merge"** option in the merge box. (You still cannot "Approve" your own PR — GitHub never allows self-approval — but as a bypass-team member you do not need an approval to merge.) Contributor PRs that are not yours still require your review before they can merge via Path 1.
-
-Either path produces a single squashed commit on `vnext`, consistent with the [merge strategy](#merge-strategy) above.
+GitHub never lets authors approve their own PRs. Members of the **`azuresandbox-vnext-bypass`** team (currently only the repository owner) can merge their own PRs without an approval by selecting **Bypass rules and merge** (`gh pr merge <pr-number> --squash --admin`), after the required checks pass.
 
 ### Enforcement
 
-The policy above is enforced by [branch protection](https://docs.github.com/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches) on `main`:
+Both branches are protected entirely by [rulesets](https://docs.github.com/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets) (Settings → Rules); neither uses a classic branch protection rule. Every applicable ruleset must pass, and each ruleset's bypass list applies only to that ruleset. Rules that must never be bypassed are in rulesets with no bypass list. Every bypass is **For pull requests only**, so nobody can push directly to either branch.
 
-- `main` can only be updated through a pull request (no direct contributor pushes).
-- Push/merge access to `main` is restricted to **@doherty100**, so only the owner can complete a `vnext` → `main` pull request.
-- Force pushes and branch deletion are disabled on `main`.
+| Branch | Ruleset | Rules | Bypass |
+| --- | --- | --- | --- |
+| `vnext` | `vnext-baseline` | Require a PR, require conversation resolution, block force pushes and deletion | None |
+| `vnext` | `vnext-required-checks` | Require the ten static CI checks from GitHub Actions, with the branch up to date | `azuresandbox-vnext-bypass`, PRs only |
+| `vnext` | `vnext-require-review` | Require one approval | `azuresandbox-vnext-bypass`, PRs only |
+| `main` | `main-baseline` | Require a PR, block force pushes and deletion | None |
+| `main` | `main-restrict-updates` | Only the repository owner can update `main` | `azuresandbox-main-bypass`, PRs only |
+| `main` | `main-release-source` | Require `main-source-eligibility`, `release-static-ci`, `sandbox-deployment-gate`, and `Publish release deployment status` | `azuresandbox-main-bypass`, PRs only |
 
-The separate `main-release-source` ruleset requires the
-`main-source-eligibility` commit status, reported by GitHub Actions, for PRs
-targeting `main`. The [source-policy workflow](.github/workflows/main-source-policy.yml)
-runs trusted default-branch code on a GitHub-hosted runner without checking out
-or executing PR code. It publishes success on the exact PR head SHA only when
-the source is this repository's `vnext` branch; other sources, including a fork's
-`vnext`, fail. This is a source-policy check, not an Azure deployment/CD gate.
+The [source-policy workflow](.github/workflows/main-source-policy.yml) publishes
+`main-source-eligibility`. It runs trusted default-branch code on a
+GitHub-hosted runner without checking out or executing PR code, and reports
+success on the exact PR head SHA only when the source is this repository's
+`vnext` branch; other sources, including a fork's `vnext`, fail. This is a
+source-policy check, not an Azure deployment gate.
 
-After successful release-path acceptance, the same ruleset also requires
-`sandbox-deployment-gate` and the hosted `Publish release deployment status`
-check from GitHub Actions. Ready `vnext` to `main` PRs request a fresh deployment
-with protected-environment approval and serialized applies; draft PRs do not
-deploy. Deployment or test failures block ordinary merging without closing the
-PR. See the [deployment workflow guide](extras/configurations/rg-devops-iac/README.md)
-for the exact-SHA status and evidence requirements.
+The [deployment workflow](.github/workflows/sandbox-deployment.yml) publishes
+`release-static-ci` after the static CI checks pass on the release head, then
+`sandbox-deployment-gate` and `Publish release deployment status` after the
+approved deployment and tests. Deployment or test failures block ordinary
+merging without closing the PR. See the
+[deployment workflow guide](extras/configurations/rg-devops-iac/README.md) for
+the exact-SHA status and evidence requirements.
 
-#### Main maintenance exceptions
+The Microsoft CLA check (`license/cla`) is managed by the Azure-Samples
+organization, not this repository. No ruleset or workflow here depends on it.
 
-The `azuresandbox-main-bypass` organization team contains only the repository
-owner and has **For pull requests only** bypass on `main-release-source`.
-For an exceptional workflow-registration or maintenance PR, record the reason
-in the PR, complete the applicable static checks, and explicitly select
-**Bypass rules and merge**. The source check remains failed; the exception does
-not manufacture a passing release result.
+#### Emergency merges
 
-This bypass does not permit direct pushes and does not waive protections in
-other rulesets or classic branch protection. It does not change the separate
-`azuresandbox-vnext-bypass` team or `vnext` review ruleset. GitHub's native bypass
-applies to the whole selected ruleset, not a file allowlist, so maintainers must
-review the exception's scope.
+For urgent situations where waiting isn't practical, the repository owner can
+merge an existing PR to either branch when its CI checks or, on `main`, its
+deployment haven't passed. Examples include a GitHub outage that delays CI, a
+deployment that isn't possible because of time or cost constraints, or an
+authorized workflow-registration or maintenance PR to `main` that is not from
+`vnext`. Record the reason in the PR, then select **Bypass rules and merge**.
+
+- The bypassed checks keep their real pending or failed state; a bypass never
+  creates a passing result, approves or starts a deployment, or allows a direct
+  push.
+- A bypass never resolves merge conflicts or unresolved conversations, which
+  have no bypass.
+- GitHub's bypass applies to the whole selected ruleset, not to a list of
+  files, so review the PR's full scope before using it.
 
 Code ownership is declared in [`.github/CODEOWNERS`](.github/CODEOWNERS) (`* @doherty100`), which automatically requests the owner as a reviewer on pull requests.
 
@@ -156,14 +164,16 @@ Code ownership is declared in [`.github/CODEOWNERS`](.github/CODEOWNERS) (`* @do
 
 ## Continuous Integration
 
-Pull requests targeting `vnext` (and pushes to `vnext`) automatically run lightweight static-analysis checks via GitHub Actions. These do **not** deploy anything to Azure and require no credentials. The workflows live in [`.github/workflows/`](.github/workflows):
+Ready (non-draft) pull requests targeting `vnext`, and pushes to `vnext`, automatically run lightweight static-analysis checks via GitHub Actions. These do **not** deploy anything to Azure and require no credentials. The same six workflows also run inside the release deployment workflow for a ready `vnext` → `main` PR, against the release's exact head commit and its full diff from `main`, before any deployment can be approved. The workflows live in [`.github/workflows/`](.github/workflows):
 
 | Workflow | Checks | Configuration |
 | --- | --- | --- |
 | `ci-docs` | `markdownlint-cli2` (Markdown style) and `lychee` (internal/relative link checker, offline) | [`.markdownlint.jsonc`](.markdownlint.jsonc), [`.markdownlint-cli2.jsonc`](.markdownlint-cli2.jsonc) |
-| `ci-terraform` | `terraform fmt -check -recursive` and `tflint --recursive` | [`.tflint.hcl`](.tflint.hcl) |
+| `ci-terraform` | `terraform fmt -check -recursive`, `tflint --recursive`, and `terraform validate` for both root configurations | [`.tflint.hcl`](.tflint.hcl) |
 | `ci-powershell` | `PSScriptAnalyzer` over all PowerShell scripts | [`PSScriptAnalyzerSettings.psd1`](PSScriptAnalyzerSettings.psd1) |
 | `ci-bash` | `ShellCheck` over all `*.sh` scripts (fails on warning + error severity) | [`.shellcheckrc`](.shellcheckrc) |
+| `ci-actions` | `actionlint` over the GitHub Actions workflows | — |
+| `ci-secrets` | `gitleaks` secret scan of the working tree (always runs) | — |
 
 To reproduce the checks locally before opening a PR:
 

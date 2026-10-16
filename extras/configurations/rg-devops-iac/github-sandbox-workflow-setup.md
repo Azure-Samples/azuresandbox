@@ -20,6 +20,9 @@ Python implementation; its test failure was correctly reported.
 Step 73 changes the unit-test stage to JSON-only output and consumption.
 Earlier JUnit artifact observations describe historical runs, not the current
 output contract.
+Step 93 makes release static CI a prerequisite for deployment approval and
+moves both branches from classic branch protection to rulesets. Earlier
+descriptions of classic protection are historical, not current policy.
 
 ## Deployment scope and success criteria
 
@@ -4188,3 +4191,53 @@ before removing the original uncommitted copies. Then fast-forward local
 verified obsolete publication branches and clean auxiliary worktrees.
 Keep ignored configuration, credentials, Terraform state, and Azure resources
 untouched. Azure cleanup and runner-local retention cleanup remain separate.
+
+## Step 93: Require static CI before release deployment approval
+
+Issue #854 found that a ready `vnext` → `main` release PR could request
+deployment approval before its static CI had finished. The fix makes static CI
+an explicit prerequisite and aligns both branches with these operator flows:
+
+| Target | Normal path |
+| --- | --- |
+| `vnext` | Draft PR → mark ready for review → static CI runs → once it passes, the PR can be merged. |
+| `main` | Draft `vnext` → `main` PR → mark ready for review → static CI runs → deployment queued awaiting approval → owner approves → deploy and unit/integration tests → once they pass, the PR can be merged. |
+
+Workflow changes:
+
+* The six `ci-*.yml` workflows skip all jobs on draft PRs and start a fresh
+  run on `ready_for_review`. Post-merge CI on `vnext` is unchanged.
+* Each is also a reusable workflow (`workflow_call`) with `head_sha` and
+  `base_sha` inputs. In that release mode it checks out the exact head SHA
+  without persisted credentials, diffs the full release against its merge base
+  with `main`, keys concurrency on the PR number and head SHA, and ends with a
+  `release gate` job that returns an explicit `pass`, `not-applicable`, or
+  `fail` verdict. Native PR, push, and manual runs behave as before.
+* `sandbox-deployment.yml` publishes `release-static-ci` and
+  `sandbox-deployment-gate` as pending, calls the six workflows from the
+  trusted `main` revision, and runs a hosted `Release static CI` job that
+  requires all six verdicts for the same head and a live recheck of the PR.
+  Only after it publishes `release-static-ci = success` can the deployment job
+  request approval. After approval, the deployment job repeats the live and
+  status-ownership check before checking out candidate code.
+* Manual dispatch keeps its existing behavior and does not run or wait for
+  static CI.
+
+Branch protection for both branches moved from classic branch protection rules
+to rulesets, and both classic rules were deleted after the replacement
+rulesets were active and verified. Rules that must never be bypassed (PR
+required, conversation resolution on `vnext`, force-push and deletion blocks)
+are in baseline rulesets with no bypass. The required CI checks on `vnext`,
+the review requirement on `vnext`, the owner-only update restriction on
+`main`, and the release checks on `main` each allow the owner's team to
+bypass **for pull requests only**. See
+[CONTRIBUTING.md](../../../CONTRIBUTING.md#enforcement) for the ruleset table
+and the emergency-merge rules. After hosted verification, `release-static-ci`
+is added to the `main-release-source` ruleset.
+
+Validation used temporary, session-only logic tests of the actual workflow
+scripts (release gate verdicts, full-diff staging, the static CI aggregate,
+and the post-approval guard) with stubbed GitHub API responses. No test
+sources were committed. Hosted acceptance on a real release PR, confirming
+that static CI runs and passes before any deployment approval request
+appears, is recorded on issue #854.
