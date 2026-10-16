@@ -3,9 +3,116 @@
 This guide documents an attended Bash deployment of the standalone
 `rg-devops-iac` configuration, with its Linux VM used as a GitHub Actions
 self-hosted runner for Azure Sandbox deployments. It is not a production
-deployment guide.
+deployment guide. This guide walks through all of the steps that were required
+for an intial setup, including mid-setup validation steps and the particular
+environment that was used to do the setup. Since then after multiple
+re-deploys all of this content can be generalized into these steps:
 
-## Steps
+* Prepare a [Terraform execution environment](../../../README.md#terraform-execution-environment) to deploy `rg-devops-iac` in "GitHub self-hosted runner" mode.
+* Create (or regenerate) a fine grained PAT which will be used one-time-only for Github self-hosted runner registration.
+    1. Navigate to Github > My profile > Settings
+    1. Navigate to Settings > Access > Credentials
+    1. Navigate to Credentials > Overview > Fine-grained personal access tokens
+    1. Create / regenerate a token named `azuresandbox-runner-jumplinux2` scoped to this repo with  **Administration: Read and write** privileges. To do this the operator must be a repo admin.
+    1. Make a note of the token you will need it in a later step
+* From the terraform execution environment, open a bash terminal and clone the azure sandbox repo into a separate devops folder because local terraform state will need to be retained.
+
+  ```bash
+  mkdir devops
+  cd devops
+  git clone https://github.com/Azure-Samples/azuresandbox
+  cd azuresandbox/extras/configurations/rg-devops-iac
+  ```
+
+* From bash, create environment variables for deployment secrets:
+
+  ```bash
+  export TF_VAR_arm_client_secret=<spn-secret-here> 
+  export TF_VAR_github_runner_token=<pat-token-here>
+  ```
+
+* Generate a baseline `terraform.tfvars` file.
+
+  ```bash
+  az login --use-device-code
+  ./scripts/bootstrap.sh
+  ```
+
+* Edit `terraform.tfvars` and add Github self-hosted runner settings.
+
+  ```hcl
+  aad_tenant_id   = "<entra-tenant-id-here>"
+  arm_client_id   = "<spn-client-id-here>"
+  location        = "southcentralus"
+  subscription_id = "<subscription-id-here>"
+  user_object_id  = "<operator-user-id-here>"
+
+  # Add environment specific tags as required required here
+  tags = {
+    project     = "devops",
+    costcenter  = "mycostcenter",
+    environment = "dev"
+  }
+
+  # Self-hosted runner settings
+  enable_github_runner          = true
+  enable_user_assigned_identity = true
+  github_runner_url             = "https://github.com/Azure-Samples/azuresandbox"
+  github_runner_labels          = ["azuresandbox"]
+  github_runner_token_type      = "pat"
+  ```
+
+* Apply the configuration.
+
+  ```bash
+  terraform init
+  terraform apply --auto-approve
+  ```
+
+* Record the output.
+
+  ```hcl
+  github_runner_name = "jumplinux2"
+  resource_ids = {
+    "key_vault" = "/subscriptions/<subscription-id-here>/resourceGroups/rg-devops-dev-<xxxxxxxx>/providers/Microsoft.KeyVault/vaults/kv-devops-dev-<xxxxxxxx>"
+    "resource_group" = "/subscriptions/<subscription-id-here>/resourceGroups/rg-devops-dev-<xxxxxxxx>"
+    "storage_account" = "/subscriptions/<subscription-id-here>/resourceGroups/rg-devops-dev-<xxxxxxxx>/providers/Microsoft.Storage/storageAccounts/stdevopsdev<xxxxxxxx>"
+    "user_assigned_identity" = "/subscriptions/<subscription-id-here>/resourceGroups/rg-devops-dev-<xxxxxxxx>/providers/Microsoft.ManagedIdentity/userAssignedIdentities/uai-devops-dev-<xxxxxxxx>"
+    "virtual_machine_jumplinux2" = "/subscriptions/<subscription-id-here>/resourceGroups/rg-devops-dev-<xxxxxxxx>/providers/Microsoft.Compute/virtualMachines/jumplinux2"
+    "virtual_network" = "/subscriptions/<subscription-id-here>/resourceGroups/rg-devops-dev-<xxxxxxxx>/providers/Microsoft.Network/virtualNetworks/vnet-devops-dev-devops"
+  }
+  resource_names = {
+    "key_vault" = "kv-devops-dev-<xxxxxxxx>"
+    "resource_group" = "rg-devops-dev-<xxxxxxxx>"
+    "storage_account" = "stdevopsdev<xxxxxxxx>"
+    "user_assigned_identity" = "uai-devops-dev-<xxxxxxxx>"
+    "virtual_machine_jumplinux2" = "jumplinux2"
+    "virtual_network" = "vnet-devops-dev-devops"
+  }
+  user_assigned_identity_client_id = "<uami-client-id-here>"
+  user_assigned_identity_principal_id = "<uami-principal-id-here>"
+  ```
+
+* Ensure the operator has a at least a `Privileged Role Administrator` Entra ID role assignment. This may require PIM activation.
+
+* Grant UAMI Entra ID Graph Privileges. This is required for creation of Entra ID groups used by `mssql` module.
+
+  ```bash
+  ./scripts/grant-graph-permissions.sh
+  ```
+
+  You should see output similar to this:
+
+  ```text
+  Managed identity: uai-devops-dev-<xxxxxxxx> (<uami-principal-id-here>)
+    Group.ReadWrite.All: granting...
+    Group.ReadWrite.All: granted.
+  Microsoft Graph permission grant complete.
+  ```
+
+* Proceed with [GitHub Sandbox Deployment Workflow Setup](./github-sandbox-workflow-setup.md)
+
+## Detailed Steps from first-time deployment
 
 1. [Prepare variables and authentication](#step-1-prepare-variables-and-authentication).
 2. [Enable the runner and deployment identity](#step-2-enable-the-runner-and-deployment-identity).
@@ -119,32 +226,25 @@ deployment has its own inputs and must be configured separately later.
 For a repository-level runner, the intended additional settings are:
 
 ```hcl
-enable_github_runner = true
-github_runner_url    = "https://github.com/<owner>/<repository>"
-github_runner_labels = ["azuresandbox"]
-github_runner_token_type = "pat"
-```
-
-Replace the URL locally with the confirmed repository. Labels must match the
-workflows that will target the runner. Do not append duplicate assignments if
-these keys already exist.
-
-For Sandbox deployments using managed identity, also consider:
-
-```hcl
+# Self-hosted runner settings
+enable_github_runner          = true
 enable_user_assigned_identity = true
+github_runner_url             = "https://github.com/Azure-Samples/azuresandbox"
+github_runner_labels          = ["azuresandbox"]
+github_runner_token_type      = "pat"
 ```
 
-Confirm this choice before applying: it creates a user-assigned identity with
+The URL and label must match the workflows that will target the runner.
+`enable_user_assigned_identity` creates a user-assigned managed identity with
 subscription `Owner` and attaches it to the VM. Subscription Owner privileges
 are needed for the bootstrap's role assignments, or an equivalent role
 combination must permit them. The subscription-owner identity can also modify
 the runner infrastructure itself.
 
-The VM's system-assigned identity remains the default for cloud-init, token
-retrieval, and the remote-state backend. The user-assigned identity is selected
-explicitly for later Sandbox provider authentication. Do not replace the
-bootstrap's service principal client ID with that identity's client ID.
+The VM's system-assigned managed identity remains the default for cloud-init, token
+retrieval, and the remote-state backend. The user-assigned managed identity (UAMI) is used
+for later Sandbox provider authentication. Do not replace the
+bootstrap's service principal `arm_client_id` with the UAMI client ID.
 
 ### Secret and environment handling
 
@@ -500,11 +600,6 @@ Proceed only after the [bootstrap apply](#step-5-apply-the-reviewed-bootstrap-pl
 completes successfully. Terraform completion does not prove that the GitHub
 runner is ready.
 
-Backporting the root Sandbox module's managed cloud-init completion wait is
-tracked in [issue #805](https://github.com/Azure-Samples/azuresandbox/issues/805).
-That enhancement does not replace successful-provisioning and GitHub-side
-readiness checks.
-
 Use the workstation's existing Azure CLI authentication. These checks use
 [Azure VM Run Command](https://learn.microsoft.com/azure/virtual-machines/linux/run-command)
 to execute read-only guest diagnostics, so they do not require downloading an
@@ -835,10 +930,10 @@ first.
 
 Before running the command, the operator must explicitly confirm:
 
-- Sandbox deployments will enable `mssql`.
-- The workstation Azure CLI is signed in to the correct tenant as an Entra
+* Sandbox deployments will enable `mssql`.
+* The workstation Azure CLI is signed in to the correct tenant as an Entra
   **Privileged Role Administrator** or **Global Administrator**.
-- That role is active. If activated through PIM after sign-in, sign in again
+* That role is active. If activated through PIM after sign-in, sign in again
   so the current session reflects the role activation.
 
 Subscription `Owner` is not sufficient. Do not run the grant on the VM using
@@ -902,14 +997,14 @@ workflow. Those remain separate from this standalone infrastructure bootstrap.
 After completing the preceding checks, the standalone runner infrastructure
 is provisioned and its prerequisites are verified:
 
-- Cloud-init completed without reported errors.
-- The runner service is active and GitHub reports the expected runner online,
+* Cloud-init completed without reported errors.
+* The runner service is active and GitHub reports the expected runner online,
   idle, and labeled for Azure Sandbox.
-- The runner account can use the required deployment toolchain.
-- The system-assigned identity can read the state container from the VM.
-- The user-assigned identity authenticates to the intended subscription and
+* The runner account can use the required deployment toolchain.
+* The system-assigned identity can read the state container from the VM.
+* The user-assigned identity authenticates to the intended subscription and
   has subscription `Owner`.
-- If `mssql` will be enabled, an authorized administrator completed the
+* If `mssql` will be enabled, an authorized administrator completed the
   Microsoft Graph `Group.ReadWrite.All` grant.
 
 This does not mean an Azure Sandbox has been deployed or that a deployment
