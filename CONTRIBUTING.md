@@ -162,7 +162,7 @@ authorized workflow-registration or maintenance PR to `main` that is not from
 - GitHub's bypass applies to the whole selected ruleset, not to a list of
   files, so review the PR's full scope before using it.
 
-Code ownership is declared in [`.github/CODEOWNERS`](.github/CODEOWNERS) (`* @Azure-Samples/azuresandbox-owners`), which automatically requests the owners as reviewers on pull requests. The same team approves release deployments in the `sandbox-release-gate` environment.
+Code ownership is declared in [`.github/CODEOWNERS`](.github/CODEOWNERS) (`* @Azure-Samples/azuresandbox-owners`), which automatically requests the owners as reviewers on pull requests. The same team approves release deployments in the `sandbox-release-gate` environment. Administrators can't skip that approval, so every release deployment waits for an owner to approve it. Merging a release PR without a deployment, such as a documentation-only release, doesn't involve the environment: an owner uses the PR-only bypass on `main-release-deployment` and records the reason in the PR.
 
 ## Collaborator Access and Issue Assignment
 
