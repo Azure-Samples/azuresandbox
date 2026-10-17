@@ -27,7 +27,7 @@ re-deploys all of this content can be generalized into these steps:
 * From bash, create environment variables for deployment secrets:
 
   ```bash
-  export TF_VAR_arm_client_secret=<spn-secret-here> 
+  export TF_VAR_client_secret=<spn-secret-here> 
   export TF_VAR_github_runner_token=<pat-token-here>
   ```
 
@@ -41,8 +41,8 @@ re-deploys all of this content can be generalized into these steps:
 * Edit `terraform.tfvars` and add Github self-hosted runner settings.
 
   ```hcl
-  aad_tenant_id   = "<entra-tenant-id-here>"
-  arm_client_id   = "<spn-client-id-here>"
+  client_id       = "<spn-client-id-here>"
+  entra_tenant_id = "<entra-tenant-id-here>"
   location        = "southcentralus"
   subscription_id = "<subscription-id-here>"
   user_object_id  = "<operator-user-id-here>"
@@ -56,7 +56,7 @@ re-deploys all of this content can be generalized into these steps:
 
   # Self-hosted runner settings
   enable_github_runner          = true
-  enable_user_assigned_identity = true
+  deployment_identity           = "managed_identity"
   github_runner_url             = "https://github.com/Azure-Samples/azuresandbox"
   github_runner_labels          = ["azuresandbox"]
   github_runner_token_type      = "pat"
@@ -72,25 +72,25 @@ re-deploys all of this content can be generalized into these steps:
 * Record the output.
 
   ```hcl
+  deployment_identity_client_id = "<uami-client-id-here>"
+  deployment_identity_principal_id = "<uami-principal-id-here>"
   github_runner_name = "jumplinux2"
   resource_ids = {
+    "deployment_identity" = "/subscriptions/<subscription-id-here>/resourceGroups/rg-devops-dev-<xxxxxxxx>/providers/Microsoft.ManagedIdentity/userAssignedIdentities/uai-devops-dev-<xxxxxxxx>"
     "key_vault" = "/subscriptions/<subscription-id-here>/resourceGroups/rg-devops-dev-<xxxxxxxx>/providers/Microsoft.KeyVault/vaults/kv-devops-dev-<xxxxxxxx>"
     "resource_group" = "/subscriptions/<subscription-id-here>/resourceGroups/rg-devops-dev-<xxxxxxxx>"
     "storage_account" = "/subscriptions/<subscription-id-here>/resourceGroups/rg-devops-dev-<xxxxxxxx>/providers/Microsoft.Storage/storageAccounts/stdevopsdev<xxxxxxxx>"
-    "user_assigned_identity" = "/subscriptions/<subscription-id-here>/resourceGroups/rg-devops-dev-<xxxxxxxx>/providers/Microsoft.ManagedIdentity/userAssignedIdentities/uai-devops-dev-<xxxxxxxx>"
     "virtual_machine_jumplinux2" = "/subscriptions/<subscription-id-here>/resourceGroups/rg-devops-dev-<xxxxxxxx>/providers/Microsoft.Compute/virtualMachines/jumplinux2"
     "virtual_network" = "/subscriptions/<subscription-id-here>/resourceGroups/rg-devops-dev-<xxxxxxxx>/providers/Microsoft.Network/virtualNetworks/vnet-devops-dev-devops"
   }
   resource_names = {
+    "deployment_identity" = "uai-devops-dev-<xxxxxxxx>"
     "key_vault" = "kv-devops-dev-<xxxxxxxx>"
     "resource_group" = "rg-devops-dev-<xxxxxxxx>"
     "storage_account" = "stdevopsdev<xxxxxxxx>"
-    "user_assigned_identity" = "uai-devops-dev-<xxxxxxxx>"
     "virtual_machine_jumplinux2" = "jumplinux2"
     "virtual_network" = "vnet-devops-dev-devops"
   }
-  user_assigned_identity_client_id = "<uami-client-id-here>"
-  user_assigned_identity_principal_id = "<uami-principal-id-here>"
   ```
 
 * Ensure the operator has a at least a `Privileged Role Administrator` Entra ID role assignment. This may require PIM activation.
@@ -183,7 +183,7 @@ az version --query '"azure-cli"' --output tsv
 git branch --show-current
 git check-ignore terraform.tfvars
 
-printf 'TF_VAR_arm_client_secret: %s\n' "${TF_VAR_arm_client_secret:+set}"
+printf 'TF_VAR_client_secret: %s\n' "${TF_VAR_client_secret:+set}"
 printf 'TF_VAR_github_runner_token: %s\n' "${TF_VAR_github_runner_token:+set}"
 
 printf '\nExported Terraform/Azure variable names (values omitted):\n'
@@ -211,8 +211,8 @@ those values. The bootstrap requires these inputs:
 
 | Setting | Purpose |
 | --- | --- |
-| `aad_tenant_id` | Tenant containing the bootstrap service principal. |
-| `arm_client_id` | Bootstrap service principal application/client ID, not a managed identity client ID. |
+| `entra_tenant_id` | Tenant containing the bootstrap service principal. |
+| `client_id` | Bootstrap service principal application/client ID, not a managed identity client ID. |
 | `subscription_id` | Subscription where the runner infrastructure will be created. |
 | `user_object_id` | Operator's Entra user object ID for the configuration's role assignments. |
 | `location` | Operator-selected Azure region with suitable VM availability and quota. |
@@ -228,14 +228,14 @@ For a repository-level runner, the intended additional settings are:
 ```hcl
 # Self-hosted runner settings
 enable_github_runner          = true
-enable_user_assigned_identity = true
+deployment_identity           = "managed_identity"
 github_runner_url             = "https://github.com/Azure-Samples/azuresandbox"
 github_runner_labels          = ["azuresandbox"]
 github_runner_token_type      = "pat"
 ```
 
 The URL and label must match the workflows that will target the runner.
-`enable_user_assigned_identity` creates a user-assigned managed identity with
+`deployment_identity = "managed_identity"` creates a user-assigned managed identity with
 subscription `Owner` and attaches it to the VM. Subscription Owner privileges
 are needed for the bootstrap's role assignments, or an equivalent role
 combination must permit them. The subscription-owner identity can also modify
@@ -244,11 +244,11 @@ the runner infrastructure itself.
 The VM's system-assigned managed identity remains the default for cloud-init, token
 retrieval, and the remote-state backend. The user-assigned managed identity (UAMI) is used
 for later Sandbox provider authentication. Do not replace the
-bootstrap's service principal `arm_client_id` with the UAMI client ID.
+bootstrap's service principal `client_id` with the UAMI client ID.
 
 ### Secret and environment handling
 
-Keep `TF_VAR_arm_client_secret` exported in the operator's deployment terminal.
+Keep `TF_VAR_client_secret` exported in the operator's deployment terminal.
 Do not put it in `terraform.tfvars` or paste its value into the walkthrough.
 
 Runner registration also requires `TF_VAR_github_runner_token`. For a
@@ -311,7 +311,7 @@ chmod 600 terraform.tfvars
 cat >> terraform.tfvars <<'EOF'
 
 enable_github_runner          = true
-enable_user_assigned_identity = true
+deployment_identity           = "managed_identity"
 github_runner_url            = "https://github.com/<owner>/<repository>"
 github_runner_labels         = ["azuresandbox"]
 github_runner_token_type     = "pat"
@@ -320,7 +320,7 @@ EOF
 terraform fmt terraform.tfvars
 ```
 
-The `arm_client_id` already in this file must remain the bootstrap service
+The `client_id` already in this file must remain the bootstrap service
 principal's client ID. The new managed identity is created by this deployment;
 its client ID is used only when configuring later Sandbox deployments.
 
@@ -350,7 +350,7 @@ export TF_VAR_github_runner_token
 printf 'TF_VAR_github_runner_token: %s\n' "${TF_VAR_github_runner_token:+set}"
 ```
 
-Keep the existing `TF_VAR_arm_client_secret` exported. The two secrets serve
+Keep the existing `TF_VAR_client_secret` exported. The two secrets serve
 different purposes: the service principal authenticates the bootstrap's Azure
 providers; the PAT allows the VM to request a GitHub runner registration token.
 The runner does not need this PAT to authenticate ordinary workflow jobs after
@@ -362,9 +362,9 @@ This diagnostic prints the five non-secret runner settings and secret-presence
 flags. It does not print the bootstrap IDs, organizational tags, or credentials.
 
 ```bash
-awk '/^(enable_github_runner|enable_user_assigned_identity|github_runner_url|github_runner_labels|github_runner_token_type)[[:space:]]*=/ { print }' terraform.tfvars
+awk '/^(enable_github_runner|deployment_identity|github_runner_url|github_runner_labels|github_runner_token_type)[[:space:]]*=/ { print }' terraform.tfvars
 
-printf 'TF_VAR_arm_client_secret: %s\n' "${TF_VAR_arm_client_secret:+set}"
+printf 'TF_VAR_client_secret: %s\n' "${TF_VAR_client_secret:+set}"
 printf 'TF_VAR_github_runner_token: %s\n' "${TF_VAR_github_runner_token:+set}"
 ```
 
@@ -850,8 +850,8 @@ authentication.
 
 ### Permissions already provisioned versus a separate admin grant
 
-With `enable_user_assigned_identity = true`, the bootstrap automatically
-creates `azurerm_role_assignment.user_assigned_identity_owner` at subscription
+With `deployment_identity = "managed_identity"`, the bootstrap automatically
+creates `azurerm_role_assignment.deployment_identity_owner` at subscription
 scope. No separate manual Azure RBAC grant is required for the identity's
 `Owner` role. The commands below verify the live assignment rather than
 granting it.
@@ -870,8 +870,8 @@ terminal. Keep `VM_ID` populated from step 6. The commands capture identity
 IDs from the completed bootstrap's outputs without printing them.
 
 ```bash
-UAI_CLIENT_ID=$(terraform output -raw user_assigned_identity_client_id) &&
-UAI_PRINCIPAL_ID=$(terraform output -raw user_assigned_identity_principal_id) &&
+UAI_CLIENT_ID=$(terraform output -raw deployment_identity_client_id) &&
+UAI_PRINCIPAL_ID=$(terraform output -raw deployment_identity_principal_id) &&
 SUBSCRIPTION_ID=$(printf '%s\n' "$VM_ID" | cut -d / -f 3) &&
 GUEST_SCRIPT=$(cat <<EOF
 set -eu
@@ -916,7 +916,7 @@ grant by a Privileged Role Administrator or Global Administrator.
 
 This check does not perform a Terraform Sandbox plan or validate all provider
 operations. The later Sandbox configuration must use this identity's client
-ID as `arm_client_id` with `arm_auth_mode = "msi"`. Do not change the
+ID as `client_id` with `auth_mode = "managed_identity"`. Do not change the
 standalone bootstrap's service principal inputs.
 
 ## Step 11: Grant the optional Microsoft Graph permission
@@ -953,7 +953,7 @@ the confirmed administrator's Azure CLI session:
 ./scripts/grant-graph-permissions.sh
 ```
 
-The script reads `user_assigned_identity_principal_id` from the completed
+The script reads `deployment_identity_principal_id` from the completed
 bootstrap outputs. It resolves Microsoft Graph's service principal and
 `Group.ReadWrite.All` application role, inspects existing assignments, and
 creates the assignment only if it is missing.
@@ -1044,7 +1044,7 @@ A deployment workflow needs its own human-confirmed configuration:
 | --- | --- |
 | Runner selection | Match `self-hosted`, `Linux`, `X64`, and `azuresandbox`; labels are routing, not an authorization boundary. |
 | Source revision | Explicitly select the intended Sandbox revision. |
-| Provider authentication | Set `arm_auth_mode = "msi"` and use the user-assigned identity client ID as `arm_client_id`. Do not copy the bootstrap service principal settings. |
+| Provider authentication | Set `auth_mode = "managed_identity"` and use the user-assigned identity client ID as `client_id`. Do not copy the bootstrap service principal settings. |
 | State backend | Use the provisioned storage account and container with Azure AD/managed identity authorization, normally the system-assigned identity. |
 | State key | Confirm a unique, stable key for the intended Sandbox; do not mix it with bootstrap state. |
 | Job workspace | Generate environment-specific inputs and backend configuration securely in each checkout; ignored local files are not automatically available to Actions jobs. Preserve an existing backend rather than overwriting it. |

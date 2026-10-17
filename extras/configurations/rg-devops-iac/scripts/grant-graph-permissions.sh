@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # Grants the Microsoft Graph application permissions required by root Azure Sandbox applies with
-# arm_auth_mode = "msi" to the user-assigned managed identity created by this configuration
-# (enable_user_assigned_identity = true). Group.ReadWrite.All is required by the mssql module.
+# auth_mode = "managed_identity" to the user-assigned managed identity created by this configuration
+# (deployment_identity = "managed_identity"). Group.ReadWrite.All is required by the mssql module.
 #
 # Must be run with Azure CLI signed in as a Microsoft Entra Privileged Role Administrator or Global
 # Administrator. The service principal used to provision this configuration cannot grant it.
 #
 # Usage: ./scripts/grant-graph-permissions.sh [managed-identity-principal-id]
-# The principal id defaults to the 'user_assigned_identity_principal_id' terraform output.
+# The principal id defaults to the 'deployment_identity_principal_id' terraform output.
 # The script is idempotent: permissions that are already granted are skipped.
 
 set -euo pipefail
@@ -23,10 +23,10 @@ if [[ $# -ge 1 ]]; then
   MI_OBJECT_ID="$1"
 else
   echo "Retrieving managed identity principal id from terraform output..."
-  MI_OBJECT_ID=$(terraform -chdir="${TERRAFORM_DIR}" output -raw user_assigned_identity_principal_id 2>/dev/null) || MI_OBJECT_ID=""
+  MI_OBJECT_ID=$(terraform -chdir="${TERRAFORM_DIR}" output -raw deployment_identity_principal_id 2>/dev/null) || MI_OBJECT_ID=""
   if [[ -z "${MI_OBJECT_ID}" || "${MI_OBJECT_ID}" == "null" ]]; then
-    echo "Error: 'user_assigned_identity_principal_id' terraform output is empty."
-    echo "Set enable_user_assigned_identity = true and run 'terraform apply', or pass the principal id."
+    echo "Error: 'deployment_identity_principal_id' terraform output is empty."
+    echo "Set deployment_identity = \"managed_identity\" and run 'terraform apply', or pass the principal id."
     echo "Usage: $0 [managed-identity-principal-id]"
     exit 1
   fi

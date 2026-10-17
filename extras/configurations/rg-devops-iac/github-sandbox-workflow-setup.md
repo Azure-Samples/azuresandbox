@@ -1,5 +1,11 @@
 # GitHub Sandbox Deployment Workflow Setup
 
+> [!NOTE]
+> This walkthrough records an attended setup and uses the variable and output names that were current when it was
+> written. Current names differ: `auth_mode` (`client_secret` or `managed_identity`), `client_id`, `client_secret`
+> (`TF_VAR_client_secret`), `entra_tenant_id`, `deployment_identity`, and the `deployment_identity_client_id` and
+> `deployment_identity_principal_id` outputs. See [Authentication](../../../README.md#authentication) for current behavior.
+
 This guide documents an attended, step-by-step setup of a GitHub Actions
 workflow that deploys a new Azure Sandbox on the self-hosted runner provisioned
 by [GitHub Self-Hosted Runner Setup](./github-selfhosted-runner-setup.md).

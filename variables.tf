@@ -1,55 +1,39 @@
-variable "aad_tenant_id" {
-  type        = string
-  description = "The Microsoft Entra tenant id."
-
-  validation {
-    condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.aad_tenant_id))
-    error_message = "Must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
-  }
-}
-
 variable "additional_tags" {
   type        = map(string)
   description = "Extra tags merged over the base tags map."
   default     = {}
 }
 
-variable "arm_client_id" {
+variable "auth_mode" {
   type        = string
-  description = "The service principal client ID for secret authentication or the user-assigned managed identity client ID for MSI authentication."
-  default     = null
+  description = "How Terraform authenticates the azurerm, azapi and azuread providers: client_secret (service principal and secret) or managed_identity (user-assigned managed identity on the Terraform execution host)."
+  default     = "client_secret"
 
   validation {
-    condition     = var.arm_client_id == null || can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.arm_client_id))
-    error_message = "When specified, arm_client_id must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
-  }
-
-  validation {
-    condition     = var.arm_client_id != null
-    error_message = "arm_client_id is required. It identifies the service principal when arm_auth_mode is secret or the user-assigned managed identity when arm_auth_mode is msi."
+    condition     = contains(["client_secret", "managed_identity"], var.auth_mode)
+    error_message = "auth_mode must be one of: client_secret or managed_identity."
   }
 }
 
-variable "arm_auth_mode" {
+variable "client_id" {
   type        = string
-  description = "The Azure authentication mode: secret for a service principal client secret or msi for a managed identity."
-  default     = "secret"
+  description = "The client id of the identity Terraform authenticates as: the service principal appId when auth_mode is client_secret, or the user-assigned managed identity client id when auth_mode is managed_identity."
 
   validation {
-    condition     = contains(["secret", "msi"], var.arm_auth_mode)
-    error_message = "arm_auth_mode must be one of: secret or msi."
+    condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.client_id))
+    error_message = "client_id must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
   }
 }
 
-variable "arm_client_secret" {
+variable "client_secret" {
   type        = string
-  description = "The password for secret authentication. Set it with TF_VAR_arm_client_secret when arm_auth_mode is secret."
+  description = "The service principal secret. Required only when auth_mode is client_secret. Set it with the TF_VAR_client_secret environment variable, never in a file."
   default     = null
   sensitive   = true
 
   validation {
-    condition     = var.arm_auth_mode != "secret" || (var.arm_client_secret != null && length(var.arm_client_secret) >= 8)
-    error_message = "arm_client_secret must be at least 8 characters long when arm_auth_mode is secret. Set it with TF_VAR_arm_client_secret."
+    condition     = var.auth_mode != "client_secret" || try(length(var.client_secret), 0) >= 8
+    error_message = "client_secret must be at least 8 characters long when auth_mode is client_secret. Set it with TF_VAR_client_secret."
   }
 }
 
@@ -145,6 +129,16 @@ variable "enable_module_vwan" {
   validation {
     condition     = !var.enable_module_vwan || var.enable_module_vnet_app
     error_message = "enable_module_vnet_app must be true when enable_module_vwan is true because the vwan module references resources from the vnet_app module."
+  }
+}
+
+variable "entra_tenant_id" {
+  type        = string
+  description = "The Microsoft Entra tenant id."
+
+  validation {
+    condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.entra_tenant_id))
+    error_message = "Must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
   }
 }
 

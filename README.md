@@ -6,6 +6,7 @@
 * [Overview](#overview)
 * [Features](#features)
 * [Prerequisites](#prerequisites)
+* [Authentication](#authentication)
 * [Getting Started (Interactive Execution)](#getting-started-interactive-execution)
 * [Documentation](#documentation)
 
@@ -119,7 +120,7 @@ Azure Sandbox is built with security as a core principle, ensuring that all reso
   * Ensures that only authorized entities can access or manage Azure resources.
   * Simplifies access management by leveraging Microsoft Entra ID for identity and access control.
 
-  **IMPORTANT**: Both the interactive user and the service principal used to provision the sandbox environment must have an `Owner` role assignment scoped to the sandbox subscription. This is required for the service principal to be able to create and manage resources in the subscription including role assignments. All other role assignments follow the principle of least privilege and leverage managed identities where applicable.
+  **IMPORTANT**: Both the interactive user and the deployment identity used to provision the sandbox environment must have an `Owner` role assignment scoped to the sandbox subscription. This is required for the deployment identity to be able to create and manage resources in the subscription including role assignments. See [Authentication](#authentication). All other role assignments follow the principle of least privilege and leverage managed identities where applicable.
 
 * **Data Encryption**:
   * All data stored in the sandbox environment is encrypted at rest using platform-managed keys.
@@ -162,6 +163,8 @@ This section describes the prerequisites required in order to provision an Azure
 * Ask the subscription owner to create an [Owner](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#owner) Azure RBAC role assignment for each sandbox user. See [Steps to assign an Azure role](https://learn.microsoft.com/azure/role-based-access-control/role-assignments-steps) for more information.
 
 ### Service Principal
+
+This section applies to the default `client_secret` authentication mode. See [Authentication](#authentication) for the other modes.
 
 * Verify the subscription owner has privileges to create a service principal on the Microsoft Entra tenant. See [Permissions required for registering an app](https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal#permissions-required-for-registering-an-app) for more information.
 * Ask the subscription owner to [Create an Azure service principal](https://learn.microsoft.com/en-us/cli/azure/azure-cli-sp-tutorial-1?tabs=bash) (SPN) for sandbox users with [Azure Cloud Shell](https://learn.microsoft.com/azure/cloud-shell/quickstart). The service principal can be created with the following command:
@@ -275,6 +278,39 @@ Azure DevOps, GitHub Actions, or other CI/CD tools can be used to automate the d
 * Az PowerShell Module
 * Terraform
 
+## Authentication
+
+This section is the single reference for how Terraform authenticates to Azure and Microsoft Entra ID in this repository. The root configuration and the [rg-devops-iac](./extras/configurations/rg-devops-iac/) configuration use the same authentication contract.
+
+### Authentication Modes
+
+The `auth_mode` variable selects how Terraform authenticates the `azurerm`, `azapi` and `azuread` providers. Every provider uses the same settings, derived once in the `provider_auth` local in `providers.tf`.
+
+`auth_mode` | Identity (`client_id`) | Credential | Typical use
+--- | --- | --- | ---
+`client_secret` (default) | Service principal `appId` | `client_secret`, supplied with the `TF_VAR_client_secret` environment variable | Interactive execution from any client. See [Service Principal](#service-principal).
+`managed_identity` | Client id of a user-assigned managed identity attached to the Terraform execution host | Managed identity endpoint of the host. No secret. | Secretless execution on the rg-devops-iac Linux virtual machine.
+
+Variable | Description
+--- | ---
+`auth_mode` | `client_secret` or `managed_identity`. Defaults to `client_secret`.
+`client_id` | The client id of the identity Terraform authenticates as.
+`client_secret` | The service principal secret. Required only when `auth_mode` is `client_secret`. Set it with `TF_VAR_client_secret`; never store it in a file.
+`entra_tenant_id` | The Microsoft Entra tenant id.
+
+### Deployment Identity Permissions
+
+The identity Terraform authenticates as needs:
+
+* An `Owner` Azure RBAC role assignment on the sandbox subscription, because the sandbox creates role assignments.
+* The `Group.ReadWrite.All` Microsoft Graph application permission, only when the mssql module is enabled.
+
+For `client_secret` mode, see [Service Principal](#service-principal). For `managed_identity` mode, set `deployment_identity = "managed_identity"` in rg-devops-iac. It creates the user-assigned managed identity, assigns `Owner` on the subscription, and attaches the identity to its Linux virtual machine. Use the `deployment_identity_client_id` output as `client_id`, and grant the Microsoft Graph permission with `extras/configurations/rg-devops-iac/scripts/grant-graph-permissions.sh`. See the [rg-devops-iac README](./extras/configurations/rg-devops-iac/README.md) for details.
+
+### State Backend Authentication
+
+Provider authentication and state backend authentication are independent. `auth_mode` affects only the providers. By default, Terraform state is stored locally. When an `azurerm` backend is configured in `backend.tf`, it authenticates with its own settings, for example the system-assigned managed identity of the rg-devops-iac Linux virtual machine (`use_msi = true` with `use_azuread_auth = true`).
+
 ## Getting Started (Interactive Execution)
 
 This section covers the steps to get started with Azure Sandbox using an interactive Terraform execution environment. The steps include logging into Azure, cloning the repository, initializing Terraform, configuring variables, validating and applying the configuration, and smoke testing.
@@ -375,24 +411,24 @@ There are hundreds of variables in this configuration. Defaults have been set fo
 
 Follow these steps to configure the variables for your sandbox:
 
-* For the default service-principal authentication, set the password as an environment variable
-  rather than storing it in `terraform.tfvars`.
+* For the default `client_secret` authentication mode, set the service principal password as an environment variable
+  rather than storing it in `terraform.tfvars`. See [Authentication](#authentication) for other modes.
 
   ```bash
   # Set environment variable in bash
-  export TF_VAR_arm_client_secret=<service-principal-password-here>
+  export TF_VAR_client_secret=<service-principal-password-here>
   ```
 
   ```pwsh
   # Set environment variable in PowerShell
-  $env:TF_VAR_arm_client_secret = "<service-principal-password-here>"
+  $env:TF_VAR_client_secret = "<service-principal-password-here>"
   ```
 
 * Next, create a `terraform.tfvars` file in the root directory of the project. This file should set the necessary variables for your deployment. Here is an example of what the `terraform.tfvars` file might look like:
 
   ```hcl
-  aad_tenant_id   = "<entra-tenant-id-here>"
-  arm_client_id   = "<service-principal-app-id-here>"
+  client_id       = "<service-principal-app-id-here>"
+  entra_tenant_id = "<entra-tenant-id-here>"
   location        = "<azure-region-here>"
   subscription_id = "<azure-subscription-id-here>"
   user_object_id  = "<user-object-id-here>"
@@ -421,8 +457,8 @@ Follow these steps to configure the variables for your sandbox:
 By default only the shared virtual network module (vnet-shared) is enabled which isn't very useful on it's own. You can enable additional modules by setting the `enable_module_*` variables in the `terraform.tfvars` file. At a minimum you should enable the application virtual network module (vnet-app) like this:
 
 ```hcl
-aad_tenant_id   = "<entra-tenant-id-here>"
-arm_client_id   = "<service-principal-app-id-here>"
+client_id       = "<service-principal-app-id-here>"
+entra_tenant_id = "<entra-tenant-id-here>"
 location        = "<azure-region-here>"
 subscription_id = "<azure-subscription-id-here>"
 user_object_id  = "<user-object-id-here>"
@@ -440,8 +476,8 @@ enable_module_vnet_app = true
 And here's how to enable all the modules:
 
 ```hcl
-aad_tenant_id   = "<entra-tenant-id-here>"
-arm_client_id   = "<service-principal-app-id-here>"
+client_id       = "<service-principal-app-id-here>"
+entra_tenant_id = "<entra-tenant-id-here>"
 location        = "<azure-region-here>"
 subscription_id = "<azure-subscription-id-here>"
 user_object_id  = "<user-object-id-here>"
@@ -609,16 +645,16 @@ This section lists input variables used in the root module. Defaults can be over
 
 Variable | Default | Description
 --- | --- | ---
-aad_tenant_id | | The Microsoft Entra tenant id.
-arm_auth_mode | `secret` | Authentication mode: `secret` or `msi`.
-arm_client_id | | Service principal client ID for `secret` authentication or user-assigned managed identity client ID for `msi` authentication.
-arm_client_secret | | Password for secret authentication. Required only when `arm_auth_mode` is `secret`; set it using `TF_VAR_arm_client_secret`.
+auth_mode | `client_secret` | How Terraform authenticates the providers: `client_secret` or `managed_identity`. See [Authentication](#authentication).
+client_id | | The client id of the identity Terraform authenticates as: the service principal `appId` for `client_secret`, or the user-assigned managed identity client id for `managed_identity`.
+client_secret | | The service principal secret. Required only when `auth_mode` is `client_secret`; set it using `TF_VAR_client_secret`.
 enable_module_mssql | false | Set to true to enable the Azure SQL Database (mssql) module, false to skip it.
 enable_module_mysql | false | Set to true to enable the Azure Database for MySQL (mysql) module, false to skip it.
 enable_module_vm_jumpbox_linux | false | Set to true to enable the vm_jumpbox_linux module, false to skip it.
 enable_module_vm_mssql_win | false | Set to true to enable the vm_mssql_win module, false to skip it.
 enable_module_vnet_app | false | Set to true to enable the vnet_app module, false to skip it.
 enable_module_vwan | false | Set to true to enable the vwan module, false to skip it.
+entra_tenant_id | | The Microsoft Entra tenant id.
 location | | The name of the Azure Region where resources will be provisioned.
 subscription_id | | The Azure subscription id used to provision sandbox resources.
 tags | { costcenter = "mycostcenter", environment = "dev", project = "sand" } | Tags in map format to be applied to the sandbox resource group and used for resource naming.
