@@ -176,8 +176,15 @@ and do not deploy; opening or reopening a ready PR, marking it ready, updating
 its head, or retargeting it to `main` starts a fresh run.
 PR runs use the separate `sandbox-release-gate` environment and always run
 all stages with checkout pinned to the exact PR head SHA. Manual dispatch
-retains `sandbox-deployment`, the `vnext` checkout, and its stage selector,
-and does not run or wait for static CI.
+retains `sandbox-deployment` and its stage selector, and does not run or wait
+for static CI. Its `source_branch` input chooses which branch of this
+repository to deploy: `vnext` (the default, matching earlier runs) or `main`
+for released code. Both sources support every stage. The hosted selection job
+rejects any other value before checkout or environment-secret access, then
+checks out the branch tip as `refs/heads/<branch>`. The run name and summary
+show the selected source, and the stage results report the deployed commit.
+The input never affects release PR runs, and manual runs never publish or
+satisfy the release statuses.
 Both environments require `SANDBOX_BACKEND_HCL` and `SANDBOX_TFVARS_HCL`
 and owner approval. Keep their deployment branch restrictions on `main`,
 the trusted workflow context, and explicitly allow `pull_request_target`
