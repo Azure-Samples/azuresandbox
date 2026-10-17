@@ -6,7 +6,7 @@ locals {
       role_definition_name = "Key Vault Secrets Officer"
     }
     kv_secrets_officer_user = {
-      principal_id         = var.user_object_id
+      principal_id         = var.operator_object_id
       principal_type       = "User"
       role_definition_name = "Key Vault Secrets Officer"
     }
@@ -19,7 +19,7 @@ locals {
       role_definition_name = "Storage Blob Data Contributor"
     }
     blob_data_contributor_user = {
-      principal_id         = var.user_object_id
+      principal_id         = var.operator_object_id
       principal_type       = "User"
       role_definition_name = "Storage Blob Data Contributor"
     }

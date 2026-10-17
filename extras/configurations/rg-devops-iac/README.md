@@ -366,11 +366,11 @@ Follow these steps to configure the variables for this configuration:
 * Next, create a `terraform.tfvars` file in the root directory of the project. This file should set the necessary variables for your deployment. Here is an example of what the `terraform.tfvars` file might look like:
 
   ```hcl
-  client_id       = "YOUR-SERVICE-PRINCIPAL-APP-ID-HERE"
-  entra_tenant_id = "YOUR-ENTRA-TENANT-ID-HERE"
-  location        = "YOUR-AZURE-REGION-HERE"
-  subscription_id = "YOUR-AZURE-SUBSCRIPTION-ID-HERE"
-  user_object_id  = "YOUR-USER-OBJECT-ID-HERE"
+  client_id          = "YOUR-SERVICE-PRINCIPAL-APP-ID-HERE"
+  entra_tenant_id    = "YOUR-ENTRA-TENANT-ID-HERE"
+  location           = "YOUR-AZURE-REGION-HERE"
+  operator_object_id = "YOUR-OPERATOR-OBJECT-ID-HERE"
+  subscription_id    = "YOUR-AZURE-SUBSCRIPTION-ID-HERE"
 
   tags = {
     project     = "devops",
@@ -597,6 +597,7 @@ github_runner_token_secret_version | 1 | Increment to write a new value for the 
 github_runner_token_type | `pat` | The type of token supplied in `github_runner_token`, either `pat` or `registration`.
 github_runner_url | | The GitHub repository or organization URL to register the self-hosted runner with, e.g. `https://github.com/myorg/myrepo`. Required when `enable_github_runner` is true.
 location | | The name of the Azure Region where resources will be provisioned.
+operator_object_id | | The Microsoft Entra object id of the operator: the signed-in user who provisions this configuration. The operator is granted data-plane role assignments on the resources it creates.
 storage_access_tier | Hot | The access tier for the new storage account.
 storage_replication_type | LRS | The type of replication for the new storage account.
 subnet_address_prefix | 10.0.0.0/24 | The address prefix for the miscellaneous subnet. The minimum size is /29.
@@ -606,7 +607,6 @@ subnet_privatelink_name | snet-privatelink-03 | The name of the subnet for Priva
 subscription_id | | The Azure subscription id used to provision resources.
 storage_container_name | tfstate | The name of the storage container to be created in the new storage account.
 tags | | The tags in map format to be used when creating new resources.
-user_object_id | | The object id of the user in Microsoft Entra ID.
 vm_jumpbox_linux_size | `Standard_D2ls_v6` | The size of the jumpbox virtual machine (`jumplinux2`).
 vnet_address_space | 10.0.0.0/16 | The address space in CIDR notation for the new virtual network. The minimum size is /24.
 vnet_name | devops | The name of the new virtual

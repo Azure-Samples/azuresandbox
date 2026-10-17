@@ -41,11 +41,11 @@ re-deploys all of this content can be generalized into these steps:
 * Edit `terraform.tfvars` and add Github self-hosted runner settings.
 
   ```hcl
-  client_id       = "<spn-client-id-here>"
-  entra_tenant_id = "<entra-tenant-id-here>"
-  location        = "southcentralus"
-  subscription_id = "<subscription-id-here>"
-  user_object_id  = "<operator-user-id-here>"
+  client_id          = "<spn-client-id-here>"
+  entra_tenant_id    = "<entra-tenant-id-here>"
+  location           = "southcentralus"
+  operator_object_id = "<operator-object-id-here>"
+  subscription_id    = "<subscription-id-here>"
 
   # Add environment specific tags as required required here
   tags = {
@@ -214,7 +214,7 @@ those values. The bootstrap requires these inputs:
 | `entra_tenant_id` | Tenant containing the bootstrap service principal. |
 | `client_id` | Bootstrap service principal application/client ID, not a managed identity client ID. |
 | `subscription_id` | Subscription where the runner infrastructure will be created. |
-| `user_object_id` | Operator's Entra user object ID for the configuration's role assignments. |
+| `operator_object_id` | Operator's Entra user object ID for the configuration's role assignments. |
 | `location` | Operator-selected Azure region with suitable VM availability and quota. |
 | `tags` | Include `project`, `environment`, and `costcenter`, plus any policy-required tags. |
 | `vm_jumpbox_linux_size` | Optional VM-size override; check capacity for the intended deployment workload. |

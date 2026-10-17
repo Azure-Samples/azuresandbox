@@ -90,6 +90,7 @@ admin_username | bootstrapadmin | The default admin username used when configuri
 admin_username_secret | adminuser | The name of the key vault secret containing the admin username.
 location | | The Azure region defined in the root module.
 log_analytics_workspace_retention_days | 30 | The retention period for the new log analytics workspace.
+operator_object_id | | The Microsoft Entra object id of the operator. Defined in the root module.
 resource_group_name | | The resource group defined in the root module.
 subnet_adds_address_prefix | 10.1.1.0/24 | The address prefix for the AD Domain Services subnet.
 subnet_AzureBastionSubnet_address_prefix | 10.1.0.0/26 | The address prefix for the AzureBastionSubnet subnet. `/26` is the minimum size required for the Bastion Standard SKU (host scaling).
@@ -99,7 +100,6 @@ subnet_misc_02_address_prefix | 10.1.3.0/24 | The address prefix for the miscell
 subnet_privatelink_address_prefix | 10.1.5.0/24 | The address prefix for the PrivateLink subnet, which hosts the private endpoints for the entire sandbox environment.
 tags | | The tags defined in the root module.
 unique_seed | | A unique seed used by the Azure/naming module to generate random values for resources. Set in the root module and used here for consistent naming.
-user_object_id | | The object id of the interactive user in Microsoft Entra ID.
 vm_adds_image_offer | WindowsServer | The offer type of the virtual machine image used to create the VM.
 vm_adds_image_publisher | MicrosoftWindowsServer | The publisher for the virtual machine image used to create the VM.
 vm_adds_image_sku | 2025-datacenter-azure-edition-core | The SKU of the virtual machine image used to create the VM.

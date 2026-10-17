@@ -92,7 +92,7 @@ if (-not $defaultSubscriptionId) {
 }
 
 # Set default user from currently logged in Azure PowerShell session
-$defaultUserObjectId = (Show-JWTtoken -token (Get-AzAccessToken -AsSecureString).Token).oid
+$defaultOperatorObjectId = (Show-JWTtoken -token (Get-AzAccessToken -AsSecureString).Token).oid
 
 # Set default Microsoft Entra tenant id from currently logged in Azure PowerShell session
 $defaultEntraTenantId = (Get-AzContext).Tenant.Id
@@ -113,10 +113,10 @@ if (-not $entraTenantId) {
     $entraTenantId = $defaultEntraTenantId
 }
 
-$userObjectId = Read-Host "Object id for Azure PowerShell signed in user (user_object_id) default '$defaultUserObjectId'"
+$operatorObjectId = Read-Host "Operator object id (operator_object_id) default '$defaultOperatorObjectId'"
 
-if (-not $userObjectId) {
-    $userObjectId = $defaultUserObjectId
+if (-not $operatorObjectId) {
+    $operatorObjectId = $defaultOperatorObjectId
 }
 
 $subscriptionId = Read-Host "Azure subscription id (subscription_id) default '$defaultSubscriptionId'"
@@ -193,11 +193,11 @@ $tags = @{
 Write-Host "`nGenerating terraform.tfvars file...`n"
 
 @"
-client_id       = "$clientId"
-entra_tenant_id = "$entraTenantId"
-location        = "$location"
-subscription_id = "$subscriptionId"
-user_object_id  = "$userObjectId"
+client_id          = "$clientId"
+entra_tenant_id    = "$entraTenantId"
+location           = "$location"
+operator_object_id = "$operatorObjectId"
+subscription_id    = "$subscriptionId"
 
 tags = {
   project     = "$($tags.project)"

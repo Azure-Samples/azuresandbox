@@ -307,6 +307,10 @@ The identity Terraform authenticates as needs:
 
 For `client_secret` mode, see [Service Principal](#service-principal). For `managed_identity` mode, set `deployment_identity = "managed_identity"` in rg-devops-iac. It creates the user-assigned managed identity, assigns `Owner` on the subscription, and attaches the identity to its Linux virtual machine. Use the `deployment_identity_client_id` output as `client_id`, and grant the Microsoft Graph permission with `extras/configurations/rg-devops-iac/scripts/grant-graph-permissions.sh`. See the [rg-devops-iac README](./extras/configurations/rg-devops-iac/README.md) for details.
 
+### Operator
+
+`operator_object_id` is the Microsoft Entra object id of the operator: the signed-in user who provisions the configuration. It is separate from the deployment identity. The operator is granted data-plane role assignments, such as Key Vault and Storage roles, on the resources the configuration creates. The bootstrap scripts default it to the signed-in Azure CLI or Azure PowerShell user.
+
 ### State Backend Authentication
 
 Provider authentication and state backend authentication are independent. `auth_mode` affects only the providers. By default, Terraform state is stored locally. When an `azurerm` backend is configured in `backend.tf`, it authenticates with its own settings, for example the system-assigned managed identity of the rg-devops-iac Linux virtual machine (`use_msi = true` with `use_azuread_auth = true`).
@@ -427,11 +431,11 @@ Follow these steps to configure the variables for your sandbox:
 * Next, create a `terraform.tfvars` file in the root directory of the project. This file should set the necessary variables for your deployment. Here is an example of what the `terraform.tfvars` file might look like:
 
   ```hcl
-  client_id       = "<service-principal-app-id-here>"
-  entra_tenant_id = "<entra-tenant-id-here>"
-  location        = "<azure-region-here>"
-  subscription_id = "<azure-subscription-id-here>"
-  user_object_id  = "<user-object-id-here>"
+  client_id          = "<service-principal-app-id-here>"
+  entra_tenant_id    = "<entra-tenant-id-here>"
+  location           = "<azure-region-here>"
+  operator_object_id = "<operator-object-id-here>"
+  subscription_id    = "<azure-subscription-id-here>"
 
   tags = {
     project     = "sand",
@@ -457,11 +461,11 @@ Follow these steps to configure the variables for your sandbox:
 By default only the shared virtual network module (vnet-shared) is enabled which isn't very useful on it's own. You can enable additional modules by setting the `enable_module_*` variables in the `terraform.tfvars` file. At a minimum you should enable the application virtual network module (vnet-app) like this:
 
 ```hcl
-client_id       = "<service-principal-app-id-here>"
-entra_tenant_id = "<entra-tenant-id-here>"
-location        = "<azure-region-here>"
-subscription_id = "<azure-subscription-id-here>"
-user_object_id  = "<user-object-id-here>"
+client_id          = "<service-principal-app-id-here>"
+entra_tenant_id    = "<entra-tenant-id-here>"
+location           = "<azure-region-here>"
+operator_object_id = "<operator-object-id-here>"
+subscription_id    = "<azure-subscription-id-here>"
 
 tags = {
   project     = "sand",
@@ -476,11 +480,11 @@ enable_module_vnet_app = true
 And here's how to enable all the modules:
 
 ```hcl
-client_id       = "<service-principal-app-id-here>"
-entra_tenant_id = "<entra-tenant-id-here>"
-location        = "<azure-region-here>"
-subscription_id = "<azure-subscription-id-here>"
-user_object_id  = "<user-object-id-here>"
+client_id          = "<service-principal-app-id-here>"
+entra_tenant_id    = "<entra-tenant-id-here>"
+location           = "<azure-region-here>"
+operator_object_id = "<operator-object-id-here>"
+subscription_id    = "<azure-subscription-id-here>"
 
 tags = {
   project     = "sand",
@@ -508,10 +512,10 @@ module "vnet_shared" {
   source = "./modules/vnet-shared"
 
   location            = azurerm_resource_group.this.location
+  operator_object_id  = var.operator_object_id
   resource_group_name = azurerm_resource_group.this.name
   tags                = var.tags
   unique_seed         = module.naming.unique-seed
-  user_object_id      = var.user_object_id
 
   # Override default values here
   vm_adds_name = "mydc1" # default was "adds1"
@@ -656,9 +660,9 @@ enable_module_vnet_app | false | Set to true to enable the vnet_app module, fals
 enable_module_vwan | false | Set to true to enable the vwan module, false to skip it.
 entra_tenant_id | | The Microsoft Entra tenant id.
 location | | The name of the Azure Region where resources will be provisioned.
+operator_object_id | | The Microsoft Entra object id of the operator: the signed-in user who provisions this configuration. The operator is granted data-plane role assignments on the resources it creates.
 subscription_id | | The Azure subscription id used to provision sandbox resources.
 tags | { costcenter = "mycostcenter", environment = "dev", project = "sand" } | Tags in map format to be applied to the sandbox resource group and used for resource naming.
-user_object_id | | The object id of the interactive user (e.g. Azure CLI or Az PowerShell signed in user).
 vm_avd_size | `Standard_D4s_v6` | The size of the Azure Virtual Desktop session host virtual machines: `sessionhost1` and `sessionhost2`.
 vm_jumpbox_size | `Standard_D2ls_v6` | The size of the jumpbox and domain controller virtual machines: `jumpwin1`, `jumplinux1`, and `adds1`, as well as `jumpwin2` and `adds2` when the `vnet_onprem` module is enabled.
 vm_mssql_win_size | `Standard_D4ds_v6` | The size of the database server virtual machine `mssqlwin1`. Must be a Diskful Ddsv6 (general purpose) or Edsv6 (memory optimized) size with local NVMe temp disks and a minimum of 4 vCPUs.

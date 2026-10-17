@@ -62,28 +62,28 @@ then
 fi
 
 # Set default user from currently logged in Azure CLI user.
-default_user_object_id=$(az account get-access-token --query accessToken --output tsv | tr -d '\n' | python3 -c "import jwt, sys; print(jwt.decode(sys.stdin.read(), algorithms=['RS256'], options={'verify_signature': False})['oid'])")
+default_operator_object_id=$(az account get-access-token --query accessToken --output tsv | tr -d '\n' | python3 -c "import jwt, sys; print(jwt.decode(sys.stdin.read(), algorithms=['RS256'], options={'verify_signature': False})['oid'])")
 
 # Set default Microsoft Entra tenant id from currently logged in Azure CLI user.
 default_entra_tenant_id=$(az account show --query tenantId --output tsv)
 
 # Get user input
 # shellcheck disable=SC2154  # TF_VAR_client_id is an external Terraform env var, optionally exported by the caller.
-read -e -i "$TF_VAR_client_id"       -p "Service principal appId (client_id) ----------------------: " client_id
-read -e -i $default_entra_tenant_id  -p "Microsoft Entra tenant id (entra_tenant_id) --------------: " entra_tenant_id
-read -e -i $default_user_object_id   -p "Object id for Azure CLI signed in user (user_object_id) --: " user_object_id
-read -e -i $default_subscription_id  -p "Azure subscription id (subscription_id) ------------------: " subscription_id
-read -e -i $default_location         -p "Azure location (location) --------------------------------: " location
-read -e -i $default_environment      -p "Environment tag value (environment) ----------------------: " environment
-read -e -i $default_costcenter       -p "Cost center tag value (costcenter) -----------------------: " costcenter
-read -e -i $default_project          -p "Project tag value (project) ------------------------------: " project
+read -e -i "$TF_VAR_client_id"          -p "Service principal appId (client_id) ----------: " client_id
+read -e -i $default_entra_tenant_id     -p "Microsoft Entra tenant id (entra_tenant_id) --: " entra_tenant_id
+read -e -i $default_operator_object_id  -p "Operator object id (operator_object_id) ------: " operator_object_id
+read -e -i $default_subscription_id     -p "Azure subscription id (subscription_id) ------: " subscription_id
+read -e -i $default_location            -p "Azure location (location) --------------------: " location
+read -e -i $default_environment         -p "Environment tag value (environment) ----------: " environment
+read -e -i $default_costcenter          -p "Cost center tag value (costcenter) -----------: " costcenter
+read -e -i $default_project             -p "Project tag value (project) ------------------: " project
 
 # Validate user input
 entra_tenant_id=${entra_tenant_id:-$default_entra_tenant_id}
 costcenter=${costcenter:-$default_costcenter}
 environment=${environment:-$default_environment}
 location=${location:-$default_location}
-user_object_id=${user_object_id:-$default_user_object_id}
+operator_object_id=${operator_object_id:-$default_operator_object_id}
 project=${project:-$default_project}
 subscription_id=${subscription_id:-$default_subscription_id}
 
@@ -124,9 +124,9 @@ else
 fi
 
 # Validate object id of Azure CLI signed in user
-if [ -z "$user_object_id" ]
+if [ -z "$operator_object_id" ]
 then
-  printf "Object id for Azure CLI signed in user (user_object_id) not provided.\n"
+  printf "Operator object id (operator_object_id) not provided.\n"
   usage
 fi
 
@@ -152,11 +152,11 @@ EOF
 # Generate terraform.tfvars file
 printf "\nGenerating terraform.tfvars file...\n\n"
 
-printf "client_id       = \"$client_id\"\n"      >  ./terraform.tfvars
-printf "entra_tenant_id = \"$entra_tenant_id\"\n" >> ./terraform.tfvars
-printf "location        = \"$location\"\n"       >> ./terraform.tfvars
-printf "subscription_id = \"$subscription_id\"\n" >> ./terraform.tfvars
-printf "user_object_id  = \"$user_object_id\"\n" >> ./terraform.tfvars
+printf "client_id          = \"$client_id\"\n"        >  ./terraform.tfvars
+printf "entra_tenant_id    = \"$entra_tenant_id\"\n"   >> ./terraform.tfvars
+printf "location           = \"$location\"\n"          >> ./terraform.tfvars
+printf "operator_object_id = \"$operator_object_id\"\n" >> ./terraform.tfvars
+printf "subscription_id    = \"$subscription_id\"\n"   >> ./terraform.tfvars
 printf "\ntags = $tags\n"                         >> ./terraform.tfvars
 cat ./terraform.tfvars
 
