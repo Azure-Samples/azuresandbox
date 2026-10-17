@@ -3,9 +3,11 @@
 # first runs the six static CI workflows (ci-*.yml, called below) against its
 # exact head SHA and full diff. Only after they pass and a live recheck of the PR
 # succeeds does the environment-protected deployment job request approval.
-# Manual path (workflow_dispatch): unchanged; no static CI dependency.
+# Manual path (workflow_dispatch): deploys the tip of this repository's vnext
+# (default) or main branch, chosen by source_branch; no static CI dependency and
+# no release status publication.
 name: Azure Sandbox deployment
-run-name: Sandbox sandbox-${{ github.run_id }} / ${{ github.event_name == 'pull_request_target' && 'unit-test' || inputs.run_through }}
+run-name: Sandbox sandbox-${{ github.run_id }} / ${{ github.event_name == 'pull_request_target' && 'unit-test' || format('{0} / {1}', inputs.run_through, inputs.source_branch) }}
 
 on:
   pull_request_target:
@@ -18,6 +20,11 @@ on:
         type: choice
         options: [preflight, apply, unit-test]
         default: preflight
+      source_branch:
+        description: Deploy source code from this branch
+        type: choice
+        options: [vnext, main]
+        default: vnext
 
 permissions:
   contents: read
@@ -43,6 +50,7 @@ jobs:
         id: select
         env:
           MANUAL_RUN_THROUGH: ${{ inputs.run_through }}
+          MANUAL_SOURCE_BRANCH: ${{ inputs.source_branch }}
         run: |
           set -euo pipefail
           if [[ "$GITHUB_REF" != refs/heads/main ]]; then
@@ -55,12 +63,19 @@ jobs:
                 preflight|apply|unit-test) ;;
                 *) echo "::error::Invalid manual stage selection."; exit 1 ;;
               esac
+              # Only this repository's vnext or main branch; never tags, SHAs, or forks.
+              case "$MANUAL_SOURCE_BRANCH" in
+                vnext|main) ;;
+                *) echo "::error::Invalid deployment source. Choose vnext or main."; exit 1 ;;
+              esac
               {
-                echo "source_ref=vnext"
+                echo "source_ref=refs/heads/$MANUAL_SOURCE_BRANCH"
                 echo "run_through=$MANUAL_RUN_THROUGH"
                 echo "environment=sandbox-deployment"
                 echo "deploy=true"
               } >> "$GITHUB_OUTPUT"
+              printf "## Deployment source\n\nManual run: \`%s\` branch, through \`%s\`, environment \`sandbox-deployment\`.\n" \
+                "$MANUAL_SOURCE_BRANCH" "$MANUAL_RUN_THROUGH" >> "$GITHUB_STEP_SUMMARY"
               ;;
             pull_request_target)
               if ! jq -e --arg repository "$GITHUB_REPOSITORY" '
