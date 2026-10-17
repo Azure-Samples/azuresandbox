@@ -1,6 +1,7 @@
 # CI: GitHub Actions workflow linting (actionlint).
 # Lints the workflow files themselves for syntax errors, bad expressions,
-# deprecated runners, and shell-script issues in `run:` steps.
+# deprecated runners, and shell-script issues in `run:` steps, then tests the
+# sandbox-deployment.yml entry selection (scripts/tests/Test-SandboxDeploymentSelection.sh).
 # Runs on ready (non-draft) pull requests targeting vnext and on pushes to vnext.
 # sandbox-deployment.yml also calls it (workflow_call) to check the exact head
 # SHA and full diff of a vnext -> main release PR before any deployment.
@@ -101,6 +102,7 @@ jobs:
           filters: |
             actions:
               - '.github/workflows/**'
+              - 'scripts/tests/Test-SandboxDeploymentSelection.sh'
 
   actionlint:
     name: actionlint
@@ -135,6 +137,13 @@ jobs:
       # findings readable in the Actions log. Exits non-zero on any finding.
       - name: Run actionlint
         run: ./actionlint -color
+
+      # Runs the sandbox-deployment selection step against fixture events
+      # (no GitHub or Azure access). Kept in this job so the existing required
+      # actionlint check covers it. jq and python3 with PyYAML are preinstalled
+      # on ubuntu-latest; the test fails explicitly if either is missing.
+      - name: Test sandbox-deployment selection
+        run: ./scripts/tests/Test-SandboxDeploymentSelection.sh
 
   # Release mode only: pass the raw job results back to sandbox-deployment.yml.
   # This job has no logic; the Release static CI job there applies the one
