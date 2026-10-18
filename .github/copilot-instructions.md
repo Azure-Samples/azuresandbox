@@ -286,6 +286,10 @@ Larger modules split HCL by concern instead of one giant `main.tf`:
 
 Modules expose two map outputs used heavily by the root and other modules: `resource_ids` and `resource_names` (and sometimes `fqdns`, `private_dns_zones`). Look them up by key, e.g. `module.vnet_shared.resource_ids["key_vault"]`. Add new resources to these maps rather than creating new top-level outputs.
 
+### Deployment identity role list (least privilege)
+
+The deployment identity has no `Owner` in any auth mode: it has `Contributor` plus `Role Based Access Control Administrator` with an ABAC condition that allows only the role definition ids in `scripts/deployment-identity-roles.txt` (condition template: `scripts/deployment-identity-rbac-condition.tftpl`; consumed by `scripts/grant-deployment-identity-roles.sh` and rg-devops-iac `locals.tf`). When adding an `azurerm_role_assignment` for a role not in that file, add the role's id and name to it — otherwise applies fail with an authorization error. Microsoft Graph is limited to `Group.Create`, `User.Read.All` and `Application.Read.All` (`extras/configurations/rg-devops-iac/scripts/grant-graph-permissions.sh`); don't add Entra writes that need more without discussing it first.
+
 ## Secrets handling
 
 - Secrets that should never be in state files are passed via env var (`TF_VAR_client_secret`).

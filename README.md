@@ -120,7 +120,7 @@ Azure Sandbox is built with security as a core principle, ensuring that all reso
   * Ensures that only authorized entities can access or manage Azure resources.
   * Simplifies access management by leveraging Microsoft Entra ID for identity and access control.
 
-  **IMPORTANT**: Both the interactive user and the deployment identity used to provision the sandbox environment must have an `Owner` role assignment scoped to the sandbox subscription. This is required for the deployment identity to be able to create and manage resources in the subscription including role assignments. See [Authentication](#authentication). All other role assignments follow the principle of least privilege and leverage managed identities where applicable.
+  **IMPORTANT**: The interactive user who provisions the sandbox must have an `Owner` role assignment scoped to the sandbox subscription. The deployment identity Terraform authenticates as does not need `Owner`: it has `Contributor` and a `Role Based Access Control Administrator` assignment with a condition that allows it to assign only the roles the sandbox uses. See [Deployment Identity Permissions](#deployment-identity-permissions). All other role assignments follow the principle of least privilege and leverage managed identities where applicable.
 
 * **Data Encryption**:
   * All data stored in the sandbox environment is encrypted at rest using platform-managed keys.
@@ -167,10 +167,10 @@ This section describes the prerequisites required in order to provision an Azure
 This section applies to the default `client_secret` authentication mode. See [Authentication](#authentication) for the other modes.
 
 * Verify the subscription owner has privileges to create a service principal on the Microsoft Entra tenant. See [Permissions required for registering an app](https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal#permissions-required-for-registering-an-app) for more information.
-* Ask the subscription owner to [Create an Azure service principal](https://learn.microsoft.com/en-us/cli/azure/azure-cli-sp-tutorial-1?tabs=bash) (SPN) for sandbox users with [Azure Cloud Shell](https://learn.microsoft.com/azure/cloud-shell/quickstart). The service principal can be created with the following command:
+* Ask the subscription owner to [Create an Azure service principal](https://learn.microsoft.com/en-us/cli/azure/azure-cli-sp-tutorial-1?tabs=bash) (SPN) for sandbox users with [Azure Cloud Shell](https://learn.microsoft.com/azure/cloud-shell/quickstart). The service principal can be created without any role assignments with the following command:
 
   ```bash
-  az ad sp create-for-rbac -n AzureSandboxSPN --role Owner --scopes /subscriptions/YOUR-SUBSCRIPTION-ID-HERE
+  az ad sp create-for-rbac -n AzureSandboxSPN
   ```
 
   The output should look like this:
@@ -186,24 +186,18 @@ This section applies to the default `client_secret` authentication mode. See [Au
 
 * Save the service principal *appId* and *password* in a secure location such as a password vault.
 
-* If you want to deploy the Azure SQL Database module, you will need to grant the service principal privileges to create Entra ID security groups and assign members to them.
+* Ask the subscription owner to grant the service principal its Azure RBAC role assignments on the sandbox subscription. From a clone of this repository, run:
 
   ```bash
-  # Get the SP's object ID
-  SP_OBJECT_ID=$(az ad sp show --id <service-principal-app-id-here> --query id -o tsv)
+  ./scripts/grant-deployment-identity-roles.sh <service-principal-app-id-here> YOUR-SUBSCRIPTION-ID-HERE
+  ```
 
-  # Get the Microsoft Graph service principal object ID in the tenant
-  GRAPH_SP_ID=$(az ad sp show --id 00000003-0000-0000-c000-000000000000 --query id -o tsv)
+  The script assigns `Contributor` and a conditioned `Role Based Access Control Administrator` role. See [Deployment Identity Permissions](#deployment-identity-permissions). It is idempotent, and it warns if the service principal still has `Owner` or `User Access Administrator` from an earlier setup.
 
-  # Grant Group.ReadWrite.All application permission via Microsoft Graph API
-  az rest --method POST \
-    --uri "https://graph.microsoft.com/v1.0/servicePrincipals/${SP_OBJECT_ID}/appRoleAssignments" \
-    --headers "Content-Type=application/json" \
-    --body "{
-      \"principalId\": \"${SP_OBJECT_ID}\",
-      \"resourceId\": \"${GRAPH_SP_ID}\",
-      \"appRoleId\": \"62a82d76-70ea-41e2-9197-370581804d09\"
-    }"
+* If you want to deploy the Azure SQL Database module, a Microsoft Entra Global Administrator or Privileged Role Administrator must grant the service principal the Microsoft Graph application permissions it needs to create the SQL administrators security group. From a clone of this repository, run:
+
+  ```bash
+  ./extras/configurations/rg-devops-iac/scripts/grant-graph-permissions.sh <service-principal-app-id-here>
   ```
 
   Alternatively you can perform these steps manually from the Entra portal:
@@ -214,7 +208,7 @@ This section applies to the default `client_secret` authentication mode. See [Au
   3. Search for and select the service principal's app registration (matching `<service-principal-app-id-here>`).
   4. Select **API permissions** in the left menu.
   5. Click **Add a permission** > **Microsoft Graph** > **Application permissions**.
-  6. Search for `Group.ReadWrite.All`, check the box, and click **Add permissions**.
+  6. Search for and check `Group.Create`, `User.Read.All` and `Application.Read.All`, then click **Add permissions**.
   7. Back on the API permissions page, click **Grant admin consent for \<tenant name\>** and
     confirm when prompted. A green checkmark should appear in the Status column.
 
@@ -300,12 +294,17 @@ Variable | Description
 
 ### Deployment Identity Permissions
 
-The identity Terraform authenticates as needs:
+The identity Terraform authenticates as needs the same permissions in every authentication mode. None of them is `Owner`.
 
-* An `Owner` Azure RBAC role assignment on the sandbox subscription, because the sandbox creates role assignments.
-* The `Group.ReadWrite.All` Microsoft Graph application permission, only when the mssql module is enabled.
+Permission | Scope | Why
+--- | --- | ---
+`Contributor` Azure RBAC role | Sandbox subscription | Creates and manages the sandbox resources.
+`Role Based Access Control Administrator` Azure RBAC role, with a condition | Sandbox subscription | Creates and removes the sandbox's role assignments. The condition allows only the roles listed in [`scripts/deployment-identity-roles.txt`](./scripts/deployment-identity-roles.txt), so the identity cannot grant `Owner`, `User Access Administrator` or `Role Based Access Control Administrator`. The condition is built from [`scripts/deployment-identity-rbac-condition.tftpl`](./scripts/deployment-identity-rbac-condition.tftpl).
+`Group.Create`, `User.Read.All` and `Application.Read.All` Microsoft Graph application permissions | Microsoft Entra tenant | Creates the SQL administrators security group, with a user and a managed identity as members. The identity becomes the group's owner, which lets it manage and delete the group. Required only when the mssql module is enabled.
 
-For `client_secret` mode, see [Service Principal](#service-principal). For `managed_identity` mode, set `deployment_identity = "managed_identity"` in rg-devops-iac. It creates the user-assigned managed identity, assigns `Owner` on the subscription, and attaches the identity to its Linux virtual machine. Use the `deployment_identity_client_id` output as `client_id`, and grant the Microsoft Graph permission with `extras/configurations/rg-devops-iac/scripts/grant-graph-permissions.sh`. See the [rg-devops-iac README](./extras/configurations/rg-devops-iac/README.md) for details.
+When you add a module that assigns an Azure RBAC role not in `scripts/deployment-identity-roles.txt`, add the role to the file and re-grant: re-run `scripts/grant-deployment-identity-roles.sh` for a service principal, or re-apply rg-devops-iac for its managed identity.
+
+For `client_secret` mode, see [Service Principal](#service-principal). For `managed_identity` mode, set `deployment_identity = "managed_identity"` in rg-devops-iac. It creates the user-assigned managed identity, assigns both Azure RBAC roles on the subscription, and attaches the identity to its Linux virtual machine. Use the `deployment_identity_client_id` output as `client_id`, and grant the Microsoft Graph permission with `extras/configurations/rg-devops-iac/scripts/grant-graph-permissions.sh`. See the [rg-devops-iac README](./extras/configurations/rg-devops-iac/README.md) for details.
 
 ### Operator
 
@@ -622,6 +621,9 @@ The Azure Sandbox project is organized into the following structure:
 │   ├── bootstrap.ps1                             # PowerShell helper script for generating terraform.tfvars
 │   ├── bootstrap.sh                              # Bash helper script for generating terraform.tfvars
 │   ├── Create-AzSqlDbUser.ps1                    # Creates Azure SQL Database user
+│   ├── deployment-identity-rbac-condition.tftpl  # Condition limiting the roles the deployment identity can assign
+│   ├── deployment-identity-roles.txt             # Roles the deployment identity can assign
+│   ├── grant-deployment-identity-roles.sh        # Grants the deployment identity its Azure RBAC roles
 │   ├── Invoke-UnitTests.ps1                      # Orchestrates module unit and integration tests
 │   ├── Test-Integration-AvdPersonal.ps1          # Integration test for AVD Personal Desktop
 │   ├── Test-Integration-AvdRemoteapp.ps1         # Integration test for AVD RemoteApp

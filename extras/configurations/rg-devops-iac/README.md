@@ -36,7 +36,7 @@ This section provides a brief overview of the features included in this configur
   * Pre-installed software for IaC / DevOps projects
   * Optional public access for connectivity from the internet
   * Optional registration as a GitHub Actions self-hosted runner for CI/CD workflows (disabled by default)
-  * Optional deployment identity: a user-assigned managed identity with subscription `Owner` for sandbox applies with `auth_mode = "managed_identity"` (disabled by default)
+  * Optional deployment identity: a user-assigned managed identity with subscription `Contributor` and conditioned `Role Based Access Control Administrator` for sandbox applies with `auth_mode = "managed_identity"` (disabled by default)
 
 **NOTE:** The Linux virtual machine is implemented as a module so it can be easily reused in other configurations. It is not intended to be used as a production jumpbox. It is intended to be used as a Terraform execution environment for DevOps / IaC projects.
 
@@ -83,7 +83,7 @@ Save the service principal *appId* and *password* in a secure location such as a
 These prerequisites apply only if you plan to use this configuration as a self-hosted runner that deploys Azure Sandbox with managed identity authentication (`enable_github_runner = true` and `deployment_identity = "managed_identity"`). Arrange them **before** provisioning, because some of them need privileged roles that the person running the deployment may not hold.
 
 * **GitHub repository administrator.** Registering a repository-level runner needs a fine-grained personal access token with `Administration: Read and write` on the target repository, created by a repository administrator. See [Optional: GitHub Actions Self-Hosted Runner](#optional-github-actions-self-hosted-runner).
-* **Microsoft Entra Privileged Role Administrator or Global Administrator.** Required only if the sandbox will be deployed with the `mssql` module enabled. The user-assigned managed identity then needs the Microsoft Graph `Group.ReadWrite.All` application permission, and only one of these Entra roles can grant it. Neither the service principal nor an Owner on the subscription can grant it. Read-only Entra roles such as Global Reader are not enough. Privileged Role Administrator is the least privileged role that works. If your organization uses [Privileged Identity Management](https://learn.microsoft.com/entra/id-governance/privileged-identity-management/pim-configure), activate an eligible assignment for the grant, or arrange for an administrator to run it. The grant is a one-time step after the identity is created. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies).
+* **Microsoft Entra Privileged Role Administrator or Global Administrator.** Required only if the sandbox will be deployed with the `mssql` module enabled. The user-assigned managed identity then needs the Microsoft Graph `Group.Create`, `User.Read.All` and `Application.Read.All` application permissions, and only one of these Entra roles can grant them. Neither the service principal nor an Owner on the subscription can grant them. Read-only Entra roles such as Global Reader are not enough. Privileged Role Administrator is the least privileged role that works. If your organization uses [Privileged Identity Management](https://learn.microsoft.com/entra/id-governance/privileged-identity-management/pim-configure), activate an eligible assignment for the grant, or arrange for an administrator to run it. The grant is a one-time step after the identity is created. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies).
 
 ### Other Prerequisites
 
@@ -461,21 +461,25 @@ deployment_identity = "managed_identity"
 When enabled, the identity is:
 
 * Created in the resource group provisioned by this configuration.
-* Assigned the `Owner` role at the subscription scope, because sandbox applies create role assignments. This is a standing, privileged identity. Owner on the subscription also includes this configuration's own resource group, so anything running on `jumplinux2` that uses this identity can modify or delete it.
+* Assigned two roles at the subscription scope, as described in [Deployment Identity Permissions](../../../README.md#deployment-identity-permissions) in the root README:
+  * `Contributor`, to create and manage sandbox resources.
+  * `Role Based Access Control Administrator`, with a condition that allows assigning and removing only the roles listed in [`scripts/deployment-identity-roles.txt`](../../../scripts/deployment-identity-roles.txt). The identity cannot grant `Owner`, `User Access Administrator` or `Role Based Access Control Administrator`.
+
+  This is still a standing, privileged identity. Contributor on the subscription also includes this configuration's own resource group, so anything running on `jumplinux2` that uses this identity can modify or delete it. When `scripts/deployment-identity-roles.txt` changes, re-apply this configuration to update the condition.
 * Attached to `jumplinux2` **in addition to** the system-assigned identity. The system-assigned identity remains the VM's default identity, so cloud-init, the runner registration script, `az login --identity` and the `azurerm` state backend (`ARM_USE_MSI`) keep using it. Use the user-assigned identity explicitly by its client id, e.g. `az login --identity --client-id <client-id>` or `Connect-AzAccount -Identity -AccountId <client-id>`.
 
 Enabling or disabling the identity on an existing deployment updates the VM in place. It does not replace the VM.
 
 After the apply, use the `deployment_identity_client_id` output as `client_id` in the root sandbox `terraform.tfvars`, together with `auth_mode = "managed_identity"`.
 
-If the sandbox will be deployed with the `mssql` module enabled, the identity also needs the Microsoft Graph `Group.ReadWrite.All` application permission, which this configuration cannot grant. A Global Administrator or Privileged Role Administrator must grant it once, after the identity is created:
+If the sandbox will be deployed with the `mssql` module enabled, the identity also needs the Microsoft Graph `Group.Create`, `User.Read.All` and `Application.Read.All` application permissions, which this configuration cannot grant. A Global Administrator or Privileged Role Administrator must grant them once, after the identity is created:
 
 ```bash
 # Run from this configuration's directory, signed in to Azure CLI as a Privileged Role Administrator or Global Administrator
 ./scripts/grant-graph-permissions.sh
 ```
 
-The script reads the identity from the `deployment_identity_principal_id` output (or takes a principal id as its first argument), and skips permissions that are already granted, so it is safe to re-run. If you activated the Entra role just before running it, sign in again with `az login` so the new role is included in your token.
+The script reads the identity from the `deployment_identity_principal_id` output (or takes a client id or object id as its first argument), and skips permissions that are already granted, so it is safe to re-run. It warns, and prints the removal command, if the identity still has `Group.ReadWrite.All` from an earlier setup. If you activated the Entra role just before running it, sign in again with `az login` so the new role is included in your token.
 
 Managed identities have no app registration, so the Entra admin center **API permissions** steps used for a service principal do not apply. Use the script above instead. The grant is removed automatically if the identity is deleted.
 
@@ -567,7 +571,7 @@ This configuration is organized into the following structure:
 │   ├── bootstrap.ps1                     # PowerShell helper script for generating terraform.tfvars
 │   ├── cleanterraformtemp.sh             # Bash helper script for removing Terraform temp/local files
 │   ├── enable-public-access.sh           # Bash helper script for re-enabling public access on key vault/storage account
-│   ├── grant-graph-permissions.sh        # Bash helper script for granting Microsoft Graph permissions to the user-assigned managed identity
+│   ├── grant-graph-permissions.sh        # Bash helper script for granting Microsoft Graph permissions to a deployment identity
 │   └── delete-tfstate.sh                 # Bash helper script for deleting Terraform state blob(s) from the storage backend
 ├── locals.tf                             # Local variables 
 ├── main.tf                               # Resource configurations
@@ -588,7 +592,7 @@ Variable | Default | Description
 auth_mode | `client_secret` | How Terraform authenticates the providers: `client_secret` or `managed_identity`. See [Authentication](../../../README.md#authentication).
 client_id | | The client id of the identity Terraform authenticates as: the service principal `appId` for `client_secret`, or the user-assigned managed identity client id for `managed_identity`.
 client_secret | | The service principal secret. Required only when `auth_mode` is `client_secret`; set it using `TF_VAR_client_secret`.
-deployment_identity | `none` | The identity this configuration provisions for root sandbox deployments: `none` or `managed_identity`. `managed_identity` creates a user-assigned managed identity with an `Owner` role assignment on the subscription and attaches it to `jumplinux2`, for root sandbox applies with `auth_mode = "managed_identity"`. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies).
+deployment_identity | `none` | The identity this configuration provisions for root sandbox deployments: `none` or `managed_identity`. `managed_identity` creates a user-assigned managed identity with `Contributor` and conditioned `Role Based Access Control Administrator` role assignments on the subscription and attaches it to `jumplinux2`, for root sandbox applies with `auth_mode = "managed_identity"`. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies).
 enable_github_runner | false | Set to true to install and register the GitHub Actions self-hosted runner agent on `jumplinux2`. See [vm-jumpbox-linux](./modules/vm-jumpbox-linux/README.md#github-actions-self-hosted-runner).
 entra_tenant_id | | The Microsoft Entra tenant id.
 github_runner_labels | `["azuresandbox"]` | Additional labels to apply to the GitHub Actions self-hosted runner. Only used when `enable_github_runner` is true.
@@ -631,7 +635,8 @@ azurerm_public_ip.this | pip-devops-dev-nat | Public IP address for the NAT gate
 azurerm_resource_group.this | rg-devops-dev-xxx | Resource group for all resources in this configuration.
 azurerm_role_assignment.keyvault_roles[*] | | Assigns `Key Vault Secrets Officer` to both the service principal and the interactive user.
 azurerm_role_assignment.storage_roles[*] | | Assigns `Storage Blob Data Contributor` to both the service principal and the interactive user.
-azurerm_role_assignment.deployment_identity_owner[0] | | Assigns `Owner` at the subscription scope to the deployment identity. Created only when `deployment_identity` is `managed_identity`.
+azurerm_role_assignment.deployment_identity_contributor[0] | | Assigns `Contributor` at the subscription scope to the deployment identity. Created only when `deployment_identity` is `managed_identity`.
+azurerm_role_assignment.deployment_identity_rbac_admin[0] | | Assigns `Role Based Access Control Administrator` at the subscription scope to the deployment identity, with a condition that allows only the roles in `scripts/deployment-identity-roles.txt`. Created only when `deployment_identity` is `managed_identity`.
 azurerm_storage_account.this | stdevopsdevxxx | Storage account for storing Terraform state files.
 azurerm_storage_container.this | tfstate | Storage container for storing Terraform state files.
 azurerm_subnet.devops | snet-devops-01 | Subnet for jumplinux2 VM

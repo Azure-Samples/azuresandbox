@@ -4,7 +4,10 @@
 > This walkthrough records an attended setup and uses the variable and output names that were current when it was
 > written. Current names differ: `auth_mode` (`client_secret` or `managed_identity`), `client_id`, `client_secret`
 > (`TF_VAR_client_secret`), `entra_tenant_id`, `operator_object_id` (was `user_object_id`), `deployment_identity`, and the `deployment_identity_client_id` and
-> `deployment_identity_principal_id` outputs. See [Authentication](../../../README.md#authentication) for current behavior.
+> `deployment_identity_principal_id` outputs. The deployment identity no longer has `Owner`: it has `Contributor` and a
+> conditioned `Role Based Access Control Administrator` role, plus the Microsoft Graph `Group.Create`, `User.Read.All`
+> and `Application.Read.All` permissions instead of `Group.ReadWrite.All`. See [Authentication](../../../README.md#authentication)
+> for current behavior.
 
 This guide documents an attended, step-by-step setup of a GitHub Actions
 workflow that deploys a new Azure Sandbox on the self-hosted runner provisioned

@@ -104,9 +104,13 @@ re-deploys all of this content can be generalized into these steps:
   You should see output similar to this:
 
   ```text
-  Managed identity: uai-devops-dev-<xxxxxxxx> (<uami-principal-id-here>)
-    Group.ReadWrite.All: granting...
-    Group.ReadWrite.All: granted.
+  Deployment identity: uai-devops-dev-<xxxxxxxx> (<uami-principal-id-here>)
+    Group.Create: granting...
+    Group.Create: granted.
+    User.Read.All: granting...
+    User.Read.All: granted.
+    Application.Read.All: granting...
+    Application.Read.All: granted.
   Microsoft Graph permission grant complete.
   ```
 
@@ -159,8 +163,8 @@ Do not paste secrets or unfiltered environment-variable output into the
 walkthrough. Share only the requested sanitized diagnostics. Disable shell
 tracing before handling secrets.
 
-An identity with subscription `Owner` makes this runner a privileged execution
-environment. Only trusted deployment workflows should use it. Do not route
+An identity with subscription `Contributor` and conditioned `Role Based Access
+Control Administrator` makes this runner a privileged execution environment. Only trusted deployment workflows should use it. Do not route
 untrusted pull-request code to this runner; GitHub approval alone is not a
 security boundary for a persistent self-hosted runner.
 
@@ -236,10 +240,12 @@ github_runner_token_type      = "pat"
 
 The URL and label must match the workflows that will target the runner.
 `deployment_identity = "managed_identity"` creates a user-assigned managed identity with
-subscription `Owner` and attaches it to the VM. Subscription Owner privileges
-are needed for the bootstrap's role assignments, or an equivalent role
-combination must permit them. The subscription-owner identity can also modify
-the runner infrastructure itself.
+subscription `Contributor` and a `Role Based Access Control Administrator`
+assignment whose condition allows only the roles in
+`scripts/deployment-identity-roles.txt`, and attaches it to the VM. The
+identity that applies this bootstrap needs `Owner` (or `Contributor` plus an
+unconstrained role-assignment role) to create those assignments. The
+deployment identity can also modify the runner infrastructure itself.
 
 The VM's system-assigned managed identity remains the default for cloud-init, token
 retrieval, and the remote-state backend. The user-assigned managed identity (UAMI) is used
@@ -281,8 +287,9 @@ backend. Do not copy VM-side `ARM_USE_MSI=true` into the bootstrap terminal.
 
 If later Sandbox deployments enable `mssql` with managed identity, arrange
 for a Privileged Role Administrator or Global Administrator to grant the
-user-assigned identity Microsoft Graph `Group.ReadWrite.All` after creation.
-Azure subscription Owner alone cannot grant that application permission.
+user-assigned identity Microsoft Graph `Group.Create`, `User.Read.All` and
+`Application.Read.All` after creation. Azure subscription Owner alone cannot
+grant application permissions.
 
 ## Step 2: Enable the runner and deployment identity
 
@@ -491,7 +498,8 @@ no changes or deletions to existing managed resources. Review all proposed
 operations rather than relying on a predetermined resource count.
 
 Confirm the plan includes the intended VM, runner configuration, user-assigned
-managed identity, and its subscription `Owner` role assignment. Confirm that
+managed identity, and its subscription `Contributor` and conditioned
+`Role Based Access Control Administrator` role assignments. Confirm that
 the selected subscription, region, and tags are correct. Runner installation
 and registration happen later during cloud-init; Terraform planning cannot
 prove those steps will succeed.
@@ -838,7 +846,7 @@ without retrying, changing role assignments, enabling public access, or
 switching identities as an automatic workaround.
 
 The system-assigned identity is intended for the state backend; the
-subscription-Owner user-assigned identity is intended for the later Sandbox
+user-assigned deployment identity is intended for the later Sandbox
 provider configuration. Keep those authentication roles distinct.
 
 ## Step 10: Check the Sandbox deployment identity
@@ -851,15 +859,15 @@ authentication.
 ### Permissions already provisioned versus a separate admin grant
 
 With `deployment_identity = "managed_identity"`, the bootstrap automatically
-creates `azurerm_role_assignment.deployment_identity_owner` at subscription
-scope. No separate manual Azure RBAC grant is required for the identity's
-`Owner` role. The commands below verify the live assignment rather than
-granting it.
+creates `azurerm_role_assignment.deployment_identity_contributor` and
+`azurerm_role_assignment.deployment_identity_rbac_admin` at subscription
+scope. No separate manual Azure RBAC grant is required. The commands below
+verify the live assignments rather than granting them.
 
-Microsoft Graph `Group.ReadWrite.All` is different: Terraform does not grant
-it. If Sandbox deployments will enable `mssql`, an authorized Entra
+The Microsoft Graph permissions are different: Terraform does not grant
+them. If Sandbox deployments will enable `mssql`, an authorized Entra
 administrator must complete `scripts/grant-graph-permissions.sh` before those
-deployments. Subscription `Owner` is not Entra administrator consent.
+deployments. Azure RBAC roles are not Entra administrator consent.
 Confirm the module scope and administrator availability before selecting that
 separate grant step.
 
@@ -901,17 +909,18 @@ CLI context, then restore system-assigned identity authentication on success.
 
 ### Expected result
 
-Expect `subscriptionMatches: true`, `state: "Enabled"`, a role entry for
-`Owner`, and the final context-restoration message.
+Expect `subscriptionMatches: true`, `state: "Enabled"`, role entries for
+`Contributor` and `Role Based Access Control Administrator` (and no `Owner`),
+and the final context-restoration message.
 
 Review stdout and stderr. If authentication or role inspection fails, the
 guest command stops and may not reach context restoration. Report the
 sanitized error and stop; do not attempt an automatic retry or permission
 change.
 
-Successful Azure authentication and subscription `Owner` do not establish
+Successful Azure authentication and subscription roles do not establish
 Microsoft Graph application permissions. If the later Sandbox deployment
-enables `mssql`, arrange the separately documented `Group.ReadWrite.All`
+enables `mssql`, arrange the separately documented Microsoft Graph
 grant by a Privileged Role Administrator or Global Administrator.
 
 This check does not perform a Terraform Sandbox plan or validate all provider
@@ -936,9 +945,9 @@ Before running the command, the operator must explicitly confirm:
 * That role is active. If activated through PIM after sign-in, sign in again
   so the current session reflects the role activation.
 
-Subscription `Owner` is not sufficient. Do not run the grant on the VM using
-its managed identity, or assume the bootstrap service principal can grant
-application permissions.
+Azure RBAC roles, including subscription `Owner`, are not sufficient. Do not
+run the grant on the VM using its managed identity, or assume the bootstrap
+service principal can grant application permissions.
 
 If another administrator must perform the grant, arrange a private handoff
 of the managed identity principal ID and the existing script. Do not publish
@@ -954,12 +963,14 @@ the confirmed administrator's Azure CLI session:
 ```
 
 The script reads `deployment_identity_principal_id` from the completed
-bootstrap outputs. It resolves Microsoft Graph's service principal and
-`Group.ReadWrite.All` application role, inspects existing assignments, and
-creates the assignment only if it is missing.
+bootstrap outputs. It resolves Microsoft Graph's service principal and the
+`Group.Create`, `User.Read.All` and `Application.Read.All` application roles,
+inspects existing assignments, and creates only the missing ones. It warns if
+the identity still has `Group.ReadWrite.All` from an earlier setup.
 
-This command changes directory permissions: it grants a broad application
-permission to read and write groups in the tenant. It is not merely an
+This command changes directory permissions: it grants application
+permissions to create groups and to read all users and service principals in
+the tenant. It is not merely an
 authentication check or an Azure RBAC assignment. Limit access to the runner
 and its trusted deployment workflows accordingly.
 
@@ -972,18 +983,22 @@ application role assignment on the managed identity service principal.
 Expected output includes either:
 
 ```text
-Group.ReadWrite.All: granted.
+Group.Create: granted.
+User.Read.All: granted.
+Application.Read.All: granted.
 Microsoft Graph permission grant complete.
 ```
 
 or:
 
 ```text
-Group.ReadWrite.All: already granted.
+Group.Create: already granted.
+User.Read.All: already granted.
+Application.Read.All: already granted.
 Microsoft Graph permission grant complete.
 ```
 
-The script also prints the actual managed identity name and principal ID.
+The script also prints the actual deployment identity name and principal ID.
 Keep those locally; share only the permission-status and completion lines.
 If it fails, share the sanitized error, preserve the full output locally, and
 stop without retrying, broadening permissions, or switching credentials as
@@ -1003,9 +1018,10 @@ is provisioned and its prerequisites are verified:
 * The runner account can use the required deployment toolchain.
 * The system-assigned identity can read the state container from the VM.
 * The user-assigned identity authenticates to the intended subscription and
-  has subscription `Owner`.
+  has subscription `Contributor` and conditioned `Role Based Access Control
+  Administrator`.
 * If `mssql` will be enabled, an authorized administrator completed the
-  Microsoft Graph `Group.ReadWrite.All` grant.
+  Microsoft Graph grant.
 
 This does not mean an Azure Sandbox has been deployed or that a deployment
 workflow, Terraform backend initialization, blob writes, or state leases have
@@ -1061,7 +1077,7 @@ different. Do not carry tags into a Sandbox deployment by assumption: capture
 them explicitly for that deployment and include them consistently in its
 plan/apply inputs.
 
-Subscription `Owner` does not substitute for Storage data-plane roles. Avoid
+Subscription control-plane roles do not substitute for Storage data-plane roles. Avoid
 unintentionally making the backend select the user-assigned identity through
 a shared `ARM_CLIENT_ID` export when its storage authorization was configured
 for the system-assigned identity.

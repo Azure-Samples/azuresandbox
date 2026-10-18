@@ -50,23 +50,30 @@ resource "azurerm_user_assigned_identity" "deployment" {
   tags                = var.tags
 }
 
-resource "azurerm_role_assignment" "deployment_identity_owner" {
+resource "azurerm_role_assignment" "deployment_identity_contributor" {
   count = var.deployment_identity == "managed_identity" ? 1 : 0
 
   principal_id         = azurerm_user_assigned_identity.deployment[0].principal_id
   principal_type       = "ServicePrincipal"
-  role_definition_name = "Owner"
+  role_definition_name = "Contributor"
+  scope                = "/subscriptions/${var.subscription_id}"
+}
+
+# Allows the deployment identity to assign and remove only the roles in scripts/deployment-identity-roles.txt.
+resource "azurerm_role_assignment" "deployment_identity_rbac_admin" {
+  count = var.deployment_identity == "managed_identity" ? 1 : 0
+
+  condition            = local.deployment_identity_rbac_condition
+  condition_version    = "2.0"
+  principal_id         = azurerm_user_assigned_identity.deployment[0].principal_id
+  principal_type       = "ServicePrincipal"
+  role_definition_name = "Role Based Access Control Administrator"
   scope                = "/subscriptions/${var.subscription_id}"
 }
 
 moved {
   from = azurerm_user_assigned_identity.this
   to   = azurerm_user_assigned_identity.deployment
-}
-
-moved {
-  from = azurerm_role_assignment.user_assigned_identity_owner
-  to   = azurerm_role_assignment.deployment_identity_owner
 }
 #endregion
 
