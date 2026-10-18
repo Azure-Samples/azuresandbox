@@ -229,11 +229,14 @@ This section applies to the default `client_secret` authentication mode. See [Au
   done
   ROLE_IDS="${ROLE_IDS#, }" # remove the leading ", "
 
-  # Condition: the identity can create (write) or remove (delete) a role assignment only if the role is in ROLE_IDS
+  # Condition: the identity can create (write) or remove (delete) a role assignment only if the role is in ROLE_IDS.
+  # This prevents it from assigning highly privileged roles such as Owner, User Access Administrator or
+  # Role Based Access Control Administrator, including to itself, and from removing role assignments it doesn't manage.
   CONDITION="((NOT ActionMatches{'Microsoft.Authorization/roleAssignments/write'}) OR (@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {$ROLE_IDS}))"
   CONDITION+=" AND ((NOT ActionMatches{'Microsoft.Authorization/roleAssignments/delete'}) OR (@Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {$ROLE_IDS}))"
 
-  # Role Based Access Control Administrator, limited by the condition
+  # Role Based Access Control Administrator, limited by the condition. Without the condition, this role could assign
+  # any role, including Owner, which would make the identity as powerful as an Owner.
   az role assignment create --assignee "$SPN_APP_ID" --role "Role Based Access Control Administrator" --scope "$SCOPE" \
     --condition "$CONDITION" --condition-version "2.0"
   ```
