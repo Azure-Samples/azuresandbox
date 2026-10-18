@@ -167,10 +167,10 @@ This section describes the prerequisites required in order to provision an Azure
 This section applies to the default `client_secret` authentication mode. See [Authentication](#authentication) for the other modes.
 
 * Verify the subscription owner has privileges to create a service principal on the Microsoft Entra tenant. See [Permissions required for registering an app](https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal#permissions-required-for-registering-an-app) for more information.
-* Ask the subscription owner to [Create an Azure service principal](https://learn.microsoft.com/en-us/cli/azure/azure-cli-sp-tutorial-1?tabs=bash) (SPN) for sandbox users with [Azure Cloud Shell](https://learn.microsoft.com/azure/cloud-shell/quickstart). The service principal can be created without any role assignments with the following command:
+* Ask the subscription owner to [Create an Azure service principal](https://learn.microsoft.com/en-us/cli/azure/azure-cli-sp-tutorial-1?tabs=bash) (SPN) for sandbox users with [Azure Cloud Shell](https://learn.microsoft.com/azure/cloud-shell/quickstart). The following command creates the service principal with a `Contributor` role assignment on the sandbox subscription, which lets it create and manage sandbox resources:
 
   ```bash
-  az ad sp create-for-rbac -n AzureSandboxSPN
+  az ad sp create-for-rbac -n AzureSandboxSPN --role Contributor --scopes /subscriptions/YOUR-SUBSCRIPTION-ID-HERE
   ```
 
   The output should look like this:
@@ -186,14 +186,11 @@ This section applies to the default `client_secret` authentication mode. See [Au
 
 * Save the service principal *appId* and *password* in a secure location such as a password vault.
 
-* Ask the subscription owner to grant the service principal its Azure RBAC role assignments on the sandbox subscription: `Contributor`, and `Role Based Access Control Administrator` with a condition that allows it to assign and remove only the roles the sandbox uses. See [Deployment Identity Permissions](#deployment-identity-permissions). Run these commands in Azure Cloud Shell:
+* Ask the subscription owner to grant the service principal `Role Based Access Control Administrator` on the sandbox subscription, with a condition that allows it to assign and remove only the roles the sandbox uses. See [Deployment Identity Permissions](#deployment-identity-permissions). Run these commands in Azure Cloud Shell:
 
   ```bash
   SPN_APP_ID="<service-principal-app-id-here>"
   SCOPE="/subscriptions/YOUR-SUBSCRIPTION-ID-HERE"
-
-  # Contributor: create and manage sandbox resources
-  az role assignment create --assignee "$SPN_APP_ID" --role "Contributor" --scope "$SCOPE"
 
   # Roles the sandbox assigns, grouped by module (same list as scripts/deployment-identity-roles.txt).
   # Each role is listed once, under the first module that needs it.
@@ -241,7 +238,7 @@ This section applies to the default `client_secret` authentication mode. See [Au
     --condition "$CONDITION" --condition-version "2.0"
   ```
 
-  Alternatively, from a clone of this repository, run `./scripts/grant-deployment-identity-roles.sh <service-principal-app-id-here> YOUR-SUBSCRIPTION-ID-HERE`. It makes the same assignments and is safe to re-run.
+  Alternatively, from a clone of this repository, run `./scripts/grant-deployment-identity-roles.sh <service-principal-app-id-here> YOUR-SUBSCRIPTION-ID-HERE`. It makes the same assignment, also assigns `Contributor` if it is missing, and is safe to re-run.
 
 * If you want to deploy the Azure SQL Database module, a Microsoft Entra Global Administrator or Privileged Role Administrator must grant the service principal the Microsoft Graph application permissions it needs to create the SQL administrators security group. Run these commands in Azure Cloud Shell:
 
