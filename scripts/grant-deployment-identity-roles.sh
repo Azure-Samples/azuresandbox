@@ -41,7 +41,17 @@ SCOPE="/subscriptions/${SUBSCRIPTION_ID}"
 echo "Deployment identity: ${PRINCIPAL_NAME} (${PRINCIPAL_ID})"
 echo "Scope: ${SCOPE}"
 
-ROLE_IDS=$(awk '!/^#/ && NF { print $1 }' "${ROLES_FILE}" | paste -sd, - | sed 's/,/, /g')
+ROLE_IDS=""
+while IFS= read -r ROLE; do
+  [[ -z "${ROLE}" || "${ROLE}" == \#* ]] && continue
+  ROLE_ID=$(az role definition list --name "${ROLE}" --query "[0].name" -o tsv)
+  if [[ -z "${ROLE_ID}" ]]; then
+    echo "Error: role '${ROLE}' in ${ROLES_FILE} not found."
+    exit 1
+  fi
+  ROLE_IDS="${ROLE_IDS}, ${ROLE_ID}"
+done <"${ROLES_FILE}"
+ROLE_IDS="${ROLE_IDS#, }"
 CONDITION=$(<"${CONDITION_TEMPLATE}")
 CONDITION="${CONDITION//\$\{role_ids\}/${ROLE_IDS}}"
 

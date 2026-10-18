@@ -197,30 +197,40 @@ This section applies to the default `client_secret` authentication mode. See [Au
 
   # Roles the sandbox assigns, grouped by module (same list as scripts/deployment-identity-roles.txt).
   # Each role is listed once, under the first module that needs it.
+  ROLES=(
+    # vnet_shared
+    "Key Vault Secrets Officer"
 
-  # vnet_shared
-  ROLE_IDS="b86a8fe4-44ce-4948-aee5-eccb2c155cd7"    # Key Vault Secrets Officer
+    # vnet_app
+    "Key Vault Secrets User"
+    "Monitoring Reader"
+    "Storage Account Contributor"
+    "Storage Blob Data Contributor"
+    "Storage Blob Data Reader"
+    "Storage File Data Privileged Contributor"
 
-  # vnet_app
-  ROLE_IDS+=", 4633458b-17de-408a-b874-0445c86b69e6" # Key Vault Secrets User
-  ROLE_IDS+=", 43d0d8ad-25c7-4714-9337-8ba259a9fe05" # Monitoring Reader
-  ROLE_IDS+=", 17d1049b-9a84-46fb-8f53-869881c3d3ab" # Storage Account Contributor
-  ROLE_IDS+=", ba92f5b4-2d11-453d-a403-e96b0029c9fe" # Storage Blob Data Contributor
-  ROLE_IDS+=", 2a2b9908-6ea1-4ae2-8e65-a410df84e7d1" # Storage Blob Data Reader
-  ROLE_IDS+=", 69566ab7-960f-475b-8e7c-b3118f30c6bd" # Storage File Data Privileged Contributor
+    # vm_jumpbox_linux, vm_mssql_win, mssql, mysql, vwan: no additional roles
 
-  # vm_jumpbox_linux, vm_mssql_win, mssql, mysql, vwan: no additional roles
+    # avd (extra module)
+    "Desktop Virtualization User"
+    "Virtual Machine User Login"
 
-  # avd (extra module)
-  ROLE_IDS+=", 1d18fff3-a72a-46b5-b4a9-0b38a3cd7e63" # Desktop Virtualization User
-  ROLE_IDS+=", fb879df8-f326-4884-b1cf-06f3ad86be52" # Virtual Machine User Login
+    # petstore (extra module)
+    "AcrPull"
+    "AcrPush"
+    "Monitoring Metrics Publisher"
 
-  # petstore (extra module)
-  ROLE_IDS+=", 7f951dda-4ed3-4680-a7ca-43fe172d538d" # AcrPull
-  ROLE_IDS+=", 8311e382-0749-4cb8-b61a-304f252e45ec" # AcrPush
-  ROLE_IDS+=", 3913510d-42f4-4e42-8a64-420c390055eb" # Monitoring Metrics Publisher
+    # vnet_onprem (extra module): no additional roles
+  )
 
-  # vnet_onprem (extra module): no additional roles
+  # Look up each role's id; the condition below needs ids, not names
+  ROLE_IDS=""
+  for ROLE in "${ROLES[@]}"; do
+    ROLE_ID=$(az role definition list --name "$ROLE" --query "[0].name" -o tsv)
+    echo "$ROLE: $ROLE_ID"
+    ROLE_IDS="$ROLE_IDS, $ROLE_ID"
+  done
+  ROLE_IDS="${ROLE_IDS#, }" # remove the leading ", "
 
   # Condition: allow creating and deleting role assignments only for the roles in ROLE_IDS
   set +H # turn off "!" history expansion so the condition can be typed as-is

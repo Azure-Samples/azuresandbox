@@ -59,6 +59,13 @@ resource "azurerm_role_assignment" "deployment_identity_contributor" {
   scope                = "/subscriptions/${var.subscription_id}"
 }
 
+data "azurerm_role_definition" "deployment_identity_assignable" {
+  for_each = toset(local.deployment_identity_assignable_roles)
+
+  name  = each.value
+  scope = "/subscriptions/${var.subscription_id}"
+}
+
 # Allows the deployment identity to assign and remove only the roles in scripts/deployment-identity-roles.txt.
 resource "azurerm_role_assignment" "deployment_identity_rbac_admin" {
   count = var.deployment_identity == "managed_identity" ? 1 : 0
