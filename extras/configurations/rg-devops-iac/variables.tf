@@ -33,7 +33,6 @@ variable "client_secret" {
   }
 }
 
-
 variable "deployment_identity" {
   type        = string
   description = "The identity this configuration provisions for root sandbox deployments. Use none to provision no deployment identity, or managed_identity to create a user-assigned managed identity with 'Contributor' and conditioned 'Role Based Access Control Administrator' role assignments on the subscription and attach it to the Linux virtual machine, for root sandbox applies with auth_mode = \"managed_identity\"."

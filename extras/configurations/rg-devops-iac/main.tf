@@ -1,5 +1,12 @@
 #region data
 data "azurerm_client_config" "current" {}
+
+data "azurerm_role_definition" "deployment_identity_assignable" {
+  for_each = toset(local.deployment_identity_assignable_roles)
+
+  name  = each.value
+  scope = "/subscriptions/${var.subscription_id}"
+}
 #endregion
 
 #region resources
@@ -59,13 +66,6 @@ resource "azurerm_role_assignment" "deployment_identity_contributor" {
   scope                = "/subscriptions/${var.subscription_id}"
 }
 
-data "azurerm_role_definition" "deployment_identity_assignable" {
-  for_each = toset(local.deployment_identity_assignable_roles)
-
-  name  = each.value
-  scope = "/subscriptions/${var.subscription_id}"
-}
-
 # Allows the deployment identity to assign and remove only the roles in local.deployment_identity_assignable_roles.
 resource "azurerm_role_assignment" "deployment_identity_rbac_admin" {
   count = var.deployment_identity == "managed_identity" ? 1 : 0
@@ -76,11 +76,6 @@ resource "azurerm_role_assignment" "deployment_identity_rbac_admin" {
   principal_type       = "ServicePrincipal"
   role_definition_name = "Role Based Access Control Administrator"
   scope                = "/subscriptions/${var.subscription_id}"
-}
-
-moved {
-  from = azurerm_user_assigned_identity.this
-  to   = azurerm_user_assigned_identity.deployment
 }
 #endregion
 
