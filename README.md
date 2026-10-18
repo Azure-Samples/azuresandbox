@@ -120,7 +120,7 @@ Azure Sandbox is built with security as a core principle, ensuring that all reso
   * Ensures that only authorized entities can access or manage Azure resources.
   * Simplifies access management by leveraging Microsoft Entra ID for identity and access control.
 
-  **IMPORTANT**: The interactive user who provisions the sandbox must have an `Owner` role assignment scoped to the sandbox subscription. The deployment identity Terraform authenticates as does not need `Owner`: it has `Contributor` and a `Role Based Access Control Administrator` assignment with a condition that allows it to assign only the roles the sandbox uses. See [Deployment Identity Permissions](#deployment-identity-permissions). All other role assignments follow the principle of least privilege and leverage managed identities where applicable.
+  **IMPORTANT**: The interactive user who provisions the sandbox must have an `Owner` role assignment scoped to the sandbox subscription. The deployment identity Terraform authenticates as does not need `Owner`: it has `Contributor` and a `Role Based Access Control Administrator` assignment with a condition that allows it to assign only the roles the sandbox uses. See [Service Principal](#service-principal). All other role assignments follow the principle of least privilege and leverage managed identities where applicable.
 
 * **Data Encryption**:
   * All data stored in the sandbox environment is encrypted at rest using platform-managed keys.
@@ -186,7 +186,7 @@ This section applies to the default `client_secret` authentication mode. See [Au
 
 * Save the service principal *appId* and *password* in a secure location such as a password vault.
 
-* Ask the subscription owner to grant the service principal `Role Based Access Control Administrator` on the sandbox subscription, with a condition that allows it to assign and remove only the roles the sandbox uses. See [Deployment Identity Permissions](#deployment-identity-permissions). Run these commands in Azure Cloud Shell:
+* Ask the subscription owner to grant the service principal `Role Based Access Control Administrator` on the sandbox subscription, with a condition that allows it to assign and remove only the roles the sandbox uses. Run these commands in Azure Cloud Shell:
 
   ```bash
   SPN_APP_ID="<service-principal-app-id-here>"
@@ -339,53 +339,9 @@ Azure DevOps, GitHub Actions, or other CI/CD tools can be used to automate the d
 
 ## Authentication
 
-This section is the single reference for how Terraform authenticates to Azure and Microsoft Entra ID in this repository. The root configuration and the [rg-devops-iac](./extras/configurations/rg-devops-iac/) configuration use the same authentication contract.
+By default, Terraform authenticates as a service principal with a client secret (`auth_mode = "client_secret"`). Create the service principal and grant its permissions as described in [Service Principal](#service-principal), and supply its secret with the `TF_VAR_client_secret` environment variable. The bootstrap script writes the other values, `client_id`, `entra_tenant_id` and `operator_object_id`, to `terraform.tfvars`.
 
-### Authentication Modes
-
-The `auth_mode` variable selects how Terraform authenticates the `azurerm`, `azapi` and `azuread` providers. Every provider uses the same settings, derived once in the `provider_auth` local in `providers.tf`.
-
-`auth_mode` | Identity (`client_id`) | Credential | Typical use
---- | --- | --- | ---
-`client_secret` (default) | Service principal `appId` | `client_secret`, supplied with the `TF_VAR_client_secret` environment variable | Interactive execution from any client. See [Service Principal](#service-principal).
-`managed_identity` | Client id of a user-assigned managed identity attached to the Terraform execution host | Managed identity endpoint of the host. No secret. | Secretless execution on the rg-devops-iac Linux virtual machine.
-
-Variable | Description
---- | ---
-`auth_mode` | `client_secret` or `managed_identity`. Defaults to `client_secret`.
-`client_id` | The client id of the identity Terraform authenticates as.
-`client_secret` | The service principal secret. Required only when `auth_mode` is `client_secret`. Set it with `TF_VAR_client_secret`; never store it in a file.
-`entra_tenant_id` | The Microsoft Entra tenant id.
-
-### Deployment Identity Permissions
-
-The identity Terraform authenticates as needs the same permissions in every authentication mode. None of them is `Owner`.
-
-Permission | Scope | Why
---- | --- | ---
-`Contributor` Azure RBAC role | Sandbox subscription | Creates and manages the sandbox resources.
-`Role Based Access Control Administrator` Azure RBAC role, with a condition | Sandbox subscription | Creates and removes the sandbox's role assignments. The condition allows only the roles listed in `ROLES` in the [Service Principal](#service-principal) commands, so the identity cannot grant `Owner`, `User Access Administrator` or `Role Based Access Control Administrator`.
-`Group.Create`, `User.Read.All` and `Application.Read.All` Microsoft Graph application permissions | Microsoft Entra tenant | Creates the SQL administrators security group, with a user and a managed identity as members. The identity becomes the group's owner, which lets it manage and delete the group. Required only when the mssql module is enabled.
-
-When you add a module that assigns a new Azure RBAC role, add the role to the `ROLES` list in [Service Principal](#service-principal) and to `deployment_identity_assignable_roles` in rg-devops-iac [`locals.tf`](./extras/configurations/rg-devops-iac/locals.tf). Then re-grant:
-
-* **Service principal:** remove the existing assignment, then re-run the `Role Based Access Control Administrator` commands in [Service Principal](#service-principal):
-
-  ```bash
-  az role assignment delete --assignee "$SPN_APP_ID" --role "Role Based Access Control Administrator" --scope "$SCOPE"
-  ```
-
-* **Managed identity:** re-apply rg-devops-iac.
-
-For `client_secret` mode, see [Service Principal](#service-principal). For `managed_identity` mode, set `deployment_identity = "managed_identity"` in rg-devops-iac. It creates the user-assigned managed identity, assigns both Azure RBAC roles on the subscription, and attaches the identity to its Linux virtual machine. Use the `deployment_identity_client_id` output as `client_id`, and grant the Microsoft Graph permission with `extras/configurations/rg-devops-iac/scripts/grant-graph-permissions.sh`. See the [rg-devops-iac README](./extras/configurations/rg-devops-iac/README.md) for details.
-
-### Operator
-
-`operator_object_id` is the Microsoft Entra object id of the operator: the signed-in user who provisions the configuration. It is separate from the deployment identity. The operator is granted data-plane role assignments, such as Key Vault and Storage roles, on the resources the configuration creates. The bootstrap scripts default it to the signed-in Azure CLI or Azure PowerShell user.
-
-### State Backend Authentication
-
-Provider authentication and state backend authentication are independent. `auth_mode` affects only the providers. By default, Terraform state is stored locally. When an `azurerm` backend is configured in `backend.tf`, it authenticates with its own settings, for example the system-assigned managed identity of the rg-devops-iac Linux virtual machine (`use_msi = true` with `use_azuread_auth = true`).
+For automated or secretless deployments, such as from a GitHub Actions self-hosted runner using a managed identity, see [Deployment Identity and Authentication](./extras/configurations/rg-devops-iac/README.md#deployment-identity-and-authentication) in the rg-devops-iac configuration.
 
 ## Getting Started (Interactive Execution)
 

@@ -7,6 +7,7 @@
 * [Features](#features)
 * [Prerequisites](#prerequisites)
 * [Getting Started (Interactive Execution)](#getting-started-interactive-execution)
+* [Deployment Identity and Authentication](#deployment-identity-and-authentication)
 * [Documentation](#documentation)
 
 ## Architecture
@@ -351,7 +352,7 @@ There many variables in this configuration. Defaults have been set for most of t
 
 Follow these steps to configure the variables for this configuration:
 
-* First, create an environment variable for the service principal password. For security reasons this secret should not be stored in the `terraform.tfvars` file. This configuration uses the same authentication contract as the root sandbox; see [Authentication](../../../README.md#authentication).
+* First, create an environment variable for the service principal password. For security reasons this secret should not be stored in the `terraform.tfvars` file. This configuration uses the same authentication contract as the root sandbox; see [Deployment Identity and Authentication](#deployment-identity-and-authentication).
 
   ```bash
   # Set environment variable in bash
@@ -450,7 +451,7 @@ By default the runner service account is granted command scoped passwordless `su
 
 #### **Optional: Deployment Identity for Managed Identity Sandbox Applies**
 
-The root Azure Sandbox configuration can authenticate with a managed identity instead of a service principal secret (`auth_mode = "managed_identity"`; see [Authentication](../../../README.md#authentication)), for example from a CD workflow running on the self-hosted runner. That mode requires a **user-assigned** managed identity attached to the Terraform execution environment. This configuration can create one for you. This is **disabled by default**.
+The root Azure Sandbox configuration can authenticate with a managed identity instead of a service principal secret (`auth_mode = "managed_identity"`; see [Deployment Identity and Authentication](#deployment-identity-and-authentication)), for example from a CD workflow running on the self-hosted runner. That mode requires a **user-assigned** managed identity attached to the Terraform execution environment. This configuration can create one for you. This is **disabled by default**.
 
 To enable it, add the following to the `terraform.tfvars` file:
 
@@ -461,7 +462,7 @@ deployment_identity = "managed_identity"
 When enabled, the identity is:
 
 * Created in the resource group provisioned by this configuration.
-* Assigned two roles at the subscription scope, as described in [Deployment Identity Permissions](../../../README.md#deployment-identity-permissions) in the root README:
+* Assigned two roles at the subscription scope, as described in [Deployment Identity Permissions](#deployment-identity-permissions):
   * `Contributor`, to create and manage sandbox resources.
   * `Role Based Access Control Administrator`, with a condition that allows assigning and removing only the roles the sandbox assigns, listed in `local.deployment_identity_assignable_roles` in [`locals.tf`](./locals.tf). The identity cannot grant `Owner`, `User Access Administrator` or `Role Based Access Control Administrator`.
 
@@ -546,6 +547,56 @@ If you only need to remove Terraform state file(s) from the Azure Blob Storage c
 ./scripts/delete-tfstate.sh --yes azuresandbox.tfstate  # skip confirmation prompt
 ```
 
+## Deployment Identity and Authentication
+
+This section is the reference for how Terraform authenticates to Azure and Microsoft Entra ID in this repository. The root sandbox configuration and this configuration use the same authentication contract. Most sandbox users deploy interactively with a service principal, as described in the root README's [Service Principal](../../../README.md#service-principal) prerequisites; the managed identity mode below supports automated and secretless deployments from this configuration's Linux virtual machine.
+
+### Authentication Modes
+
+The `auth_mode` variable selects how Terraform authenticates the `azurerm`, `azapi` and `azuread` providers. Every provider uses the same settings, derived once in the `provider_auth` local in `locals.tf`.
+
+`auth_mode` | Identity (`client_id`) | Credential | Typical use
+--- | --- | --- | ---
+`client_secret` (default) | Service principal `appId` | `client_secret`, supplied with the `TF_VAR_client_secret` environment variable | Interactive execution from any client. See [Service Principal](../../../README.md#service-principal) in the root README.
+`managed_identity` | Client id of a user-assigned managed identity attached to the Terraform execution host | Managed identity endpoint of the host. No secret. | Secretless execution on the rg-devops-iac Linux virtual machine.
+
+Variable | Description
+--- | ---
+`auth_mode` | `client_secret` or `managed_identity`. Defaults to `client_secret`.
+`client_id` | The client id of the identity Terraform authenticates as.
+`client_secret` | The service principal secret. Required only when `auth_mode` is `client_secret`. Set it with `TF_VAR_client_secret`; never store it in a file.
+`entra_tenant_id` | The Microsoft Entra tenant id.
+
+### Deployment Identity Permissions
+
+The identity Terraform authenticates as needs the same permissions in every authentication mode. None of them is `Owner`.
+
+Permission | Scope | Why
+--- | --- | ---
+`Contributor` Azure RBAC role | Sandbox subscription | Creates and manages the sandbox resources.
+`Role Based Access Control Administrator` Azure RBAC role, with a condition | Sandbox subscription | Creates and removes the sandbox's role assignments. The condition allows only the roles listed in `ROLES` in the root README's [Service Principal](../../../README.md#service-principal) commands, so the identity cannot grant `Owner`, `User Access Administrator` or `Role Based Access Control Administrator`.
+`Group.Create`, `User.Read.All` and `Application.Read.All` Microsoft Graph application permissions | Microsoft Entra tenant | Creates the SQL administrators security group, with a user and a managed identity as members. The identity becomes the group's owner, which lets it manage and delete the group. Required only when the mssql module is enabled.
+
+When you add a module that assigns a new Azure RBAC role, add the role to the `ROLES` list in the root README's [Service Principal](../../../README.md#service-principal) commands and to `deployment_identity_assignable_roles` in [`locals.tf`](./locals.tf). Then re-grant:
+
+* **Service principal:** remove the existing assignment, then re-run the `Role Based Access Control Administrator` commands in [Service Principal](../../../README.md#service-principal):
+
+  ```bash
+  az role assignment delete --assignee "$SPN_APP_ID" --role "Role Based Access Control Administrator" --scope "$SCOPE"
+  ```
+
+* **Managed identity:** re-apply this configuration.
+
+For `client_secret` mode, see [Service Principal](../../../README.md#service-principal) in the root README. For `managed_identity` mode, set `deployment_identity = "managed_identity"` in this configuration. It creates the user-assigned managed identity, assigns both Azure RBAC roles on the subscription, and attaches the identity to its Linux virtual machine. Use the `deployment_identity_client_id` output as `client_id`, and grant the Microsoft Graph permissions with `scripts/grant-graph-permissions.sh`. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies).
+
+### Operator
+
+`operator_object_id` is the Microsoft Entra object id of the operator: the signed-in user who provisions the configuration. It is separate from the deployment identity. The operator is granted data-plane role assignments, such as Key Vault and Storage roles, on the resources the configuration creates. The bootstrap scripts default it to the signed-in Azure CLI or Azure PowerShell user.
+
+### State Backend Authentication
+
+Provider authentication and state backend authentication are independent. `auth_mode` affects only the providers. By default, Terraform state is stored locally. When an `azurerm` backend is configured in `backend.tf`, it authenticates with its own settings, for example the system-assigned managed identity of the rg-devops-iac Linux virtual machine (`use_msi = true` with `use_azuread_auth = true`).
+
 ## Documentation
 
 This section provides documentation regarding the overall structure of the root module for this configuration. See the README.md files in each module directory for more information about that module.
@@ -589,7 +640,7 @@ This section lists input variables used in the root module. Defaults can be over
 
 Variable | Default | Description
 --- | --- | ---
-auth_mode | `client_secret` | How Terraform authenticates the providers: `client_secret` or `managed_identity`. See [Authentication](../../../README.md#authentication).
+auth_mode | `client_secret` | How Terraform authenticates the providers: `client_secret` or `managed_identity`. See [Deployment Identity and Authentication](#deployment-identity-and-authentication).
 client_id | | The client id of the identity Terraform authenticates as: the service principal `appId` for `client_secret`, or the user-assigned managed identity client id for `managed_identity`.
 client_secret | | The service principal secret. Required only when `auth_mode` is `client_secret`; set it using `TF_VAR_client_secret`.
 deployment_identity | `none` | The identity this configuration provisions for root sandbox deployments: `none` or `managed_identity`. `managed_identity` creates a user-assigned managed identity with `Contributor` and conditioned `Role Based Access Control Administrator` role assignments on the subscription and attaches it to `jumplinux2`, for root sandbox applies with `auth_mode = "managed_identity"`. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies).
