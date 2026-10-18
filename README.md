@@ -195,33 +195,32 @@ This section applies to the default `client_secret` authentication mode. See [Au
   # Contributor: create and manage sandbox resources
   az role assignment create --assignee "$SPN_APP_ID" --role "Contributor" --scope "$SCOPE"
 
-  # Role definition ids of the roles the sandbox assigns (same list as scripts/deployment-identity-roles.txt)
-  ACRPULL_ROLE_ID="7f951dda-4ed3-4680-a7ca-43fe172d538d"                                  # AcrPull
-  ACRPUSH_ROLE_ID="8311e382-0749-4cb8-b61a-304f252e45ec"                                  # AcrPush
-  AZURE_AI_DEVELOPER_ROLE_ID="64702f94-c441-49e6-a78b-ef80e0188fee"                       # Azure AI Developer
-  COGNITIVE_SERVICES_OPENAI_CONTRIBUTOR_ROLE_ID="a001fd3d-188f-4b5d-821b-7da978bf7442"    # Cognitive Services OpenAI Contributor
-  COGNITIVE_SERVICES_USER_ROLE_ID="a97b65f3-24c7-4388-baec-2e87135dc908"                  # Cognitive Services User
-  DESKTOP_VIRTUALIZATION_USER_ROLE_ID="1d18fff3-a72a-46b5-b4a9-0b38a3cd7e63"              # Desktop Virtualization User
-  KEY_VAULT_SECRETS_OFFICER_ROLE_ID="b86a8fe4-44ce-4948-aee5-eccb2c155cd7"                # Key Vault Secrets Officer
-  KEY_VAULT_SECRETS_USER_ROLE_ID="4633458b-17de-408a-b874-0445c86b69e6"                   # Key Vault Secrets User
-  MONITORING_METRICS_PUBLISHER_ROLE_ID="3913510d-42f4-4e42-8a64-420c390055eb"             # Monitoring Metrics Publisher
-  MONITORING_READER_ROLE_ID="43d0d8ad-25c7-4714-9337-8ba259a9fe05"                        # Monitoring Reader
-  SEARCH_INDEX_DATA_CONTRIBUTOR_ROLE_ID="8ebe5a00-799e-43f5-93ac-243d3dce84a7"            # Search Index Data Contributor
-  SEARCH_INDEX_DATA_READER_ROLE_ID="1407120a-92aa-4202-b7e9-c0e197c71c8f"                 # Search Index Data Reader
-  SEARCH_SERVICE_CONTRIBUTOR_ROLE_ID="7ca78c08-252a-4471-8644-bb5ff32d4ba0"               # Search Service Contributor
-  STORAGE_ACCOUNT_CONTRIBUTOR_ROLE_ID="17d1049b-9a84-46fb-8f53-869881c3d3ab"              # Storage Account Contributor
-  STORAGE_BLOB_DATA_CONTRIBUTOR_ROLE_ID="ba92f5b4-2d11-453d-a403-e96b0029c9fe"            # Storage Blob Data Contributor
-  STORAGE_BLOB_DATA_READER_ROLE_ID="2a2b9908-6ea1-4ae2-8e65-a410df84e7d1"                 # Storage Blob Data Reader
-  STORAGE_FILE_DATA_PRIVILEGED_CONTRIBUTOR_ROLE_ID="69566ab7-960f-475b-8e7c-b3118f30c6bd" # Storage File Data Privileged Contributor
-  VIRTUAL_MACHINE_USER_LOGIN_ROLE_ID="fb879df8-f326-4884-b1cf-06f3ad86be52"               # Virtual Machine User Login
+  # Roles the sandbox assigns, grouped by module (same list as scripts/deployment-identity-roles.txt).
+  # Each role is listed once, under the first module that needs it.
 
-  # Comma-separated list of the role ids above
-  ROLE_IDS="$ACRPULL_ROLE_ID, $ACRPUSH_ROLE_ID, $AZURE_AI_DEVELOPER_ROLE_ID"
-  ROLE_IDS+=", $COGNITIVE_SERVICES_OPENAI_CONTRIBUTOR_ROLE_ID, $COGNITIVE_SERVICES_USER_ROLE_ID, $DESKTOP_VIRTUALIZATION_USER_ROLE_ID"
-  ROLE_IDS+=", $KEY_VAULT_SECRETS_OFFICER_ROLE_ID, $KEY_VAULT_SECRETS_USER_ROLE_ID, $MONITORING_METRICS_PUBLISHER_ROLE_ID"
-  ROLE_IDS+=", $MONITORING_READER_ROLE_ID, $SEARCH_INDEX_DATA_CONTRIBUTOR_ROLE_ID, $SEARCH_INDEX_DATA_READER_ROLE_ID"
-  ROLE_IDS+=", $SEARCH_SERVICE_CONTRIBUTOR_ROLE_ID, $STORAGE_ACCOUNT_CONTRIBUTOR_ROLE_ID, $STORAGE_BLOB_DATA_CONTRIBUTOR_ROLE_ID"
-  ROLE_IDS+=", $STORAGE_BLOB_DATA_READER_ROLE_ID, $STORAGE_FILE_DATA_PRIVILEGED_CONTRIBUTOR_ROLE_ID, $VIRTUAL_MACHINE_USER_LOGIN_ROLE_ID"
+  # vnet_shared
+  ROLE_IDS="b86a8fe4-44ce-4948-aee5-eccb2c155cd7"    # Key Vault Secrets Officer
+
+  # vnet_app
+  ROLE_IDS+=", 4633458b-17de-408a-b874-0445c86b69e6" # Key Vault Secrets User
+  ROLE_IDS+=", 43d0d8ad-25c7-4714-9337-8ba259a9fe05" # Monitoring Reader
+  ROLE_IDS+=", 17d1049b-9a84-46fb-8f53-869881c3d3ab" # Storage Account Contributor
+  ROLE_IDS+=", ba92f5b4-2d11-453d-a403-e96b0029c9fe" # Storage Blob Data Contributor
+  ROLE_IDS+=", 2a2b9908-6ea1-4ae2-8e65-a410df84e7d1" # Storage Blob Data Reader
+  ROLE_IDS+=", 69566ab7-960f-475b-8e7c-b3118f30c6bd" # Storage File Data Privileged Contributor
+
+  # vm_jumpbox_linux, vm_mssql_win, mssql, mysql, vwan: no additional roles
+
+  # avd (extra module)
+  ROLE_IDS+=", 1d18fff3-a72a-46b5-b4a9-0b38a3cd7e63" # Desktop Virtualization User
+  ROLE_IDS+=", fb879df8-f326-4884-b1cf-06f3ad86be52" # Virtual Machine User Login
+
+  # petstore (extra module)
+  ROLE_IDS+=", 7f951dda-4ed3-4680-a7ca-43fe172d538d" # AcrPull
+  ROLE_IDS+=", 8311e382-0749-4cb8-b61a-304f252e45ec" # AcrPush
+  ROLE_IDS+=", 3913510d-42f4-4e42-8a64-420c390055eb" # Monitoring Metrics Publisher
+
+  # vnet_onprem (extra module): no additional roles
 
   # Condition: allow creating and deleting role assignments only for the roles in ROLE_IDS
   set +H # turn off "!" history expansion so the condition can be typed as-is
