@@ -463,9 +463,9 @@ When enabled, the identity is:
 * Created in the resource group provisioned by this configuration.
 * Assigned two roles at the subscription scope, as described in [Deployment Identity Permissions](../../../README.md#deployment-identity-permissions) in the root README:
   * `Contributor`, to create and manage sandbox resources.
-  * `Role Based Access Control Administrator`, with a condition that allows assigning and removing only the roles listed in [`scripts/deployment-identity-roles.txt`](../../../scripts/deployment-identity-roles.txt). The identity cannot grant `Owner`, `User Access Administrator` or `Role Based Access Control Administrator`.
+  * `Role Based Access Control Administrator`, with a condition that allows assigning and removing only the roles the sandbox assigns, listed in `local.deployment_identity_assignable_roles` in [`locals.tf`](./locals.tf). The identity cannot grant `Owner`, `User Access Administrator` or `Role Based Access Control Administrator`.
 
-  This is still a standing, privileged identity. Contributor on the subscription also includes this configuration's own resource group, so anything running on `jumplinux2` that uses this identity can modify or delete it. When `scripts/deployment-identity-roles.txt` changes, re-apply this configuration to update the condition.
+  This is still a standing, privileged identity. Contributor on the subscription also includes this configuration's own resource group, so anything running on `jumplinux2` that uses this identity can modify or delete it. When that list changes, re-apply this configuration to update the condition.
 * Attached to `jumplinux2` **in addition to** the system-assigned identity. The system-assigned identity remains the VM's default identity, so cloud-init, the runner registration script, `az login --identity` and the `azurerm` state backend (`ARM_USE_MSI`) keep using it. Use the user-assigned identity explicitly by its client id, e.g. `az login --identity --client-id <client-id>` or `Connect-AzAccount -Identity -AccountId <client-id>`.
 
 Enabling or disabling the identity on an existing deployment updates the VM in place. It does not replace the VM.
@@ -636,7 +636,7 @@ azurerm_resource_group.this | rg-devops-dev-xxx | Resource group for all resourc
 azurerm_role_assignment.keyvault_roles[*] | | Assigns `Key Vault Secrets Officer` to both the service principal and the interactive user.
 azurerm_role_assignment.storage_roles[*] | | Assigns `Storage Blob Data Contributor` to both the service principal and the interactive user.
 azurerm_role_assignment.deployment_identity_contributor[0] | | Assigns `Contributor` at the subscription scope to the deployment identity. Created only when `deployment_identity` is `managed_identity`.
-azurerm_role_assignment.deployment_identity_rbac_admin[0] | | Assigns `Role Based Access Control Administrator` at the subscription scope to the deployment identity, with a condition that allows only the roles in `scripts/deployment-identity-roles.txt`. Created only when `deployment_identity` is `managed_identity`.
+azurerm_role_assignment.deployment_identity_rbac_admin[0] | | Assigns `Role Based Access Control Administrator` at the subscription scope to the deployment identity, with a condition that allows only the roles in `local.deployment_identity_assignable_roles`. Created only when `deployment_identity` is `managed_identity`.
 azurerm_storage_account.this | stdevopsdevxxx | Storage account for storing Terraform state files.
 azurerm_storage_container.this | tfstate | Storage container for storing Terraform state files.
 azurerm_subnet.devops | snet-devops-01 | Subnet for jumplinux2 VM

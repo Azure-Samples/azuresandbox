@@ -241,8 +241,8 @@ github_runner_token_type      = "pat"
 The URL and label must match the workflows that will target the runner.
 `deployment_identity = "managed_identity"` creates a user-assigned managed identity with
 subscription `Contributor` and a `Role Based Access Control Administrator`
-assignment whose condition allows only the roles in
-`scripts/deployment-identity-roles.txt`, and attaches it to the VM. The
+assignment whose condition allows only the roles the sandbox assigns (listed in
+`locals.tf`), and attaches it to the VM. The
 identity that applies this bootstrap needs `Owner` (or `Contributor` plus an
 unconstrained role-assignment role) to create those assignments. The
 deployment identity can also modify the runner infrastructure itself.
