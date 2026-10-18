@@ -186,19 +186,87 @@ This section applies to the default `client_secret` authentication mode. See [Au
 
 * Save the service principal *appId* and *password* in a secure location such as a password vault.
 
-* Ask the subscription owner to grant the service principal its Azure RBAC role assignments on the sandbox subscription. From a clone of this repository, run:
+* Ask the subscription owner to grant the service principal its Azure RBAC role assignments on the sandbox subscription: `Contributor`, and `Role Based Access Control Administrator` with a condition that allows it to assign and remove only the roles the sandbox uses. See [Deployment Identity Permissions](#deployment-identity-permissions). Run these commands in Azure Cloud Shell:
 
   ```bash
-  ./scripts/grant-deployment-identity-roles.sh <service-principal-app-id-here> YOUR-SUBSCRIPTION-ID-HERE
+  SPN_APP_ID="<service-principal-app-id-here>"
+  SCOPE="/subscriptions/YOUR-SUBSCRIPTION-ID-HERE"
+
+  # Contributor: create and manage sandbox resources
+  az role assignment create --assignee "$SPN_APP_ID" --role "Contributor" --scope "$SCOPE"
+
+  # Role definition ids of the roles the sandbox assigns (same list as scripts/deployment-identity-roles.txt)
+  ACRPULL_ROLE_ID="7f951dda-4ed3-4680-a7ca-43fe172d538d"                                  # AcrPull
+  ACRPUSH_ROLE_ID="8311e382-0749-4cb8-b61a-304f252e45ec"                                  # AcrPush
+  AZURE_AI_DEVELOPER_ROLE_ID="64702f94-c441-49e6-a78b-ef80e0188fee"                       # Azure AI Developer
+  COGNITIVE_SERVICES_OPENAI_CONTRIBUTOR_ROLE_ID="a001fd3d-188f-4b5d-821b-7da978bf7442"    # Cognitive Services OpenAI Contributor
+  COGNITIVE_SERVICES_USER_ROLE_ID="a97b65f3-24c7-4388-baec-2e87135dc908"                  # Cognitive Services User
+  DESKTOP_VIRTUALIZATION_USER_ROLE_ID="1d18fff3-a72a-46b5-b4a9-0b38a3cd7e63"              # Desktop Virtualization User
+  KEY_VAULT_SECRETS_OFFICER_ROLE_ID="b86a8fe4-44ce-4948-aee5-eccb2c155cd7"                # Key Vault Secrets Officer
+  KEY_VAULT_SECRETS_USER_ROLE_ID="4633458b-17de-408a-b874-0445c86b69e6"                   # Key Vault Secrets User
+  MONITORING_METRICS_PUBLISHER_ROLE_ID="3913510d-42f4-4e42-8a64-420c390055eb"             # Monitoring Metrics Publisher
+  MONITORING_READER_ROLE_ID="43d0d8ad-25c7-4714-9337-8ba259a9fe05"                        # Monitoring Reader
+  SEARCH_INDEX_DATA_CONTRIBUTOR_ROLE_ID="8ebe5a00-799e-43f5-93ac-243d3dce84a7"            # Search Index Data Contributor
+  SEARCH_INDEX_DATA_READER_ROLE_ID="1407120a-92aa-4202-b7e9-c0e197c71c8f"                 # Search Index Data Reader
+  SEARCH_SERVICE_CONTRIBUTOR_ROLE_ID="7ca78c08-252a-4471-8644-bb5ff32d4ba0"               # Search Service Contributor
+  STORAGE_ACCOUNT_CONTRIBUTOR_ROLE_ID="17d1049b-9a84-46fb-8f53-869881c3d3ab"              # Storage Account Contributor
+  STORAGE_BLOB_DATA_CONTRIBUTOR_ROLE_ID="ba92f5b4-2d11-453d-a403-e96b0029c9fe"            # Storage Blob Data Contributor
+  STORAGE_BLOB_DATA_READER_ROLE_ID="2a2b9908-6ea1-4ae2-8e65-a410df84e7d1"                 # Storage Blob Data Reader
+  STORAGE_FILE_DATA_PRIVILEGED_CONTRIBUTOR_ROLE_ID="69566ab7-960f-475b-8e7c-b3118f30c6bd" # Storage File Data Privileged Contributor
+  VIRTUAL_MACHINE_USER_LOGIN_ROLE_ID="fb879df8-f326-4884-b1cf-06f3ad86be52"               # Virtual Machine User Login
+
+  # Comma-separated list of the role ids above
+  ROLE_IDS="$ACRPULL_ROLE_ID, $ACRPUSH_ROLE_ID, $AZURE_AI_DEVELOPER_ROLE_ID"
+  ROLE_IDS+=", $COGNITIVE_SERVICES_OPENAI_CONTRIBUTOR_ROLE_ID, $COGNITIVE_SERVICES_USER_ROLE_ID, $DESKTOP_VIRTUALIZATION_USER_ROLE_ID"
+  ROLE_IDS+=", $KEY_VAULT_SECRETS_OFFICER_ROLE_ID, $KEY_VAULT_SECRETS_USER_ROLE_ID, $MONITORING_METRICS_PUBLISHER_ROLE_ID"
+  ROLE_IDS+=", $MONITORING_READER_ROLE_ID, $SEARCH_INDEX_DATA_CONTRIBUTOR_ROLE_ID, $SEARCH_INDEX_DATA_READER_ROLE_ID"
+  ROLE_IDS+=", $SEARCH_SERVICE_CONTRIBUTOR_ROLE_ID, $STORAGE_ACCOUNT_CONTRIBUTOR_ROLE_ID, $STORAGE_BLOB_DATA_CONTRIBUTOR_ROLE_ID"
+  ROLE_IDS+=", $STORAGE_BLOB_DATA_READER_ROLE_ID, $STORAGE_FILE_DATA_PRIVILEGED_CONTRIBUTOR_ROLE_ID, $VIRTUAL_MACHINE_USER_LOGIN_ROLE_ID"
+
+  # Condition: allow creating and deleting role assignments only for the roles in ROLE_IDS
+  set +H # turn off "!" history expansion so the condition can be typed as-is
+  WRITE_CONDITION="(!(ActionMatches{'Microsoft.Authorization/roleAssignments/write'})) OR (@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {$ROLE_IDS})"
+  DELETE_CONDITION="(!(ActionMatches{'Microsoft.Authorization/roleAssignments/delete'})) OR (@Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {$ROLE_IDS})"
+  CONDITION="($WRITE_CONDITION) AND ($DELETE_CONDITION)"
+
+  # Role Based Access Control Administrator, limited by the condition
+  az role assignment create --assignee "$SPN_APP_ID" --role "Role Based Access Control Administrator" --scope "$SCOPE" \
+    --condition "$CONDITION" --condition-version "2.0"
   ```
 
-  The script assigns `Contributor` and a conditioned `Role Based Access Control Administrator` role. See [Deployment Identity Permissions](#deployment-identity-permissions). It is idempotent, and it warns if the service principal still has `Owner` or `User Access Administrator` from an earlier setup.
-
-* If you want to deploy the Azure SQL Database module, a Microsoft Entra Global Administrator or Privileged Role Administrator must grant the service principal the Microsoft Graph application permissions it needs to create the SQL administrators security group. From a clone of this repository, run:
+  If the service principal was created earlier with `Owner`, remove it once the new assignments exist:
 
   ```bash
-  ./extras/configurations/rg-devops-iac/scripts/grant-graph-permissions.sh <service-principal-app-id-here>
+  az role assignment delete --assignee "$SPN_APP_ID" --role "Owner" --scope "$SCOPE"
   ```
+
+  Alternatively, from a clone of this repository, run `./scripts/grant-deployment-identity-roles.sh <service-principal-app-id-here> YOUR-SUBSCRIPTION-ID-HERE`. It makes the same assignments, is safe to re-run, updates an outdated condition, and warns if `Owner` or `User Access Administrator` is still assigned.
+
+* If you want to deploy the Azure SQL Database module, a Microsoft Entra Global Administrator or Privileged Role Administrator must grant the service principal the Microsoft Graph application permissions it needs to create the SQL administrators security group. Run these commands in Azure Cloud Shell:
+
+  ```bash
+  SPN_APP_ID="<service-principal-app-id-here>"
+  GRAPH_APP_ID="00000003-0000-0000-c000-000000000000" # Microsoft Graph (the same in every tenant)
+
+  # Microsoft Graph application permission (app role) ids
+  GROUP_CREATE_ID="bf7b1a76-6e77-406b-b258-bf5c7720e98f"         # Group.Create: create the group
+  USER_READ_ALL_ID="df021288-bdef-4463-88db-98f22de89214"        # User.Read.All: add the operator (a user) as a member
+  APPLICATION_READ_ALL_ID="9a5d68dd-52b0-4cc2-bd40-abcf44ac3a30" # Application.Read.All: add a managed identity as a member
+
+  SPN_OBJECT_ID=$(az ad sp show --id "$SPN_APP_ID" --query id -o tsv)
+  GRAPH_OBJECT_ID=$(az ad sp show --id "$GRAPH_APP_ID" --query id -o tsv)
+
+  for APP_ROLE_ID in "$GROUP_CREATE_ID" "$USER_READ_ALL_ID" "$APPLICATION_READ_ALL_ID"; do
+    az rest --method POST \
+      --uri "https://graph.microsoft.com/v1.0/servicePrincipals/$SPN_OBJECT_ID/appRoleAssignments" \
+      --headers "Content-Type=application/json" \
+      --body "{\"principalId\": \"$SPN_OBJECT_ID\", \"resourceId\": \"$GRAPH_OBJECT_ID\", \"appRoleId\": \"$APP_ROLE_ID\"}"
+  done
+  ```
+
+  If the service principal was granted `Group.ReadWrite.All` earlier, it is no longer required. Remove it from the app registration's **API permissions** page in the Entra admin center.
+
+  Alternatively, from a clone of this repository, run `./extras/configurations/rg-devops-iac/scripts/grant-graph-permissions.sh <service-principal-app-id-here>`. It grants the same permissions, skips any already granted, and prints the command to remove a leftover `Group.ReadWrite.All`.
 
   Alternatively you can perform these steps manually from the Entra portal:
 
@@ -302,7 +370,7 @@ Permission | Scope | Why
 `Role Based Access Control Administrator` Azure RBAC role, with a condition | Sandbox subscription | Creates and removes the sandbox's role assignments. The condition allows only the roles listed in [`scripts/deployment-identity-roles.txt`](./scripts/deployment-identity-roles.txt), so the identity cannot grant `Owner`, `User Access Administrator` or `Role Based Access Control Administrator`. The condition is built from [`scripts/deployment-identity-rbac-condition.tftpl`](./scripts/deployment-identity-rbac-condition.tftpl).
 `Group.Create`, `User.Read.All` and `Application.Read.All` Microsoft Graph application permissions | Microsoft Entra tenant | Creates the SQL administrators security group, with a user and a managed identity as members. The identity becomes the group's owner, which lets it manage and delete the group. Required only when the mssql module is enabled.
 
-When you add a module that assigns an Azure RBAC role not in `scripts/deployment-identity-roles.txt`, add the role to the file and re-grant: re-run `scripts/grant-deployment-identity-roles.sh` for a service principal, or re-apply rg-devops-iac for its managed identity.
+When you add a module that assigns an Azure RBAC role not in `scripts/deployment-identity-roles.txt`, add the role to the file and re-grant: re-run the `Role Based Access Control Administrator` commands in [Service Principal](#service-principal) (or `scripts/grant-deployment-identity-roles.sh`) for a service principal, or re-apply rg-devops-iac for its managed identity.
 
 For `client_secret` mode, see [Service Principal](#service-principal). For `managed_identity` mode, set `deployment_identity = "managed_identity"` in rg-devops-iac. It creates the user-assigned managed identity, assigns both Azure RBAC roles on the subscription, and attaches the identity to its Linux virtual machine. Use the `deployment_identity_client_id` output as `client_id`, and grant the Microsoft Graph permission with `extras/configurations/rg-devops-iac/scripts/grant-graph-permissions.sh`. See the [rg-devops-iac README](./extras/configurations/rg-devops-iac/README.md) for details.
 
