@@ -190,7 +190,7 @@ This section applies to the default `client_secret` authentication mode. See [Au
 
   ```bash
   SPN_APP_ID="<service-principal-app-id-here>"
-  SCOPE="/subscriptions/YOUR-SUBSCRIPTION-ID-HERE"
+  SCOPE="/subscriptions/<subscription-id-here>"
 
   # Roles the sandbox assigns, grouped by module (same list as scripts/deployment-identity-roles.txt).
   # Each role is listed once, under the first module that needs it.
@@ -241,7 +241,7 @@ This section applies to the default `client_secret` authentication mode. See [Au
     --condition "$CONDITION" --condition-version "2.0"
   ```
 
-  Alternatively, from a clone of this repository, run `./scripts/grant-deployment-identity-roles.sh <service-principal-app-id-here> YOUR-SUBSCRIPTION-ID-HERE`. It makes the same assignment, also assigns `Contributor` if it is missing, and is safe to re-run.
+  Alternatively, from a clone of this repository, run `./scripts/grant-deployment-identity-roles.sh <service-principal-app-id-here> <subscription-id-here>`. It makes the same assignment, also assigns `Contributor` if it is missing, and is safe to re-run.
 
 * If you want to deploy the Azure SQL Database module, a Microsoft Entra Global Administrator or Privileged Role Administrator must grant the service principal the Microsoft Graph application permissions it needs to create the SQL administrators security group. Run these commands in Azure Cloud Shell:
 
