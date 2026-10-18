@@ -263,8 +263,6 @@ This section applies to the default `client_secret` authentication mode. See [Au
   done
   ```
 
-  Alternatively, from a clone of this repository, run `./extras/configurations/rg-devops-iac/scripts/grant-graph-permissions.sh <service-principal-app-id-here>`. It grants the same permissions and skips any already granted.
-
   Alternatively you can perform these steps manually from the Entra portal:
 
   1. Sign in to [Microsoft Entra admin center](https://entra.microsoft.com) as a Global
@@ -282,7 +280,7 @@ This section applies to the default `client_secret` authentication mode. See [Au
 * Some Azure subscriptions may have low quota limits for specific Azure resources which may cause sandbox deployments to fail. See [Resolve errors for resource quotas](https://learn.microsoft.com/azure/azure-resource-manager/templates/error-resource-quota) for more information.
 * Some Azure subscriptions may not have the required resource providers registered. Terraform is configured to automatically register the required resource providers, but this may take some time on first use.
 * Some Azure subscriptions may not have the required features enabled, such has host encryption for virtual machines. Monitor your plan application for errors related to specific subscription features and enable them as needed.
-* Some organizations may institute [Azure policy](https://learn.microsoft.com/azure/governance/policy/overview) which may cause some sandbox deployments to fail. This can be addressed by using custom settings which pass the policy checks, or by disabling the policies on the Azure subscription being used for the configurations.
+* Some organizations may institute [Azure policy](https://learn.microsoft.com/azure/governance/policy/overview) which may cause some sandbox deployments to fail. This can be addressed by using custom settings which pass the policy checks, using environment-specific tags which alter how policies are applied, or by disabling the policies on the Azure subscription being used for the configurations.
 
 ### Terraform Execution Environment
 
