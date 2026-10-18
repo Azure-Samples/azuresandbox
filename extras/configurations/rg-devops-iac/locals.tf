@@ -52,6 +52,13 @@ locals {
     }
   }
 
+  provider_auth = {
+    client_id     = var.client_id
+    client_secret = var.auth_mode == "client_secret" ? var.client_secret : null
+    tenant_id     = var.entra_tenant_id
+    use_msi       = var.auth_mode == "managed_identity"
+  }
+
   storage_roles = {
     blob_data_contributor_spn = {
       principal_id         = data.azurerm_client_config.current.object_id

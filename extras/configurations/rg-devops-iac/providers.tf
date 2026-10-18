@@ -5,15 +5,6 @@
 # ---------------- | ---------------------------------- | -------------------------------------------
 # client_secret    | Service principal appId            | var.client_secret (TF_VAR_client_secret)
 # managed_identity | User-assigned managed identity id  | Managed identity endpoint of the host
-locals {
-  provider_auth = {
-    client_id     = var.client_id
-    client_secret = var.auth_mode == "client_secret" ? var.client_secret : null
-    tenant_id     = var.entra_tenant_id
-    use_msi       = var.auth_mode == "managed_identity"
-  }
-}
-
 provider "azurerm" {
   subscription_id                 = var.subscription_id
   tenant_id                       = local.provider_auth.tenant_id
