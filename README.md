@@ -232,11 +232,9 @@ This section applies to the default `client_secret` authentication mode. See [Au
   done
   ROLE_IDS="${ROLE_IDS#, }" # remove the leading ", "
 
-  # Condition: allow creating and deleting role assignments only for the roles in ROLE_IDS
-  set +H # turn off "!" history expansion so the condition can be typed as-is
-  WRITE_CONDITION="(!(ActionMatches{'Microsoft.Authorization/roleAssignments/write'})) OR (@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {$ROLE_IDS})"
-  DELETE_CONDITION="(!(ActionMatches{'Microsoft.Authorization/roleAssignments/delete'})) OR (@Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {$ROLE_IDS})"
-  CONDITION="($WRITE_CONDITION) AND ($DELETE_CONDITION)"
+  # Condition: the identity can create (write) or remove (delete) a role assignment only if the role is in ROLE_IDS
+  CONDITION="((NOT ActionMatches{'Microsoft.Authorization/roleAssignments/write'}) OR (@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {$ROLE_IDS}))"
+  CONDITION+=" AND ((NOT ActionMatches{'Microsoft.Authorization/roleAssignments/delete'}) OR (@Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {$ROLE_IDS}))"
 
   # Role Based Access Control Administrator, limited by the condition
   az role assignment create --assignee "$SPN_APP_ID" --role "Role Based Access Control Administrator" --scope "$SCOPE" \
