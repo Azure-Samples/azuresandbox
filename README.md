@@ -170,7 +170,7 @@ This section applies to the default `client_secret` authentication mode. See [Au
 * Ask the subscription owner to [Create an Azure service principal](https://learn.microsoft.com/en-us/cli/azure/azure-cli-sp-tutorial-1?tabs=bash) (SPN) for sandbox users with [Azure Cloud Shell](https://learn.microsoft.com/azure/cloud-shell/quickstart). The following command creates the service principal with a `Contributor` role assignment on the sandbox subscription, which lets it create and manage sandbox resources:
 
   ```bash
-  az ad sp create-for-rbac -n AzureSandboxSPN --role Contributor --scopes /subscriptions/YOUR-SUBSCRIPTION-ID-HERE
+  az ad sp create-for-rbac -n AzureSandboxSPN --role Contributor --scopes /subscriptions/<subscription-id-here>
   ```
 
   The output should look like this:
