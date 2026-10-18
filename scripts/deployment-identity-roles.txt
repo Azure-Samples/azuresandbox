@@ -1,8 +1,8 @@
 # Azure RBAC roles the deployment identity may assign and remove.
 #
 # The deployment identity has Contributor plus Role Based Access Control Administrator on the sandbox
-# subscription. The Role Based Access Control Administrator assignment carries a condition, built from
-# deployment-identity-rbac-condition.tftpl, that allows only the roles listed here. It cannot grant Owner,
+# subscription. The Role Based Access Control Administrator assignment carries a condition that allows
+# only the roles listed here. It cannot grant Owner,
 # User Access Administrator, Role Based Access Control Administrator, or any other role.
 #
 # Used by scripts/grant-deployment-identity-roles.sh (client_secret mode) and by

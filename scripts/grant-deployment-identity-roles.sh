@@ -19,7 +19,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROLES_FILE="${SCRIPT_DIR}/deployment-identity-roles.txt"
-CONDITION_TEMPLATE="${SCRIPT_DIR}/deployment-identity-rbac-condition.tftpl"
 RBAC_ADMIN_ROLE="Role Based Access Control Administrator"
 
 usage() {
@@ -52,8 +51,12 @@ while IFS= read -r ROLE; do
   ROLE_IDS="${ROLE_IDS}, ${ROLE_ID}"
 done <"${ROLES_FILE}"
 ROLE_IDS="${ROLE_IDS#, }"
-CONDITION=$(<"${CONDITION_TEMPLATE}")
-CONDITION="${CONDITION//\$\{role_ids\}/${ROLE_IDS}}"
+
+# The identity can create (write) or remove (delete) a role assignment only if the role is in ROLE_IDS.
+# This prevents it from assigning highly privileged roles such as Owner, User Access Administrator or
+# Role Based Access Control Administrator. Keep in sync with rg-devops-iac locals.tf.
+CONDITION="((NOT ActionMatches{'Microsoft.Authorization/roleAssignments/write'}) OR (@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${ROLE_IDS}}))"
+CONDITION+=" AND ((NOT ActionMatches{'Microsoft.Authorization/roleAssignments/delete'}) OR (@Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${ROLE_IDS}}))"
 
 assignment_query() {
   echo "[?principalId=='${PRINCIPAL_ID}' && scope=='${SCOPE}' && roleDefinitionName=='$1']"

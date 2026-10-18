@@ -5,9 +5,17 @@ locals {
     trimspace(line) if trimspace(line) != "" && !startswith(trimspace(line), "#")
   ]
 
-  deployment_identity_rbac_condition = trimspace(templatefile("${path.module}/../../../scripts/deployment-identity-rbac-condition.tftpl", {
-    role_ids = join(", ", [for role in local.deployment_identity_assignable_roles : data.azurerm_role_definition.deployment_identity_assignable[role].role_definition_id])
-  }))
+  deployment_identity_role_ids = join(", ", [
+    for role in local.deployment_identity_assignable_roles : data.azurerm_role_definition.deployment_identity_assignable[role].role_definition_id
+  ])
+
+  # The identity can create (write) or remove (delete) a role assignment only if the role is in the list above.
+  # This prevents it from assigning highly privileged roles such as Owner, User Access Administrator or
+  # Role Based Access Control Administrator. Keep in sync with scripts/grant-deployment-identity-roles.sh.
+  deployment_identity_rbac_condition = join(" AND ", [
+    "((NOT ActionMatches{'Microsoft.Authorization/roleAssignments/write'}) OR (@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${local.deployment_identity_role_ids}}))",
+    "((NOT ActionMatches{'Microsoft.Authorization/roleAssignments/delete'}) OR (@Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${local.deployment_identity_role_ids}}))",
+  ])
 
   key_vault_roles = {
     kv_secrets_officer_spn = {
