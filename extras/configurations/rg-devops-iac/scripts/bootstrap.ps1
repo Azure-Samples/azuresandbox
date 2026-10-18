@@ -63,8 +63,8 @@ $defaultProject = "devops"
 
 #region main
 # Check if environment variables are set
-if (-not $env:TF_VAR_arm_client_secret) {
-    Write-Host "Environment variable 'TF_VAR_arm_client_secret' must be set." -ForegroundColor Red
+if (-not $env:TF_VAR_client_secret) {
+    Write-Host "Environment variable 'TF_VAR_client_secret' must be set." -ForegroundColor Red
     Show-Usage
 }
 
@@ -91,31 +91,31 @@ if (-not $defaultSubscriptionId) {
 }
 
 # Set default user from currently logged in Azure PowerShell session
-$defaultUserObjectId = (Show-JWTtoken -token (Get-AzAccessToken -AsSecureString).Token).oid
+$defaultOperatorObjectId = (Show-JWTtoken -token (Get-AzAccessToken -AsSecureString).Token).oid
 
 # Set default Microsoft Entra tenant id from currently logged in Azure PowerShell session
-$defaultAadTenantId = (Get-AzContext).Tenant.Id
+$defaultEntraTenantId = (Get-AzContext).Tenant.Id
 
-# Set default service principal appId from TF_VAR_arm_client_id environment variable
-$defaultArmClientId = $env:TF_VAR_arm_client_id
+# Set default service principal appId from TF_VAR_client_id environment variable
+$defaultClientId = $env:TF_VAR_client_id
 
 # Get user input
-$armClientId = Read-Host "Service principal appId (arm_client_id) default '$defaultArmClientId'"
+$clientId = Read-Host "Service principal appId (client_id) default '$defaultClientId'"
 
-if (-not $armClientId) {
-    $armClientId = $defaultArmClientId
+if (-not $clientId) {
+    $clientId = $defaultClientId
 }
 
-$aadTenantId = Read-Host "Microsoft Entra tenant id (aad_tenant_id) default '$defaultAadTenantId'"
+$entraTenantId = Read-Host "Microsoft Entra tenant id (entra_tenant_id) default '$defaultEntraTenantId'"
 
-if (-not $aadTenantId) {
-    $aadTenantId = $defaultAadTenantId
+if (-not $entraTenantId) {
+    $entraTenantId = $defaultEntraTenantId
 }
 
-$userObjectId = Read-Host "Object id for Azure PowerShell signed in user (user_object_id) default '$defaultUserObjectId'"
+$operatorObjectId = Read-Host "Operator object id (operator_object_id) default '$defaultOperatorObjectId'"
 
-if (-not $userObjectId) {
-    $userObjectId = $defaultUserObjectId
+if (-not $operatorObjectId) {
+    $operatorObjectId = $defaultOperatorObjectId
 }
 
 $subscriptionId = Read-Host "Azure subscription id (subscription_id) default '$defaultSubscriptionId'"
@@ -149,17 +149,17 @@ if (-not $project) {
 }
 
 # Validate user input
-if (-not $armClientId) {
-    Write-Host "arm_client_id is required." -ForegroundColor Red
+if (-not $clientId) {
+    Write-Host "client_id is required." -ForegroundColor Red
     Show-Usage
 }
 
 # Validate service principal
-$armClientDisplayName = (Get-AzADServicePrincipal -AppId $armClientId).DisplayName
+$armClientDisplayName = (Get-AzADServicePrincipal -AppId $clientId).DisplayName
 if ($armClientDisplayName) {
     Write-Host "Found service principal '$armClientDisplayName'..."
 } else {
-    Write-Host "Invalid service principal AppId '$armClientId'." -ForegroundColor Red
+    Write-Host "Invalid service principal AppId '$clientId'." -ForegroundColor Red
     Show-Usage
 }
 
@@ -192,11 +192,11 @@ $tags = @{
 Write-Host "`nGenerating terraform.tfvars file...`n"
 
 @"
-aad_tenant_id   = "$aadTenantId"
-arm_client_id   = "$armClientId"
-location        = "$location"
-subscription_id = "$subscriptionId"
-user_object_id  = "$userObjectId"
+client_id          = "$clientId"
+entra_tenant_id    = "$entraTenantId"
+location           = "$location"
+operator_object_id = "$operatorObjectId"
+subscription_id    = "$subscriptionId"
 
 tags = {
   project     = "$($tags.project)"

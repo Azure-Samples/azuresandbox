@@ -13,7 +13,7 @@ resource "azurerm_key_vault" "this" {
   name                          = module.naming.key_vault.name_unique
   location                      = var.location
   resource_group_name           = azurerm_resource_group.this.name
-  tenant_id                     = var.aad_tenant_id
+  tenant_id                     = var.entra_tenant_id
   sku_name                      = "standard"
   rbac_authorization_enabled    = true
   public_network_access_enabled = true # Note: The barrier pattern will disable this on apply.
@@ -38,11 +38,11 @@ resource "time_sleep" "wait_for_roles" {
 }
 #endregion
 
-#region user-assigned-identity
-# Identity used by root sandbox applies with arm_auth_mode = "msi". It is attached to the VM alongside the
+#region deployment-identity
+# Identity used by root sandbox applies with auth_mode = "managed_identity". It is attached to the VM alongside the
 # system-assigned identity, which remains the default identity for cloud-init and the state backend.
-resource "azurerm_user_assigned_identity" "this" {
-  count = var.enable_user_assigned_identity ? 1 : 0
+resource "azurerm_user_assigned_identity" "deployment" {
+  count = var.deployment_identity == "managed_identity" ? 1 : 0
 
   name                = module.naming.user_assigned_identity.name_unique
   location            = azurerm_resource_group.this.location
@@ -50,13 +50,37 @@ resource "azurerm_user_assigned_identity" "this" {
   tags                = var.tags
 }
 
-resource "azurerm_role_assignment" "user_assigned_identity_owner" {
-  count = var.enable_user_assigned_identity ? 1 : 0
+resource "azurerm_role_assignment" "deployment_identity_contributor" {
+  count = var.deployment_identity == "managed_identity" ? 1 : 0
 
-  principal_id         = azurerm_user_assigned_identity.this[0].principal_id
+  principal_id         = azurerm_user_assigned_identity.deployment[0].principal_id
   principal_type       = "ServicePrincipal"
-  role_definition_name = "Owner"
+  role_definition_name = "Contributor"
   scope                = "/subscriptions/${var.subscription_id}"
+}
+
+data "azurerm_role_definition" "deployment_identity_assignable" {
+  for_each = toset(local.deployment_identity_assignable_roles)
+
+  name  = each.value
+  scope = "/subscriptions/${var.subscription_id}"
+}
+
+# Allows the deployment identity to assign and remove only the roles in scripts/deployment-identity-roles.txt.
+resource "azurerm_role_assignment" "deployment_identity_rbac_admin" {
+  count = var.deployment_identity == "managed_identity" ? 1 : 0
+
+  condition            = local.deployment_identity_rbac_condition
+  condition_version    = "2.0"
+  principal_id         = azurerm_user_assigned_identity.deployment[0].principal_id
+  principal_type       = "ServicePrincipal"
+  role_definition_name = "Role Based Access Control Administrator"
+  scope                = "/subscriptions/${var.subscription_id}"
+}
+
+moved {
+  from = azurerm_user_assigned_identity.this
+  to   = azurerm_user_assigned_identity.deployment
 }
 #endregion
 
@@ -124,7 +148,7 @@ module "vm_jumpbox_linux" {
   storage_account_id                 = azurerm_storage_account.this.id
   subnet_id                          = azurerm_subnet.devops.id
   tags                               = var.tags
-  user_assigned_identity_ids         = azurerm_user_assigned_identity.this[*].id
+  user_assigned_identity_ids         = azurerm_user_assigned_identity.deployment[*].id
   vm_jumpbox_linux_size              = var.vm_jumpbox_linux_size
 
   depends_on = [time_sleep.wait_for_roles]

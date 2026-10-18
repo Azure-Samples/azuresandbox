@@ -1,0 +1,41 @@
+# Azure RBAC roles the deployment identity may assign and remove.
+#
+# The deployment identity has Contributor plus Role Based Access Control Administrator on the sandbox
+# subscription. The Role Based Access Control Administrator assignment carries a condition, built from
+# deployment-identity-rbac-condition.tftpl, that allows only the roles listed here. It cannot grant Owner,
+# User Access Administrator, Role Based Access Control Administrator, or any other role.
+#
+# Used by scripts/grant-deployment-identity-roles.sh (client_secret mode) and by
+# extras/configurations/rg-devops-iac (managed_identity mode).
+#
+# When a module adds an Azure RBAC role assignment for a role not listed here, add the role, then re-run
+# grant-deployment-identity-roles.sh or re-apply rg-devops-iac to update the condition.
+#
+# Grouped by the module that first assigns each role. A role already listed for an earlier module is not
+# repeated. Keep this list in sync with the Service Principal commands in the root README.
+#
+# Format: one built-in role name per line. Role definition ids are looked up by name.
+
+# vnet_shared
+Key Vault Secrets Officer
+
+# vnet_app
+Key Vault Secrets User
+Monitoring Reader
+Storage Account Contributor
+Storage Blob Data Contributor
+Storage Blob Data Reader
+Storage File Data Privileged Contributor
+
+# vm_jumpbox_linux, vm_mssql_win, mssql, mysql, vwan: no additional roles
+
+# avd (extra module)
+Desktop Virtualization User
+Virtual Machine User Login
+
+# petstore (extra module)
+AcrPull
+AcrPush
+Monitoring Metrics Publisher
+
+# vnet_onprem (extra module): no additional roles

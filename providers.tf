@@ -1,24 +1,40 @@
+# Provider authentication is selected by var.auth_mode and applied identically to every provider.
+# The Terraform state backend (backend.tf, when used) authenticates independently of these settings.
+#
+# auth_mode        | client_id                          | credential
+# ---------------- | ---------------------------------- | -------------------------------------------
+# client_secret    | Service principal appId            | var.client_secret (TF_VAR_client_secret)
+# managed_identity | User-assigned managed identity id  | Managed identity endpoint of the host
+locals {
+  provider_auth = {
+    client_id     = var.client_id
+    client_secret = var.auth_mode == "client_secret" ? var.client_secret : null
+    tenant_id     = var.entra_tenant_id
+    use_msi       = var.auth_mode == "managed_identity"
+  }
+}
+
 provider "azuread" {
-  tenant_id     = var.aad_tenant_id
-  client_id     = var.arm_client_id
-  client_secret = var.arm_auth_mode == "secret" ? var.arm_client_secret : null
-  use_msi       = var.arm_auth_mode == "msi"
+  tenant_id     = local.provider_auth.tenant_id
+  client_id     = local.provider_auth.client_id
+  client_secret = local.provider_auth.client_secret
+  use_msi       = local.provider_auth.use_msi
 }
 
 provider "azapi" {
   subscription_id = var.subscription_id
-  client_id       = var.arm_client_id
-  client_secret   = var.arm_auth_mode == "secret" ? var.arm_client_secret : null
-  tenant_id       = var.aad_tenant_id
-  use_msi         = var.arm_auth_mode == "msi"
+  tenant_id       = local.provider_auth.tenant_id
+  client_id       = local.provider_auth.client_id
+  client_secret   = local.provider_auth.client_secret
+  use_msi         = local.provider_auth.use_msi
 }
 
 provider "azurerm" {
   subscription_id                 = var.subscription_id
-  client_id                       = var.arm_client_id
-  client_secret                   = var.arm_auth_mode == "secret" ? var.arm_client_secret : null
-  tenant_id                       = var.aad_tenant_id
-  use_msi                         = var.arm_auth_mode == "msi"
+  tenant_id                       = local.provider_auth.tenant_id
+  client_id                       = local.provider_auth.client_id
+  client_secret                   = local.provider_auth.client_secret
+  use_msi                         = local.provider_auth.use_msi
   resource_provider_registrations = "extended"
 
   # The "extended" set does not include the resource providers required by some

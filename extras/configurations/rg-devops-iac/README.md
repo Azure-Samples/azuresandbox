@@ -36,7 +36,7 @@ This section provides a brief overview of the features included in this configur
   * Pre-installed software for IaC / DevOps projects
   * Optional public access for connectivity from the internet
   * Optional registration as a GitHub Actions self-hosted runner for CI/CD workflows (disabled by default)
-  * Optional user-assigned managed identity with subscription `Owner` for managed identity (`msi`) sandbox applies (disabled by default)
+  * Optional deployment identity: a user-assigned managed identity with subscription `Contributor` and conditioned `Role Based Access Control Administrator` for sandbox applies with `auth_mode = "managed_identity"` (disabled by default)
 
 **NOTE:** The Linux virtual machine is implemented as a module so it can be easily reused in other configurations. It is not intended to be used as a production jumpbox. It is intended to be used as a Terraform execution environment for DevOps / IaC projects.
 
@@ -80,10 +80,10 @@ Save the service principal *appId* and *password* in a secure location such as a
 
 ### Self-Hosted Runner and Managed Identity Prerequisites (Optional)
 
-These prerequisites apply only if you plan to use this configuration as a self-hosted runner that deploys Azure Sandbox with managed identity authentication (`enable_github_runner = true` and `enable_user_assigned_identity = true`). Arrange them **before** provisioning, because some of them need privileged roles that the person running the deployment may not hold.
+These prerequisites apply only if you plan to use this configuration as a self-hosted runner that deploys Azure Sandbox with managed identity authentication (`enable_github_runner = true` and `deployment_identity = "managed_identity"`). Arrange them **before** provisioning, because some of them need privileged roles that the person running the deployment may not hold.
 
 * **GitHub repository administrator.** Registering a repository-level runner needs a fine-grained personal access token with `Administration: Read and write` on the target repository, created by a repository administrator. See [Optional: GitHub Actions Self-Hosted Runner](#optional-github-actions-self-hosted-runner).
-* **Microsoft Entra Privileged Role Administrator or Global Administrator.** Required only if the sandbox will be deployed with the `mssql` module enabled. The user-assigned managed identity then needs the Microsoft Graph `Group.ReadWrite.All` application permission, and only one of these Entra roles can grant it. Neither the service principal nor an Owner on the subscription can grant it. Read-only Entra roles such as Global Reader are not enough. Privileged Role Administrator is the least privileged role that works. If your organization uses [Privileged Identity Management](https://learn.microsoft.com/entra/id-governance/privileged-identity-management/pim-configure), activate an eligible assignment for the grant, or arrange for an administrator to run it. The grant is a one-time step after the identity is created. See [Optional: User-Assigned Managed Identity for MSI-Mode Sandbox Applies](#optional-user-assigned-managed-identity-for-msi-mode-sandbox-applies).
+* **Microsoft Entra Privileged Role Administrator or Global Administrator.** Required only if the sandbox will be deployed with the `mssql` module enabled. The user-assigned managed identity then needs the Microsoft Graph `Group.Create`, `User.Read.All` and `Application.Read.All` application permissions, and only one of these Entra roles can grant them. Neither the service principal nor an Owner on the subscription can grant them. Read-only Entra roles such as Global Reader are not enough. Privileged Role Administrator is the least privileged role that works. If your organization uses [Privileged Identity Management](https://learn.microsoft.com/entra/id-governance/privileged-identity-management/pim-configure), activate an eligible assignment for the grant, or arrange for an administrator to run it. The grant is a one-time step after the identity is created. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies).
 
 ### Other Prerequisites
 
@@ -351,26 +351,26 @@ There many variables in this configuration. Defaults have been set for most of t
 
 Follow these steps to configure the variables for this configuration:
 
-* First, create an environment variable for the service principal password. For security reasons this secret should not be stored in the `terraform.tfvars` file.
+* First, create an environment variable for the service principal password. For security reasons this secret should not be stored in the `terraform.tfvars` file. This configuration uses the same authentication contract as the root sandbox; see [Authentication](../../../README.md#authentication).
 
   ```bash
   # Set environment variable in bash
-  export TF_VAR_arm_client_secret=YOUR-SERVICE-PRINCIPAL-PASSWORD-HERE
+  export TF_VAR_client_secret=YOUR-SERVICE-PRINCIPAL-PASSWORD-HERE
   ```
 
   ```pwsh
   # Set environment variable in PowerShell
-  $env:TF_VAR_arm_client_secret = "YOUR-SERVICE-PRINCIPAL-PASSWORD-HERE"
+  $env:TF_VAR_client_secret = "YOUR-SERVICE-PRINCIPAL-PASSWORD-HERE"
   ```
 
 * Next, create a `terraform.tfvars` file in the root directory of the project. This file should set the necessary variables for your deployment. Here is an example of what the `terraform.tfvars` file might look like:
 
   ```hcl
-  aad_tenant_id   = "YOUR-ENTRA-TENANT-ID-HERE"
-  arm_client_id   = "YOUR-SERVICE-PRINCIPAL-APP-ID-HERE"
-  location        = "YOUR-AZURE-REGION-HERE"
-  subscription_id = "YOUR-AZURE-SUBSCRIPTION-ID-HERE"
-  user_object_id  = "YOUR-USER-OBJECT-ID-HERE"
+  client_id          = "YOUR-SERVICE-PRINCIPAL-APP-ID-HERE"
+  entra_tenant_id    = "YOUR-ENTRA-TENANT-ID-HERE"
+  location           = "YOUR-AZURE-REGION-HERE"
+  operator_object_id = "YOUR-OPERATOR-OBJECT-ID-HERE"
+  subscription_id    = "YOUR-AZURE-SUBSCRIPTION-ID-HERE"
 
   tags = {
     project     = "devops",
@@ -448,34 +448,38 @@ If the registration URL is a repository URL the runner is registered as a reposi
 
 By default the runner service account is granted command scoped passwordless `sudo` for the binaries used by the `vwan` point-to-site VPN integration tests. Review [Elevated Permissions for Integration Tests](./modules/vm-jumpbox-linux/README.md#elevated-permissions-for-integration-tests) and disable it if the runner will not execute those tests.
 
-#### **Optional: User-Assigned Managed Identity for MSI-Mode Sandbox Applies**
+#### **Optional: Deployment Identity for Managed Identity Sandbox Applies**
 
-The root Azure Sandbox configuration can authenticate with a managed identity instead of a service principal secret (`arm_auth_mode = "msi"`), for example from a CD workflow running on the self-hosted runner. That mode requires a **user-assigned** managed identity attached to the Terraform execution environment. This configuration can create one for you. This is **disabled by default**.
+The root Azure Sandbox configuration can authenticate with a managed identity instead of a service principal secret (`auth_mode = "managed_identity"`; see [Authentication](../../../README.md#authentication)), for example from a CD workflow running on the self-hosted runner. That mode requires a **user-assigned** managed identity attached to the Terraform execution environment. This configuration can create one for you. This is **disabled by default**.
 
 To enable it, add the following to the `terraform.tfvars` file:
 
 ```hcl
-enable_user_assigned_identity = true
+deployment_identity = "managed_identity"
 ```
 
 When enabled, the identity is:
 
 * Created in the resource group provisioned by this configuration.
-* Assigned the `Owner` role at the subscription scope, because sandbox applies create role assignments. This is a standing, privileged identity. Owner on the subscription also includes this configuration's own resource group, so anything running on `jumplinux2` that uses this identity can modify or delete it.
+* Assigned two roles at the subscription scope, as described in [Deployment Identity Permissions](../../../README.md#deployment-identity-permissions) in the root README:
+  * `Contributor`, to create and manage sandbox resources.
+  * `Role Based Access Control Administrator`, with a condition that allows assigning and removing only the roles listed in [`scripts/deployment-identity-roles.txt`](../../../scripts/deployment-identity-roles.txt). The identity cannot grant `Owner`, `User Access Administrator` or `Role Based Access Control Administrator`.
+
+  This is still a standing, privileged identity. Contributor on the subscription also includes this configuration's own resource group, so anything running on `jumplinux2` that uses this identity can modify or delete it. When `scripts/deployment-identity-roles.txt` changes, re-apply this configuration to update the condition.
 * Attached to `jumplinux2` **in addition to** the system-assigned identity. The system-assigned identity remains the VM's default identity, so cloud-init, the runner registration script, `az login --identity` and the `azurerm` state backend (`ARM_USE_MSI`) keep using it. Use the user-assigned identity explicitly by its client id, e.g. `az login --identity --client-id <client-id>` or `Connect-AzAccount -Identity -AccountId <client-id>`.
 
 Enabling or disabling the identity on an existing deployment updates the VM in place. It does not replace the VM.
 
-After the apply, use the `user_assigned_identity_client_id` output as `arm_client_id` in the root sandbox `terraform.tfvars`, together with `arm_auth_mode = "msi"`.
+After the apply, use the `deployment_identity_client_id` output as `client_id` in the root sandbox `terraform.tfvars`, together with `auth_mode = "managed_identity"`.
 
-If the sandbox will be deployed with the `mssql` module enabled, the identity also needs the Microsoft Graph `Group.ReadWrite.All` application permission, which this configuration cannot grant. A Global Administrator or Privileged Role Administrator must grant it once, after the identity is created:
+If the sandbox will be deployed with the `mssql` module enabled, the identity also needs the Microsoft Graph `Group.Create`, `User.Read.All` and `Application.Read.All` application permissions, which this configuration cannot grant. A Global Administrator or Privileged Role Administrator must grant them once, after the identity is created:
 
 ```bash
 # Run from this configuration's directory, signed in to Azure CLI as a Privileged Role Administrator or Global Administrator
 ./scripts/grant-graph-permissions.sh
 ```
 
-The script reads the identity from the `user_assigned_identity_principal_id` output (or takes a principal id as its first argument), and skips permissions that are already granted, so it is safe to re-run. If you activated the Entra role just before running it, sign in again with `az login` so the new role is included in your token.
+The script reads the identity from the `deployment_identity_principal_id` output (or takes a client id or object id as its first argument), and skips permissions that are already granted, so it is safe to re-run. It warns, and prints the removal command, if the identity still has `Group.ReadWrite.All` from an earlier setup. If you activated the Entra role just before running it, sign in again with `az login` so the new role is included in your token.
 
 Managed identities have no app registration, so the Entra admin center **API permissions** steps used for a service principal do not apply. Use the script above instead. The grant is removed automatically if the identity is deleted.
 
@@ -567,7 +571,7 @@ This configuration is organized into the following structure:
 │   ├── bootstrap.ps1                     # PowerShell helper script for generating terraform.tfvars
 │   ├── cleanterraformtemp.sh             # Bash helper script for removing Terraform temp/local files
 │   ├── enable-public-access.sh           # Bash helper script for re-enabling public access on key vault/storage account
-│   ├── grant-graph-permissions.sh        # Bash helper script for granting Microsoft Graph permissions to the user-assigned managed identity
+│   ├── grant-graph-permissions.sh        # Bash helper script for granting Microsoft Graph permissions to a deployment identity
 │   └── delete-tfstate.sh                 # Bash helper script for deleting Terraform state blob(s) from the storage backend
 ├── locals.tf                             # Local variables 
 ├── main.tf                               # Resource configurations
@@ -585,17 +589,19 @@ This section lists input variables used in the root module. Defaults can be over
 
 Variable | Default | Description
 --- | --- | ---
-aad_tenant_id | | The Microsoft Entra tenant id.
-arm_client_id | | The AppId of the service principal used for authenticating with Azure. Must have a 'Contributor' role assignment.
-arm_client_secret | | The password for the service principal used for authenticating with Azure. Set interactively or using an environment variable 'TF_VAR_arm_client_secret'.
+auth_mode | `client_secret` | How Terraform authenticates the providers: `client_secret` or `managed_identity`. See [Authentication](../../../README.md#authentication).
+client_id | | The client id of the identity Terraform authenticates as: the service principal `appId` for `client_secret`, or the user-assigned managed identity client id for `managed_identity`.
+client_secret | | The service principal secret. Required only when `auth_mode` is `client_secret`; set it using `TF_VAR_client_secret`.
+deployment_identity | `none` | The identity this configuration provisions for root sandbox deployments: `none` or `managed_identity`. `managed_identity` creates a user-assigned managed identity with `Contributor` and conditioned `Role Based Access Control Administrator` role assignments on the subscription and attaches it to `jumplinux2`, for root sandbox applies with `auth_mode = "managed_identity"`. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies).
 enable_github_runner | false | Set to true to install and register the GitHub Actions self-hosted runner agent on `jumplinux2`. See [vm-jumpbox-linux](./modules/vm-jumpbox-linux/README.md#github-actions-self-hosted-runner).
-enable_user_assigned_identity | false | Set to true to create a user-assigned managed identity with an `Owner` role assignment on the subscription and attach it to `jumplinux2`, for root sandbox applies with `arm_auth_mode = "msi"`. See [Optional: User-Assigned Managed Identity for MSI-Mode Sandbox Applies](#optional-user-assigned-managed-identity-for-msi-mode-sandbox-applies).
+entra_tenant_id | | The Microsoft Entra tenant id.
 github_runner_labels | `["azuresandbox"]` | Additional labels to apply to the GitHub Actions self-hosted runner. Only used when `enable_github_runner` is true.
 github_runner_token | | A GitHub personal access token or runner registration token used to register the self-hosted runner. Set interactively or using an environment variable 'TF_VAR_github_runner_token'. Required when `enable_github_runner` is true.
 github_runner_token_secret_version | 1 | Increment to write a new value for the GitHub runner token key vault secret.
 github_runner_token_type | `pat` | The type of token supplied in `github_runner_token`, either `pat` or `registration`.
 github_runner_url | | The GitHub repository or organization URL to register the self-hosted runner with, e.g. `https://github.com/myorg/myrepo`. Required when `enable_github_runner` is true.
 location | | The name of the Azure Region where resources will be provisioned.
+operator_object_id | | The Microsoft Entra object id of the operator: the signed-in user who provisions this configuration. The operator is granted data-plane role assignments on the resources it creates.
 storage_access_tier | Hot | The access tier for the new storage account.
 storage_replication_type | LRS | The type of replication for the new storage account.
 subnet_address_prefix | 10.0.0.0/24 | The address prefix for the miscellaneous subnet. The minimum size is /29.
@@ -605,7 +611,6 @@ subnet_privatelink_name | snet-privatelink-03 | The name of the subnet for Priva
 subscription_id | | The Azure subscription id used to provision resources.
 storage_container_name | tfstate | The name of the storage container to be created in the new storage account.
 tags | | The tags in map format to be used when creating new resources.
-user_object_id | | The object id of the user in Microsoft Entra ID.
 vm_jumpbox_linux_size | `Standard_D2ls_v6` | The size of the jumpbox virtual machine (`jumplinux2`).
 vnet_address_space | 10.0.0.0/16 | The address space in CIDR notation for the new virtual network. The minimum size is /24.
 vnet_name | devops | The name of the new virtual
@@ -630,14 +635,15 @@ azurerm_public_ip.this | pip-devops-dev-nat | Public IP address for the NAT gate
 azurerm_resource_group.this | rg-devops-dev-xxx | Resource group for all resources in this configuration.
 azurerm_role_assignment.keyvault_roles[*] | | Assigns `Key Vault Secrets Officer` to both the service principal and the interactive user.
 azurerm_role_assignment.storage_roles[*] | | Assigns `Storage Blob Data Contributor` to both the service principal and the interactive user.
-azurerm_role_assignment.user_assigned_identity_owner[0] | | Assigns `Owner` at the subscription scope to the user-assigned managed identity. Created only when `enable_user_assigned_identity` is true.
+azurerm_role_assignment.deployment_identity_contributor[0] | | Assigns `Contributor` at the subscription scope to the deployment identity. Created only when `deployment_identity` is `managed_identity`.
+azurerm_role_assignment.deployment_identity_rbac_admin[0] | | Assigns `Role Based Access Control Administrator` at the subscription scope to the deployment identity, with a condition that allows only the roles in `scripts/deployment-identity-roles.txt`. Created only when `deployment_identity` is `managed_identity`.
 azurerm_storage_account.this | stdevopsdevxxx | Storage account for storing Terraform state files.
 azurerm_storage_container.this | tfstate | Storage container for storing Terraform state files.
 azurerm_subnet.devops | snet-devops-01 | Subnet for jumplinux2 VM
 azurerm_subnet.privatelink | snet-privatelink-03 | Subnet for PrivateLink endpoints
 azurerm_subnet_nat_gateway_association.devops | vnet-devops-dev-devops| Associates the NAT gateway with the subnet.
 azurerm_subnet_network_security_group_association.this | | Associates the NSG with the subnet.
-azurerm_user_assigned_identity.this[0] | uai-devops-dev-xxx | User-assigned managed identity for root sandbox applies with `arm_auth_mode = "msi"`, attached to `jumplinux2`. Created only when `enable_user_assigned_identity` is true.
+azurerm_user_assigned_identity.deployment[0] | uai-devops-dev-xxx | Deployment identity for root sandbox applies with `auth_mode = "managed_identity"`, attached to `jumplinux2`. Created only when `deployment_identity` is `managed_identity`.
 azurerm_virtual_network.this | vnet-devops-dev-devops | Virtual network for the Linux virtual machine.
 
 ### Root Module Output Variables
@@ -646,11 +652,11 @@ This section includes a list of output variables returned by the root module.
 
 Name | Comments
 --- | ---
+deployment_identity_client_id | The client id of the deployment identity, used as `client_id` for root sandbox applies with `auth_mode = "managed_identity"`, or `null` when `deployment_identity` is `none`.
+deployment_identity_principal_id | The principal (object) id of the deployment identity, used to grant Microsoft Graph application permissions, or `null` when `deployment_identity` is `none`.
 github_runner_name | The name the GitHub Actions self-hosted runner is registered with, or `null` when `enable_github_runner` is false.
 resource_ids | A map of resource IDs for key resources in the configuration.
 resource_names | A map of resource names for key resources in the configuration.
-user_assigned_identity_client_id | The client id of the user-assigned managed identity, used as `arm_client_id` for root sandbox applies with `arm_auth_mode = "msi"`, or `null` when `enable_user_assigned_identity` is false.
-user_assigned_identity_principal_id | The principal (object) id of the user-assigned managed identity, used to grant Microsoft Graph application permissions, or `null` when `enable_user_assigned_identity` is false.
 
 ### Child Modules
 

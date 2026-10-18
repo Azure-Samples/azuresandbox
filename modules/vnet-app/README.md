@@ -149,6 +149,7 @@ location | | The Azure region defined in the root module.
 log_analytics_workspace_id | | The ID of the shared log analytics workspace.
 monitor_private_link_scope_id | | The ID of the Azure Monitor Private Link Scope (AMPLS) owned by vnet-shared. Used to register Application Insights as a scoped service.
 monitor_private_link_scope_name | | The name of the Azure Monitor Private Link Scope (AMPLS) owned by vnet-shared. Required by azurerm_monitor_private_link_scoped_service.
+operator_object_id | | The Microsoft Entra object id of the operator. Defined in the root module.
 private_dns_zone_links_complete | | Dependency signal from the *vnet-shared* module indicating all private DNS zone virtual network links are complete.
 private_dns_zones | | A map of the private DNS zones defined in the *vnet-shared* module, keyed by zone name.
 private_endpoint_subnet_id | | The resource ID of the centralized private endpoint subnet *snet-privatelink-01* in the *vnet-shared* module.
@@ -163,7 +164,6 @@ subnet_database_address_prefix | 10.2.1.0/24 | The address prefix for the databa
 subnet_misc_address_prefix | 10.2.3.0/24 | The address prefix for the miscellaneous subnet.
 tags | | The tags defined in the root module.
 unique_seed | | The unique seed used to generate unique names for resources. Defined in the root module.
-user_object_id | | The object ID of the interactive user. Defined in the root module.
 virtual_network_shared_id | | The resource ID of the shared services virtual network.  Defined in the *vnet-shared*  module.
 virtual_network_shared_name | | The name of the shared services virtual network.  Defined in the *vnet-shared* module.
 vm_jumpbox_win_image_offer | `WindowsServer` | The offer type of the virtual machine image used to create the VM.
