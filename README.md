@@ -234,13 +234,7 @@ This section applies to the default `client_secret` authentication mode. See [Au
     --condition "$CONDITION" --condition-version "2.0"
   ```
 
-  If the service principal was created earlier with `Owner`, remove it once the new assignments exist:
-
-  ```bash
-  az role assignment delete --assignee "$SPN_APP_ID" --role "Owner" --scope "$SCOPE"
-  ```
-
-  Alternatively, from a clone of this repository, run `./scripts/grant-deployment-identity-roles.sh <service-principal-app-id-here> YOUR-SUBSCRIPTION-ID-HERE`. It makes the same assignments, is safe to re-run, updates an outdated condition, and warns if `Owner` or `User Access Administrator` is still assigned.
+  Alternatively, from a clone of this repository, run `./scripts/grant-deployment-identity-roles.sh <service-principal-app-id-here> YOUR-SUBSCRIPTION-ID-HERE`. It makes the same assignments and is safe to re-run.
 
 * If you want to deploy the Azure SQL Database module, a Microsoft Entra Global Administrator or Privileged Role Administrator must grant the service principal the Microsoft Graph application permissions it needs to create the SQL administrators security group. Run these commands in Azure Cloud Shell:
 
@@ -264,9 +258,7 @@ This section applies to the default `client_secret` authentication mode. See [Au
   done
   ```
 
-  If the service principal was granted `Group.ReadWrite.All` earlier, it is no longer required. Remove it from the app registration's **API permissions** page in the Entra admin center.
-
-  Alternatively, from a clone of this repository, run `./extras/configurations/rg-devops-iac/scripts/grant-graph-permissions.sh <service-principal-app-id-here>`. It grants the same permissions, skips any already granted, and prints the command to remove a leftover `Group.ReadWrite.All`.
+  Alternatively, from a clone of this repository, run `./extras/configurations/rg-devops-iac/scripts/grant-graph-permissions.sh <service-principal-app-id-here>`. It grants the same permissions and skips any already granted.
 
   Alternatively you can perform these steps manually from the Entra portal:
 
