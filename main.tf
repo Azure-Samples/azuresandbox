@@ -3,7 +3,7 @@ resource "azuread_group" "sql_admins" {
   count            = var.enable_module_mssql ? 1 : 0
   display_name     = "grp-sql-admins-${var.tags["project"]}-${var.tags["environment"]}-${element(split("-", azurerm_resource_group.this.name), length(split("-", azurerm_resource_group.this.name)) - 1)}"
   security_enabled = true
-  members          = [var.user_object_id, azurerm_user_assigned_identity.sql_admin[0].principal_id]
+  members          = [var.operator_object_id, azurerm_user_assigned_identity.sql_admin[0].principal_id]
 }
 
 resource "azurerm_resource_group" "this" {
@@ -208,7 +208,7 @@ module "vnet_shared" {
   resource_group_name = azurerm_resource_group.this.name
   tags                = local.tags
   unique_seed         = module.naming.unique-seed
-  user_object_id      = var.user_object_id
+  operator_object_id  = var.operator_object_id
   vm_adds_size        = var.vm_jumpbox_size
 }
 #endregion
@@ -243,7 +243,7 @@ module "vnet_app" {
   sql_admin_uami_id               = var.enable_module_mssql ? azurerm_user_assigned_identity.sql_admin[0].id : null
   tags                            = local.tags
   unique_seed                     = module.naming.unique-seed
-  user_object_id                  = var.user_object_id
+  operator_object_id              = var.operator_object_id
   virtual_network_shared_id       = module.vnet_shared.resource_ids["virtual_network_shared"]
   virtual_network_shared_name     = module.vnet_shared.resource_names["virtual_network_shared"]
   vm_jumpbox_win_size             = var.vm_jumpbox_size
@@ -393,7 +393,7 @@ module "avd" {
   location                      = azurerm_resource_group.this.location
   resource_group_id             = azurerm_resource_group.this.id
   resource_group_name           = azurerm_resource_group.this.name
-  security_principal_object_ids = [var.user_object_id]
+  security_principal_object_ids = [var.operator_object_id]
   subnet_id                     = module.vnet_app[0].subnets["snet-app-01"].id
   tags                          = local.tags
   unique_seed                   = module.naming.unique-seed

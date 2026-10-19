@@ -1,5 +1,14 @@
 # GitHub Sandbox Deployment Workflow Setup
 
+> [!NOTE]
+> This walkthrough records an attended setup and uses the variable and output names that were current when it was
+> written. Current names differ: `auth_mode` (`client_secret` or `managed_identity`), `client_id`, `client_secret`
+> (`TF_VAR_client_secret`), `entra_tenant_id`, `operator_object_id` (was `user_object_id`), `deployment_identity`, and the `deployment_identity_client_id` and
+> `deployment_identity_principal_id` outputs. The deployment identity no longer has `Owner`: it has `Contributor` and a
+> conditioned `Role Based Access Control Administrator` role, plus the Microsoft Graph `Group.Create`, `GroupMember.Read.All`,
+> `User.Read.All` and `Application.Read.All` permissions instead of `Group.ReadWrite.All`. See [Deployment Identity and Authentication](./README.md#deployment-identity-and-authentication)
+> for current behavior.
+
 This guide documents an attended, step-by-step setup of a GitHub Actions
 workflow that deploys a new Azure Sandbox on the self-hosted runner provisioned
 by [GitHub Self-Hosted Runner Setup](./github-selfhosted-runner-setup.md).
@@ -94,7 +103,7 @@ Keep actual deployment values out of committed files and public documentation.
 
 The operator must explicitly confirm the deployment target and test scope
 before planning or applying. The walkthrough selects the same tenant,
-subscription, region, and operator object ID as the standalone bootstrap,
+subscription, region, and operator as the standalone bootstrap,
 with separate, human-supplied Sandbox tags.
 
 Use the runner's user-assigned identity for Sandbox provider authentication:
@@ -127,8 +136,8 @@ printf '\n'
 Do not paste the output into chat or public documentation. The root MSI
 configuration does not require an SPN secret, and its workflow should not
 receive `TF_VAR_arm_client_secret`. The standalone `rg-devops-iac` bootstrap
-still uses SPN authentication; preserve its separate `arm_client_id`, input
-file, and operator-session secret.
+authenticates as the operator signed in to Azure CLI and keeps its own input
+file.
 
 Run the root MSI configuration on the Azure runner to which this identity
 is attached, not from the workstation merely because its input file was

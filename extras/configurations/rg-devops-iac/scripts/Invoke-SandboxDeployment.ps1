@@ -187,11 +187,11 @@ function Confirm-SandboxReceipt {
 
 function Connect-SandboxProvider {
     param([System.Collections.IDictionary]$DeploymentProfile)
-    $script:childEnvironment['ARM_TENANT_ID'] = $DeploymentProfile.aad_tenant_id
-    Invoke-SandboxCommand @('az', 'login', '--identity', '--client-id', $DeploymentProfile.arm_client_id, '--output', 'none')
+    $script:childEnvironment['ARM_TENANT_ID'] = $DeploymentProfile.entra_tenant_id
+    Invoke-SandboxCommand @('az', 'login', '--identity', '--client-id', $DeploymentProfile.client_id, '--output', 'none')
     Invoke-SandboxCommand @('az', 'account', 'set', '--subscription', $DeploymentProfile.subscription_id)
     $account = Get-SandboxOutput @('az', 'account', 'show', '--output', 'json') 'account.json' | ConvertFrom-Json -AsHashtable
-    if ($account.id -cne $DeploymentProfile.subscription_id -or $account.tenantId -cne $DeploymentProfile.aad_tenant_id) {
+    if ($account.id -cne $DeploymentProfile.subscription_id -or $account.tenantId -cne $DeploymentProfile.entra_tenant_id) {
         Stop-SandboxStage 'Azure CLI context does not match the approved deployment.'
     }
 }
@@ -284,11 +284,11 @@ function Invoke-SandboxPreflight {
     Write-SandboxJson $manifestPath $manifest
     Invoke-SandboxCommand @('terraform', 'init', '-input=false', "-backend-config=key=$script:key")
     Invoke-SandboxCommand @('terraform', 'validate', '-no-color')
-    $expression = 'jsonencode({arm_auth_mode=var.arm_auth_mode,arm_client_id=var.arm_client_id,aad_tenant_id=var.aad_tenant_id,subscription_id=var.subscription_id,base=[var.enable_module_vnet_app,var.enable_module_vm_jumpbox_linux,var.enable_module_vm_mssql_win,var.enable_module_mssql,var.enable_module_mysql,var.enable_module_vwan],extras=[var.enable_module_avd,var.enable_module_petstore,var.enable_module_vnet_onprem]})' + "`n"
+    $expression = 'jsonencode({auth_mode=var.auth_mode,client_id=var.client_id,entra_tenant_id=var.entra_tenant_id,subscription_id=var.subscription_id,base=[var.enable_module_vnet_app,var.enable_module_vm_jumpbox_linux,var.enable_module_vm_mssql_win,var.enable_module_mssql,var.enable_module_mysql,var.enable_module_vwan],extras=[var.enable_module_avd,var.enable_module_petstore,var.enable_module_vnet_onprem]})' + "`n"
     $console = Get-SandboxOutput -Arguments @('terraform', 'console', '-no-color') -Name 'console.txt' -InputText $expression
     $deploymentProfile = ConvertFrom-Json -AsHashtable -InputObject (ConvertFrom-Json -InputObject $console)
-    if ($deploymentProfile.arm_auth_mode -cne 'msi' -or $deploymentProfile.aad_tenant_id -cne $backend.tenant_id -or
-        $deploymentProfile.subscription_id -cne $backend.subscription_id -or -not $deploymentProfile.arm_client_id -or
+    if ($deploymentProfile.auth_mode -cne 'managed_identity' -or $deploymentProfile.entra_tenant_id -cne $backend.tenant_id -or
+        $deploymentProfile.subscription_id -cne $backend.subscription_id -or -not $deploymentProfile.client_id -or
         @($deploymentProfile.base | Where-Object { $_ -isnot [bool] -or -not $_ }).Count -gt 0 -or
         @($deploymentProfile.extras | Where-Object { $_ -isnot [bool] -or $_ }).Count -gt 0) {
         Stop-SandboxStage 'Inputs do not match the approved MSI, backend, or module scope.'

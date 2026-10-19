@@ -69,6 +69,16 @@ variable "log_analytics_workspace_retention_days" {
   }
 }
 
+variable "operator_object_id" {
+  type        = string
+  description = "The Microsoft Entra object id of the operator. Defined in the root module."
+
+  validation {
+    condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.operator_object_id))
+    error_message = "Must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
+  }
+}
+
 variable "resource_group_name" {
   type        = string
   description = "The name of the new resource group to be provisioned."
@@ -166,16 +176,6 @@ variable "unique_seed" {
   validation {
     condition     = can(regex("^[a-zA-Z0-9-]{1,64}$", var.unique_seed))
     error_message = "Must only contain alphanumeric characters and hyphens (-), and must be between 1 and 32 characters long."
-  }
-}
-
-variable "user_object_id" {
-  type        = string
-  description = "The object id of the user in Microsoft Entra ID."
-
-  validation {
-    condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.user_object_id))
-    error_message = "Must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
   }
 }
 

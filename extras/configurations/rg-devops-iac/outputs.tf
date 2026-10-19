@@ -6,7 +6,7 @@ output "resource_ids" {
       storage_account = azurerm_storage_account.this.id
       virtual_network = azurerm_virtual_network.this.id
     },
-    var.enable_user_assigned_identity ? { user_assigned_identity = azurerm_user_assigned_identity.this[0].id } : {},
+    var.deployment_identity == "managed_identity" ? { deployment_identity = azurerm_user_assigned_identity.deployment[0].id } : {},
     module.vm_jumpbox_linux.resource_ids
   )
 }
@@ -19,19 +19,19 @@ output "resource_names" {
       storage_account = azurerm_storage_account.this.name
       virtual_network = azurerm_virtual_network.this.name
     },
-    var.enable_user_assigned_identity ? { user_assigned_identity = azurerm_user_assigned_identity.this[0].name } : {},
+    var.deployment_identity == "managed_identity" ? { deployment_identity = azurerm_user_assigned_identity.deployment[0].name } : {},
     module.vm_jumpbox_linux.resource_names
   )
 }
 
-output "user_assigned_identity_client_id" {
-  value       = var.enable_user_assigned_identity ? azurerm_user_assigned_identity.this[0].client_id : null
-  description = "The client id of the user-assigned managed identity, used as 'arm_client_id' for root sandbox applies with arm_auth_mode = \"msi\", or null when var.enable_user_assigned_identity is false."
+output "deployment_identity_client_id" {
+  value       = var.deployment_identity == "managed_identity" ? azurerm_user_assigned_identity.deployment[0].client_id : null
+  description = "The client id of the deployment identity, used as 'client_id' for root sandbox applies with auth_mode = \"managed_identity\", or null when var.deployment_identity is none."
 }
 
-output "user_assigned_identity_principal_id" {
-  value       = var.enable_user_assigned_identity ? azurerm_user_assigned_identity.this[0].principal_id : null
-  description = "The principal (object) id of the user-assigned managed identity, used to grant Microsoft Graph application permissions, or null when var.enable_user_assigned_identity is false."
+output "deployment_identity_principal_id" {
+  value       = var.deployment_identity == "managed_identity" ? azurerm_user_assigned_identity.deployment[0].principal_id : null
+  description = "The principal (object) id of the deployment identity, used to grant Microsoft Graph application permissions, or null when var.deployment_identity is none."
 }
 
 output "github_runner_name" {

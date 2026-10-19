@@ -27,7 +27,7 @@ locals {
       role_definition_name = "Storage Blob Data Contributor"
     }
     blob_contributor_user = {
-      principal_id         = var.user_object_id
+      principal_id         = var.operator_object_id
       principal_type       = "User"
       role_definition_name = "Storage Blob Data Contributor"
     }
@@ -37,7 +37,7 @@ locals {
       role_definition_name = "Storage File Data Privileged Contributor"
     }
     file_contributor_user = {
-      principal_id         = var.user_object_id
+      principal_id         = var.operator_object_id
       principal_type       = "User"
       role_definition_name = "Storage File Data Privileged Contributor"
     }
