@@ -249,13 +249,14 @@ This section applies to the default `client_secret` authentication mode. See [Au
 
   # Microsoft Graph application permission (app role) ids
   GROUP_CREATE_ID="bf7b1a76-6e77-406b-b258-bf5c7720e98f"         # Group.Create: create the group
+  GROUP_MEMBER_READ_ALL_ID="98830695-27a2-44f7-8c18-0c3ebc9698f6" # GroupMember.Read.All: read the group's owners and members
   USER_READ_ALL_ID="df021288-bdef-4463-88db-98f22de89214"        # User.Read.All: add the operator (a user) as a member
   APPLICATION_READ_ALL_ID="9a5d68dd-52b0-4cc2-bd40-abcf44ac3a30" # Application.Read.All: add a managed identity as a member
 
   SPN_OBJECT_ID=$(az ad sp show --id "$SPN_APP_ID" --query id -o tsv)
   GRAPH_OBJECT_ID=$(az ad sp show --id "$GRAPH_APP_ID" --query id -o tsv)
 
-  for APP_ROLE_ID in "$GROUP_CREATE_ID" "$USER_READ_ALL_ID" "$APPLICATION_READ_ALL_ID"; do
+  for APP_ROLE_ID in "$GROUP_CREATE_ID" "$GROUP_MEMBER_READ_ALL_ID" "$USER_READ_ALL_ID" "$APPLICATION_READ_ALL_ID"; do
     az rest --method POST \
       --uri "https://graph.microsoft.com/v1.0/servicePrincipals/$SPN_OBJECT_ID/appRoleAssignments" \
       --headers "Content-Type=application/json" \
@@ -271,7 +272,7 @@ This section applies to the default `client_secret` authentication mode. See [Au
   3. Search for and select the service principal's app registration (matching `<service-principal-app-id-here>`).
   4. Select **API permissions** in the left menu.
   5. Click **Add a permission** > **Microsoft Graph** > **Application permissions**.
-  6. Search for and check `Group.Create`, `User.Read.All` and `Application.Read.All`, then click **Add permissions**.
+  6. Search for and check `Group.Create`, `GroupMember.Read.All`, `User.Read.All` and `Application.Read.All`, then click **Add permissions**.
   7. Back on the API permissions page, click **Grant admin consent for \<tenant name\>** and
     confirm when prompted. A green checkmark should appear in the Status column.
 

@@ -5,8 +5,8 @@
 > written. Current names differ: `auth_mode` (`client_secret` or `managed_identity`), `client_id`, `client_secret`
 > (`TF_VAR_client_secret`), `entra_tenant_id`, `operator_object_id` (was `user_object_id`), `deployment_identity`, and the `deployment_identity_client_id` and
 > `deployment_identity_principal_id` outputs. The deployment identity no longer has `Owner`: it has `Contributor` and a
-> conditioned `Role Based Access Control Administrator` role, plus the Microsoft Graph `Group.Create`, `User.Read.All`
-> and `Application.Read.All` permissions instead of `Group.ReadWrite.All`. See [Deployment Identity and Authentication](./README.md#deployment-identity-and-authentication)
+> conditioned `Role Based Access Control Administrator` role, plus the Microsoft Graph `Group.Create`, `GroupMember.Read.All`,
+> `User.Read.All` and `Application.Read.All` permissions instead of `Group.ReadWrite.All`. See [Deployment Identity and Authentication](./README.md#deployment-identity-and-authentication)
 > for current behavior.
 
 This guide documents an attended, step-by-step setup of a GitHub Actions

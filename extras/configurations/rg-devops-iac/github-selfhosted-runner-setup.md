@@ -107,6 +107,8 @@ re-deploys all of this content can be generalized into these steps:
   Deployment identity: uai-devops-dev-<xxxxxxxx> (<uami-principal-id-here>)
     Group.Create: granting...
     Group.Create: granted.
+    GroupMember.Read.All: granting...
+    GroupMember.Read.All: granted.
     User.Read.All: granting...
     User.Read.All: granted.
     Application.Read.All: granting...
@@ -287,8 +289,8 @@ backend. Do not copy VM-side `ARM_USE_MSI=true` into the bootstrap terminal.
 
 If later Sandbox deployments enable `mssql` with managed identity, arrange
 for a Privileged Role Administrator or Global Administrator to grant the
-user-assigned identity Microsoft Graph `Group.Create`, `User.Read.All` and
-`Application.Read.All` after creation. Azure subscription Owner alone cannot
+user-assigned identity Microsoft Graph `Group.Create`, `GroupMember.Read.All`,
+`User.Read.All` and `Application.Read.All` after creation. Azure subscription Owner alone cannot
 grant application permissions.
 
 ## Step 2: Enable the runner and deployment identity
@@ -964,13 +966,14 @@ the confirmed administrator's Azure CLI session:
 
 The script reads `deployment_identity_principal_id` from the completed
 bootstrap outputs. It resolves Microsoft Graph's service principal and the
-`Group.Create`, `User.Read.All` and `Application.Read.All` application roles,
+`Group.Create`, `GroupMember.Read.All`, `User.Read.All` and `Application.Read.All`
+application roles,
 inspects existing assignments, and creates only the missing ones. It warns if
 the identity still has `Group.ReadWrite.All` from an earlier setup.
 
 This command changes directory permissions: it grants application
-permissions to create groups and to read all users and service principals in
-the tenant. It is not merely an
+permissions to create groups and to read all group memberships, users and
+service principals in the tenant. It is not merely an
 authentication check or an Azure RBAC assignment. Limit access to the runner
 and its trusted deployment workflows accordingly.
 
@@ -984,6 +987,7 @@ Expected output includes either:
 
 ```text
 Group.Create: granted.
+GroupMember.Read.All: granted.
 User.Read.All: granted.
 Application.Read.All: granted.
 Microsoft Graph permission grant complete.
@@ -993,6 +997,7 @@ or:
 
 ```text
 Group.Create: already granted.
+GroupMember.Read.All: already granted.
 User.Read.All: already granted.
 Application.Read.All: already granted.
 Microsoft Graph permission grant complete.

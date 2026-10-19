@@ -4,6 +4,7 @@
 # module is enabled. The module creates a security group whose members are the operator (a user) and a
 # user-assigned managed identity (a service principal):
 #   * Group.Create          creates the group. The deployment identity becomes the group's owner.
+#   * GroupMember.Read.All  reads the group's owners and members after it is created.
 #   * User.Read.All         reads the user added as a member.
 #   * Application.Read.All  reads the service principal added as a member.
 #
@@ -23,7 +24,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TERRAFORM_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 GRAPH_APP_ID="00000003-0000-0000-c000-000000000000"
-GRAPH_PERMISSIONS=("Group.Create" "User.Read.All" "Application.Read.All")
+GRAPH_PERMISSIONS=("Group.Create" "GroupMember.Read.All" "User.Read.All" "Application.Read.All")
 
 if [[ $# -ge 1 ]]; then
   IDENTITY="$1"
