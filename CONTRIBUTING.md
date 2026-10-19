@@ -148,3 +148,5 @@ Issues and PRs can be assigned only to users with triage access or higher, or to
 ### CI tool versions
 
 The tool versions pinned in the CI workflows and `Invoke-CIChecks.sh` aren't tracked by Dependabot. Each week, [`ci-tool-versions`](.github/workflows/ci-tool-versions.yml) runs [`scripts/Check-ToolVersionDrift.sh`](scripts/Check-ToolVersionDrift.sh). When any tool is behind, it opens or updates a single `tool-version-drift` issue listing every file to update. To bump a version, update every file listed, then rerun `./scripts/Invoke-CIChecks.sh`.
+
+The Terraform CLI version isn't pinned in any workflow. [`ci-terraform`](.github/workflows/ci-terraform.yml) installs the `X.Y.Z` version from `required_version` in each configuration's `terraform.tf`, so a CLI bump only changes `terraform.tf` files. Release PRs then pass static CI without a separate update to `main`.

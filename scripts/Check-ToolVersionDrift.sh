@@ -8,9 +8,10 @@
 # gated by an env-var version string, an Install-Module / npx inline invocation
 # with no manifest, or an input parameter to a setup action. This script closes
 # that gap: for each pinned tool it reads the version currently pinned in the
-# workflow (and the mirrored copies in scripts/Invoke-CIChecks.sh, .tflint.hcl,
-# terraform.tf), queries the upstream latest release, and
-# reports any drift.
+# workflow (and the mirrored copies in scripts/Invoke-CIChecks.sh, .tflint.hcl),
+# queries the upstream latest release, and reports any drift. The Terraform CLI
+# is read from required_version in the root terraform.tf, which ci-terraform.yml
+# also derives its CLI version from (it has no pin of its own).
 #
 # It is consumed by the scheduled ci-tool-versions.yml workflow, which turns the
 # report into a single tracking issue, but it also runs standalone so a
@@ -46,7 +47,7 @@ tools=(
   'markdownlint-cli2|markdownlint-cli2|npm:markdownlint-cli2|.github/workflows/ci-docs.yml::markdownlint-cli2@\K[0-9.]+|.github/workflows/ci-docs.yml,scripts/Invoke-CIChecks.sh'
   'tflint|tflint|gh:terraform-linters/tflint|.github/workflows/ci-terraform.yml::tflint_version:\s*v?\K[0-9.]+|.github/workflows/ci-terraform.yml,scripts/Invoke-CIChecks.sh'
   'tflint-azurerm|tflint azurerm ruleset|gh:terraform-linters/tflint-ruleset-azurerm|.tflint.hcl::version\s*=\s*"\K[0-9.]+|.tflint.hcl'
-  'terraform|Terraform CLI|gh:hashicorp/terraform|.github/workflows/ci-terraform.yml::terraform_version:\s*\K[0-9.]+|.github/workflows/ci-terraform.yml (fmt + validate jobs),terraform.tf (required_version)'
+  'terraform|Terraform CLI|gh:hashicorp/terraform|terraform.tf::required_version\s*=\s*"[^0-9]*\K[0-9.]+|terraform.tf (required_version; ci-terraform.yml derives its CLI version from it),modules/*/terraform.tf,extras/configurations/rg-devops-iac/terraform.tf,extras/configurations/rg-devops-iac/modules/*/terraform.tf,extras/modules/*/terraform.tf (except retired/)'
 )
 
 # Return the version pinned in the given file, matched by a perl regex whose \K

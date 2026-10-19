@@ -121,10 +121,22 @@ jobs:
           ref: ${{ inputs.head_sha }}
           persist-credentials: false
 
+      # Derive the CLI version from required_version in the checked-out code
+      # rather than pinning it here. In release mode main's copy of this
+      # workflow runs against the release head, so a hardcoded pin would lag
+      # behind a Terraform CLI bump on vnext and fail the release PR.
+      - name: Resolve Terraform version
+        id: tfver
+        run: |
+          set -euo pipefail
+          version=$(grep -oP -m1 'required_version\s*=\s*"[^0-9]*\K[0-9]+\.[0-9]+\.[0-9]+' terraform.tf || true)
+          [ -n "$version" ] || { echo '::error file=terraform.tf::No X.Y.Z required_version found.'; exit 1; }
+          echo "Using Terraform $version (from terraform.tf)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
-          # Matches required_version (~> 1.16.6) in terraform.tf.
-          terraform_version: 1.16.6
+          terraform_version: ${{ steps.tfver.outputs.version }}
           terraform_wrapper: false
 
       - name: Check formatting
@@ -196,11 +208,23 @@ jobs:
           ref: ${{ inputs.head_sha }}
           persist-credentials: false
 
+      # Each root configuration declares its own required_version; derive the
+      # CLI version from it (see the fmt job for why it isn't pinned here).
+      - name: Resolve Terraform version
+        id: tfver
+        if: ${{ needs.changes.outputs.terraform == 'true' }}
+        working-directory: ${{ matrix.dir }}
+        run: |
+          set -euo pipefail
+          version=$(grep -oP -m1 'required_version\s*=\s*"[^0-9]*\K[0-9]+\.[0-9]+\.[0-9]+' terraform.tf || true)
+          [ -n "$version" ] || { echo "::error::No X.Y.Z required_version found in $PWD/terraform.tf."; exit 1; }
+          echo "Using Terraform $version (from $PWD/terraform.tf)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         if: ${{ needs.changes.outputs.terraform == 'true' }}
         with:
-          # Matches required_version (~> 1.16.6) in terraform.tf.
-          terraform_version: 1.16.6
+          terraform_version: ${{ steps.tfver.outputs.version }}
           terraform_wrapper: false
 
       # -backend=false downloads providers/initializes modules without
