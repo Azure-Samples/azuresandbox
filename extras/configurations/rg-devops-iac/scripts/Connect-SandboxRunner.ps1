@@ -17,9 +17,9 @@ try {
     Import-Module Az.Accounts, Az.Compute, Az.Resources, Az.Sql, Az.Network, Az.PrivateDns, Az.MySql, Az.DesktopVirtualization -ErrorAction Stop
     $deploymentProfile = Get-Content -LiteralPath $ProfilePath -Raw | ConvertFrom-Json
     Disable-AzContextAutosave -Scope Process | Out-Null
-    Connect-AzAccount -Identity -AccountId $deploymentProfile.arm_client_id | Out-Null
-    $context = Set-AzContext -Subscription $deploymentProfile.subscription_id -Tenant $deploymentProfile.aad_tenant_id
-    if ($context.Subscription.Id -ne $deploymentProfile.subscription_id -or $context.Tenant.Id -ne $deploymentProfile.aad_tenant_id) {
+    Connect-AzAccount -Identity -AccountId $deploymentProfile.client_id | Out-Null
+    $context = Set-AzContext -Subscription $deploymentProfile.subscription_id -Tenant $deploymentProfile.entra_tenant_id
+    if ($context.Subscription.Id -ne $deploymentProfile.subscription_id -or $context.Tenant.Id -ne $deploymentProfile.entra_tenant_id) {
         throw 'Managed identity context does not match the approved deployment.'
     }
 }

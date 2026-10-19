@@ -24,14 +24,13 @@ re-deploys all of this content can be generalized into these steps:
   cd azuresandbox/extras/configurations/rg-devops-iac
   ```
 
-* From bash, create environment variables for deployment secrets:
+* From bash, create an environment variable for the runner PAT:
 
   ```bash
-  export TF_VAR_arm_client_secret=<spn-secret-here> 
   export TF_VAR_github_runner_token=<pat-token-here>
   ```
 
-* Generate a baseline `terraform.tfvars` file.
+* Sign in to Azure CLI as a subscription `Owner` (activate an eligible `Owner` assignment first if you use Privileged Identity Management). Terraform authenticates as this signed-in identity. Then generate a baseline `terraform.tfvars` file.
 
   ```bash
   az login --use-device-code
@@ -41,11 +40,9 @@ re-deploys all of this content can be generalized into these steps:
 * Edit `terraform.tfvars` and add Github self-hosted runner settings.
 
   ```hcl
-  aad_tenant_id   = "<entra-tenant-id-here>"
-  arm_client_id   = "<spn-client-id-here>"
+  entra_tenant_id = "<entra-tenant-id-here>"
   location        = "southcentralus"
   subscription_id = "<subscription-id-here>"
-  user_object_id  = "<operator-user-id-here>"
 
   # Add environment specific tags as required required here
   tags = {
@@ -56,7 +53,7 @@ re-deploys all of this content can be generalized into these steps:
 
   # Self-hosted runner settings
   enable_github_runner          = true
-  enable_user_assigned_identity = true
+  deployment_identity           = "managed_identity"
   github_runner_url             = "https://github.com/Azure-Samples/azuresandbox"
   github_runner_labels          = ["azuresandbox"]
   github_runner_token_type      = "pat"
@@ -72,25 +69,25 @@ re-deploys all of this content can be generalized into these steps:
 * Record the output.
 
   ```hcl
+  deployment_identity_client_id = "<uami-client-id-here>"
+  deployment_identity_principal_id = "<uami-principal-id-here>"
   github_runner_name = "jumplinux2"
   resource_ids = {
+    "deployment_identity" = "/subscriptions/<subscription-id-here>/resourceGroups/rg-devops-dev-<xxxxxxxx>/providers/Microsoft.ManagedIdentity/userAssignedIdentities/uai-devops-dev-<xxxxxxxx>"
     "key_vault" = "/subscriptions/<subscription-id-here>/resourceGroups/rg-devops-dev-<xxxxxxxx>/providers/Microsoft.KeyVault/vaults/kv-devops-dev-<xxxxxxxx>"
     "resource_group" = "/subscriptions/<subscription-id-here>/resourceGroups/rg-devops-dev-<xxxxxxxx>"
     "storage_account" = "/subscriptions/<subscription-id-here>/resourceGroups/rg-devops-dev-<xxxxxxxx>/providers/Microsoft.Storage/storageAccounts/stdevopsdev<xxxxxxxx>"
-    "user_assigned_identity" = "/subscriptions/<subscription-id-here>/resourceGroups/rg-devops-dev-<xxxxxxxx>/providers/Microsoft.ManagedIdentity/userAssignedIdentities/uai-devops-dev-<xxxxxxxx>"
     "virtual_machine_jumplinux2" = "/subscriptions/<subscription-id-here>/resourceGroups/rg-devops-dev-<xxxxxxxx>/providers/Microsoft.Compute/virtualMachines/jumplinux2"
     "virtual_network" = "/subscriptions/<subscription-id-here>/resourceGroups/rg-devops-dev-<xxxxxxxx>/providers/Microsoft.Network/virtualNetworks/vnet-devops-dev-devops"
   }
   resource_names = {
+    "deployment_identity" = "uai-devops-dev-<xxxxxxxx>"
     "key_vault" = "kv-devops-dev-<xxxxxxxx>"
     "resource_group" = "rg-devops-dev-<xxxxxxxx>"
     "storage_account" = "stdevopsdev<xxxxxxxx>"
-    "user_assigned_identity" = "uai-devops-dev-<xxxxxxxx>"
     "virtual_machine_jumplinux2" = "jumplinux2"
     "virtual_network" = "vnet-devops-dev-devops"
   }
-  user_assigned_identity_client_id = "<uami-client-id-here>"
-  user_assigned_identity_principal_id = "<uami-principal-id-here>"
   ```
 
 * Ensure the operator has a at least a `Privileged Role Administrator` Entra ID role assignment. This may require PIM activation.
@@ -104,9 +101,15 @@ re-deploys all of this content can be generalized into these steps:
   You should see output similar to this:
 
   ```text
-  Managed identity: uai-devops-dev-<xxxxxxxx> (<uami-principal-id-here>)
-    Group.ReadWrite.All: granting...
-    Group.ReadWrite.All: granted.
+  Deployment identity: uai-devops-dev-<xxxxxxxx> (<uami-principal-id-here>)
+    Group.Create: granting...
+    Group.Create: granted.
+    GroupMember.Read.All: granting...
+    GroupMember.Read.All: granted.
+    User.Read.All: granting...
+    User.Read.All: granted.
+    Application.Read.All: granting...
+    Application.Read.All: granted.
   Microsoft Graph permission grant complete.
   ```
 
@@ -159,8 +162,8 @@ Do not paste secrets or unfiltered environment-variable output into the
 walkthrough. Share only the requested sanitized diagnostics. Disable shell
 tracing before handling secrets.
 
-An identity with subscription `Owner` makes this runner a privileged execution
-environment. Only trusted deployment workflows should use it. Do not route
+An identity with subscription `Contributor` and conditioned `Role Based Access
+Control Administrator` makes this runner a privileged execution environment. Only trusted deployment workflows should use it. Do not route
 untrusted pull-request code to this runner; GitHub approval alone is not a
 security boundary for a persistent self-hosted runner.
 
@@ -183,7 +186,6 @@ az version --query '"azure-cli"' --output tsv
 git branch --show-current
 git check-ignore terraform.tfvars
 
-printf 'TF_VAR_arm_client_secret: %s\n' "${TF_VAR_arm_client_secret:+set}"
 printf 'TF_VAR_github_runner_token: %s\n' "${TF_VAR_github_runner_token:+set}"
 
 printf '\nExported Terraform/Azure variable names (values omitted):\n'
@@ -193,12 +195,13 @@ printf '\nTop-level terraform.tfvars keys (values omitted):\n'
 awk '/^[[:alpha:]_][[:alnum:]_]*[[:space:]]*=/ { print $1 }' terraform.tfvars
 
 az account show \
-  --query '{environment:environmentName,state:state,isDefault:isDefault}' \
+  --query '{environment:environmentName,state:state,isDefault:isDefault,userType:user.type}' \
   --output json
 ```
 
 An empty secret-status field means the variable is unset or empty. If Azure CLI
-authentication fails, stop and resolve sign-in before deployment. If
+authentication fails, or `userType` is not `user`, stop and sign in as the
+operator before deployment. If
 `git check-ignore` does not identify `terraform.tfvars`, do not stage that file.
 Terraform's required version is defined in this configuration's `terraform.tf`;
 check it against the version printed above.
@@ -211,10 +214,8 @@ those values. The bootstrap requires these inputs:
 
 | Setting | Purpose |
 | --- | --- |
-| `aad_tenant_id` | Tenant containing the bootstrap service principal. |
-| `arm_client_id` | Bootstrap service principal application/client ID, not a managed identity client ID. |
+| `entra_tenant_id` | Tenant of the signed-in operator. |
 | `subscription_id` | Subscription where the runner infrastructure will be created. |
-| `user_object_id` | Operator's Entra user object ID for the configuration's role assignments. |
 | `location` | Operator-selected Azure region with suitable VM availability and quota. |
 | `tags` | Include `project`, `environment`, and `costcenter`, plus any policy-required tags. |
 | `vm_jumpbox_linux_size` | Optional VM-size override; check capacity for the intended deployment workload. |
@@ -228,28 +229,30 @@ For a repository-level runner, the intended additional settings are:
 ```hcl
 # Self-hosted runner settings
 enable_github_runner          = true
-enable_user_assigned_identity = true
+deployment_identity           = "managed_identity"
 github_runner_url             = "https://github.com/Azure-Samples/azuresandbox"
 github_runner_labels          = ["azuresandbox"]
 github_runner_token_type      = "pat"
 ```
 
 The URL and label must match the workflows that will target the runner.
-`enable_user_assigned_identity` creates a user-assigned managed identity with
-subscription `Owner` and attaches it to the VM. Subscription Owner privileges
-are needed for the bootstrap's role assignments, or an equivalent role
-combination must permit them. The subscription-owner identity can also modify
-the runner infrastructure itself.
+`deployment_identity = "managed_identity"` creates a user-assigned managed identity with
+subscription `Contributor` and a `Role Based Access Control Administrator`
+assignment whose condition allows only the roles the sandbox assigns (listed in
+`locals.tf`), and attaches it to the VM. The
+operator signed in to Azure CLI applies this bootstrap and needs `Owner` (or
+`Contributor` plus an unconstrained role-assignment role) to create those
+assignments. The
+deployment identity can also modify the runner infrastructure itself.
 
 The VM's system-assigned managed identity remains the default for cloud-init, token
 retrieval, and the remote-state backend. The user-assigned managed identity (UAMI) is used
-for later Sandbox provider authentication. Do not replace the
-bootstrap's service principal `arm_client_id` with the UAMI client ID.
+for later Sandbox provider authentication.
 
 ### Secret and environment handling
 
-Keep `TF_VAR_arm_client_secret` exported in the operator's deployment terminal.
-Do not put it in `terraform.tfvars` or paste its value into the walkthrough.
+The bootstrap needs no Azure secret: Terraform uses the operator's Azure CLI
+sign-in.
 
 Runner registration also requires `TF_VAR_github_runner_token`. For a
 repository-level runner, use an approved fine-grained PAT scoped to that
@@ -274,15 +277,16 @@ its short lifetime can expire during provisioning; this walkthrough has not
 selected that mode.
 
 No `ARM_*` exports are required for the standalone configuration's provider
-authentication: `providers.tf` explicitly uses the service principal inputs.
+authentication: `providers.tf` explicitly uses the Azure CLI sign-in.
 Inventory existing exports before deciding whether any should be cleared,
 especially if this terminal previously used managed identity or another
 backend. Do not copy VM-side `ARM_USE_MSI=true` into the bootstrap terminal.
 
 If later Sandbox deployments enable `mssql` with managed identity, arrange
 for a Privileged Role Administrator or Global Administrator to grant the
-user-assigned identity Microsoft Graph `Group.ReadWrite.All` after creation.
-Azure subscription Owner alone cannot grant that application permission.
+user-assigned identity Microsoft Graph `Group.Create`, `GroupMember.Read.All`,
+`User.Read.All` and `Application.Read.All` after creation. Azure subscription Owner alone cannot
+grant application permissions.
 
 ## Step 2: Enable the runner and deployment identity
 
@@ -311,7 +315,7 @@ chmod 600 terraform.tfvars
 cat >> terraform.tfvars <<'EOF'
 
 enable_github_runner          = true
-enable_user_assigned_identity = true
+deployment_identity           = "managed_identity"
 github_runner_url            = "https://github.com/<owner>/<repository>"
 github_runner_labels         = ["azuresandbox"]
 github_runner_token_type     = "pat"
@@ -320,9 +324,8 @@ EOF
 terraform fmt terraform.tfvars
 ```
 
-The `arm_client_id` already in this file must remain the bootstrap service
-principal's client ID. The new managed identity is created by this deployment;
-its client ID is used only when configuring later Sandbox deployments.
+The new managed identity is created by this deployment; its client ID is used
+only when configuring later Sandbox deployments.
 
 The default VM name and runner name are `jumplinux2`; no name override is
 required. The standard `self-hosted`, `Linux`, and `X64` labels are assigned by
@@ -350,9 +353,7 @@ export TF_VAR_github_runner_token
 printf 'TF_VAR_github_runner_token: %s\n' "${TF_VAR_github_runner_token:+set}"
 ```
 
-Keep the existing `TF_VAR_arm_client_secret` exported. The two secrets serve
-different purposes: the service principal authenticates the bootstrap's Azure
-providers; the PAT allows the VM to request a GitHub runner registration token.
+The PAT only allows the VM to request a GitHub runner registration token.
 The runner does not need this PAT to authenticate ordinary workflow jobs after
 registration.
 
@@ -362,9 +363,8 @@ This diagnostic prints the five non-secret runner settings and secret-presence
 flags. It does not print the bootstrap IDs, organizational tags, or credentials.
 
 ```bash
-awk '/^(enable_github_runner|enable_user_assigned_identity|github_runner_url|github_runner_labels|github_runner_token_type)[[:space:]]*=/ { print }' terraform.tfvars
+awk '/^(enable_github_runner|deployment_identity|github_runner_url|github_runner_labels|github_runner_token_type)[[:space:]]*=/ { print }' terraform.tfvars
 
-printf 'TF_VAR_arm_client_secret: %s\n' "${TF_VAR_arm_client_secret:+set}"
 printf 'TF_VAR_github_runner_token: %s\n' "${TF_VAR_github_runner_token:+set}"
 ```
 
@@ -491,7 +491,8 @@ no changes or deletions to existing managed resources. Review all proposed
 operations rather than relying on a predetermined resource count.
 
 Confirm the plan includes the intended VM, runner configuration, user-assigned
-managed identity, and its subscription `Owner` role assignment. Confirm that
+managed identity, and its subscription `Contributor` and conditioned
+`Role Based Access Control Administrator` role assignments. Confirm that
 the selected subscription, region, and tags are correct. Runner installation
 and registration happen later during cloud-init; Terraform planning cannot
 prove those steps will succeed.
@@ -838,7 +839,7 @@ without retrying, changing role assignments, enabling public access, or
 switching identities as an automatic workaround.
 
 The system-assigned identity is intended for the state backend; the
-subscription-Owner user-assigned identity is intended for the later Sandbox
+user-assigned deployment identity is intended for the later Sandbox
 provider configuration. Keep those authentication roles distinct.
 
 ## Step 10: Check the Sandbox deployment identity
@@ -850,16 +851,16 @@ authentication.
 
 ### Permissions already provisioned versus a separate admin grant
 
-With `enable_user_assigned_identity = true`, the bootstrap automatically
-creates `azurerm_role_assignment.user_assigned_identity_owner` at subscription
-scope. No separate manual Azure RBAC grant is required for the identity's
-`Owner` role. The commands below verify the live assignment rather than
-granting it.
+With `deployment_identity = "managed_identity"`, the bootstrap automatically
+creates `azurerm_role_assignment.deployment_identity_contributor` and
+`azurerm_role_assignment.deployment_identity_rbac_admin` at subscription
+scope. No separate manual Azure RBAC grant is required. The commands below
+verify the live assignments rather than granting them.
 
-Microsoft Graph `Group.ReadWrite.All` is different: Terraform does not grant
-it. If Sandbox deployments will enable `mssql`, an authorized Entra
+The Microsoft Graph permissions are different: Terraform does not grant
+them. If Sandbox deployments will enable `mssql`, an authorized Entra
 administrator must complete `scripts/grant-graph-permissions.sh` before those
-deployments. Subscription `Owner` is not Entra administrator consent.
+deployments. Azure RBAC roles are not Entra administrator consent.
 Confirm the module scope and administrator availability before selecting that
 separate grant step.
 
@@ -870,8 +871,8 @@ terminal. Keep `VM_ID` populated from step 6. The commands capture identity
 IDs from the completed bootstrap's outputs without printing them.
 
 ```bash
-UAI_CLIENT_ID=$(terraform output -raw user_assigned_identity_client_id) &&
-UAI_PRINCIPAL_ID=$(terraform output -raw user_assigned_identity_principal_id) &&
+UAI_CLIENT_ID=$(terraform output -raw deployment_identity_client_id) &&
+UAI_PRINCIPAL_ID=$(terraform output -raw deployment_identity_principal_id) &&
 SUBSCRIPTION_ID=$(printf '%s\n' "$VM_ID" | cut -d / -f 3) &&
 GUEST_SCRIPT=$(cat <<EOF
 set -eu
@@ -901,23 +902,23 @@ CLI context, then restore system-assigned identity authentication on success.
 
 ### Expected result
 
-Expect `subscriptionMatches: true`, `state: "Enabled"`, a role entry for
-`Owner`, and the final context-restoration message.
+Expect `subscriptionMatches: true`, `state: "Enabled"`, role entries for
+`Contributor` and `Role Based Access Control Administrator` (and no `Owner`),
+and the final context-restoration message.
 
 Review stdout and stderr. If authentication or role inspection fails, the
 guest command stops and may not reach context restoration. Report the
 sanitized error and stop; do not attempt an automatic retry or permission
 change.
 
-Successful Azure authentication and subscription `Owner` do not establish
+Successful Azure authentication and subscription roles do not establish
 Microsoft Graph application permissions. If the later Sandbox deployment
-enables `mssql`, arrange the separately documented `Group.ReadWrite.All`
+enables `mssql`, arrange the separately documented Microsoft Graph
 grant by a Privileged Role Administrator or Global Administrator.
 
 This check does not perform a Terraform Sandbox plan or validate all provider
 operations. The later Sandbox configuration must use this identity's client
-ID as `arm_client_id` with `arm_auth_mode = "msi"`. Do not change the
-standalone bootstrap's service principal inputs.
+ID as `client_id` with `auth_mode = "managed_identity"`.
 
 ## Step 11: Grant the optional Microsoft Graph permission
 
@@ -936,9 +937,9 @@ Before running the command, the operator must explicitly confirm:
 * That role is active. If activated through PIM after sign-in, sign in again
   so the current session reflects the role activation.
 
-Subscription `Owner` is not sufficient. Do not run the grant on the VM using
-its managed identity, or assume the bootstrap service principal can grant
-application permissions.
+Azure RBAC roles, including subscription `Owner`, are not sufficient. Do not
+run the grant on the VM using its managed identity, or assume the bootstrap
+service principal can grant application permissions.
 
 If another administrator must perform the grant, arrange a private handoff
 of the managed identity principal ID and the existing script. Do not publish
@@ -953,13 +954,16 @@ the confirmed administrator's Azure CLI session:
 ./scripts/grant-graph-permissions.sh
 ```
 
-The script reads `user_assigned_identity_principal_id` from the completed
-bootstrap outputs. It resolves Microsoft Graph's service principal and
-`Group.ReadWrite.All` application role, inspects existing assignments, and
-creates the assignment only if it is missing.
+The script reads `deployment_identity_principal_id` from the completed
+bootstrap outputs. It resolves Microsoft Graph's service principal and the
+`Group.Create`, `GroupMember.Read.All`, `User.Read.All` and `Application.Read.All`
+application roles,
+inspects existing assignments, and creates only the missing ones. It warns if
+the identity still has `Group.ReadWrite.All` from an earlier setup.
 
-This command changes directory permissions: it grants a broad application
-permission to read and write groups in the tenant. It is not merely an
+This command changes directory permissions: it grants application
+permissions to create groups and to read all group memberships, users and
+service principals in the tenant. It is not merely an
 authentication check or an Azure RBAC assignment. Limit access to the runner
 and its trusted deployment workflows accordingly.
 
@@ -972,18 +976,24 @@ application role assignment on the managed identity service principal.
 Expected output includes either:
 
 ```text
-Group.ReadWrite.All: granted.
+Group.Create: granted.
+GroupMember.Read.All: granted.
+User.Read.All: granted.
+Application.Read.All: granted.
 Microsoft Graph permission grant complete.
 ```
 
 or:
 
 ```text
-Group.ReadWrite.All: already granted.
+Group.Create: already granted.
+GroupMember.Read.All: already granted.
+User.Read.All: already granted.
+Application.Read.All: already granted.
 Microsoft Graph permission grant complete.
 ```
 
-The script also prints the actual managed identity name and principal ID.
+The script also prints the actual deployment identity name and principal ID.
 Keep those locally; share only the permission-status and completion lines.
 If it fails, share the sanitized error, preserve the full output locally, and
 stop without retrying, broadening permissions, or switching credentials as
@@ -1003,9 +1013,10 @@ is provisioned and its prerequisites are verified:
 * The runner account can use the required deployment toolchain.
 * The system-assigned identity can read the state container from the VM.
 * The user-assigned identity authenticates to the intended subscription and
-  has subscription `Owner`.
+  has subscription `Contributor` and conditioned `Role Based Access Control
+  Administrator`.
 * If `mssql` will be enabled, an authorized administrator completed the
-  Microsoft Graph `Group.ReadWrite.All` grant.
+  Microsoft Graph grant.
 
 This does not mean an Azure Sandbox has been deployed or that a deployment
 workflow, Terraform backend initialization, blob writes, or state leases have
@@ -1044,7 +1055,7 @@ A deployment workflow needs its own human-confirmed configuration:
 | --- | --- |
 | Runner selection | Match `self-hosted`, `Linux`, `X64`, and `azuresandbox`; labels are routing, not an authorization boundary. |
 | Source revision | Explicitly select the intended Sandbox revision. |
-| Provider authentication | Set `arm_auth_mode = "msi"` and use the user-assigned identity client ID as `arm_client_id`. Do not copy the bootstrap service principal settings. |
+| Provider authentication | Set `auth_mode = "managed_identity"` and use the user-assigned identity client ID as `client_id`. |
 | State backend | Use the provisioned storage account and container with Azure AD/managed identity authorization, normally the system-assigned identity. |
 | State key | Confirm a unique, stable key for the intended Sandbox; do not mix it with bootstrap state. |
 | Job workspace | Generate environment-specific inputs and backend configuration securely in each checkout; ignored local files are not automatically available to Actions jobs. Preserve an existing backend rather than overwriting it. |
@@ -1061,7 +1072,7 @@ different. Do not carry tags into a Sandbox deployment by assumption: capture
 them explicitly for that deployment and include them consistently in its
 plan/apply inputs.
 
-Subscription `Owner` does not substitute for Storage data-plane roles. Avoid
+Subscription control-plane roles do not substitute for Storage data-plane roles. Avoid
 unintentionally making the backend select the user-assigned identity through
 a shared `ARM_CLIENT_ID` export when its storage authorization was configured
 for the system-assigned identity.

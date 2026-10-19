@@ -21,12 +21,9 @@ resource "azurerm_storage_container" "this" {
   container_access_type = "private"
 }
 
-resource "azurerm_role_assignment" "storage_roles" {
-  for_each = local.storage_roles
-
-  principal_id         = each.value.principal_id
-  principal_type       = each.value.principal_type
-  role_definition_name = each.value.role_definition_name
+resource "azurerm_role_assignment" "storage_blob_data_contributor" {
+  principal_id         = data.azurerm_client_config.current.object_id
+  role_definition_name = "Storage Blob Data Contributor"
   scope                = azurerm_storage_account.this.id
 }
 #endregion

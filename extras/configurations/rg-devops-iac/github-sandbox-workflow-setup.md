@@ -1,5 +1,14 @@
 # GitHub Sandbox Deployment Workflow Setup
 
+> [!NOTE]
+> This walkthrough records an attended setup and uses the variable and output names that were current when it was
+> written. Current names differ: `auth_mode` (`client_secret` or `managed_identity`), `client_id`, `client_secret`
+> (`TF_VAR_client_secret`), `entra_tenant_id`, `operator_object_id` (was `user_object_id`), `deployment_identity`, and the `deployment_identity_client_id` and
+> `deployment_identity_principal_id` outputs. The deployment identity no longer has `Owner`: it has `Contributor` and a
+> conditioned `Role Based Access Control Administrator` role, plus the Microsoft Graph `Group.Create`, `GroupMember.Read.All`,
+> `User.Read.All` and `Application.Read.All` permissions instead of `Group.ReadWrite.All`. See [Deployment Identity and Authentication](./README.md#deployment-identity-and-authentication)
+> for current behavior.
+
 This guide documents an attended, step-by-step setup of a GitHub Actions
 workflow that deploys a new Azure Sandbox on the self-hosted runner provisioned
 by [GitHub Self-Hosted Runner Setup](./github-selfhosted-runner-setup.md).
@@ -25,6 +34,9 @@ moves both branches from classic branch protection to rulesets. Step 94
 introduces the `azuresandbox-owners` team, splits the release checks into
 separate rulesets, and restores a classic push restriction on `main`. Earlier
 descriptions of branch protection are historical, not current policy.
+Step 95 adds a manual `source_branch` choice so a run can deploy `main` as
+well as `vnext`; earlier references to a fixed `vnext` manual checkout are
+historical.
 
 ## Deployment scope and success criteria
 
@@ -91,7 +103,7 @@ Keep actual deployment values out of committed files and public documentation.
 
 The operator must explicitly confirm the deployment target and test scope
 before planning or applying. The walkthrough selects the same tenant,
-subscription, region, and operator object ID as the standalone bootstrap,
+subscription, region, and operator as the standalone bootstrap,
 with separate, human-supplied Sandbox tags.
 
 Use the runner's user-assigned identity for Sandbox provider authentication:
@@ -124,8 +136,8 @@ printf '\n'
 Do not paste the output into chat or public documentation. The root MSI
 configuration does not require an SPN secret, and its workflow should not
 receive `TF_VAR_arm_client_secret`. The standalone `rg-devops-iac` bootstrap
-still uses SPN authentication; preserve its separate `arm_client_id`, input
-file, and operator-session secret.
+authenticates as the operator signed in to Azure CLI and keeps its own input
+file.
 
 Run the root MSI configuration on the Azure runner to which this identity
 is attached, not from the workstation merely because its input file was
@@ -4278,3 +4290,42 @@ only one owner, an owner's own `vnext` PR still needs a review-only bypass,
 because GitHub doesn't let authors approve their own PRs. See
 [CONTRIBUTING.md](../../../CONTRIBUTING.md#who-can-do-what)
 for the resulting contribution and merge rules.
+
+## Step 95: Choose the manual deployment source branch
+
+Manual runs always deployed the `vnext` tip, so there was no way to deploy a
+new Sandbox from released `main` code. Issue #853 adds a `source_branch`
+choice to `workflow_dispatch`, with `vnext` (the default) and `main` as the
+only options.
+
+Workflow changes:
+
+* The workflow still runs only in the trusted `main` context. The input
+  chooses the source code to deploy, not the workflow revision.
+* The hosted `Validate deployment entry` job reads the input only through an
+  environment variable. It rejects anything other than `vnext` or `main`
+  (other branches, tags, SHAs, fork references, or an empty value) before any
+  checkout or environment-secret access.
+* The deployment job checks out `refs/heads/<branch>` from this repository,
+  so a tag can't shadow the branch. Every stage choice (`preflight`, `apply`,
+  and `unit-test`) works with either source, and runs keep the
+  `sandbox-deployment` environment, its secrets, and its approvals.
+* The run name (`Sandbox sandbox-<run id> / <stage> / <branch>`) and the
+  selection job's summary show the selected source. The stage results still
+  record the exact deployed commit.
+* Release PR runs ignore the input. They still deploy the PR's exact head SHA
+  through `sandbox-release-gate`, and manual runs never publish or satisfy
+  `release-static-ci` or `sandbox-deployment-gate`.
+
+[`scripts/tests/Test-SandboxDeploymentSelection.sh`](../../../scripts/tests/Test-SandboxDeploymentSelection.sh)
+runs the selection step against sample events with no GitHub or Azure
+access. It covers both sources for every stage, invalid sources and stages,
+and the unchanged release PR path. The `actionlint` job in `ci-actions` and
+`./scripts/Invoke-CIChecks.sh actions` both run it.
+
+The change reaches `vnext` through a normal topic PR. Because manual runs use
+the workflow file on `main`, a narrow maintenance PR then copies only
+`.github/workflows/sandbox-deployment.yml` to `main`, as in steps 10 through
+15. An owner merges it with a bypass because the source isn't `vnext`. A
+`main` to `vnext` sync PR follows. The test script and documentation reach
+`main` with the next normal release.

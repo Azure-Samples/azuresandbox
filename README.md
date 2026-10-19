@@ -6,6 +6,7 @@
 * [Overview](#overview)
 * [Features](#features)
 * [Prerequisites](#prerequisites)
+* [Authentication](#authentication)
 * [Getting Started (Interactive Execution)](#getting-started-interactive-execution)
 * [Documentation](#documentation)
 
@@ -119,7 +120,7 @@ Azure Sandbox is built with security as a core principle, ensuring that all reso
   * Ensures that only authorized entities can access or manage Azure resources.
   * Simplifies access management by leveraging Microsoft Entra ID for identity and access control.
 
-  **IMPORTANT**: Both the interactive user and the service principal used to provision the sandbox environment must have an `Owner` role assignment scoped to the sandbox subscription. This is required for the service principal to be able to create and manage resources in the subscription including role assignments. All other role assignments follow the principle of least privilege and leverage managed identities where applicable.
+  **IMPORTANT**: The interactive user who provisions the sandbox must have an `Owner` role assignment scoped to the sandbox subscription. The deployment identity Terraform authenticates as does not need `Owner`: it has `Contributor` and a `Role Based Access Control Administrator` assignment with a condition that allows it to assign only the roles the sandbox uses. See [Service Principal](#service-principal). All other role assignments follow the principle of least privilege and leverage managed identities where applicable.
 
 * **Data Encryption**:
   * All data stored in the sandbox environment is encrypted at rest using platform-managed keys.
@@ -163,11 +164,13 @@ This section describes the prerequisites required in order to provision an Azure
 
 ### Service Principal
 
+This section applies to the default `client_secret` authentication mode. See [Authentication](#authentication) for the other modes.
+
 * Verify the subscription owner has privileges to create a service principal on the Microsoft Entra tenant. See [Permissions required for registering an app](https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal#permissions-required-for-registering-an-app) for more information.
-* Ask the subscription owner to [Create an Azure service principal](https://learn.microsoft.com/en-us/cli/azure/azure-cli-sp-tutorial-1?tabs=bash) (SPN) for sandbox users with [Azure Cloud Shell](https://learn.microsoft.com/azure/cloud-shell/quickstart). The service principal can be created with the following command:
+* Ask the subscription owner to [Create an Azure service principal](https://learn.microsoft.com/en-us/cli/azure/azure-cli-sp-tutorial-1?tabs=bash) (SPN) for sandbox users with [Azure Cloud Shell](https://learn.microsoft.com/azure/cloud-shell/quickstart). The following command creates the service principal with a `Contributor` role assignment on the sandbox subscription, which lets it create and manage sandbox resources:
 
   ```bash
-  az ad sp create-for-rbac -n AzureSandboxSPN --role Owner --scopes /subscriptions/YOUR-SUBSCRIPTION-ID-HERE
+  az ad sp create-for-rbac -n AzureSandboxSPN --role Contributor --scopes /subscriptions/<subscription-id-here>
   ```
 
   The output should look like this:
@@ -183,24 +186,82 @@ This section describes the prerequisites required in order to provision an Azure
 
 * Save the service principal *appId* and *password* in a secure location such as a password vault.
 
-* If you want to deploy the Azure SQL Database module, you will need to grant the service principal privileges to create Entra ID security groups and assign members to them.
+* Ask the subscription owner to grant the service principal `Role Based Access Control Administrator` on the sandbox subscription, with a condition that allows it to assign and remove only the roles the sandbox uses. Run these commands in Azure Cloud Shell:
 
   ```bash
-  # Get the SP's object ID
-  SP_OBJECT_ID=$(az ad sp show --id <service-principal-app-id-here> --query id -o tsv)
+  SPN_APP_ID="<service-principal-app-id-here>"
+  SCOPE="/subscriptions/<subscription-id-here>"
 
-  # Get the Microsoft Graph service principal object ID in the tenant
-  GRAPH_SP_ID=$(az ad sp show --id 00000003-0000-0000-c000-000000000000 --query id -o tsv)
+  # Roles the sandbox assigns, grouped by module.
+  # Each role is listed once, under the first module that needs it.
+  ROLES=(
+    # vnet_shared
+    "Key Vault Secrets Officer"
 
-  # Grant Group.ReadWrite.All application permission via Microsoft Graph API
-  az rest --method POST \
-    --uri "https://graph.microsoft.com/v1.0/servicePrincipals/${SP_OBJECT_ID}/appRoleAssignments" \
-    --headers "Content-Type=application/json" \
-    --body "{
-      \"principalId\": \"${SP_OBJECT_ID}\",
-      \"resourceId\": \"${GRAPH_SP_ID}\",
-      \"appRoleId\": \"62a82d76-70ea-41e2-9197-370581804d09\"
-    }"
+    # vnet_app
+    "Key Vault Secrets User"
+    "Monitoring Reader"
+    "Storage Account Contributor"
+    "Storage Blob Data Contributor"
+    "Storage Blob Data Reader"
+    "Storage File Data Privileged Contributor"
+
+    # vm_jumpbox_linux, vm_mssql_win, mssql, mysql, vwan: no additional roles
+
+    # avd (extra module)
+    "Desktop Virtualization User"
+    "Virtual Machine User Login"
+
+    # petstore (extra module)
+    "AcrPull"
+    "AcrPush"
+    "Monitoring Metrics Publisher"
+
+    # vnet_onprem (extra module): no additional roles
+  )
+
+  # Look up each role's id; the condition below needs ids, not names
+  ROLE_IDS=""
+  for ROLE in "${ROLES[@]}"; do
+    ROLE_ID=$(az role definition list --name "$ROLE" --query "[0].name" -o tsv)
+    echo "$ROLE: $ROLE_ID"
+    ROLE_IDS="$ROLE_IDS, $ROLE_ID"
+  done
+  ROLE_IDS="${ROLE_IDS#, }" # remove the leading ", "
+
+  # Condition: the identity can create (write) or remove (delete) a role assignment only if the role is in ROLE_IDS.
+  # This prevents it from assigning highly privileged roles such as Owner, User Access Administrator or
+  # Role Based Access Control Administrator, including to itself, and from removing role assignments it doesn't manage.
+  CONDITION="((NOT ActionMatches{'Microsoft.Authorization/roleAssignments/write'}) OR (@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {$ROLE_IDS}))"
+  CONDITION+=" AND ((NOT ActionMatches{'Microsoft.Authorization/roleAssignments/delete'}) OR (@Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {$ROLE_IDS}))"
+
+  # Role Based Access Control Administrator, limited by the condition. Without the condition, this role could assign
+  # any role, including Owner, which would make the identity as powerful as an Owner.
+  az role assignment create --assignee "$SPN_APP_ID" --role "Role Based Access Control Administrator" --scope "$SCOPE" \
+    --condition "$CONDITION" --condition-version "2.0"
+  ```
+
+* If you want to deploy the Azure SQL Database module, a Microsoft Entra Global Administrator or Privileged Role Administrator must grant the service principal the Microsoft Graph application permissions it needs to create the SQL administrators security group. Run these commands in Azure Cloud Shell:
+
+  ```bash
+  SPN_APP_ID="<service-principal-app-id-here>"
+  GRAPH_APP_ID="00000003-0000-0000-c000-000000000000" # Microsoft Graph (the same in every tenant)
+
+  # Microsoft Graph application permission (app role) ids
+  GROUP_CREATE_ID="bf7b1a76-6e77-406b-b258-bf5c7720e98f"         # Group.Create: create the group
+  GROUP_MEMBER_READ_ALL_ID="98830695-27a2-44f7-8c18-0c3ebc9698f6" # GroupMember.Read.All: read the group's owners and members
+  USER_READ_ALL_ID="df021288-bdef-4463-88db-98f22de89214"        # User.Read.All: add the operator (a user) as a member
+  APPLICATION_READ_ALL_ID="9a5d68dd-52b0-4cc2-bd40-abcf44ac3a30" # Application.Read.All: add a managed identity as a member
+
+  SPN_OBJECT_ID=$(az ad sp show --id "$SPN_APP_ID" --query id -o tsv)
+  GRAPH_OBJECT_ID=$(az ad sp show --id "$GRAPH_APP_ID" --query id -o tsv)
+
+  for APP_ROLE_ID in "$GROUP_CREATE_ID" "$GROUP_MEMBER_READ_ALL_ID" "$USER_READ_ALL_ID" "$APPLICATION_READ_ALL_ID"; do
+    az rest --method POST \
+      --uri "https://graph.microsoft.com/v1.0/servicePrincipals/$SPN_OBJECT_ID/appRoleAssignments" \
+      --headers "Content-Type=application/json" \
+      --body "{\"principalId\": \"$SPN_OBJECT_ID\", \"resourceId\": \"$GRAPH_OBJECT_ID\", \"appRoleId\": \"$APP_ROLE_ID\"}"
+  done
   ```
 
   Alternatively you can perform these steps manually from the Entra portal:
@@ -211,7 +272,7 @@ This section describes the prerequisites required in order to provision an Azure
   3. Search for and select the service principal's app registration (matching `<service-principal-app-id-here>`).
   4. Select **API permissions** in the left menu.
   5. Click **Add a permission** > **Microsoft Graph** > **Application permissions**.
-  6. Search for `Group.ReadWrite.All`, check the box, and click **Add permissions**.
+  6. Search for and check `Group.Create`, `GroupMember.Read.All`, `User.Read.All` and `Application.Read.All`, then click **Add permissions**.
   7. Back on the API permissions page, click **Grant admin consent for \<tenant name\>** and
     confirm when prompted. A green checkmark should appear in the Status column.
 
@@ -220,7 +281,7 @@ This section describes the prerequisites required in order to provision an Azure
 * Some Azure subscriptions may have low quota limits for specific Azure resources which may cause sandbox deployments to fail. See [Resolve errors for resource quotas](https://learn.microsoft.com/azure/azure-resource-manager/templates/error-resource-quota) for more information.
 * Some Azure subscriptions may not have the required resource providers registered. Terraform is configured to automatically register the required resource providers, but this may take some time on first use.
 * Some Azure subscriptions may not have the required features enabled, such has host encryption for virtual machines. Monitor your plan application for errors related to specific subscription features and enable them as needed.
-* Some organizations may institute [Azure policy](https://learn.microsoft.com/azure/governance/policy/overview) which may cause some sandbox deployments to fail. This can be addressed by using custom settings which pass the policy checks, or by disabling the policies on the Azure subscription being used for the configurations.
+* Some organizations may institute [Azure policy](https://learn.microsoft.com/azure/governance/policy/overview) which may cause some sandbox deployments to fail. This can be addressed by using custom settings which pass the policy checks, using environment-specific tags which alter how policies are applied, or by disabling the policies on the Azure subscription being used for the configurations.
 
 ### Terraform Execution Environment
 
@@ -274,6 +335,12 @@ Azure DevOps, GitHub Actions, or other CI/CD tools can be used to automate the d
 * PowerShell 7.x
 * Az PowerShell Module
 * Terraform
+
+## Authentication
+
+By default, Terraform authenticates as a service principal with a client secret (`auth_mode = "client_secret"`). Create the service principal and grant its permissions as described in [Service Principal](#service-principal), and supply its secret with the `TF_VAR_client_secret` environment variable. The bootstrap script writes the other values, `client_id`, `entra_tenant_id` and `operator_object_id`, to `terraform.tfvars`.
+
+For automated or secretless deployments, such as from a GitHub Actions self-hosted runner using a managed identity, see [Deployment Identity and Authentication](./extras/configurations/rg-devops-iac/README.md#deployment-identity-and-authentication) in the rg-devops-iac configuration.
 
 ## Getting Started (Interactive Execution)
 
@@ -375,27 +442,27 @@ There are hundreds of variables in this configuration. Defaults have been set fo
 
 Follow these steps to configure the variables for your sandbox:
 
-* For the default service-principal authentication, set the password as an environment variable
-  rather than storing it in `terraform.tfvars`.
+* For the default `client_secret` authentication mode, set the service principal password as an environment variable
+  rather than storing it in `terraform.tfvars`. See [Authentication](#authentication) for other modes.
 
   ```bash
   # Set environment variable in bash
-  export TF_VAR_arm_client_secret=<service-principal-password-here>
+  export TF_VAR_client_secret=<service-principal-password-here>
   ```
 
   ```pwsh
   # Set environment variable in PowerShell
-  $env:TF_VAR_arm_client_secret = "<service-principal-password-here>"
+  $env:TF_VAR_client_secret = "<service-principal-password-here>"
   ```
 
 * Next, create a `terraform.tfvars` file in the root directory of the project. This file should set the necessary variables for your deployment. Here is an example of what the `terraform.tfvars` file might look like:
 
   ```hcl
-  aad_tenant_id   = "<entra-tenant-id-here>"
-  arm_client_id   = "<service-principal-app-id-here>"
-  location        = "<azure-region-here>"
-  subscription_id = "<azure-subscription-id-here>"
-  user_object_id  = "<user-object-id-here>"
+  client_id          = "<service-principal-app-id-here>"
+  entra_tenant_id    = "<entra-tenant-id-here>"
+  location           = "<azure-region-here>"
+  operator_object_id = "<operator-object-id-here>"
+  subscription_id    = "<azure-subscription-id-here>"
 
   tags = {
     project     = "sand",
@@ -421,11 +488,11 @@ Follow these steps to configure the variables for your sandbox:
 By default only the shared virtual network module (vnet-shared) is enabled which isn't very useful on it's own. You can enable additional modules by setting the `enable_module_*` variables in the `terraform.tfvars` file. At a minimum you should enable the application virtual network module (vnet-app) like this:
 
 ```hcl
-aad_tenant_id   = "<entra-tenant-id-here>"
-arm_client_id   = "<service-principal-app-id-here>"
-location        = "<azure-region-here>"
-subscription_id = "<azure-subscription-id-here>"
-user_object_id  = "<user-object-id-here>"
+client_id          = "<service-principal-app-id-here>"
+entra_tenant_id    = "<entra-tenant-id-here>"
+location           = "<azure-region-here>"
+operator_object_id = "<operator-object-id-here>"
+subscription_id    = "<azure-subscription-id-here>"
 
 tags = {
   project     = "sand",
@@ -440,11 +507,11 @@ enable_module_vnet_app = true
 And here's how to enable all the modules:
 
 ```hcl
-aad_tenant_id   = "<entra-tenant-id-here>"
-arm_client_id   = "<service-principal-app-id-here>"
-location        = "<azure-region-here>"
-subscription_id = "<azure-subscription-id-here>"
-user_object_id  = "<user-object-id-here>"
+client_id          = "<service-principal-app-id-here>"
+entra_tenant_id    = "<entra-tenant-id-here>"
+location           = "<azure-region-here>"
+operator_object_id = "<operator-object-id-here>"
+subscription_id    = "<azure-subscription-id-here>"
 
 tags = {
   project     = "sand",
@@ -472,10 +539,10 @@ module "vnet_shared" {
   source = "./modules/vnet-shared"
 
   location            = azurerm_resource_group.this.location
+  operator_object_id  = var.operator_object_id
   resource_group_name = azurerm_resource_group.this.name
   tags                = var.tags
   unique_seed         = module.naming.unique-seed
-  user_object_id      = var.user_object_id
 
   # Override default values here
   vm_adds_name = "mydc1" # default was "adds1"
@@ -609,20 +676,20 @@ This section lists input variables used in the root module. Defaults can be over
 
 Variable | Default | Description
 --- | --- | ---
-aad_tenant_id | | The Microsoft Entra tenant id.
-arm_auth_mode | `secret` | Authentication mode: `secret` or `msi`.
-arm_client_id | | Service principal client ID for `secret` authentication or user-assigned managed identity client ID for `msi` authentication.
-arm_client_secret | | Password for secret authentication. Required only when `arm_auth_mode` is `secret`; set it using `TF_VAR_arm_client_secret`.
+auth_mode | `client_secret` | How Terraform authenticates the providers: `client_secret` or `managed_identity`. See [Authentication](#authentication).
+client_id | | The client id of the identity Terraform authenticates as: the service principal `appId` for `client_secret`, or the user-assigned managed identity client id for `managed_identity`.
+client_secret | | The service principal secret. Required only when `auth_mode` is `client_secret`; set it using `TF_VAR_client_secret`.
 enable_module_mssql | false | Set to true to enable the Azure SQL Database (mssql) module, false to skip it.
 enable_module_mysql | false | Set to true to enable the Azure Database for MySQL (mysql) module, false to skip it.
 enable_module_vm_jumpbox_linux | false | Set to true to enable the vm_jumpbox_linux module, false to skip it.
 enable_module_vm_mssql_win | false | Set to true to enable the vm_mssql_win module, false to skip it.
 enable_module_vnet_app | false | Set to true to enable the vnet_app module, false to skip it.
 enable_module_vwan | false | Set to true to enable the vwan module, false to skip it.
+entra_tenant_id | | The Microsoft Entra tenant id.
 location | | The name of the Azure Region where resources will be provisioned.
+operator_object_id | | The Microsoft Entra object id of the operator: the signed-in user who provisions this configuration. The operator is granted data-plane role assignments on the resources it creates.
 subscription_id | | The Azure subscription id used to provision sandbox resources.
 tags | { costcenter = "mycostcenter", environment = "dev", project = "sand" } | Tags in map format to be applied to the sandbox resource group and used for resource naming.
-user_object_id | | The object id of the interactive user (e.g. Azure CLI or Az PowerShell signed in user).
 vm_avd_size | `Standard_D4s_v6` | The size of the Azure Virtual Desktop session host virtual machines: `sessionhost1` and `sessionhost2`.
 vm_jumpbox_size | `Standard_D2ls_v6` | The size of the jumpbox and domain controller virtual machines: `jumpwin1`, `jumplinux1`, and `adds1`, as well as `jumpwin2` and `adds2` when the `vnet_onprem` module is enabled.
 vm_mssql_win_size | `Standard_D4ds_v6` | The size of the database server virtual machine `mssqlwin1`. Must be a Diskful Ddsv6 (general purpose) or Edsv6 (memory optimized) size with local NVMe temp disks and a minimum of 4 vCPUs.
