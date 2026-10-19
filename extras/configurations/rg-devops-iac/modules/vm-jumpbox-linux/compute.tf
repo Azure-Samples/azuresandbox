@@ -59,3 +59,26 @@ resource "azurerm_role_assignment" "this" {
   scope                = var.storage_account_id
 }
 #endregion
+
+#region entra-id-ssh
+# Enables Microsoft Entra ID sign-in over SSH using short-lived OpenSSH certificates, so operators sign in
+# as their own Entra identity through Azure Bastion instead of the local admin account. Installing the
+# extension uses apt, so it waits for cloud-init and the dpkg/apt locks to be released first.
+resource "azurerm_virtual_machine_extension" "aad_ssh_login" {
+  name                       = "${module.naming.virtual_machine_extension.name}-${var.vm_jumpbox_linux_name}-AADSSHLoginForLinux"
+  virtual_machine_id         = azurerm_linux_virtual_machine.this.id
+  publisher                  = "Microsoft.Azure.ActiveDirectory"
+  type                       = "AADSSHLoginForLinux"
+  type_handler_version       = "1.0"
+  auto_upgrade_minor_version = true
+
+  depends_on = [azurerm_virtual_machine_run_command.wait_for_cloud_init]
+}
+
+# Grants the operator (the identity applying this configuration) Entra ID SSH sign-in with passwordless sudo.
+resource "azurerm_role_assignment" "operator_vm_admin_login" {
+  principal_id         = data.azurerm_client_config.current.object_id
+  role_definition_name = "Virtual Machine Administrator Login"
+  scope                = azurerm_linux_virtual_machine.this.id
+}
+#endregion

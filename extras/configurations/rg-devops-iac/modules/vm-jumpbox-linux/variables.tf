@@ -21,12 +21,6 @@ variable "enable_github_runner" {
   default     = false
 }
 
-variable "enable_public_access" {
-  type        = bool
-  description = "Set to true to enable public access to the VM, false to disable it."
-  default     = false
-}
-
 variable "github_runner_enable_vwan_sudoers" {
   type        = bool
   description = "Set to true to grant the runner service account command-scoped NOPASSWD sudo for the binaries used by the vwan P2S VPN integration tests (openvpn, cat, tail, kill, pkill). Required for unattended vwan integration testing. Only used when var.enable_github_runner is true."

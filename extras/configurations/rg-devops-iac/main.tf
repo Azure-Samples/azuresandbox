@@ -127,7 +127,6 @@ module "vm_jumpbox_linux" {
   source = "./modules/vm-jumpbox-linux"
 
   enable_github_runner               = var.enable_github_runner
-  enable_public_access               = true
   github_runner_labels               = var.github_runner_labels
   github_runner_token                = var.github_runner_token
   github_runner_token_secret_version = var.github_runner_token_secret_version

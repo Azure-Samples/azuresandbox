@@ -1,6 +1,7 @@
 output "resource_ids" {
   value = merge(
     {
+      bastion_host    = azurerm_bastion_host.this.id
       key_vault       = azurerm_key_vault.this.id
       resource_group  = azurerm_resource_group.this.id
       storage_account = azurerm_storage_account.this.id
@@ -14,6 +15,7 @@ output "resource_ids" {
 output "resource_names" {
   value = merge(
     {
+      bastion_host    = azurerm_bastion_host.this.name
       key_vault       = azurerm_key_vault.this.name
       resource_group  = azurerm_resource_group.this.name
       storage_account = azurerm_storage_account.this.name

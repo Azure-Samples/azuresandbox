@@ -27,6 +27,57 @@ resource "azurerm_subnet" "privatelink" {
   default_outbound_access_enabled   = false
   private_endpoint_network_policies = "Disabled"
 }
+
+resource "azurerm_subnet" "bastion" {
+  name                 = "AzureBastionSubnet" # Name is fixed by Azure
+  resource_group_name  = azurerm_resource_group.this.name
+  virtual_network_name = azurerm_virtual_network.this.name
+  address_prefixes     = [var.subnet_bastion_address_prefix]
+}
+#endregion
+
+#region bastion
+resource "azurerm_bastion_host" "this" {
+  name                = module.naming.bastion_host.name
+  location            = var.location
+  resource_group_name = azurerm_resource_group.this.name
+  tags                = var.tags
+
+  # The Standard SKU is required for native client support (tunneling_enabled), which the
+  # 'az network bastion tunnel' / VS Code Remote-SSH workflow depends on, and to emit
+  # BastionAuditLogs via a diagnostic setting; the Basic SKU supports neither. Standard also
+  # requires an AzureBastionSubnet of /26 or larger (see subnet_bastion_address_prefix).
+  sku               = "Standard"
+  tunneling_enabled = true
+
+  ip_configuration {
+    name                 = "Primary"
+    subnet_id            = azurerm_subnet.bastion.id
+    public_ip_address_id = azurerm_public_ip.bastion.id
+  }
+
+  # Standard SKU Bastion provisioning routinely exceeds the azurerm provider's default 30m
+  # create timeout, which aborts the apply with "context deadline exceeded" even though Azure
+  # finishes creating the host. Extend the create/update/delete timeouts to accommodate it.
+  timeouts {
+    create = "60m"
+    update = "60m"
+    delete = "60m"
+  }
+}
+
+resource "azurerm_public_ip" "bastion" {
+  name                = "${module.naming.public_ip.name}-bastion"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.this.name
+  allocation_method   = "Static"
+  sku                 = "Standard"
+
+  lifecycle {
+    # Azure injects ip_tags such as 'FirstPartyUsage' after creation; ip_tags forces replacement.
+    ignore_changes = [ip_tags]
+  }
+}
 #endregion
 
 #region nsgs
@@ -43,7 +94,7 @@ resource "azurerm_network_security_group" "devops" {
     protocol                   = "Tcp"
     source_port_range          = "*"
     destination_port_ranges    = ["22"]
-    source_address_prefix      = "*"
+    source_address_prefix      = var.subnet_bastion_address_prefix
     destination_address_prefix = "*"
   }
 }

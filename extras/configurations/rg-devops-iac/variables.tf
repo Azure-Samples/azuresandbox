@@ -126,6 +126,17 @@ variable "subnet_address_prefix" {
   }
 }
 
+variable "subnet_bastion_address_prefix" {
+  type        = string
+  description = "The address prefix for the AzureBastionSubnet. The Standard SKU Bastion host requires a /26 or larger prefix."
+  default     = "10.0.2.0/26"
+
+  validation {
+    condition     = can(cidrhost(var.subnet_bastion_address_prefix, 0)) && try(tonumber(split("/", var.subnet_bastion_address_prefix)[1]) <= 26, false)
+    error_message = "Must be valid IPv4 CIDR with a prefix length of /26 or larger (e.g. /26, /25)."
+  }
+}
+
 variable "subnet_name" {
   type        = string
   description = "The name of the subnet to be created in the new virtual network."

@@ -16,9 +16,9 @@
 
 This module implements a stand-alone Linux virtual machine for use as a jumpbox or DevOps agent. The VM is configured using cloud-init and offers the following capabilities:
 
-* Secure SSH access using a private SSH key stored in Azure Key Vault.
+* No public IP address. Access is through Azure Bastion using Microsoft Entra ID sign-in with short-lived OpenSSH certificates (`AADSSHLoginForLinux` extension). A local admin SSH key is stored in Azure Key Vault for break-glass use only.
 * Automatic swapfile provisioning sized to the VM's memory (larger VMs get no swap).
-* Remote-ssh development capabilities using Visual Studio Code.
+* Remote-ssh development capabilities using Visual Studio Code through a Bastion tunnel.
 * Azure PowerShell is installed from the latest GitHub release offline bundle, with Microsoft Artifact Registry as a fallback. Installation metadata points to PSGallery for subsequent PowerShell 7 upgrades using `Update-PSResource -Name Az -Scope AllUsers`.
 * Pre-installed software packages, including:
   * azure-cli
@@ -130,127 +130,143 @@ When `github_runner_enable_vwan_sudoers` is true (the default), the configuratio
 
 ## Smoke Testing
 
-This section describes how to test the module after deployment.
+This section describes how to connect to *jumplinux2* and test the module after deployment.
 
-* [Download SSH private key from Azure Key Vault](#download-ssh-private-key-from-azure-key-vault)
-* [Determine public IP address of *jumplinux2*](#determine-public-ip-address-of-jumplinux2)
-* [Connect to *jumplinux2* using SSH](#connect-to-jumplinux2-using-ssh)
-* [Connect to *jumplinux2* using Visual Studio Code](#connect-to-jumplinux2-using-visual-studio-code)
+* [Connection paths](#connection-paths)
+  * [1. Azure Bastion with Microsoft Entra ID](#1-azure-bastion-with-microsoft-entra-id)
+  * [2. SSH and Visual Studio Code through a Bastion tunnel with Microsoft Entra ID](#2-ssh-and-visual-studio-code-through-a-bastion-tunnel-with-microsoft-entra-id)
+  * [3. Break-glass: Azure Bastion with the local admin account](#3-break-glass-azure-bastion-with-the-local-admin-account)
+* [Verify the cloud-init configuration](#verify-the-cloud-init-configuration)
 * [Verify the GitHub Actions self-hosted runner](#verify-the-github-actions-self-hosted-runner)
 
-### Download SSH private key from Azure Key Vault
+### Connection paths
 
-* Navigate to *portal.azure.com* > *Key Vaults* > *kv-devops-dev-xxxxxxxx*
-* Click on *Secrets*
-* Click on *jumplinux2-ssh-private-key*
-* Click on the most current version to view the secret details.
-* Click on *Show Secret Value* to view the private SSH key.
-* Copy the private SSH key value to the clipboard.
-* Paste the private SSH key value into a text editor and save it locally as:
+*jumplinux2* has no public IP address. All access goes through the Azure Bastion host (Standard SKU, native client support enabled) provisioned by the root module, and the network security group only allows SSH from the `AzureBastionSubnet`. Operators sign in as their own Microsoft Entra ID identity using short-lived OpenSSH certificates. The local admin account (`devopsbootstrapadmin`) and its SSH key in Key Vault are reserved for break-glass use.
 
-  ```plaintext
-  C:\Users\<user-name-here>\.ssh\devopsbootstrapadmin-ssh-key-private.txt
-  ```
+Use the connection paths in the following order of preference.
 
-### Determine public IP address of *jumplinux2*
+Prerequisites on the client:
 
-* Navigate to *portal.azure.com* > *Virtual machines* > *jumplinux2*
-* Make a note of the *Public IP address* in the *Essentials* section
-
-### Connect to *jumplinux2* using SSH
-
-* Open a PowerShell terminal.
-* Execute the following command to connect to *jumplinux1*:
-
-  ```powershell
-  ssh -i .\.ssh\devopsbootstrapadmin-ssh-key-private.txt devopsbootstrapadmin@PUBLIC-IP-ADDRESS-HERE
-  ```
-
-* Verify *jumplinux2* cloud-init configuration is complete using the following commands:
+* Azure CLI signed in with `az login`, with the `bastion` and `ssh` extensions installed:
 
   ```bash
-  # Check software versions
-  lsb_release -a
-  az --version
-  terraform --version
-  pwsh --version
-  pwsh -c "Get-InstalledModule Az"
-
-  # Check Terraform environment variables
-  echo $ARM_USE_MSI
-  echo $ARM_TENANT_ID
+  az extension add --name bastion
+  az extension add --name ssh
   ```
 
-### Connect to *jumplinux2* using Visual Studio Code
+* The *Virtual Machine Administrator Login* role on *jumplinux2*, which this module assigns to the operator that applies the configuration, and at least *Reader* on the VM, its network interface and the Bastion host. Users with *Virtual Machine Administrator Login* can run `sudo` without a password. Microsoft Entra ID authentication happens at `az login`, including multifactor authentication and Conditional Access, before the SSH certificate is issued.
+* The resource names used below are available from the root module outputs, for example `terraform output -json resource_names` and `terraform output -json resource_ids`.
 
-* Navigate to *Start* > *Visual Studio Code* > *Visual Studio Code*.
-* Click on the blue *Open a Remote Window* icon in the lower left corner
-* If you see *Select an option to open a Remote Window*, choose *SSH*
-* Click on the blue *Open a Remote Window* icon in the lower left corner
-* For *Select an option to open a Remote Window* choose *Connect to Host...*
-* For *Select configured SSH host or enter user@host* choose *+ Add New SSH Host...*
-* For *Enter SSH Connection Command* enter the following:
+Operators sign in with their Microsoft Entra user principal name, and a home directory is created on first sign-in. Use `sudo` for root access.
 
-  ```plaintext  
-  ssh devopsbootstrapadmin@PUBLIC-IP-ADDRESS-HERE
-  ```
+#### 1. Azure Bastion with Microsoft Entra ID
 
-* Configure private SSH key for *jumplinux2*
-  * Click on the blue *Open a Remote Window* icon in the lower left corner
-  * Click *Connect to Host...*
-  * Click *Configure SSH Hosts...*
-  * Select `C:\users\YOUR-USER-NAME-HERE\.ssh\config
-  * The config file will open in Visual Studio Code:
+Opens an interactive terminal session directly, with no tunnel or `~/.ssh/config` to manage:
 
-  ```yaml
-  Host PUBLIC-IP-ADDRESS-HERE
-    HostName PUBLIC-IP-ADDRESS-HERE
-    User devopsbootstrapadmin
-  ```
+```bash
+az network bastion ssh \
+  --name BASTION-NAME-HERE \
+  --resource-group RESOURCE-GROUP-NAME-HERE \
+  --target-resource-id VM-RESOURCE-ID-HERE \
+  --auth-type AAD
+```
 
-  * Update the config file as follows:
+Microsoft Entra ID authentication requires targeting the VM resource ID; IP-based Bastion connections are not supported.
 
-  ```yaml
-  Host jumplinux2
-    HostName PUBLIC-IP-ADDRESS-HERE
-    User devopsbootstrapadmin
-    IdentityFile C:\\Users\\YOUR-USER-NAME-HERE\\.ssh\\devopsbootstrapadmin-ssh-key-private.txt
-  ```
+#### 2. SSH and Visual Studio Code through a Bastion tunnel with Microsoft Entra ID
 
-* Save the file and close it.
+This is the path for Visual Studio Code Remote-SSH and any other OpenSSH client. Run the helper script from the root module directory: [connect-jumplinux2.sh](../../scripts/connect-jumplinux2.sh) on Linux, macOS or WSL, or [Connect-Jumplinux2.ps1](../../scripts/Connect-Jumplinux2.ps1) on Windows:
 
-* Connect to *jumplinux2*
-  * Click on the blue *Open a Remote Window* icon in the lower left corner
-  * For *Select an option to open a Remote Window* choose *Connect to Host...*
-  * For *Select configured SSH host or enter user@host* choose *jumplinux2*
-  * A new Visual Studio Code window will open.
-  * For *Select the platform of the remote host "jumplinux2"* choose *Linux*
-  * For *"jumplinux2" has fingerprint...* choose *Continue*
-  * Verify that *SSH:jumplinux2* is displayed in the blue status section in the lower left corner.
-  * Navigate to *View* > *Explorer*
-  * Click *Open Folder*
-  * For *Open Folder* select the default folder (home directory) and click *OK*.
-  * Navigate to *View* > *Terminal*.
-  * Inspect the configuration of *jumplinux2* by executing the following Bash commands:
+```bash
+./scripts/connect-jumplinux2.sh
+```
 
-    ```bash
-    # Check software versions
-    lsb_release -a
-    az --version
-    terraform --version
-    pwsh --version
-    pwsh -c "Get-InstalledModule Az"
+```powershell
+./scripts/Connect-Jumplinux2.ps1
+```
 
-    # Check Terraform environment variables
-    echo $ARM_USE_MSI
-    echo $ARM_TENANT_ID
-    ```
+The script:
+
+* Reads the Bastion host, resource group and VM resource ID from the Terraform outputs. Override them with `--bastion-name`, `--resource-group` and `--vm-id` (`-BastionName`, `-ResourceGroupName` and `-VmId` in PowerShell) when the state isn't available locally.
+* Requests a Microsoft Entra ID OpenSSH certificate with `az ssh cert`, using a dedicated RSA key pair in `~/.ssh/az_ssh_config/jumplinux2/`.
+* Writes a managed `Host jumplinux2` block to `~/.ssh/config` pointing at `127.0.0.1` on the local tunnel port (default `2222`). Re-running the script replaces the block rather than duplicating it.
+* Opens `az network bastion tunnel` to the VM in the foreground.
+
+**Keep the script's terminal open while connected, because it hosts the Bastion tunnel.** Press *Ctrl+C* to close the tunnel. Certificates are valid for about an hour, so the script renews the certificate about every 50 minutes while the tunnel is up. Sessions that are already connected keep working when a certificate expires. If renewal fails, for example because the `az login` session expired, run `az login` and restart the script.
+
+Then connect from another terminal or from Visual Studio Code:
+
+* Terminal: `ssh jumplinux2`
+* Visual Studio Code:
+  * Click on the blue *Open a Remote Window* icon in the lower left corner.
+  * Choose *Connect to Host...* and select *jumplinux2*.
+  * For *Select the platform of the remote host "jumplinux2"* choose *Linux*.
+  * For *"jumplinux2" has fingerprint...* choose *Continue*.
+  * Verify that *SSH: jumplinux2* is displayed in the status bar, then use *View* > *Explorer* > *Open Folder* to open your home directory.
+
+The host key is stored in `known_hosts` under the alias `jumplinux2`. If the VM is redeployed, remove the stale entry with `ssh-keygen -R jumplinux2` before reconnecting.
+
+To set up the tunnel manually instead of using the script, run `az network bastion tunnel --name BASTION-NAME-HERE --resource-group RESOURCE-GROUP-NAME-HERE --target-resource-id VM-RESOURCE-ID-HERE --resource-port 22 --port 2222`, then in another terminal run `az ssh cert --file ~/.ssh/jumplinux2/id_rsa-cert.pub`, which generates a key pair in the same directory, and connect with `ssh -p 2222 -i ~/.ssh/jumplinux2/id_rsa -o CertificateFile=~/.ssh/jumplinux2/id_rsa-cert.pub YOUR-UPN-HERE@127.0.0.1`.
+
+##### Integration tests that need `sudo`
+
+The `vwan` point-to-site VPN integration tests run privileged commands (`openvpn`, `cat`, `tail`, `kill`, `pkill`) and probe for passwordless `sudo` with `sudo -n cat /dev/null`. An operator signed in through Microsoft Entra ID with *Virtual Machine Administrator Login* already has passwordless `sudo`, so interactive `Invoke-UnitTests.ps1` runs with `vwan` enabled work without the hand-made `/etc/sudoers.d/azuresandbox-vwan` drop-in, which was only needed for the local admin account. The runner service account's drop-in, installed by cloud-init when `github_runner_enable_vwan_sudoers` is true, is unchanged. See [Elevated Permissions for Integration Tests](#elevated-permissions-for-integration-tests).
+
+#### 3. Break-glass: Azure Bastion with the local admin account
+
+Use this path only when Microsoft Entra ID sign-in fails, for example if the `AADSSHLoginForLinux` extension is broken or Microsoft Entra ID is unavailable. The username and SSH private key for the local admin account are stored in Key Vault as the `adminuser` and `jumplinux2-ssh-private-key` secrets.
+
+Key Vault public network access is disabled by the root module after each apply, so retrieving the secrets requires reopening it, which needs an elevated (for example PIM-activated) role:
+
+1. From the root module directory, run `./scripts/enable-public-access.sh`.
+1. Retrieve the secrets:
+
+   ```bash
+   KV_NAME=KEY-VAULT-NAME-HERE
+   ADMIN_USER=$(az keyvault secret show --vault-name "$KV_NAME" --name adminuser --query value -o tsv)
+   (umask 077 && az keyvault secret show --vault-name "$KV_NAME" --name jumplinux2-ssh-private-key --query value -o tsv > ~/.ssh/jumplinux2-break-glass.pem)
+   ```
+
+1. Connect through Bastion:
+
+   ```bash
+   az network bastion ssh \
+     --name BASTION-NAME-HERE \
+     --resource-group RESOURCE-GROUP-NAME-HERE \
+     --target-resource-id VM-RESOURCE-ID-HERE \
+     --auth-type ssh-key \
+     --username "$ADMIN_USER" \
+     --ssh-key ~/.ssh/jumplinux2-break-glass.pem
+   ```
+
+1. When finished, delete the local key file (`rm ~/.ssh/jumplinux2-break-glass.pem`) and run `terraform apply` from the root module to disable Key Vault public network access again.
+
+The key vault secrets expire one year after creation. The key is not rotated automatically; `admin_ssh_key` is set when the VM is created, so generating a new key (`terraform apply -replace=module.vm_jumpbox_linux.tls_private_key.ssh_key` with an incremented `ssh_private_key_version`) also replaces the VM. Audit logging and alerting for break-glass key retrieval are tracked in [#896](https://github.com/Azure-Samples/azuresandbox/issues/896).
+
+If Bastion itself is unavailable, use the Azure-native recovery options instead: reset access with `az vm user update` (VMAccess extension), run commands with `az vm run-command invoke`, or use the Serial Console.
+
+### Verify the cloud-init configuration
+
+After connecting, verify the *jumplinux2* cloud-init configuration is complete using the following commands:
+
+```bash
+# Check software versions
+lsb_release -a
+az --version
+terraform --version
+pwsh --version
+pwsh -c "Get-InstalledModule Az"
+
+# Check Terraform environment variables
+echo $ARM_USE_MSI
+echo $ARM_TENANT_ID
+```
 
 ### Verify the GitHub Actions self-hosted runner
 
 Only applicable when `enable_github_runner` is set to `true`.
 
-* Connect to *jumplinux2* using SSH or Visual Studio Code as described above.
+* Connect to *jumplinux2* using one of the [connection paths](#connection-paths) described above.
 * Verify the runner agent was installed and registered:
 
   ```bash
@@ -313,9 +329,8 @@ This section lists the default values for the input variables used in this modul
 Variable | Default | Description
 --- | --- | ---
 admin_username | `devopsbootstrapadmin` | The user name for the admin account on the VM.
-admin_username_secret | adminuser | The name of the key vault secret that contains the user name for the admin account. Defined in the vnet-shared module.
+admin_username_secret | adminuser | The name of the key vault secret that contains the user name for the break-glass admin account.
 enable_github_runner | false | When enabled the GitHub Actions self-hosted runner agent is installed on the VM and registered with the repository or organization specified in `github_runner_url`. When disabled nothing is installed.
-enable_public_access | false | When enabled a public IP address is created for the VM. When disabled, the VM is only accessible via a private IP address.
 github_runner_enable_vwan_sudoers | `true` | Set to true to grant the runner service account command scoped passwordless sudo for the binaries used by the `vwan` point-to-site VPN integration tests. Only used when `enable_github_runner` is true.
 github_runner_group | `Default` | The name of the GitHub Actions runner group to register the runner with. Ignored for repository level runners, which do not support runner groups. Only used when `enable_github_runner` is true.
 github_runner_labels | `["azuresandbox"]` | Additional labels to apply to the self-hosted runner. Only used when `enable_github_runner` is true.
@@ -331,7 +346,7 @@ key_vault_id | | The ID of the key vault defined in the root module.
 key_vault_name | | The name of the key vault defined in the root module. Used by cloud-init to read secrets from the VM using the managed identity.
 location | | The Azure region where the resources will be created. Defined in the root module.
 resource_group_name | | The name of the resource group defined in the root module.
-ssh_private_key_version | 1 | Increment to create new ssh_private_key.
+ssh_private_key_version | 1 | Increment to rewrite the break-glass `ssh_private_key` key vault secret, for example after replacing `tls_private_key.ssh_key`.
 storage_account_id | | The resource ID of of the storage account defined in the root module.
 subnet_id | | The resource ID of the subnet where the VM will be deployed. Defined in the vnet-shared module.
 tags | | The tags from the root module.
@@ -350,16 +365,17 @@ This section lists the resources included in this configuration.
 
 Address | Name | Notes
 --- | --- | ---
-module.vm_jumpbox_linux.azurerm_key_vault_secret.adminuser | adminuser | The Key Vault secret containing the admin username for the Linux virtual machine.
+module.vm_jumpbox_linux.azurerm_key_vault_secret.adminuser | adminuser | The Key Vault secret containing the break-glass admin username for the Linux virtual machine.
 module.vm_jumpbox_linux.azurerm_key_vault_secret.github_runner_token[0] | github&#8209;runner&#8209;token | The write-only Key Vault secret containing the GitHub registration token, created only when `var.enable_github_runner` is enabled. The value is never stored in Terraform state.
-module.vm_jumpbox_linux[0].azurerm_key_vault_secret.ssh_private_key | jumplinux1&#8209;ssh&#8209;private&#8209;key | The private SSH key stored in Azure Key Vault.
+module.vm_jumpbox_linux.azurerm_key_vault_secret.ssh_private_key | jumplinux2&#8209;ssh&#8209;private&#8209;key | The break-glass private SSH key for the admin account, stored in Azure Key Vault.
 module.vm_jumpbox_linux[0].azurerm_linux_virtual_machine.this | jumplinux2 | The Linux virtual machine resource.
 module.vm_jumpbox_linux[0].azurerm_network_interface.this | nic&#8209;devops&#8209;dev&#8209;jumplinux2 | The network interface associated with the Linux virtual machine.
-module.vm_jumpbox_linux.azurerm_public_ip.this[0] | pip&#8209;devops&#8209;dev&#8209;jumplinux2 | The public IP address associated with the Linux virtual machine, if `var.enable_public_access` is enabled.
+module.vm_jumpbox_linux.azurerm_role_assignment.operator_vm_admin_login | | Grants `Virtual Machine Administrator Login` role on jumplinux2 to the operator applying the configuration, enabling Microsoft Entra ID SSH sign-in with passwordless `sudo`.
 module.vm_jumpbox_linux.azurerm_role_assignment.github_runner_key_vault[0] | | Grants `Key Vault Secrets User` role to the managed identity of jumplinux2 so cloud-init can read the GitHub registration token. Created only when `var.enable_github_runner` is enabled.
 module.vm_jumpbox_linux.azurerm_role_assignment.this | | Grants `Storage Blob Data Contributor` role to the managed identity of jumplinux2. This is intended to be used for accessing a Terraform state backend hosted in Azure Blob Storage.
+module.vm_jumpbox_linux.azurerm_virtual_machine_extension.aad_ssh_login | | The `AADSSHLoginForLinux` extension that enables Microsoft Entra ID SSH sign-in. Installed after `wait_for_cloud_init` to avoid apt lock contention.
 module.vm_jumpbox_linux.azurerm_virtual_machine_run_command.wait_for_cloud_init | | Waits for cloud-init termination and dpkg/apt idle checks, with or without the optional runner.
-module.vm_jumpbox_linux[0].tls_private_key.ssh_key | | The TLS private key used for SSH authentication.
+module.vm_jumpbox_linux.tls_private_key.ssh_key | | The break-glass SSH key pair for the admin account.
 
 ### Output Variables
 
