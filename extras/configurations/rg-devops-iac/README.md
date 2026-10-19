@@ -25,17 +25,18 @@ This section provides a brief overview of the features included in this configur
 * A pre-configured virtual network, including:
   * A subnet for use by the Linux virtual machine
   * A NAT gateway for outbound internet connectivity
+  * An Azure Bastion host (Standard SKU with native client support) in its own `AzureBastionSubnet`, which is the only inbound path to the Linux virtual machine
 * A pre-configured storage account, including:
   * A container for storing Terraform state files
   * Public access is enabled by design since there may be the first environment provisioned in Azure. This can be disabled once a platform landing zone is in place.
   * Shared access keys are disabled by default and Azure RBAC is used for authorization.
 * A pre-configured key vault for managing secrets
 * A pre-configured Linux virtual machine for use as a Terraform execution environment implemented as a module for inclusion in other configurations, including:
-  * Key vault secrets for secure SSH access to the Linux virtual machine
+  * No public IP address. Operators connect through Azure Bastion and sign in with Microsoft Entra ID using short-lived OpenSSH certificates, including Visual Studio Code Remote-SSH through a Bastion tunnel
+  * Key vault secrets for a break-glass local admin account, used only when Microsoft Entra ID sign-in fails
   * Managed identity role assignments for Azure Blob Storage for use as a Terraform state backend
   * Pre-configured environment variables for Terraform azurerm provider to use managed identities
   * Pre-installed software for IaC / DevOps projects
-  * Optional public access for connectivity from the internet
   * Optional registration as a GitHub Actions self-hosted runner for CI/CD workflows (disabled by default)
   * Optional deployment identity: a user-assigned managed identity with subscription `Contributor` and conditioned `Role Based Access Control Administrator` for sandbox applies with `auth_mode = "managed_identity"` (disabled by default)
 
@@ -69,6 +70,8 @@ These prerequisites apply only if you plan to use this configuration as a self-h
 * Some Azure subscriptions may have low quota limits for specific Azure resources which may cause failures. See [Resolve errors for resource quotas](https://learn.microsoft.com/azure/azure-resource-manager/templates/error-resource-quota) for more information.
 * Some Azure subscriptions may not have the required resource providers registered. Terraform is configured to automatically register the required resource providers, but this may take some time on first use.
 * Some Azure subscriptions may not have the required features enabled which may cause failures. Monitor your plan application for errors related to specific subscription features and enable them as needed.
+* Connecting to the Linux virtual machine requires the Azure CLI `bastion` and `ssh` extensions on the client (`az extension add --name bastion` and `az extension add --name ssh`). See [Connection paths](./modules/vm-jumpbox-linux/README.md#connection-paths).
+* Azure Bastion Standard is billed hourly while deployed, plus outbound data transfer beyond the included amount. See [Azure Bastion pricing](https://azure.microsoft.com/pricing/details/azure-bastion/). Bastion is the only inbound path to the Linux virtual machine, so it's always deployed.
 * Some organizations may institute [Azure policy](https://learn.microsoft.com/azure/governance/policy/overview) which may cause failures. This can be addressed by using custom settings which pass the policy checks, or by disabling the policies on the Azure subscription being used for the configurations.
 
 ### Terraform Execution Environment
@@ -350,13 +353,12 @@ The variable defaults set in this configuration can be overridden by customizing
 module "vm_jumpbox_linux" {
   source = "./modules/vm-jumpbox-linux"
 
-  enable_public_access = true
-  key_vault_id         = azurerm_key_vault.this.id
-  location             = azurerm_resource_group.this.location
-  resource_group_name  = azurerm_resource_group.this.name
-  storage_account_id   = azurerm_storage_account.this.id
-  subnet_id            = azurerm_subnet.this.id
-  tags                 = var.tags
+  key_vault_id        = azurerm_key_vault.this.id
+  location            = azurerm_resource_group.this.location
+  resource_group_name = azurerm_resource_group.this.name
+  storage_account_id  = azurerm_storage_account.this.id
+  subnet_id           = azurerm_subnet.this.id
+  tags                = var.tags
 
   depends_on = [time_sleep.wait_for_roles]
 
@@ -472,7 +474,7 @@ After the configuration has been provisioned, complete the smoke testing procedu
 
 ### Step 6: Use The Virtual Machine
 
-You now have a fully provisioned DevOps IaC environment! You can use it as a Terraform execution environment interactively or via DevOps pipelines.
+You now have a fully provisioned DevOps IaC environment! You can use it as a Terraform execution environment interactively or via DevOps pipelines. For interactive use, connect with Visual Studio Code Remote-SSH through a Bastion tunnel using `./scripts/connect-jumplinux2.sh` or `./scripts/Connect-Jumplinux2.ps1`. See [Connection paths](./modules/vm-jumpbox-linux/README.md#connection-paths).
 
 ### Step 7: Clean Up
 
@@ -545,8 +547,48 @@ For `client_secret` mode, see [Service Principal](../../../README.md#service-pri
 
 The operator is the signed-in user who provisions a configuration. It is separate from the deployment identity.
 
-* **This configuration:** Terraform authenticates as the operator signed in to Azure CLI (`use_cli = true` in [`providers.tf`](./providers.tf)), so the operator needs `Owner` on the subscription, or `Contributor` plus an unconditioned role-assignment role such as `User Access Administrator`, for the duration of the apply. The operator's identity is read from the Azure CLI sign-in and granted `Key Vault Secrets Officer` and `Storage Blob Data Contributor` on the resources this configuration creates.
+* **This configuration:** Terraform authenticates as the operator signed in to Azure CLI (`use_cli = true` in [`providers.tf`](./providers.tf)), so the operator needs `Owner` on the subscription, or `Contributor` plus an unconditioned role-assignment role such as `User Access Administrator`, for the duration of the apply. The operator's identity is read from the Azure CLI sign-in and granted `Key Vault Secrets Officer` and `Storage Blob Data Contributor` on the resources this configuration creates, and `Virtual Machine Administrator Login` on `jumplinux2` for Microsoft Entra ID SSH sign-in.
 * **Root sandbox:** `operator_object_id` is the Microsoft Entra object id of the operator. The operator is granted data-plane role assignments, such as Key Vault and Storage roles, on the sandbox resources. The root bootstrap scripts default it to the signed-in Azure CLI or Azure PowerShell user.
+
+#### Least-Privilege Operator Access with Privileged Identity Management
+
+Day-to-day use of `jumplinux2` doesn't need `Owner`. Connecting through Bastion needs only `Reader` on the virtual machine, its network interface and the Bastion host, plus the `Virtual Machine Administrator Login` role this configuration assigns. Use [Microsoft Entra Privileged Identity Management](https://learn.microsoft.com/entra/id-governance/privileged-identity-management/pim-configure) (PIM) so the operator holds `Owner` only while running `terraform plan` or `terraform apply`. The recommended end state is:
+
+Access | How it's granted
+--- | ---
+Azure RBAC `Reader` on the subscription | Standing (active, permanent)
+Azure RBAC `Owner` on the subscription | PIM eligible, activated just in time for `terraform plan` and `terraform apply`
+Microsoft Entra directory roles, such as Global Administrator | PIM eligible
+`User Access Administrator` at root scope (`/`) | Removed
+
+Apply it in the Azure portal in this order, so you don't lock yourself out:
+
+1. Confirm the prerequisites: Microsoft Entra ID P2, at least two multifactor authentication methods registered, and an [emergency access account](https://learn.microsoft.com/entra/identity/role-based-access-control/security-emergency-access) with permanent Global Administrator.
+1. Go to *PIM* > *Azure resources* > your subscription > *Settings* > *Owner*. Set the activation duration to 4-8 hours, require multifactor authentication and a justification, don't require approval, and allow permanent eligible assignments.
+1. Add an **eligible** `Owner` assignment for the operator on the subscription, and a standing `Reader` assignment.
+1. Test activation and deactivation **before** removing any standing access.
+1. Remove the operator's standing `Owner` assignment. Check inherited scopes too; it may be assigned on a management group such as the Tenant Root Group rather than on the subscription.
+1. Remove the standing root-scope `User Access Administrator`: activate Global Administrator, then go to *Microsoft Entra ID* > *Properties* > *Access management for Azure resources* and select *No*. This grant persists after Global Administrator is deactivated, so it's easy to leave in place by accident.
+1. Verify with read-only checks:
+
+   ```bash
+   OID=$(az ad signed-in-user show --query id -o tsv)
+   SUB=$(az account show --query id -o tsv)
+   az role assignment list --assignee "$OID" --scope "/subscriptions/$SUB" --include-inherited -o table
+   az rest --method get --url "https://management.azure.com/subscriptions/$SUB/providers/Microsoft.Authorization/permissions?api-version=2022-04-01"
+   ```
+
+   With `Owner` active, the permissions output includes an `"actions": ["*"]` entry. With only standing access, the only entry is `*/read`.
+
+Things to know:
+
+* Activate Azure resource roles, such as subscription `Owner`, in the Azure portal under *PIM* > *My roles* > *Azure resources*. The Microsoft Entra admin center's PIM pages show only Microsoft Entra roles and groups.
+* You don't need a new `az login` after activating an Azure RBAC role. Azure Resource Manager evaluates role assignments on each request, so allow about a minute for propagation. Microsoft Entra directory roles and PIM for Groups do need a new token.
+* PIM may not prompt for multifactor authentication on activation if the portal session already has a multifactor authentication claim. Use a Conditional Access authentication context to require it on every activation.
+* The *Check access* current view hides eligible assignments. Check the *Eligible assignments* tab.
+* Recovery path: activate Global Administrator, turn on *Access management for Azure resources*, grant `Owner`, then turn it back off. The emergency access account is the last resort.
+* Removing the operator's `Owner` assignment doesn't affect sandbox applies by the deployment identity, which keeps `Contributor` plus the conditioned `Role Based Access Control Administrator` role.
+* In managed tenants, provider automation may re-add standing assignments, so check again after a day.
 
 ### State Backend Authentication
 
@@ -576,6 +618,8 @@ This configuration is organized into the following structure:
 │   ├── bootstrap.sh                      # Bash helper script for generating terraform.tfvars
 │   ├── bootstrap.ps1                     # PowerShell helper script for generating terraform.tfvars
 │   ├── cleanterraformtemp.sh             # Bash helper script for removing Terraform temp/local files
+│   ├── connect-jumplinux2.sh             # Bash helper script for connecting to jumplinux2 through a Bastion tunnel with Entra ID
+│   ├── Connect-Jumplinux2.ps1            # PowerShell helper script for connecting to jumplinux2 through a Bastion tunnel with Entra ID
 │   ├── enable-public-access.sh           # Bash helper script for re-enabling public access on key vault/storage account
 │   ├── grant-graph-permissions.sh        # Bash helper script for granting Microsoft Graph permissions to a deployment identity
 │   └── delete-tfstate.sh                 # Bash helper script for deleting Terraform state blob(s) from the storage backend
@@ -606,6 +650,7 @@ github_runner_url | | The GitHub repository or organization URL to register the 
 location | | The name of the Azure Region where resources will be provisioned.
 storage_access_tier | Hot | The access tier for the new storage account.
 storage_replication_type | LRS | The type of replication for the new storage account.
+subnet_bastion_address_prefix | 10.0.2.0/26 | The address prefix for the `AzureBastionSubnet`. Must be /26 or larger.
 subnet_address_prefix | 10.0.0.0/24 | The address prefix for the miscellaneous subnet. The minimum size is /29.
 subnet_name | snet-devops-01 | The name of the subnet to be created in the new virtual network.
 subnet_privatelink_address_prefix | 10.0.1.0/24 | The address prefix for the PrivateLink subnet
@@ -623,16 +668,18 @@ The root module includes a resource group, key vault and storage account used by
 
 Address | Name | Notes
 --- | --- | ---
+azurerm_bastion_host.this | snap-devops-dev | Azure Bastion host (Standard SKU, native client support enabled). The only inbound path to the Linux virtual machine.
 azurerm_key_vault.this | kv-devops-dev-xxx | Used to store secrets for the Linux virtual machine.
 azurerm_nat_gateway.this | ng-devops-dev | NAT gateway for outbound internet connectivity.
 azurerm_nat_gateway_public_ip_association.this | | Associates the NAT gateway with the public IP address.
-azurerm_network_security_group.devops | nsg-devops-dev-snet-devops-01 | NSG used to open inbound connectivity for port 22 (SSH) to the Linux virtual machine.
+azurerm_network_security_group.devops | nsg-devops-dev-snet-devops-01 | NSG that allows inbound SSH (port 22) to the Linux virtual machine only from the `AzureBastionSubnet`.
 azurerm_private_dns_zone.key_vault | privatelink.vaultcore.azure.net | Private DNS zone for Azure Key Vault
 azurerm_private_dns_zone.storage_blob | privatelink.blob.core.windows.net | Private DNS zone for Azure blob storage
 azurerm_private_dns_zone_virtual_network_link.key_vault | | Links private dns zone to azurerm_virtual_network.this
 azurerm_private_dns_zone_virtual_network_link.storage_blob | | Links private dns zone to azurerm_virtual_network.this
 azurerm_private_endpoint.key_vault | pe-devops-dev-key-vault | Private endpoint for Azure key vault
 azurerm_private_endpoint.storage_blob | pe-devops-dev-storage-blob | Private endpoint for Azure blob storage
+azurerm_public_ip.bastion | pip-devops-dev-bastion | Public IP address for the Bastion host.
 azurerm_public_ip.this | pip-devops-dev-nat | Public IP address for the NAT gateway.
 azurerm_resource_group.this | rg-devops-dev-xxx | Resource group for all resources in this configuration.
 azurerm_role_assignment.key_vault_secrets_officer | | Assigns `Key Vault Secrets Officer` on the key vault to the operator signed in to Azure CLI.
@@ -641,6 +688,7 @@ azurerm_role_assignment.deployment_identity_contributor[0] | | Assigns `Contribu
 azurerm_role_assignment.deployment_identity_rbac_admin[0] | | Assigns `Role Based Access Control Administrator` at the subscription scope to the deployment identity, with a condition that allows only the roles in `local.deployment_identity_assignable_roles`. Created only when `deployment_identity` is `managed_identity`.
 azurerm_storage_account.this | stdevopsdevxxx | Storage account for storing Terraform state files.
 azurerm_storage_container.this | tfstate | Storage container for storing Terraform state files.
+azurerm_subnet.bastion | AzureBastionSubnet | Subnet for the Bastion host. The name is required by Azure.
 azurerm_subnet.devops | snet-devops-01 | Subnet for jumplinux2 VM
 azurerm_subnet.privatelink | snet-privatelink-03 | Subnet for PrivateLink endpoints
 azurerm_subnet_nat_gateway_association.devops | vnet-devops-dev-devops| Associates the NAT gateway with the subnet.
@@ -670,10 +718,11 @@ Name | Required | Depends On | Description
 
 ### Virtual Network Design
 
-This configuration implements a virtual network. Default address ranges are set artificially high for demos and readability and can be overridden with smaller ranges to meet specific requirements. An firewall is not included in this configuration by design as it may be used as an startup environment to provision a platform landing zone or sandbox that does include a firewall. The virtual network includes two subnets:
+This configuration implements a virtual network. Default address ranges are set artificially high for demos and readability and can be overridden with smaller ranges to meet specific requirements. An firewall is not included in this configuration by design as it may be used as an startup environment to provision a platform landing zone or sandbox that does include a firewall. The virtual network includes three subnets:
 
-* A subnet for the Linux virtual machine. The subnet is configured with a NAT gateway for outbound internet connectivity and an NSG to control inbound traffic.
+* A subnet for the Linux virtual machine. The subnet is configured with a NAT gateway for outbound internet connectivity and an NSG that allows inbound SSH only from the `AzureBastionSubnet`.
 * A subnet for PrivateLink endpoints for Azure Key Vault and Azure Blob Storage
+* The `AzureBastionSubnet` for the Azure Bastion host, which is the only inbound path to the Linux virtual machine. The Linux virtual machine has no public IP address.
 
 ### Dependencies
 
@@ -699,7 +748,7 @@ This project is built built using Terraform, a cross platform, open-source Infra
   * **cloudinit**: Used to configure Linux virtual machines.
   * **random**: Used to generate random values for resource attributes.
   * **time**: Used to implement wait cycles and other time based operations.
-  * **tls**: Used to generate the SSH public and private key pairs for the Linux virtual machine.
+  * **tls**: Used to generate the break-glass SSH key pair for the Linux virtual machine's local admin account.
 * **Modules**: The following Terraform modules are used in this project:
   * **Azure/naming**: A module for generating consistent and compliant Azure resource names.
 
