@@ -107,24 +107,12 @@ A variety of Terraform execution environments can be used to provision this conf
 
 This section covers the steps to get started with this configuration using an interactive Terraform execution environment. The steps include logging into Azure, cloning the repository, initializing Terraform, configuring variables, validating and applying the configuration, and smoke testing.
 
-For an attended Bash walkthrough focused on using the VM as a GitHub Actions
-self-hosted runner for Azure Sandbox deployments, see the
-[GitHub self-hosted runner setup guide](./github-selfhosted-runner-setup.md). It covers preparation,
-runner settings, initialization, validation, planning and applying a fresh
-bootstrap, runner-readiness checks, the optional Microsoft Graph permission
-grant, and cleanup. Configuring and dispatching a Sandbox deployment workflow
-is a separate concern.
-
-Continue with the [GitHub Sandbox workflow setup guide](./github-sandbox-workflow-setup.md)
-to configure a manually triggered deployment with all base modules enabled
-and post-deployment unit/integration testing. That walkthrough currently
-covers scope, prerequisites, GitHub discovery, publication and approval
-choices, deployment environment protection setup, and smoke-only workflow
-creation, validation, publication to `vnext` and `main`, approval, and verified
-self-hosted execution. The three-stage `preflight`, `apply`, and `unit-test`
-workflow update is published to `vnext` and registered on `main`, with its first
-full deployment and test run verified successful. The guide includes sanitized HCL examples for the two protected
-configuration files, deployment-specific state keys, and private runner logs.
+The VM can serve as a GitHub Actions self-hosted runner for the
+[Sandbox deployment workflow](../../../.github/workflows/sandbox-deployment.yml),
+a manually triggered deployment with all base modules enabled and
+post-deployment unit/integration testing in three stages: `preflight`,
+`apply`, and `unit-test`. Each deployment uses its own state key, and runner
+logs stay private.
 The unit-test stage publishes default-sanitized JSON evidence as
 workflow artifacts on both test success and failure; raw logs and plans stay
 on the runner.
@@ -141,8 +129,7 @@ The updated workflow restricts automation to **new Sandboxes only**:
 each workflow run derives a new ID/key, and every preflight attempt rejects an
 existing state blob. Automated updates and recovery of existing Sandboxes are
 not supported. Unit-test also finalizes evidence itself, leaving only Publish
-and Report afterward. See the guide's steps 43 and 44 for behavior and step 45
-for coordinated publication before another deployment.
+and Report afterward.
 
 The workflow also supports a release-PR entry path through
 `pull_request_target` for same-repository `vnext` PRs targeting `main`.
@@ -244,8 +231,7 @@ The deployment/monitor helpers replace the Python implementation
 with Bash entrypoints and PowerShell 7.3+ stage logic. The helper test sources
 and their `scripts/tests` directory are removed at the operator's request;
 existing Sandbox unit/integration tests remain unchanged. Validation uses
-existing CI gates and real executions. See the guide's steps 51 and 52 for the
-port, coordinated publication, and a fresh full acceptance run.
+existing CI gates and real executions.
 
 * [Step 0: Login](#step-0-login)
 * [Step 1: Clone the Repository](#step-1-clone-the-repository)
