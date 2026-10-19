@@ -30,18 +30,15 @@ resource "azurerm_key_vault" "this" {
   }
 }
 
-resource "azurerm_role_assignment" "keyvault_roles" {
-  for_each = local.key_vault_roles
-
-  principal_id         = each.value.principal_id
-  principal_type       = each.value.principal_type
-  role_definition_name = each.value.role_definition_name
+resource "azurerm_role_assignment" "key_vault_secrets_officer" {
+  principal_id         = data.azurerm_client_config.current.object_id
+  role_definition_name = "Key Vault Secrets Officer"
   scope                = azurerm_key_vault.this.id
 }
 
 resource "time_sleep" "wait_for_roles" {
   create_duration = "2m"
-  depends_on      = [azurerm_role_assignment.keyvault_roles]
+  depends_on      = [azurerm_role_assignment.key_vault_secrets_officer]
 }
 #endregion
 

@@ -103,7 +103,7 @@ Keep actual deployment values out of committed files and public documentation.
 
 The operator must explicitly confirm the deployment target and test scope
 before planning or applying. The walkthrough selects the same tenant,
-subscription, region, and operator object ID as the standalone bootstrap,
+subscription, region, and operator as the standalone bootstrap,
 with separate, human-supplied Sandbox tags.
 
 Use the runner's user-assigned identity for Sandbox provider authentication:
@@ -136,8 +136,8 @@ printf '\n'
 Do not paste the output into chat or public documentation. The root MSI
 configuration does not require an SPN secret, and its workflow should not
 receive `TF_VAR_arm_client_secret`. The standalone `rg-devops-iac` bootstrap
-still uses SPN authentication; preserve its separate `arm_client_id`, input
-file, and operator-session secret.
+authenticates as the operator signed in to Azure CLI and keeps its own input
+file.
 
 Run the root MSI configuration on the Azure runner to which this identity
 is attached, not from the workstation merely because its input file was

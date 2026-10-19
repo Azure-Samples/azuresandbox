@@ -1,7 +1,8 @@
 #!/usr/bin/env pwsh
 
 # Creates a terraform.tfvars file for this configuration
-# Requires Azure PowerShell module
+# Requires Azure PowerShell module. Terraform itself authenticates as the operator signed in to Azure CLI (az login),
+# so no service principal is needed.
 
 #region functions
 function Show-Usage {
@@ -9,49 +10,7 @@ function Show-Usage {
     exit 1
 }
 
-function Show-JWTtoken {
-
-    [cmdletbinding()]
-    param(
-        [Parameter(Mandatory=$true)]
-        [SecureString]$token
-    )
-
-    # Convert SecureString to plain text
-    $plainToken = [System.Net.NetworkCredential]::new("", $token).Password
-
-    # Validate as per https://tools.ietf.org/html/rfc7519
-    # Access and ID tokens are fine, Refresh tokens will not work
-    if (!$plainToken.Contains(".") -or !$plainToken.StartsWith("eyJ")) { Write-Error "Invalid token" -ErrorAction Stop }
-
-    # Header
-    $tokenheader = $plainToken.Split(".")[0].Replace('-', '+').Replace('_', '/')
-    # Fix padding as needed, keep adding "=" until string length modulus 4 reaches 0
-    while ($tokenheader.Length % 4) { Write-Verbose "Invalid length for a Base-64 char array or string, adding ="; $tokenheader += "=" }
-    Write-Verbose "Base64 encoded (padded) header:"
-    Write-Verbose $tokenheader
-    # Convert from Base64 encoded string to PSObject all at once
-    Write-Verbose "Decoded header:"
-    [System.Text.Encoding]::ASCII.GetString([system.convert]::FromBase64String($tokenheader)) | ConvertFrom-Json | Format-List | Out-Null
-
-    # Payload
-    $tokenPayload = $plainToken.Split(".")[1].Replace('-', '+').Replace('_', '/')
-    # Fix padding as needed, keep adding "=" until string length modulus 4 reaches 0
-    while ($tokenPayload.Length % 4) { Write-Verbose "Invalid length for a Base-64 char array or string, adding ="; $tokenPayload += "=" }
-    Write-Verbose "Base64 encoded (padded) payload:"
-    Write-Verbose $tokenPayload
-    # Convert to Byte array
-    $tokenByteArray = [System.Convert]::FromBase64String($tokenPayload)
-    # Convert to string array
-    $tokenArray = [System.Text.Encoding]::ASCII.GetString($tokenByteArray)
-    Write-Verbose "Decoded array in JSON format:"
-    Write-Verbose $tokenArray
-    # Convert from JSON to PSObject
-    $tokobj = $tokenArray | ConvertFrom-Json
-    Write-Verbose "Decoded Payload:"
-    
-    return $tokobj
-}#endregion
+#endregion
 
 #region constants
 # Initialize constants
@@ -62,9 +21,15 @@ $defaultProject = "devops"
 #endregion
 
 #region main
-# Check if environment variables are set
-if (-not $env:TF_VAR_client_secret) {
-    Write-Host "Environment variable 'TF_VAR_client_secret' must be set." -ForegroundColor Red
+# Terraform authenticates with Azure CLI, so it must be installed and signed in
+if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
+    Write-Host "Azure CLI could not be found. Please install Azure CLI." -ForegroundColor Red
+    Show-Usage
+}
+
+az account show --only-show-errors --output none 2>$null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Azure CLI is not signed in. Please run 'az login' first." -ForegroundColor Red
     Show-Usage
 }
 
@@ -90,32 +55,14 @@ if (-not $defaultSubscriptionId) {
     Show-Usage
 }
 
-# Set default user from currently logged in Azure PowerShell session
-$defaultOperatorObjectId = (Show-JWTtoken -token (Get-AzAccessToken -AsSecureString).Token).oid
-
 # Set default Microsoft Entra tenant id from currently logged in Azure PowerShell session
 $defaultEntraTenantId = (Get-AzContext).Tenant.Id
 
-# Set default service principal appId from TF_VAR_client_id environment variable
-$defaultClientId = $env:TF_VAR_client_id
-
 # Get user input
-$clientId = Read-Host "Service principal appId (client_id) default '$defaultClientId'"
-
-if (-not $clientId) {
-    $clientId = $defaultClientId
-}
-
 $entraTenantId = Read-Host "Microsoft Entra tenant id (entra_tenant_id) default '$defaultEntraTenantId'"
 
 if (-not $entraTenantId) {
     $entraTenantId = $defaultEntraTenantId
-}
-
-$operatorObjectId = Read-Host "Operator object id (operator_object_id) default '$defaultOperatorObjectId'"
-
-if (-not $operatorObjectId) {
-    $operatorObjectId = $defaultOperatorObjectId
 }
 
 $subscriptionId = Read-Host "Azure subscription id (subscription_id) default '$defaultSubscriptionId'"
@@ -148,21 +95,6 @@ if (-not $project) {
     $project = $defaultProject
 }
 
-# Validate user input
-if (-not $clientId) {
-    Write-Host "client_id is required." -ForegroundColor Red
-    Show-Usage
-}
-
-# Validate service principal
-$armClientDisplayName = (Get-AzADServicePrincipal -AppId $clientId).DisplayName
-if ($armClientDisplayName) {
-    Write-Host "Found service principal '$armClientDisplayName'..."
-} else {
-    Write-Host "Invalid service principal AppId '$clientId'." -ForegroundColor Red
-    Show-Usage
-}
-
 # Validate subscription
 $subscriptionName = (Get-AzSubscription -SubscriptionId $subscriptionId).Name
 if ($subscriptionName) {
@@ -192,11 +124,9 @@ $tags = @{
 Write-Host "`nGenerating terraform.tfvars file...`n"
 
 @"
-client_id          = "$clientId"
-entra_tenant_id    = "$entraTenantId"
-location           = "$location"
-operator_object_id = "$operatorObjectId"
-subscription_id    = "$subscriptionId"
+entra_tenant_id = "$entraTenantId"
+location        = "$location"
+subscription_id = "$subscriptionId"
 
 tags = {
   project     = "$($tags.project)"

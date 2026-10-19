@@ -1,38 +1,3 @@
-variable "auth_mode" {
-  type        = string
-  description = "How Terraform authenticates the azurerm, azapi and azuread providers: client_secret (service principal and secret) or managed_identity (user-assigned managed identity on the Terraform execution host)."
-  default     = "client_secret"
-
-  validation {
-    condition     = contains(["client_secret", "managed_identity"], var.auth_mode)
-    error_message = "auth_mode must be one of: client_secret or managed_identity."
-  }
-}
-
-
-variable "client_id" {
-  type        = string
-  description = "The client id of the identity Terraform authenticates as: the service principal appId when auth_mode is client_secret, or the user-assigned managed identity client id when auth_mode is managed_identity."
-
-  validation {
-    condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.client_id))
-    error_message = "client_id must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
-  }
-}
-
-
-variable "client_secret" {
-  type        = string
-  description = "The service principal secret. Required only when auth_mode is client_secret. Set it with the TF_VAR_client_secret environment variable, never in a file."
-  default     = null
-  sensitive   = true
-
-  validation {
-    condition     = var.auth_mode != "client_secret" || try(length(var.client_secret), 0) >= 8
-    error_message = "client_secret must be at least 8 characters long when auth_mode is client_secret. Set it with TF_VAR_client_secret."
-  }
-}
-
 variable "deployment_identity" {
   type        = string
   description = "The identity this configuration provisions for root sandbox deployments. Use none to provision no deployment identity, or managed_identity to create a user-assigned managed identity with 'Contributor' and conditioned 'Role Based Access Control Administrator' role assignments on the subscription and attach it to the Linux virtual machine, for root sandbox applies with auth_mode = \"managed_identity\"."
@@ -114,16 +79,6 @@ variable "location" {
   validation {
     condition     = can(regex("^[a-z0-9-]+$", var.location))
     error_message = "Must be a valid Azure region name. It should only contain lowercase letters, numbers, and dashes."
-  }
-}
-
-variable "operator_object_id" {
-  type        = string
-  description = "The Microsoft Entra object id of the operator: the signed-in user who provisions this configuration. The operator is granted data-plane role assignments on the resources it creates."
-
-  validation {
-    condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.operator_object_id))
-    error_message = "Must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
   }
 }
 

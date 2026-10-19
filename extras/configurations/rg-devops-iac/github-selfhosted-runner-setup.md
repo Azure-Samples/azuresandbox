@@ -24,14 +24,13 @@ re-deploys all of this content can be generalized into these steps:
   cd azuresandbox/extras/configurations/rg-devops-iac
   ```
 
-* From bash, create environment variables for deployment secrets:
+* From bash, create an environment variable for the runner PAT:
 
   ```bash
-  export TF_VAR_client_secret=<spn-secret-here> 
   export TF_VAR_github_runner_token=<pat-token-here>
   ```
 
-* Generate a baseline `terraform.tfvars` file.
+* Sign in to Azure CLI as a subscription `Owner` (activate an eligible `Owner` assignment first if you use Privileged Identity Management). Terraform authenticates as this signed-in identity. Then generate a baseline `terraform.tfvars` file.
 
   ```bash
   az login --use-device-code
@@ -41,11 +40,9 @@ re-deploys all of this content can be generalized into these steps:
 * Edit `terraform.tfvars` and add Github self-hosted runner settings.
 
   ```hcl
-  client_id          = "<spn-client-id-here>"
-  entra_tenant_id    = "<entra-tenant-id-here>"
-  location           = "southcentralus"
-  operator_object_id = "<operator-object-id-here>"
-  subscription_id    = "<subscription-id-here>"
+  entra_tenant_id = "<entra-tenant-id-here>"
+  location        = "southcentralus"
+  subscription_id = "<subscription-id-here>"
 
   # Add environment specific tags as required required here
   tags = {
@@ -189,7 +186,6 @@ az version --query '"azure-cli"' --output tsv
 git branch --show-current
 git check-ignore terraform.tfvars
 
-printf 'TF_VAR_client_secret: %s\n' "${TF_VAR_client_secret:+set}"
 printf 'TF_VAR_github_runner_token: %s\n' "${TF_VAR_github_runner_token:+set}"
 
 printf '\nExported Terraform/Azure variable names (values omitted):\n'
@@ -199,12 +195,13 @@ printf '\nTop-level terraform.tfvars keys (values omitted):\n'
 awk '/^[[:alpha:]_][[:alnum:]_]*[[:space:]]*=/ { print $1 }' terraform.tfvars
 
 az account show \
-  --query '{environment:environmentName,state:state,isDefault:isDefault}' \
+  --query '{environment:environmentName,state:state,isDefault:isDefault,userType:user.type}' \
   --output json
 ```
 
 An empty secret-status field means the variable is unset or empty. If Azure CLI
-authentication fails, stop and resolve sign-in before deployment. If
+authentication fails, or `userType` is not `user`, stop and sign in as the
+operator before deployment. If
 `git check-ignore` does not identify `terraform.tfvars`, do not stage that file.
 Terraform's required version is defined in this configuration's `terraform.tf`;
 check it against the version printed above.
@@ -217,10 +214,8 @@ those values. The bootstrap requires these inputs:
 
 | Setting | Purpose |
 | --- | --- |
-| `entra_tenant_id` | Tenant containing the bootstrap service principal. |
-| `client_id` | Bootstrap service principal application/client ID, not a managed identity client ID. |
+| `entra_tenant_id` | Tenant of the signed-in operator. |
 | `subscription_id` | Subscription where the runner infrastructure will be created. |
-| `operator_object_id` | Operator's Entra user object ID for the configuration's role assignments. |
 | `location` | Operator-selected Azure region with suitable VM availability and quota. |
 | `tags` | Include `project`, `environment`, and `costcenter`, plus any policy-required tags. |
 | `vm_jumpbox_linux_size` | Optional VM-size override; check capacity for the intended deployment workload. |
@@ -245,19 +240,19 @@ The URL and label must match the workflows that will target the runner.
 subscription `Contributor` and a `Role Based Access Control Administrator`
 assignment whose condition allows only the roles the sandbox assigns (listed in
 `locals.tf`), and attaches it to the VM. The
-identity that applies this bootstrap needs `Owner` (or `Contributor` plus an
-unconstrained role-assignment role) to create those assignments. The
+operator signed in to Azure CLI applies this bootstrap and needs `Owner` (or
+`Contributor` plus an unconstrained role-assignment role) to create those
+assignments. The
 deployment identity can also modify the runner infrastructure itself.
 
 The VM's system-assigned managed identity remains the default for cloud-init, token
 retrieval, and the remote-state backend. The user-assigned managed identity (UAMI) is used
-for later Sandbox provider authentication. Do not replace the
-bootstrap's service principal `client_id` with the UAMI client ID.
+for later Sandbox provider authentication.
 
 ### Secret and environment handling
 
-Keep `TF_VAR_client_secret` exported in the operator's deployment terminal.
-Do not put it in `terraform.tfvars` or paste its value into the walkthrough.
+The bootstrap needs no Azure secret: Terraform uses the operator's Azure CLI
+sign-in.
 
 Runner registration also requires `TF_VAR_github_runner_token`. For a
 repository-level runner, use an approved fine-grained PAT scoped to that
@@ -282,7 +277,7 @@ its short lifetime can expire during provisioning; this walkthrough has not
 selected that mode.
 
 No `ARM_*` exports are required for the standalone configuration's provider
-authentication: `providers.tf` explicitly uses the service principal inputs.
+authentication: `providers.tf` explicitly uses the Azure CLI sign-in.
 Inventory existing exports before deciding whether any should be cleared,
 especially if this terminal previously used managed identity or another
 backend. Do not copy VM-side `ARM_USE_MSI=true` into the bootstrap terminal.
@@ -329,9 +324,8 @@ EOF
 terraform fmt terraform.tfvars
 ```
 
-The `client_id` already in this file must remain the bootstrap service
-principal's client ID. The new managed identity is created by this deployment;
-its client ID is used only when configuring later Sandbox deployments.
+The new managed identity is created by this deployment; its client ID is used
+only when configuring later Sandbox deployments.
 
 The default VM name and runner name are `jumplinux2`; no name override is
 required. The standard `self-hosted`, `Linux`, and `X64` labels are assigned by
@@ -359,9 +353,7 @@ export TF_VAR_github_runner_token
 printf 'TF_VAR_github_runner_token: %s\n' "${TF_VAR_github_runner_token:+set}"
 ```
 
-Keep the existing `TF_VAR_client_secret` exported. The two secrets serve
-different purposes: the service principal authenticates the bootstrap's Azure
-providers; the PAT allows the VM to request a GitHub runner registration token.
+The PAT only allows the VM to request a GitHub runner registration token.
 The runner does not need this PAT to authenticate ordinary workflow jobs after
 registration.
 
@@ -373,7 +365,6 @@ flags. It does not print the bootstrap IDs, organizational tags, or credentials.
 ```bash
 awk '/^(enable_github_runner|deployment_identity|github_runner_url|github_runner_labels|github_runner_token_type)[[:space:]]*=/ { print }' terraform.tfvars
 
-printf 'TF_VAR_client_secret: %s\n' "${TF_VAR_client_secret:+set}"
 printf 'TF_VAR_github_runner_token: %s\n' "${TF_VAR_github_runner_token:+set}"
 ```
 
@@ -927,8 +918,7 @@ grant by a Privileged Role Administrator or Global Administrator.
 
 This check does not perform a Terraform Sandbox plan or validate all provider
 operations. The later Sandbox configuration must use this identity's client
-ID as `client_id` with `auth_mode = "managed_identity"`. Do not change the
-standalone bootstrap's service principal inputs.
+ID as `client_id` with `auth_mode = "managed_identity"`.
 
 ## Step 11: Grant the optional Microsoft Graph permission
 
@@ -1065,7 +1055,7 @@ A deployment workflow needs its own human-confirmed configuration:
 | --- | --- |
 | Runner selection | Match `self-hosted`, `Linux`, `X64`, and `azuresandbox`; labels are routing, not an authorization boundary. |
 | Source revision | Explicitly select the intended Sandbox revision. |
-| Provider authentication | Set `auth_mode = "managed_identity"` and use the user-assigned identity client ID as `client_id`. Do not copy the bootstrap service principal settings. |
+| Provider authentication | Set `auth_mode = "managed_identity"` and use the user-assigned identity client ID as `client_id`. |
 | State backend | Use the provisioned storage account and container with Azure AD/managed identity authorization, normally the system-assigned identity. |
 | State key | Confirm a unique, stable key for the intended Sandbox; do not mix it with bootstrap state. |
 | Job workspace | Generate environment-specific inputs and backend configuration securely in each checkout; ignored local files are not automatically available to Actions jobs. Preserve an existing backend rather than overwriting it. |

@@ -46,7 +46,6 @@ This section provides a brief overview of the features included in this configur
 This section describes the prerequisites required in order to provision this configuration.
 
 * [Microsoft Entra ID Tenant and Azure Subscription](#microsoft-entra-id-tenant-and-azure-subscription)
-* [Service Principal](#service-principal)
 * [Self-Hosted Runner and Managed Identity Prerequisites (Optional)](#self-hosted-runner-and-managed-identity-prerequisites-optional)
 * [Other Prerequisites](#other-prerequisites)
 * [Terraform Execution Environment](#terraform-execution-environment)
@@ -56,35 +55,14 @@ This section describes the prerequisites required in order to provision this con
 * Identify the [Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/fundamentals/whatis) tenant to be used for identity and access management, or create a new tenant using [Quickstart: Set up a tenant](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-create-new-tenant).
 * Identify a single Azure [subscription](https://learn.microsoft.com/azure/cloud-adoption-framework/ready/considerations/fundamental-concepts#azure-terminology) or create a new Azure subscription. See [Azure Offer Details](https://azure.microsoft.com/support/legal/offer-details/) and [Associate or add an Azure subscription to your Microsoft Entra tenant](https://learn.microsoft.com/entra/fundamentals/how-subscriptions-associated-directory) for more information.
 * Identify the owner of the Azure subscription to be used to provision this configuration. This user should have an [Owner](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#owner) Azure RBAC role assignment on the subscription. See [Steps to assign an Azure role](https://learn.microsoft.com/azure/role-based-access-control/role-assignments-steps) for more information.
-
-### Service Principal
-
-* Verify the subscription owner has privileges to create a service principal on the Microsoft Entra tenant. See [Permissions required for registering an app](https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal#permissions-required-for-registering-an-app) for more information.
-* Ask the subscription owner to [Create an Azure service principal](https://learn.microsoft.com/en-us/cli/azure/azure-cli-sp-tutorial-1?tabs=bash) (SPN) to provision this configuration with [Azure Cloud Shell](https://learn.microsoft.com/azure/cloud-shell/quickstart). The service principal can be created with the following command:
-
-  ```bash
-  az ad sp create-for-rbac -n DevOpsSPN --role Owner --scopes /subscriptions/YOUR-SUBSCRIPTION-ID-HERE
-  ```
-
-  The output should look like this:
-
-  ```json
-  {
-    "appId": "YOUR-SERVICE-PRINCIPAL-APP-ID-HERE",
-    "displayName": "DevOpsSPN",
-    "password": "YOUR-SERVICE-PRINCIPAL-PASSWORD-HERE",
-    "tenant": "YOUR-ENTRA-TENANT-ID-HERE"
-  }
-  ```
-
-Save the service principal *appId* and *password* in a secure location such as a password vault.
+* The subscription owner provisions this configuration with their own identity, signed in to Azure CLI. No service principal or client secret is needed: this is a one-time bootstrap, and a service principal with `Owner` would only duplicate the owner's access as a standing credential. If your organization uses [Privileged Identity Management](https://learn.microsoft.com/entra/id-governance/privileged-identity-management/pim-configure), activate an eligible `Owner` assignment for the duration of the deployment.
 
 ### Self-Hosted Runner and Managed Identity Prerequisites (Optional)
 
 These prerequisites apply only if you plan to use this configuration as a self-hosted runner that deploys Azure Sandbox with managed identity authentication (`enable_github_runner = true` and `deployment_identity = "managed_identity"`). Arrange them **before** provisioning, because some of them need privileged roles that the person running the deployment may not hold.
 
 * **GitHub repository administrator.** Registering a repository-level runner needs a fine-grained personal access token with `Administration: Read and write` on the target repository, created by a repository administrator. See [Optional: GitHub Actions Self-Hosted Runner](#optional-github-actions-self-hosted-runner).
-* **Microsoft Entra Privileged Role Administrator or Global Administrator.** Required only if the sandbox will be deployed with the `mssql` module enabled. The user-assigned managed identity then needs the Microsoft Graph `Group.Create`, `GroupMember.Read.All`, `User.Read.All` and `Application.Read.All` application permissions, and only one of these Entra roles can grant them. Neither the service principal nor an Owner on the subscription can grant them. Read-only Entra roles such as Global Reader are not enough. Privileged Role Administrator is the least privileged role that works. If your organization uses [Privileged Identity Management](https://learn.microsoft.com/entra/id-governance/privileged-identity-management/pim-configure), activate an eligible assignment for the grant, or arrange for an administrator to run it. The grant is a one-time step after the identity is created. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies).
+* **Microsoft Entra Privileged Role Administrator or Global Administrator.** Required only if the sandbox will be deployed with the `mssql` module enabled. The user-assigned managed identity then needs the Microsoft Graph `Group.Create`, `GroupMember.Read.All`, `User.Read.All` and `Application.Read.All` application permissions, and only one of these Entra roles can grant them. An Owner on the subscription cannot grant them. Read-only Entra roles such as Global Reader are not enough. Privileged Role Administrator is the least privileged role that works. If your organization uses [Privileged Identity Management](https://learn.microsoft.com/entra/id-governance/privileged-identity-management/pim-configure), activate an eligible assignment for the grant, or arrange for an administrator to run it. The grant is a one-time step after the identity is created. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies).
 
 ### Other Prerequisites
 
@@ -102,13 +80,13 @@ A variety of Terraform execution environments can be used to provision this conf
 * **Windows-Only Client**: A Windows-only client can be used to run Terraform. The following software should be installed:
   * git
   * PowerShell 7.x
+  * Azure CLI
   * Terraform
   * Visual Studio Code
 
 * **Windows Subsystem for Linux (WSL) Client**: WSL offers the best of Windows and Linux in the same client environment and was used to develop this project. The following software should be installed:
   * Linux (WSL) software
     * Linux Distro: Ubuntu 24.04 LTS (Noble Numbat)
-    * pip3 Python library package manager and the PyJWT Python library.
     * git
     * Azure CLI
     * Terraform
@@ -280,17 +258,17 @@ port, coordinated publication, and a fresh full acceptance run.
 
 ### Step 0: Login
 
-Before you can provision this configuration interactively, you need to log in to your Azure account. Use the following steps to log in
+Before you can provision this configuration interactively, you need to log in to your Azure account. Terraform authenticates as the user signed in to Azure CLI, so an Azure CLI login is always required. If you will use the PowerShell bootstrap script, also sign in with Azure PowerShell. Use the following steps to log in
 
-* Open a terminal window and run one of the following commands to log in to Azure according to your preference:
+* Open a terminal window and run the following command to log in to Azure CLI:
 
   ```bash
-  # Log in using Azure CLI
   az login --use-device-code
   ```
 
+  If you will use the PowerShell bootstrap script, also run:
+
   ```pwsh
-  # Log in using PowerShell
   Connect-AzAccount -UseDeviceAuthentication
   ```
 
@@ -352,26 +330,12 @@ There many variables in this configuration. Defaults have been set for most of t
 
 Follow these steps to configure the variables for this configuration:
 
-* First, create an environment variable for the service principal password. For security reasons this secret should not be stored in the `terraform.tfvars` file. This configuration uses the same authentication contract as the root sandbox; see [Deployment Identity and Authentication](#deployment-identity-and-authentication).
-
-  ```bash
-  # Set environment variable in bash
-  export TF_VAR_client_secret=YOUR-SERVICE-PRINCIPAL-PASSWORD-HERE
-  ```
-
-  ```pwsh
-  # Set environment variable in PowerShell
-  $env:TF_VAR_client_secret = "YOUR-SERVICE-PRINCIPAL-PASSWORD-HERE"
-  ```
-
-* Next, create a `terraform.tfvars` file in the root directory of the project. This file should set the necessary variables for your deployment. Here is an example of what the `terraform.tfvars` file might look like:
+* Create a `terraform.tfvars` file in the root directory of the project. This file should set the necessary variables for your deployment. Here is an example of what the `terraform.tfvars` file might look like:
 
   ```hcl
-  client_id          = "YOUR-SERVICE-PRINCIPAL-APP-ID-HERE"
-  entra_tenant_id    = "YOUR-ENTRA-TENANT-ID-HERE"
-  location           = "YOUR-AZURE-REGION-HERE"
-  operator_object_id = "YOUR-OPERATOR-OBJECT-ID-HERE"
-  subscription_id    = "YOUR-AZURE-SUBSCRIPTION-ID-HERE"
+  entra_tenant_id = "YOUR-ENTRA-TENANT-ID-HERE"
+  location        = "YOUR-AZURE-REGION-HERE"
+  subscription_id = "YOUR-AZURE-SUBSCRIPTION-ID-HERE"
 
   tags = {
     project     = "devops",
@@ -549,11 +513,13 @@ If you only need to remove Terraform state file(s) from the Azure Blob Storage c
 
 ## Deployment Identity and Authentication
 
-This section is the reference for how Terraform authenticates to Azure and Microsoft Entra ID in this repository. The root sandbox configuration and this configuration use the same authentication contract. Most sandbox users deploy interactively with a service principal, as described in the root README's [Service Principal](../../../README.md#service-principal) prerequisites; the managed identity mode below supports automated and secretless deployments from this configuration's Linux virtual machine.
+This section is the reference for how the root sandbox configuration authenticates to Azure and Microsoft Entra ID. Most sandbox users deploy interactively with a service principal, as described in the root README's [Service Principal](../../../README.md#service-principal) prerequisites; the managed identity mode below supports automated and secretless deployments from this configuration's Linux virtual machine.
+
+This configuration itself does not use these modes. It always authenticates as the operator signed in to Azure CLI; see [Operator](#operator).
 
 ### Authentication Modes
 
-The `auth_mode` variable selects how Terraform authenticates the `azurerm`, `azapi` and `azuread` providers. Every provider uses the same settings, derived once in the `provider_auth` local in `locals.tf`.
+The root configuration's `auth_mode` variable selects how Terraform authenticates the `azurerm`, `azapi` and `azuread` providers. Every provider uses the same settings, derived once in the `provider_auth` local in the root [`locals.tf`](../../../locals.tf).
 
 `auth_mode` | Identity (`client_id`) | Credential | Typical use
 --- | --- | --- | ---
@@ -591,11 +557,14 @@ For `client_secret` mode, see [Service Principal](../../../README.md#service-pri
 
 ### Operator
 
-`operator_object_id` is the Microsoft Entra object id of the operator: the signed-in user who provisions the configuration. It is separate from the deployment identity. The operator is granted data-plane role assignments, such as Key Vault and Storage roles, on the resources the configuration creates. The bootstrap scripts default it to the signed-in Azure CLI or Azure PowerShell user.
+The operator is the signed-in user who provisions a configuration. It is separate from the deployment identity.
+
+* **This configuration:** Terraform authenticates as the operator signed in to Azure CLI (`use_cli = true` in [`providers.tf`](./providers.tf)), so the operator needs `Owner` on the subscription, or `Contributor` plus an unconditioned role-assignment role such as `User Access Administrator`, for the duration of the apply. The operator's identity is read from the Azure CLI sign-in and granted `Key Vault Secrets Officer` and `Storage Blob Data Contributor` on the resources this configuration creates.
+* **Root sandbox:** `operator_object_id` is the Microsoft Entra object id of the operator. The operator is granted data-plane role assignments, such as Key Vault and Storage roles, on the sandbox resources. The root bootstrap scripts default it to the signed-in Azure CLI or Azure PowerShell user.
 
 ### State Backend Authentication
 
-Provider authentication and state backend authentication are independent. `auth_mode` affects only the providers. By default, Terraform state is stored locally. When an `azurerm` backend is configured in `backend.tf`, it authenticates with its own settings, for example the system-assigned managed identity of the rg-devops-iac Linux virtual machine (`use_msi = true` with `use_azuread_auth = true`).
+Provider authentication and state backend authentication are independent. Provider settings such as `auth_mode` affect only the providers. By default, Terraform state is stored locally. When an `azurerm` backend is configured in `backend.tf`, it authenticates with its own settings, for example the system-assigned managed identity of the rg-devops-iac Linux virtual machine (`use_msi = true` with `use_azuread_auth = true`).
 
 ## Documentation
 
@@ -640,9 +609,6 @@ This section lists input variables used in the root module. Defaults can be over
 
 Variable | Default | Description
 --- | --- | ---
-auth_mode | `client_secret` | How Terraform authenticates the providers: `client_secret` or `managed_identity`. See [Deployment Identity and Authentication](#deployment-identity-and-authentication).
-client_id | | The client id of the identity Terraform authenticates as: the service principal `appId` for `client_secret`, or the user-assigned managed identity client id for `managed_identity`.
-client_secret | | The service principal secret. Required only when `auth_mode` is `client_secret`; set it using `TF_VAR_client_secret`.
 deployment_identity | `none` | The identity this configuration provisions for root sandbox deployments: `none` or `managed_identity`. `managed_identity` creates a user-assigned managed identity with `Contributor` and conditioned `Role Based Access Control Administrator` role assignments on the subscription and attaches it to `jumplinux2`, for root sandbox applies with `auth_mode = "managed_identity"`. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies).
 enable_github_runner | false | Set to true to install and register the GitHub Actions self-hosted runner agent on `jumplinux2`. See [vm-jumpbox-linux](./modules/vm-jumpbox-linux/README.md#github-actions-self-hosted-runner).
 entra_tenant_id | | The Microsoft Entra tenant id.
@@ -652,7 +618,6 @@ github_runner_token_secret_version | 1 | Increment to write a new value for the 
 github_runner_token_type | `pat` | The type of token supplied in `github_runner_token`, either `pat` or `registration`.
 github_runner_url | | The GitHub repository or organization URL to register the self-hosted runner with, e.g. `https://github.com/myorg/myrepo`. Required when `enable_github_runner` is true.
 location | | The name of the Azure Region where resources will be provisioned.
-operator_object_id | | The Microsoft Entra object id of the operator: the signed-in user who provisions this configuration. The operator is granted data-plane role assignments on the resources it creates.
 storage_access_tier | Hot | The access tier for the new storage account.
 storage_replication_type | LRS | The type of replication for the new storage account.
 subnet_address_prefix | 10.0.0.0/24 | The address prefix for the miscellaneous subnet. The minimum size is /29.
@@ -668,7 +633,7 @@ vnet_name | devops | The name of the new virtual
 
 ### Root Module Resources
 
-The root module includes a resource group, key vault and storage account used by the child modules. It also implements Azure RBAC role assignments for both the service principal used by Terraform as well as the interactive user.
+The root module includes a resource group, key vault and storage account used by the child modules. It also grants the operator who runs Terraform data-plane roles on the key vault and storage account.
 
 Address | Name | Notes
 --- | --- | ---
@@ -684,8 +649,8 @@ azurerm_private_endpoint.key_vault | pe-devops-dev-key-vault | Private endpoint 
 azurerm_private_endpoint.storage_blob | pe-devops-dev-storage-blob | Private endpoint for Azure blob storage
 azurerm_public_ip.this | pip-devops-dev-nat | Public IP address for the NAT gateway.
 azurerm_resource_group.this | rg-devops-dev-xxx | Resource group for all resources in this configuration.
-azurerm_role_assignment.keyvault_roles[*] | | Assigns `Key Vault Secrets Officer` to both the service principal and the interactive user.
-azurerm_role_assignment.storage_roles[*] | | Assigns `Storage Blob Data Contributor` to both the service principal and the interactive user.
+azurerm_role_assignment.key_vault_secrets_officer | | Assigns `Key Vault Secrets Officer` on the key vault to the operator signed in to Azure CLI.
+azurerm_role_assignment.storage_blob_data_contributor | | Assigns `Storage Blob Data Contributor` on the storage account to the operator signed in to Azure CLI.
 azurerm_role_assignment.deployment_identity_contributor[0] | | Assigns `Contributor` at the subscription scope to the deployment identity. Created only when `deployment_identity` is `managed_identity`.
 azurerm_role_assignment.deployment_identity_rbac_admin[0] | | Assigns `Role Based Access Control Administrator` at the subscription scope to the deployment identity, with a condition that allows only the roles in `local.deployment_identity_assignable_roles`. Created only when `deployment_identity` is `managed_identity`.
 azurerm_storage_account.this | stdevopsdevxxx | Storage account for storing Terraform state files.

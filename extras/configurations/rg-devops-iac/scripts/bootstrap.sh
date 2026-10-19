@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# This script generates a terraform.tfvars file for use with this configuration
+# This script generates a terraform.tfvars file for use with this configuration.
+# Terraform authenticates as the operator signed in to Azure CLI (az login), so no service principal is needed.
 #
 # Package dependencies:
-#   - Azure CLI 
-#   - PyJWT python library to decode the JWT tokens
+#   - Azure CLI
 
 #region functions
 
@@ -29,28 +29,9 @@ then
     printf "Azure CLI could not be found. Please install Azure CLI.\n"
     usage
 fi
-# Check if Python 3 is installed
-if ! command -v python3 &> /dev/null
-then
-    printf "Python 3 could not be found. Please install Python 3.\n"
-    usage
-fi
-# Check if PyJWT is installed
-if ! python3 -c "import jwt" &> /dev/null
-then
-    printf "PyJWT could not be found. Please install PyJWT.\n"
-    usage
-fi
 
 # Get runtime defaults
 printf "Retrieving runtime defaults ...\n"
-
-# Validate TF_VAR_client_secret
-if [ -z "$TF_VAR_client_secret" ]
-then
-  printf "Environment variable 'TF_VAR_client_secret' must be set.\n"
-  usage
-fi
 
 # Set default subscription from currently logged in Azure CLI user.
 default_subscription_id=$(az account list --only-show-errors --query "[? isDefault]|[0].id" --output tsv)
@@ -61,17 +42,11 @@ then
   usage
 fi
 
-# Set default user from currently logged in Azure CLI user.
-default_operator_object_id=$(az account get-access-token --query accessToken --output tsv | tr -d '\n' | python3 -c "import jwt, sys; print(jwt.decode(sys.stdin.read(), algorithms=['RS256'], options={'verify_signature': False})['oid'])")
-
 # Set default Microsoft Entra tenant id from currently logged in Azure CLI user.
 default_entra_tenant_id=$(az account show --query tenantId --output tsv)
 
 # Get user input
-# shellcheck disable=SC2154  # TF_VAR_client_id is an external Terraform env var, optionally exported by the caller.
-read -e -i "$TF_VAR_client_id"          -p "Service principal appId (client_id) ----------: " client_id
 read -e -i $default_entra_tenant_id     -p "Microsoft Entra tenant id (entra_tenant_id) --: " entra_tenant_id
-read -e -i $default_operator_object_id  -p "Operator object id (operator_object_id) ------: " operator_object_id
 read -e -i $default_subscription_id     -p "Azure subscription id (subscription_id) ------: " subscription_id
 read -e -i $default_location            -p "Azure location (location) --------------------: " location
 read -e -i $default_environment         -p "Environment tag value (environment) ----------: " environment
@@ -83,34 +58,8 @@ entra_tenant_id=${entra_tenant_id:-$default_entra_tenant_id}
 costcenter=${costcenter:-$default_costcenter}
 environment=${environment:-$default_environment}
 location=${location:-$default_location}
-operator_object_id=${operator_object_id:-$default_operator_object_id}
 project=${project:-$default_project}
 subscription_id=${subscription_id:-$default_subscription_id}
-
-# Validate client_id
-if [ -z "$client_id" ]
-then
-  printf "client_id is required.\n"
-  usage
-fi
-
-# Validate TF_VAR_client_secret
-if [ -z "$TF_VAR_client_secret" ]
-then
-  printf "Environment variable 'TF_VAR_client_secret' must be set.\n"
-  usage
-fi
-
-# Validate service principal
-client_display_name=$(az ad sp show --id $client_id --query "appDisplayName" --output tsv)
-
-if [ -n "$client_display_name" ]
-then 
-  printf "Found service principal '$client_display_name'...\n"
-else
-  printf "Invalid service principal AppId '$client_id'...\n"
-  usage
-fi
 
 # Validate subscription
 subscription_name=$(az account list --query "[?id=='$subscription_id'].name" --output tsv)
@@ -120,13 +69,6 @@ then
   printf "Found subscription '$subscription_name'...\n"
 else
   printf "Invalid subscription id '$subscription_id'.\n"
-  usage
-fi
-
-# Validate object id of Azure CLI signed in user
-if [ -z "$operator_object_id" ]
-then
-  printf "Operator object id (operator_object_id) not provided.\n"
   usage
 fi
 
@@ -152,11 +94,9 @@ EOF
 # Generate terraform.tfvars file
 printf "\nGenerating terraform.tfvars file...\n\n"
 
-printf "client_id          = \"$client_id\"\n"        >  ./terraform.tfvars
-printf "entra_tenant_id    = \"$entra_tenant_id\"\n"   >> ./terraform.tfvars
-printf "location           = \"$location\"\n"          >> ./terraform.tfvars
-printf "operator_object_id = \"$operator_object_id\"\n" >> ./terraform.tfvars
-printf "subscription_id    = \"$subscription_id\"\n"   >> ./terraform.tfvars
+printf "entra_tenant_id = \"$entra_tenant_id\"\n" >  ./terraform.tfvars
+printf "location        = \"$location\"\n"        >> ./terraform.tfvars
+printf "subscription_id = \"$subscription_id\"\n" >> ./terraform.tfvars
 printf "\ntags = $tags\n"                         >> ./terraform.tfvars
 cat ./terraform.tfvars
 

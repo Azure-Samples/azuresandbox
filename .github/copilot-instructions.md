@@ -311,10 +311,6 @@ This is a **public repo** — issues, PRs, comments, and commit messages are wor
 - `.vscode/tasks.json` provides a one-shot task to squash-merge all open PRs into `vnext` (`gh pr list ... | xargs gh pr merge --squash`).
 - **Merge strategy:** squash-merge topic/contributor PRs → `vnext`; use a **regular merge commit (no squash)** for the `vnext` → `main` release PR so individual commits and branch lineage are preserved on `main`. See CONTRIBUTING.md "Merge strategy".
 
-## Standalone configurations under `extras/configurations/`
-
-`extras/configurations/rg-devops-iac/` is a **standalone** Terraform configuration (not a module of the root sandbox) that provisions a minimal Linux Terraform execution environment — VNet + NAT, storage account for remote state, Key Vault, and a reusable `vm-jumpbox-linux` child module configured with managed-identity-based azurerm provider auth. Use it as a starting point for DevOps/IaC pipelines, not as part of a sandbox apply. See `extras/configurations/rg-devops-iac/README.md` for its own preflight, apply, and teardown steps — it has independent state and lifecycle.
-
 ## MCP servers configured for this workspace
 
 These MCP servers are wired up for Copilot sessions in this repo; prefer them over web search / memory for the topics they cover:

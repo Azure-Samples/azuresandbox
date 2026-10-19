@@ -38,37 +38,4 @@ locals {
     "((NOT ActionMatches{'Microsoft.Authorization/roleAssignments/write'}) OR (@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${local.deployment_identity_role_ids}}))",
     "((NOT ActionMatches{'Microsoft.Authorization/roleAssignments/delete'}) OR (@Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${local.deployment_identity_role_ids}}))",
   ])
-
-  key_vault_roles = {
-    kv_secrets_officer_spn = {
-      principal_id         = data.azurerm_client_config.current.object_id
-      principal_type       = "ServicePrincipal"
-      role_definition_name = "Key Vault Secrets Officer"
-    }
-    kv_secrets_officer_user = {
-      principal_id         = var.operator_object_id
-      principal_type       = "User"
-      role_definition_name = "Key Vault Secrets Officer"
-    }
-  }
-
-  provider_auth = {
-    client_id     = var.client_id
-    client_secret = var.auth_mode == "client_secret" ? var.client_secret : null
-    tenant_id     = var.entra_tenant_id
-    use_msi       = var.auth_mode == "managed_identity"
-  }
-
-  storage_roles = {
-    blob_data_contributor_spn = {
-      principal_id         = data.azurerm_client_config.current.object_id
-      principal_type       = "ServicePrincipal"
-      role_definition_name = "Storage Blob Data Contributor"
-    }
-    blob_data_contributor_user = {
-      principal_id         = var.operator_object_id
-      principal_type       = "User"
-      role_definition_name = "Storage Blob Data Contributor"
-    }
-  }
 }
