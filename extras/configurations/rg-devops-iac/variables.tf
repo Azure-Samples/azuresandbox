@@ -82,6 +82,17 @@ variable "location" {
   }
 }
 
+variable "log_analytics_workspace_retention_days" {
+  type        = string
+  description = "The retention period in days for the Log Analytics workspace."
+  default     = "30"
+
+  validation {
+    condition     = can(regex("^(30|31|60|90|120|180|270|365|550|730)$", var.log_analytics_workspace_retention_days))
+    error_message = "Must be one of the valid retention periods: 30, 31, 60, 90, 120, 180, 270, 365, 550, or 730 days."
+  }
+}
+
 variable "storage_access_tier" {
   type        = string
   description = "The access tier for the new storage account."

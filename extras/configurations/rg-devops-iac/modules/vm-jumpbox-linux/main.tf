@@ -125,6 +125,17 @@ resource "azurerm_role_assignment" "github_runner_key_vault" {
 }
 #endregion
 
+#region utilities
+resource "terraform_data" "log_analytics_operations_complete" {
+  input = {
+    ama                       = azurerm_virtual_machine_extension.ama.id
+    dcr_association           = azurerm_monitor_data_collection_rule_association.dcr.id
+    dce_association           = azurerm_monitor_data_collection_rule_association.dce.id
+    network_interface_metrics = azurerm_monitor_diagnostic_setting.network_interface.id
+  }
+}
+#endregion
+
 #region locals
 locals {
   github_runner_home = "/opt/actions-runner"

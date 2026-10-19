@@ -1,4 +1,12 @@
 locals {
+  # Private DNS zones used by the Azure Monitor Private Link Scope (AMPLS) private endpoint.
+  ampls_private_dns_zones = [
+    "privatelink.agentsvc.azure-automation.net", # Legacy agent service channel
+    "privatelink.monitor.azure.com",             # Global endpoints, AMA configuration (DCE) and ingestion
+    "privatelink.ods.opinsights.azure.com",      # Log Analytics data ingestion
+    "privatelink.oms.opinsights.azure.com",      # Log Analytics agent onboarding
+  ]
+
   # Roles the sandbox assigns, grouped by module. Each role is listed once, under the first module that needs it.
   # Keep in sync with the ROLES list in the root README's Service Principal commands.
   deployment_identity_assignable_roles = [
