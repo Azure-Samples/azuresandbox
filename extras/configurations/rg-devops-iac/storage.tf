@@ -21,6 +21,31 @@ resource "azurerm_storage_container" "this" {
   container_access_type = "private"
 }
 
+resource "azurerm_monitor_diagnostic_setting" "storage_account" {
+  name                       = "Diagnostic Logs"
+  target_resource_id         = azurerm_storage_account.this.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
+
+  enabled_metric {
+    category = "Transaction"
+  }
+}
+
+# StorageRead, StorageWrite and StorageDelete record access to Terraform state blobs.
+resource "azurerm_monitor_diagnostic_setting" "storage_blob" {
+  name                       = "Diagnostic Logs"
+  target_resource_id         = "${azurerm_storage_account.this.id}/blobServices/default"
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
+
+  enabled_log {
+    category_group = "allLogs"
+  }
+
+  enabled_metric {
+    category = "Transaction"
+  }
+}
+
 resource "azurerm_role_assignment" "storage_blob_data_contributor" {
   principal_id         = data.azurerm_client_config.current.object_id
   role_definition_name = "Storage Blob Data Contributor"

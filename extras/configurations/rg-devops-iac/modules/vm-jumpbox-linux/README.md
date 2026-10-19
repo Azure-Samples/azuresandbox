@@ -30,6 +30,7 @@ This module implements a stand-alone Linux virtual machine for use as a jumpbox 
 * Security patching using `unattended-upgrades`. A full package upgrade is not performed during provisioning, so provisioning does not depend on every package on the image being downloadable and does not trigger a mid-provisioning reboot.
 * Apt is pinned to the Canonical `archive.ubuntu.com` and `security.ubuntu.com` servers rather than the Azure regional mirror.
 * Optional registration as a [GitHub Actions self-hosted runner](#github-actions-self-hosted-runner), disabled by default.
+* Azure Monitor Agent (`AzureMonitorLinuxAgent` extension) associated with the root module's Linux data collection rule and data collection endpoint, sending syslog (including SSH sign-in and `sudo` activity) and performance counters to the root module's Log Analytics workspace through the AMPLS private endpoint. The agent is installed after the `AADSSHLoginForLinux` extension, so the two installs don't contend for the apt and dpkg locks.
 
 ## GitHub Actions Self-Hosted Runner
 
@@ -330,6 +331,8 @@ Variable | Default | Description
 --- | --- | ---
 admin_username | `devopsbootstrapadmin` | The user name for the admin account on the VM.
 admin_username_secret | adminuser | The name of the key vault secret that contains the user name for the break-glass admin account.
+data_collection_endpoint_id | | The ID of the data collection endpoint (DCE) defined in the root module, associated with the VM.
+data_collection_rule_linux_id | | The ID of the Linux data collection rule (DCR) defined in the root module, associated with the VM.
 enable_github_runner | false | When enabled the GitHub Actions self-hosted runner agent is installed on the VM and registered with the repository or organization specified in `github_runner_url`. When disabled nothing is installed.
 github_runner_enable_vwan_sudoers | `true` | Set to true to grant the runner service account command scoped passwordless sudo for the binaries used by the `vwan` point-to-site VPN integration tests. Only used when `enable_github_runner` is true.
 github_runner_group | `Default` | The name of the GitHub Actions runner group to register the runner with. Ignored for repository level runners, which do not support runner groups. Only used when `enable_github_runner` is true.
@@ -345,6 +348,7 @@ github_runner_version | `2.338.0` | The version of the GitHub Actions runner age
 key_vault_id | | The ID of the key vault defined in the root module.
 key_vault_name | | The name of the key vault defined in the root module. Used by cloud-init to read secrets from the VM using the managed identity.
 location | | The Azure region where the resources will be created. Defined in the root module.
+log_analytics_workspace_id | | The ID of the Log Analytics workspace defined in the root module. Receives the network interface metrics.
 resource_group_name | | The name of the resource group defined in the root module.
 ssh_private_key_version | 1 | Increment to rewrite the break-glass `ssh_private_key` key vault secret, for example after replacing `tls_private_key.ssh_key`.
 storage_account_id | | The resource ID of of the storage account defined in the root module.
@@ -370,11 +374,16 @@ module.vm_jumpbox_linux.azurerm_key_vault_secret.github_runner_token[0] | github
 module.vm_jumpbox_linux.azurerm_key_vault_secret.ssh_private_key | jumplinux2&#8209;ssh&#8209;private&#8209;key | The break-glass private SSH key for the admin account, stored in Azure Key Vault.
 module.vm_jumpbox_linux[0].azurerm_linux_virtual_machine.this | jumplinux2 | The Linux virtual machine resource.
 module.vm_jumpbox_linux[0].azurerm_network_interface.this | nic&#8209;devops&#8209;dev&#8209;jumplinux2 | The network interface associated with the Linux virtual machine.
+module.vm_jumpbox_linux.azurerm_monitor_data_collection_rule_association.dce | configurationAccessEndpoint | Associates the VM with the data collection endpoint so the Azure Monitor Agent retrieves its configuration through the AMPLS private endpoint.
+module.vm_jumpbox_linux.azurerm_monitor_data_collection_rule_association.dcr | dcr&#8209;devops&#8209;dev&#8209;jumplinux2&#8209;association | Associates the VM with the Linux data collection rule.
+module.vm_jumpbox_linux.azurerm_monitor_diagnostic_setting.network_interface | Diagnostic Logs | Sends network interface metrics to the Log Analytics workspace.
 module.vm_jumpbox_linux.azurerm_role_assignment.operator_vm_admin_login | | Grants `Virtual Machine Administrator Login` role on jumplinux2 to the operator applying the configuration, enabling Microsoft Entra ID SSH sign-in with passwordless `sudo`.
 module.vm_jumpbox_linux.azurerm_role_assignment.github_runner_key_vault[0] | | Grants `Key Vault Secrets User` role to the managed identity of jumplinux2 so cloud-init can read the GitHub registration token. Created only when `var.enable_github_runner` is enabled.
 module.vm_jumpbox_linux.azurerm_role_assignment.this | | Grants `Storage Blob Data Contributor` role to the managed identity of jumplinux2. This is intended to be used for accessing a Terraform state backend hosted in Azure Blob Storage.
 module.vm_jumpbox_linux.azurerm_virtual_machine_extension.aad_ssh_login | | The `AADSSHLoginForLinux` extension that enables Microsoft Entra ID SSH sign-in. Installed after `wait_for_cloud_init` to avoid apt lock contention.
+module.vm_jumpbox_linux.azurerm_virtual_machine_extension.ama | AzureMonitorLinuxAgent | The Azure Monitor Agent. Installed after `aad_ssh_login` to avoid apt lock contention.
 module.vm_jumpbox_linux.azurerm_virtual_machine_run_command.wait_for_cloud_init | | Waits for cloud-init termination and dpkg/apt idle checks, with or without the optional runner.
+module.vm_jumpbox_linux.terraform_data.log_analytics_operations_complete | | Dependency signal for the root module's AMPLS barrier.
 module.vm_jumpbox_linux.tls_private_key.ssh_key | | The break-glass SSH key pair for the admin account.
 
 ### Output Variables
@@ -384,5 +393,6 @@ This section includes a list of output variables returned by the module.
 Name | Description
 --- | ---
 github_runner_name | The name the GitHub Actions self-hosted runner is registered with, or `null` when `var.enable_github_runner` is false.
+log_analytics_operations_complete | Dependency signal: the Azure Monitor Agent, the data collection rule and endpoint associations, and the network interface diagnostic setting are complete. Consumed by the root module's `ampls_access_barrier`.
 resource_ids | A map of resource IDs for key resources in the module.
 resource_names | A map of resource names for key resources in the module.

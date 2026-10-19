@@ -10,4 +10,14 @@ resource "azurerm_network_interface" "this" {
     private_ip_address_allocation = "Dynamic"
   }
 }
+
+resource "azurerm_monitor_diagnostic_setting" "network_interface" {
+  name                       = "Diagnostic Logs"
+  target_resource_id         = azurerm_network_interface.this.id
+  log_analytics_workspace_id = var.log_analytics_workspace_id
+
+  enabled_metric {
+    category = "AllMetrics"
+  }
+}
 #endregion

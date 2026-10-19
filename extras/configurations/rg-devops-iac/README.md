@@ -31,6 +31,10 @@ This section provides a brief overview of the features included in this configur
   * Public access is enabled by design since there may be the first environment provisioned in Azure. This can be disabled once a platform landing zone is in place.
   * Shared access keys are disabled by default and Azure RBAC is used for authorization.
 * A pre-configured key vault for managing secrets
+* Network-isolated observability, including:
+  * A Log Analytics workspace that accepts ingestion and queries only through an Azure Monitor Private Link Scope (AMPLS) private endpoint in the devops virtual network
+  * Diagnostic settings that send logs and metrics to the workspace for every resource in this configuration that supports them, for example key vault audit events (including break-glass SSH key retrieval), Terraform state blob reads and writes, and Bastion sign-ins
+  * Azure Monitor Agent on the Linux virtual machine, with a data collection rule for syslog (including SSH sign-in and `sudo` activity) and performance counters
 * A pre-configured Linux virtual machine for use as a Terraform execution environment implemented as a module for inclusion in other configurations, including:
   * No public IP address. Operators connect through Azure Bastion and sign in with Microsoft Entra ID using short-lived OpenSSH certificates, including Visual Studio Code Remote-SSH through a Bastion tunnel
   * Key vault secrets for a break-glass local admin account, used only when Microsoft Entra ID sign-in fails
@@ -620,7 +624,7 @@ This configuration is organized into the following structure:
 │   ├── cleanterraformtemp.sh             # Bash helper script for removing Terraform temp/local files
 │   ├── connect-jumplinux2.sh             # Bash helper script for connecting to jumplinux2 through a Bastion tunnel with Entra ID
 │   ├── Connect-Jumplinux2.ps1            # PowerShell helper script for connecting to jumplinux2 through a Bastion tunnel with Entra ID
-│   ├── enable-public-access.sh           # Bash helper script for re-enabling public access on key vault/storage account
+│   ├── enable-public-access.sh           # Bash helper script for re-enabling public access on key vault/storage account (not the AMPLS or workspace)
 │   ├── grant-graph-permissions.sh        # Bash helper script for granting Microsoft Graph permissions to a deployment identity
 │   └── delete-tfstate.sh                 # Bash helper script for deleting Terraform state blob(s) from the storage backend
 ├── locals.tf                             # Local variables 
@@ -648,6 +652,7 @@ github_runner_token_secret_version | 1 | Increment to write a new value for the 
 github_runner_token_type | `pat` | The type of token supplied in `github_runner_token`, either `pat` or `registration`.
 github_runner_url | | The GitHub repository or organization URL to register the self-hosted runner with, e.g. `https://github.com/myorg/myrepo`. Required when `enable_github_runner` is true.
 location | | The name of the Azure Region where resources will be provisioned.
+log_analytics_workspace_retention_days | 30 | The retention period in days for the Log Analytics workspace. Must be one of 30, 31, 60, 90, 120, 180, 270, 365, 550 or 730.
 storage_access_tier | Hot | The access tier for the new storage account.
 storage_replication_type | LRS | The type of replication for the new storage account.
 subnet_bastion_address_prefix | 10.0.2.0/26 | The address prefix for the `AzureBastionSubnet`. Must be /26 or larger.
@@ -668,15 +673,38 @@ The root module includes a resource group, key vault and storage account used by
 
 Address | Name | Notes
 --- | --- | ---
+azapi_update_resource.ampls_disable_public_access | | Sets the AMPLS ingestion and query access modes to `PrivateOnly` after the AMPLS barrier.
+azapi_update_resource.key_vault_disable_public_access | | Disables key vault public network access after the key vault barrier.
+azapi_update_resource.log_analytics_disable_public_access | | Disables public ingestion and query on the Log Analytics workspace after the AMPLS barrier.
+azapi_update_resource.storage_disable_public_access | | Disables storage account public network access after the storage barrier.
 azurerm_bastion_host.this | snap-devops-dev | Azure Bastion host (Standard SKU, native client support enabled). The only inbound path to the Linux virtual machine.
 azurerm_key_vault.this | kv-devops-dev-xxx | Used to store secrets for the Linux virtual machine.
+azurerm_log_analytics_workspace.this | log-devops-dev-xxx | Log Analytics workspace that receives diagnostic settings and Azure Monitor Agent data. Public ingestion and query are disabled by the AMPLS barrier.
+azurerm_monitor_data_collection_endpoint.this | dce-devops-dev-xxx | Data collection endpoint used by the Azure Monitor Agent on `jumplinux2`. Scoped to the AMPLS.
+azurerm_monitor_data_collection_rule.linux | dcr-devops-dev-linux | Linux data collection rule: syslog (`auth` and `authpriv` at `Info` and above, other facilities at `Warning` and above) and performance counters.
+azurerm_monitor_diagnostic_setting.bastion | Diagnostic Logs | Sends `BastionAuditLogs` and metrics for the Bastion host to the workspace.
+azurerm_monitor_diagnostic_setting.data_collection_rule_linux | Diagnostic Logs | Sends data collection errors (`allLogs`) and metrics for the Linux data collection rule to the workspace.
+azurerm_monitor_diagnostic_setting.key_vault | Audit Logs | Sends key vault `audit` logs (including secret reads) and metrics to the workspace.
+azurerm_monitor_diagnostic_setting.log_analytics | Diagnostic Logs | Sends workspace query `audit` logs and metrics to the workspace itself.
+azurerm_monitor_diagnostic_setting.network_security_group_devops | Diagnostic Logs | Sends NSG event and rule counter logs (`allLogs`) to the workspace.
+azurerm_monitor_diagnostic_setting.public_ip_bastion | Diagnostic Logs | Sends DDoS logs (`allLogs`) and metrics for the Bastion public IP to the workspace.
+azurerm_monitor_diagnostic_setting.public_ip_nat | Diagnostic Logs | Sends DDoS logs (`allLogs`) and metrics for the NAT gateway public IP to the workspace.
+azurerm_monitor_diagnostic_setting.storage_account | Diagnostic Logs | Sends storage account `Transaction` metrics to the workspace.
+azurerm_monitor_diagnostic_setting.storage_blob | Diagnostic Logs | Sends blob service `StorageRead`, `StorageWrite` and `StorageDelete` logs (Terraform state access) and `Transaction` metrics to the workspace.
+azurerm_monitor_diagnostic_setting.virtual_network | Diagnostic Logs | Sends virtual network logs (`allLogs`) and metrics to the workspace.
+azurerm_monitor_private_link_scope.this | ampls-devops-dev | Azure Monitor Private Link Scope. Starts in `Open` mode and is set to `PrivateOnly` by the AMPLS barrier.
+azurerm_monitor_private_link_scoped_service.dce | ampls-scope-dce | Adds the data collection endpoint to the AMPLS.
+azurerm_monitor_private_link_scoped_service.log_analytics | ampls-scope-log-analytics | Adds the Log Analytics workspace to the AMPLS.
 azurerm_nat_gateway.this | ng-devops-dev | NAT gateway for outbound internet connectivity.
 azurerm_nat_gateway_public_ip_association.this | | Associates the NAT gateway with the public IP address.
 azurerm_network_security_group.devops | nsg-devops-dev-snet-devops-01 | NSG that allows inbound SSH (port 22) to the Linux virtual machine only from the `AzureBastionSubnet`.
+azurerm_private_dns_zone.ampls[*] | privatelink.monitor.azure.com, privatelink.oms.opinsights.azure.com, privatelink.ods.opinsights.azure.com, privatelink.agentsvc.azure-automation.net | Private DNS zones for the AMPLS private endpoint
 azurerm_private_dns_zone.key_vault | privatelink.vaultcore.azure.net | Private DNS zone for Azure Key Vault
 azurerm_private_dns_zone.storage_blob | privatelink.blob.core.windows.net | Private DNS zone for Azure blob storage
+azurerm_private_dns_zone_virtual_network_link.ampls[*] | | Links the AMPLS private dns zones to azurerm_virtual_network.this
 azurerm_private_dns_zone_virtual_network_link.key_vault | | Links private dns zone to azurerm_virtual_network.this
 azurerm_private_dns_zone_virtual_network_link.storage_blob | | Links private dns zone to azurerm_virtual_network.this
+azurerm_private_endpoint.ampls | pe-devops-dev-ampls | Private endpoint for the AMPLS (`azuremonitor` subresource)
 azurerm_private_endpoint.key_vault | pe-devops-dev-key-vault | Private endpoint for Azure key vault
 azurerm_private_endpoint.storage_blob | pe-devops-dev-storage-blob | Private endpoint for Azure blob storage
 azurerm_public_ip.bastion | pip-devops-dev-bastion | Public IP address for the Bastion host.
@@ -695,6 +723,11 @@ azurerm_subnet_nat_gateway_association.devops | vnet-devops-dev-devops| Associat
 azurerm_subnet_network_security_group_association.this | | Associates the NSG with the subnet.
 azurerm_user_assigned_identity.deployment[0] | uai-devops-dev-xxx | Deployment identity for root sandbox applies with `auth_mode = "managed_identity"`, attached to `jumplinux2`. Created only when `deployment_identity` is `managed_identity`.
 azurerm_virtual_network.this | vnet-devops-dev-devops | Virtual network for the Linux virtual machine.
+terraform_data.ampls_access_barrier | | Waits for every Azure Monitor write (scoped services, private endpoint, DNS zone links, diagnostic settings, and the `jumplinux2` agent and associations) before the AMPLS and workspace are closed to public networks.
+terraform_data.key_vault_access_barrier | | Waits for the key vault secret writes before key vault public access is disabled.
+terraform_data.storage_access_barrier | | Waits for the storage container before storage account public access is disabled.
+
+Diagnostic settings are not created for resources that don't support exporting logs or metrics through a diagnostic setting: the NAT gateway (its flow logs require the StandardV2 SKU), private endpoints, private DNS zones, the AMPLS, the data collection endpoint and the user-assigned managed identity. Their platform metrics remain available in Azure Monitor metrics explorer. The Linux virtual machine sends guest data through the Azure Monitor Agent instead of a diagnostic setting.
 
 ### Root Module Output Variables
 
@@ -721,8 +754,23 @@ Name | Required | Depends On | Description
 This configuration implements a virtual network. Default address ranges are set artificially high for demos and readability and can be overridden with smaller ranges to meet specific requirements. An firewall is not included in this configuration by design as it may be used as an startup environment to provision a platform landing zone or sandbox that does include a firewall. The virtual network includes three subnets:
 
 * A subnet for the Linux virtual machine. The subnet is configured with a NAT gateway for outbound internet connectivity and an NSG that allows inbound SSH only from the `AzureBastionSubnet`.
-* A subnet for PrivateLink endpoints for Azure Key Vault and Azure Blob Storage
+* A subnet for PrivateLink endpoints for Azure Key Vault, Azure Blob Storage and the Azure Monitor Private Link Scope (AMPLS)
 * The `AzureBastionSubnet` for the Azure Bastion host, which is the only inbound path to the Linux virtual machine. The Linux virtual machine has no public IP address.
+
+All private DNS zones are linked to the virtual network with `resolution_policy = "NxDomainRedirect"` (fallback to internet). This setting affects name resolution only: when a linked zone has no record for a name, Azure DNS resolves the name publicly instead of returning `NXDOMAIN`. It doesn't route traffic, and the target resource's own network settings still apply.
+
+#### Observability network isolation
+
+The AMPLS private endpoint changes how Azure Monitor endpoints resolve across the whole devops virtual network:
+
+* Shared (global and regional) Azure Monitor endpoints, such as the `api` endpoint used for Log Analytics and Application Insights queries, have records in the `privatelink.monitor.azure.com` zone, so they always resolve to this AMPLS private endpoint.
+* After the barrier sets the AMPLS to `PrivateOnly`, clients in the devops virtual network can reach only the Azure Monitor resources in this AMPLS through those shared endpoints.
+* Names for Azure Monitor resources outside this AMPLS, such as a root sandbox workspace, fall back to public resolution and are governed by those resources' own public network settings.
+* Don't link the AMPLS private DNS zones to any other virtual network, such as a root sandbox virtual network that has its own AMPLS.
+
+After the barrier closes, the Log Analytics workspace accepts queries only from inside the devops virtual network, for example from `jumplinux2` using `az monitor log-analytics query`. Portal and Azure CLI queries from outside the virtual network fail. `./scripts/enable-public-access.sh` intentionally doesn't reopen the AMPLS or the workspace: it reopens only the key vault (secrets) and storage account (Terraform state). Terraform's Azure Monitor writes, such as diagnostic settings, use the Azure Resource Manager control plane and don't need public access.
+
+**Cost note:** Log Analytics charges for data ingestion and for retention beyond the included period. The volume in this configuration is low: mostly key vault and blob audit events (every Terraform plan and apply reads the state blob), Bastion sign-ins, syslog and one-minute performance counters from one virtual machine. Use `log_analytics_workspace_retention_days` to control retention. See [Azure Monitor pricing](https://azure.microsoft.com/pricing/details/monitor/).
 
 ### Dependencies
 

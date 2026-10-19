@@ -82,3 +82,34 @@ resource "azurerm_role_assignment" "operator_vm_admin_login" {
   scope                = azurerm_linux_virtual_machine.this.id
 }
 #endregion
+
+#region azure-monitor
+# Installing the agent uses apt, so it waits for the Entra ID SSH extension (which waits for cloud-init)
+# to avoid contending for the dpkg/apt locks.
+resource "azurerm_virtual_machine_extension" "ama" {
+  name                       = "AzureMonitorLinuxAgent"
+  virtual_machine_id         = azurerm_linux_virtual_machine.this.id
+  publisher                  = "Microsoft.Azure.Monitor"
+  type                       = "AzureMonitorLinuxAgent"
+  type_handler_version       = "1.33"
+  auto_upgrade_minor_version = true
+  automatic_upgrade_enabled  = true
+
+  depends_on = [azurerm_virtual_machine_extension.aad_ssh_login]
+}
+
+resource "azurerm_monitor_data_collection_rule_association" "dcr" {
+  name                    = "${module.naming.monitor_data_collection_rule.name}-${var.vm_jumpbox_linux_name}-association"
+  target_resource_id      = azurerm_linux_virtual_machine.this.id
+  data_collection_rule_id = var.data_collection_rule_linux_id
+
+  depends_on = [azurerm_virtual_machine_extension.ama]
+}
+
+resource "azurerm_monitor_data_collection_rule_association" "dce" {
+  target_resource_id          = azurerm_linux_virtual_machine.this.id
+  data_collection_endpoint_id = var.data_collection_endpoint_id
+
+  depends_on = [azurerm_virtual_machine_extension.ama]
+}
+#endregion
