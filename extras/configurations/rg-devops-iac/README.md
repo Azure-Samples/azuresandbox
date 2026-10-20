@@ -544,6 +544,16 @@ Residual exposure:
 * The time-bound roles belong to the identity, not to a single run. Another approved run during the same window can use them. The workflow's concurrency group runs one deployment at a time.
 * During a run, the job's federated token is passed to Azure CLI on the runner's command line, where other processes on `jumplinux2` can see it.
 
+##### Runner power state identity
+
+With `deployment_identity = "oidc"`, this configuration also creates a second, separate user-assigned managed identity that starts `jumplinux2` before an approved workflow run and deallocates it afterwards, from jobs on GitHub-hosted runners. It is unrelated to the deployment identity and can't deploy anything. It is:
+
+* Not attached to any virtual machine.
+* Assigned the built-in `Desktop Virtualization Power On Off Contributor` role on `jumplinux2` only. Despite its name, it's the built-in role for starting and stopping virtual machines. Scoped to the virtual machine, it allows only reading it and changing its power state (start, deallocate, power off and restart). It can't run commands, change extensions or delete the virtual machine. `Virtual Machine Contributor` isn't used because it allows all of those.
+* Given one federated identity credential for the `github_runner_power_state_environment` environment (default `sandbox-runner-power-state`), with a subject in the same format as the deployment identity's. The `runner_power_state_identity_github_subject` output shows it. The environment must differ from those in `github_oidc_environments`, so a token issued to one identity's jobs is never accepted by the other identity.
+
+Create the `sandbox-runner-power-state` environment in the repository and restrict it to the `main` branch. Don't add required reviewers: the start job waits for the approval of the deployment environment before it starts the virtual machine, so a second approval isn't needed.
+
 ### Step 4: Validate and Apply Configuration
 
 Remember that Terraform will compare the state of existing resources in Azure with what it expects to be there when creating a plan. If the state of existing resources in Azure does not match what Terraform expects, the plan will modify existing resources to match the configuration. This can happen when resources are modified manually or via Policy outside of Terraform. This is known as "drift".
@@ -757,6 +767,7 @@ github_oidc_environments | `["sandbox-deployment", "sandbox-release-gate"]` | Th
 github_repository_id | | The numeric id of the repository whose workflows may federate to the deployment identity, e.g. from `gh api repos/OWNER/NAME --jq .id`. Only used when `deployment_identity` is `oidc`. When empty, it is looked up anonymously from the GitHub API using the repository in `github_runner_url`; set it for a private repository.
 github_repository_owner_id | | The numeric id of the user or organization that owns the repository, e.g. from `gh api repos/OWNER/NAME --jq .owner.id`. Only used when `deployment_identity` is `oidc`. When empty, it is looked up anonymously from the GitHub API using the repository in `github_runner_url`; set it for a private repository.
 github_runner_labels | `["azuresandbox"]` | Additional labels to apply to the GitHub Actions self-hosted runner. Only used when `enable_github_runner` is true.
+github_runner_power_state_environment | `sandbox-runner-power-state` | The GitHub Actions environment allowed to federate to the runner power state identity, which starts and deallocates `jumplinux2` for workflow runs. It must not be one of `github_oidc_environments`. Only used when `deployment_identity` is `oidc`. See [Runner power state identity](#runner-power-state-identity).
 github_runner_token | | A GitHub personal access token or runner registration token used to register the self-hosted runner. Set interactively or using an environment variable 'TF_VAR_github_runner_token'. Required when `enable_github_runner` is true.
 github_runner_token_secret_version | 1 | Increment to write a new value for the GitHub runner token key vault secret.
 github_runner_token_type | `pat` | The type of token supplied in `github_runner_token`, either `pat` or `registration`.
@@ -789,6 +800,7 @@ azapi_update_resource.log_analytics_disable_public_access | | Disables public in
 azapi_update_resource.storage_disable_public_access | | Disables storage account public network access after the storage barrier.
 azurerm_bastion_host.this | snap-devops-dev | Azure Bastion host (Standard SKU, native client support enabled). The only inbound path to the Linux virtual machine.
 azurerm_federated_identity_credential.deployment_identity_github[*] | github-sandbox-deployment, github-sandbox-release-gate | Trusts GitHub Actions OIDC tokens for the deployment identity, one per environment in `github_oidc_environments`. Created only when `deployment_identity` is `oidc`.
+azurerm_federated_identity_credential.runner_power_state_github[0] | github-sandbox-runner-power-state | Trusts GitHub Actions OIDC tokens for the runner power state identity from the `github_runner_power_state_environment` environment. Created only when `deployment_identity` is `oidc`.
 azurerm_key_vault.this | kv-devops-dev-xxx | Used to store secrets for the Linux virtual machine.
 azurerm_log_analytics_workspace.this | log-devops-dev-xxx | Log Analytics workspace that receives diagnostic settings and Azure Monitor Agent data. Public ingestion and query are disabled by the AMPLS barrier.
 azurerm_monitor_data_collection_endpoint.this | dce-devops-dev-xxx | Data collection endpoint used by the Azure Monitor Agent on `jumplinux2`. Scoped to the AMPLS.
@@ -826,6 +838,7 @@ azurerm_role_assignment.storage_blob_data_contributor | | Assigns `Storage Blob 
 azurerm_role_assignment.deployment_identity_contributor[0] | | Assigns `Contributor` at the subscription scope to the deployment identity. Created only when `deployment_identity` is `managed_identity`.
 azurerm_role_assignment.deployment_identity_rbac_admin[0] | | Assigns `Role Based Access Control Administrator` at the subscription scope to the deployment identity, with a condition that allows only the roles in `local.deployment_identity_assignable_roles`. Created only when `deployment_identity` is `managed_identity`.
 azurerm_role_assignment.deployment_identity_reader[0] | | Assigns standing `Reader` at the subscription scope to the deployment identity. Created only when `deployment_identity` is `oidc`.
+azurerm_role_assignment.runner_power_state[0] | | Assigns `Desktop Virtualization Power On Off Contributor` on `jumplinux2` to the runner power state identity. Created only when `deployment_identity` is `oidc`.
 azurerm_storage_account.this | stdevopsdevxxx | Storage account for storing Terraform state files.
 azurerm_storage_container.this | tfstate | Storage container for storing Terraform state files.
 azurerm_subnet.bastion | AzureBastionSubnet | Subnet for the Bastion host. The name is required by Azure.
@@ -834,6 +847,7 @@ azurerm_subnet.privatelink | snet-privatelink-03 | Subnet for PrivateLink endpoi
 azurerm_subnet_nat_gateway_association.devops | vnet-devops-dev-devops| Associates the NAT gateway with the subnet.
 azurerm_subnet_network_security_group_association.this | | Associates the NSG with the subnet.
 azurerm_user_assigned_identity.deployment[0] | uai-devops-dev-xxx | Deployment identity for root sandbox applies. Attached to `jumplinux2` when `deployment_identity` is `managed_identity`; unattached and federated with GitHub Actions when it is `oidc`. Not created when `deployment_identity` is `none`.
+azurerm_user_assigned_identity.runner_power_state[0] | uai-devops-dev-runner-xxx | Runner power state identity that starts and deallocates `jumplinux2` for workflow runs. Unattached and federated with GitHub Actions. Created only when `deployment_identity` is `oidc`.
 azurerm_virtual_network.this | vnet-devops-dev-devops | Virtual network for the Linux virtual machine.
 terraform_data.ampls_access_barrier | | Waits for every Azure Monitor write (scoped services, private endpoint, DNS zone links, diagnostic settings, and the `jumplinux2` agent and associations) before the AMPLS and workspace are closed to public networks.
 terraform_data.key_vault_access_barrier | | Waits for the key vault secret writes before key vault public access is disabled.
@@ -853,6 +867,8 @@ deployment_identity_jit_condition | The condition (version 2.0) to apply to the 
 deployment_identity_principal_id | The principal (object) id of the deployment identity, used to grant Microsoft Graph application permissions, or `null` when `deployment_identity` is `none`.
 github_runner_name | The name the GitHub Actions self-hosted runner is registered with, or `null` when `enable_github_runner` is false.
 resource_ids | A map of resource IDs for key resources in the configuration.
+runner_power_state_identity_client_id | The client id of the runner power state identity, which the Sandbox deployment workflow uses to start and deallocate `jumplinux2`, or `null` unless `deployment_identity` is `oidc`.
+runner_power_state_identity_github_subject | The GitHub OIDC subject accepted by the runner power state identity's federated identity credential, or `null` unless `deployment_identity` is `oidc`.
 resource_names | A map of resource names for key resources in the configuration.
 
 ### Child Modules

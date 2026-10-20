@@ -60,4 +60,7 @@ locals {
     for environment in var.github_oidc_environments :
     environment => "repository_owner_id:${local.github_repository_owner_id}:repository_id:${local.github_repository_id}:environment:${environment}"
   } : {}
+
+  # GitHub OIDC subject accepted by the runner power state identity, in the same format.
+  github_runner_power_state_subject = var.deployment_identity == "oidc" ? "repository_owner_id:${local.github_repository_owner_id}:repository_id:${local.github_repository_id}:environment:${var.github_runner_power_state_environment}" : null
 }
