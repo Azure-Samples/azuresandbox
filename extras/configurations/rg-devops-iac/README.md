@@ -507,30 +507,35 @@ After the apply, complete these one-time steps:
 1. In both the `sandbox-deployment` and `sandbox-release-gate` environments, update `SANDBOX_TFVARS_HCL` to set `auth_mode = "oidc"` and `client_id` to the `deployment_identity_client_id` output.
 1. Optionally, set the `SANDBOX_JIT_MIN_REMAINING_MINUTES` repository or environment variable (default `150`, range `0`-`1440`, where `0` skips the remaining-time check).
 
-Before approving each run, grant the identity its deployment roles just in time:
-
-1. Activate your eligible subscription `Owner` assignment through PIM. See [Least-Privilege Operator Access with Privileged Identity Management](#least-privilege-operator-access-with-privileged-identity-management).
-1. In the Azure portal, go to the subscription > *Access control (IAM)* > *Add* > *Add role assignment*. Select `Contributor`, then *Managed identity* > *User-assigned managed identity* > the deployment identity. Set *Assignment type* to *Active* and *Time bound*, with a 4-hour duration starting now. Review and assign.
-1. Repeat for `Role Based Access Control Administrator`. On the *Conditions* tab, open the advanced condition editor's code view and paste the output of `terraform output -raw deployment_identity_jit_condition`. Without this condition the identity could assign any role, including `Owner`.
-1. Approve the workflow run. Preflight waits up to 5 minutes for the roles to take effect. It fails if either role isn't active, or if less than `SANDBOX_JIT_MIN_REMAINING_MINUTES` remains on either assignment. It accepts a permanent assignment with a warning. Apply and unit-test check that both roles are still active before they start.
-1. After the run, remove the assignments or let them expire.
-
-The 4-hour grant and 2.5-hour minimum cover preflight, a full apply and unit testing. The workflow never destroys a sandbox. Tear down manually, from a terminal with your own access or while a grant is active.
-
-If the portal doesn't offer the condition with a time-bound assignment, make the equivalent request with the Azure CLI, signed in as the operator with `Owner` active:
+Before approving each run, grant the identity its deployment roles just in time. Run `./scripts/grant-jit-roles.sh` as the operator, from any directory, with Azure CLI signed in:
 
 ```bash
-SUB=$(az account show --query id -o tsv)
-BODY=$(jq -n \
-  --arg principal "$(terraform output -raw deployment_identity_principal_id)" \
-  --arg role "/subscriptions/$SUB/providers/Microsoft.Authorization/roleDefinitions/f58310d9-a9f6-439a-9e8d-f62e7b41a168" \
-  --arg condition "$(terraform output -raw deployment_identity_jit_condition)" \
-  '{properties: {principalId: $principal, roleDefinitionId: $role, requestType: "AdminAssign",
-    condition: $condition, conditionVersion: "2.0",
-    scheduleInfo: {startDateTime: (now | todate), expiration: {type: "AfterDuration", duration: "PT4H"}}}}')
-az rest --method put --body "$BODY" \
-  --url "https://management.azure.com/subscriptions/$SUB/providers/Microsoft.Authorization/roleAssignmentScheduleRequests/$(uuidgen)?api-version=2020-10-01"
+./scripts/grant-jit-roles.sh             # grant both roles for 8 hours
+./scripts/grant-jit-roles.sh --hours 6   # grant a different window (1-24 hours)
+./scripts/grant-jit-roles.sh --force     # replace assignments that are already active
+./scripts/grant-jit-roles.sh --revoke    # remove both assignments after the run
 ```
+
+The script:
+
+1. Reads the identity, subscription and condition from this configuration's terraform outputs.
+1. Activates your eligible subscription `Owner` assignment through PIM for 1 hour, unless `Owner` or `User Access Administrator` is already active. If PIM requires approval or multifactor authentication that Azure CLI can't satisfy, activate `Owner` in the portal and run the script again. See [Least-Privilege Operator Access with Privileged Identity Management](#least-privilege-operator-access-with-privileged-identity-management).
+1. Assigns `Contributor`, and `Role Based Access Control Administrator` constrained by the `deployment_identity_jit_condition` output, as time-bound active assignments on the subscription. Without the condition the identity could assign any role, including `Owner`. Assignments that are already active are kept unless you pass `--force`.
+1. Lists the assignments' end times, and warns if less than `SANDBOX_JIT_MIN_REMAINING_MINUTES` remains. For `Role Based Access Control Administrator`, it lists the actions the applied condition restricts and the roles the identity can assign and remove, and checks that the condition matches the `deployment_identity_jit_condition` output.
+
+To grant the roles in the portal instead, activate `Owner`, then go to the subscription > *Access control (IAM)* > *Add* > *Add role assignment*. Assign `Contributor` to *Managed identity* > *User-assigned managed identity* > the deployment identity, with *Assignment type* set to *Active* and *Time bound* for 8 hours starting now. Repeat for `Role Based Access Control Administrator`, and on the *Conditions* tab paste the output of `terraform output -raw deployment_identity_jit_condition` into the advanced condition editor's code view.
+
+Wait for the new assignments to appear in PIM's list of active assignments before you approve the run. This can take about 5 minutes after the grant, even though the assignments already show in the portal's *Access control (IAM)* blade. Preflight reads the end times from that list, and fails with "Could not find an active assignment" if the roles aren't listed yet. Check with the Azure CLI:
+
+```bash
+az rest --method get \
+  --url "https://management.azure.com/subscriptions/$(az account show --query id -o tsv)/providers/Microsoft.Authorization/roleAssignmentScheduleInstances?api-version=2020-10-01&\$filter=principalId+eq+'$(terraform output -raw deployment_identity_principal_id)'" \
+  --query "value[].properties.{role: expandedProperties.roleDefinition.displayName, end: endDateTime}" -o table
+```
+
+Approve when `Contributor` and `Role Based Access Control Administrator` are listed with end times. Preflight waits up to 5 minutes for the roles to take effect. It fails if either role isn't active, or if less than `SANDBOX_JIT_MIN_REMAINING_MINUTES` remains on either assignment. It accepts a permanent assignment with a warning. Apply and unit-test check that both roles are still active before they start. After the run, revoke the assignments or let them expire.
+
+The 8-hour grant and 2.5-hour minimum cover preflight, a full apply and unit testing, with time left for a manual teardown while the grant is active. The workflow never destroys a sandbox. Tear down manually, from a terminal with your own access or while a grant is active.
 
 Residual exposure:
 
@@ -727,6 +732,7 @@ This configuration is organized into the following structure:
 │   ├── Connect-Jumplinux2.ps1            # PowerShell helper script for connecting to jumplinux2 through a Bastion tunnel with Entra ID
 │   ├── enable-public-access.sh           # Bash helper script for re-enabling public access on key vault/storage account (not the AMPLS or workspace)
 │   ├── grant-graph-permissions.sh        # Bash helper script for granting Microsoft Graph permissions to a deployment identity
+│   ├── grant-jit-roles.sh                # Bash helper script for granting the OIDC deployment identity its time-bound deployment roles
 │   └── delete-tfstate.sh                 # Bash helper script for deleting Terraform state blob(s) from the storage backend
 ├── locals.tf                             # Local variables 
 ├── main.tf                               # Resource configurations
