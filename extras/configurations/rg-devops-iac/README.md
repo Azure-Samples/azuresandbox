@@ -181,6 +181,18 @@ waits for them and refuses to start unless enough of the grant remains. The
 state backend still uses the virtual machine's system-assigned identity. See
 [Optional: Deployment Identity for OIDC Workflow Applies](#optional-deployment-identity-for-oidc-workflow-applies).
 
+Preflight also checks that the runner's Terraform CLI satisfies the
+`required_version` in the deployed branch's root `terraform.tf`, using
+Terraform's own constraint check. A compatible runner is used as-is, even if
+it is newer than the version static CI uses. Otherwise preflight installs the
+`X.Y.Z` version that `ci-terraform.yml` derives from the same constraint,
+through a root-owned wrapper the runner service account may run with `sudo`,
+and checks again before `terraform init`. The job summary records the
+constraint, the version used, and whether it was installed. Runners
+provisioned before the wrapper existed fail preflight with a request to
+re-provision rg-devops-iac. See
+[Terraform Version on the Runner](modules/vm-jumpbox-linux/README.md#terraform-version-on-the-runner).
+
 Before any approval request, a release PR run calls the six static CI
 workflows (`ci-bash`, `ci-powershell`, `ci-docs`, `ci-actions`, `ci-secrets`,
 and `ci-terraform`) as reusable workflows from the trusted `main` revision.
@@ -420,7 +432,7 @@ Workflows running on the runner should store Terraform state in the `azurerm` ba
 
 If the registration URL is a repository URL the runner is registered as a repository level runner and runner groups do not apply. See [Runner Scope](./modules/vm-jumpbox-linux/README.md#runner-scope).
 
-By default the runner service account is granted command scoped passwordless `sudo` for the binaries used by the `vwan` point-to-site VPN integration tests. Review [Elevated Permissions for Integration Tests](./modules/vm-jumpbox-linux/README.md#elevated-permissions-for-integration-tests) and disable it if the runner will not execute those tests.
+By default the runner service account is granted command scoped passwordless `sudo` for the binaries used by the `vwan` point-to-site VPN integration tests. Review [Elevated Permissions for Integration Tests](./modules/vm-jumpbox-linux/README.md#elevated-permissions-for-integration-tests) and disable it if the runner will not execute those tests. The runner service account is also always granted passwordless `sudo` for a wrapper that installs a specific Terraform version; see [Terraform Version on the Runner](./modules/vm-jumpbox-linux/README.md#terraform-version-on-the-runner).
 
 #### **Optional: Deployment Identity for Managed Identity Sandbox Applies**
 
