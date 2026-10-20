@@ -7,6 +7,27 @@ data "azurerm_role_definition" "deployment_identity_assignable" {
   name  = each.value
   scope = "/subscriptions/${var.subscription_id}"
 }
+
+# Looks up the numeric repository and owner ids for the oidc deployment identity's federated credentials, unless both
+# are supplied. The request is anonymous because data source arguments are saved in state, so it works only for
+# public repositories.
+data "http" "github_repository" {
+  count = local.github_repository_lookup ? 1 : 0
+
+  url = "https://api.github.com/repos/${trimprefix(var.github_runner_url, "https://github.com/")}"
+
+  request_headers = {
+    Accept                 = "application/vnd.github+json"
+    "X-GitHub-Api-Version" = "2022-11-28"
+  }
+
+  lifecycle {
+    postcondition {
+      condition     = self.status_code == 200
+      error_message = "Could not look up ${var.github_runner_url} anonymously (HTTP ${self.status_code}). For a private repository, or if the GitHub API rate limit is exceeded, set github_repository_id and github_repository_owner_id."
+    }
+  }
+}
 #endregion
 
 #region resources

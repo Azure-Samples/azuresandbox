@@ -466,12 +466,18 @@ The [Sandbox deployment workflow](../../../.github/workflows/sandbox-deployment.
 To enable it, add the following to the `terraform.tfvars` file:
 
 ```hcl
-deployment_identity        = "oidc"
+deployment_identity = "oidc"
+github_runner_url   = "https://github.com/OWNER/NAME" # a repository URL
+```
+
+The federated credentials trust workflows in that repository in the environments in `github_oidc_environments`. It defaults to the workflow's two environments, `sandbox-deployment` and `sandbox-release-gate`. The credentials identify the repository and its owner by numeric id, which doesn't change if either is renamed. Terraform looks the ids up from the GitHub API on each plan. The request is anonymous, because data source arguments are saved in state, so it works only for public repositories and is subject to GitHub's rate limit for unauthenticated requests. For a private repository, or to avoid the lookup, set both ids:
+
+```hcl
 github_repository_id       = "123456789" # gh api repos/OWNER/NAME --jq .id
 github_repository_owner_id = "987654321" # gh api repos/OWNER/NAME --jq .owner.id
 ```
 
-The federated credentials trust workflows in that repository, by id, in the environments in `github_oidc_environments`. It defaults to the workflow's two environments, `sandbox-deployment` and `sandbox-release-gate`. See [Root Module Input Variables](#root-module-input-variables).
+See [Root Module Input Variables](#root-module-input-variables).
 
 When enabled, the identity is:
 
@@ -742,13 +748,13 @@ deployment_identity | `none` | The identity this configuration provisions for ro
 enable_github_runner | false | Set to true to install and register the GitHub Actions self-hosted runner agent on `jumplinux2`. See [vm-jumpbox-linux](./modules/vm-jumpbox-linux/README.md#github-actions-self-hosted-runner).
 entra_tenant_id | | The Microsoft Entra tenant id.
 github_oidc_environments | `["sandbox-deployment", "sandbox-release-gate"]` | The GitHub Actions environments allowed to federate to the deployment identity. One federated identity credential is created per environment. Only used when `deployment_identity` is `oidc`.
-github_repository_id | | The numeric id of the repository whose workflows may federate to the deployment identity, e.g. from `gh api repos/OWNER/NAME --jq .id`. Required when `deployment_identity` is `oidc`.
-github_repository_owner_id | | The numeric id of the user or organization that owns the repository in `github_repository_id`, e.g. from `gh api repos/OWNER/NAME --jq .owner.id`. Required when `deployment_identity` is `oidc`.
+github_repository_id | | The numeric id of the repository whose workflows may federate to the deployment identity, e.g. from `gh api repos/OWNER/NAME --jq .id`. Only used when `deployment_identity` is `oidc`. When empty, it is looked up anonymously from the GitHub API using the repository in `github_runner_url`; set it for a private repository.
+github_repository_owner_id | | The numeric id of the user or organization that owns the repository, e.g. from `gh api repos/OWNER/NAME --jq .owner.id`. Only used when `deployment_identity` is `oidc`. When empty, it is looked up anonymously from the GitHub API using the repository in `github_runner_url`; set it for a private repository.
 github_runner_labels | `["azuresandbox"]` | Additional labels to apply to the GitHub Actions self-hosted runner. Only used when `enable_github_runner` is true.
 github_runner_token | | A GitHub personal access token or runner registration token used to register the self-hosted runner. Set interactively or using an environment variable 'TF_VAR_github_runner_token'. Required when `enable_github_runner` is true.
 github_runner_token_secret_version | 1 | Increment to write a new value for the GitHub runner token key vault secret.
 github_runner_token_type | `pat` | The type of token supplied in `github_runner_token`, either `pat` or `registration`.
-github_runner_url | | The GitHub repository or organization URL to register the self-hosted runner with, e.g. `https://github.com/myorg/myrepo`. Required when `enable_github_runner` is true.
+github_runner_url | | The GitHub repository or organization URL to register the self-hosted runner with, e.g. `https://github.com/myorg/myrepo`. Required when `enable_github_runner` is true. When `deployment_identity` is `oidc` and the repository ids are not set, it must be a repository URL; the ids are looked up from it.
 location | | The name of the Azure Region where resources will be provisioned.
 log_analytics_workspace_retention_days | 30 | The retention period in days for the Log Analytics workspace. Must be one of 30, 31, 60, 90, 120, 180, 270, 365, 550 or 730.
 storage_access_tier | Hot | The access tier for the new storage account.
