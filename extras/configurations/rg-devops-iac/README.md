@@ -42,7 +42,9 @@ This section provides a brief overview of the features included in this configur
   * Pre-configured environment variables for Terraform azurerm provider to use managed identities
   * Pre-installed software for IaC / DevOps projects
   * Optional registration as a GitHub Actions self-hosted runner for CI/CD workflows (disabled by default)
-  * Optional deployment identity: a user-assigned managed identity with subscription `Contributor` and conditioned `Role Based Access Control Administrator` for sandbox applies with `auth_mode = "managed_identity"` (disabled by default)
+  * Optional deployment identity (disabled by default), either:
+    * a user-assigned managed identity attached to the Linux virtual machine, with standing subscription `Contributor` and conditioned `Role Based Access Control Administrator`, for sandbox applies with `auth_mode = "managed_identity"`, or
+    * an unattached user-assigned managed identity with standing subscription `Reader` and GitHub Actions federated identity credentials, for approval-gated workflow applies with `auth_mode = "oidc"` after the operator grants time-bound roles
 
 **NOTE:** The Linux virtual machine is implemented as a module so it can be easily reused in other configurations. It is not intended to be used as a production jumpbox. It is intended to be used as a Terraform execution environment for DevOps / IaC projects.
 
@@ -64,10 +66,16 @@ This section describes the prerequisites required in order to provision this con
 
 ### Self-Hosted Runner and Managed Identity Prerequisites (Optional)
 
-These prerequisites apply only if you plan to use this configuration as a self-hosted runner that deploys Azure Sandbox with managed identity authentication (`enable_github_runner = true` and `deployment_identity = "managed_identity"`). Arrange them **before** provisioning, because some of them need privileged roles that the person running the deployment may not hold.
+These prerequisites apply only if you plan to use this configuration as a self-hosted runner that deploys Azure Sandbox with a deployment identity (`enable_github_runner = true` and `deployment_identity = "managed_identity"` or `"oidc"`). Arrange them **before** provisioning, because some of them need privileged roles that the person running the deployment may not hold.
 
 * **GitHub repository administrator.** Registering a repository-level runner needs a fine-grained personal access token with `Administration: Read and write` on the target repository, created by a repository administrator. See [Optional: GitHub Actions Self-Hosted Runner](#optional-github-actions-self-hosted-runner).
 * **Microsoft Entra Privileged Role Administrator or Global Administrator.** Required only if the sandbox will be deployed with the `mssql` module enabled. The user-assigned managed identity then needs the Microsoft Graph `Group.Create`, `GroupMember.Read.All`, `User.Read.All` and `Application.Read.All` application permissions, and only one of these Entra roles can grant them. An Owner on the subscription cannot grant them. Read-only Entra roles such as Global Reader are not enough. Privileged Role Administrator is the least privileged role that works. If your organization uses [Privileged Identity Management](https://learn.microsoft.com/entra/id-governance/privileged-identity-management/pim-configure), activate an eligible assignment for the grant, or arrange for an administrator to run it. The grant is a one-time step after the identity is created. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies).
+* **OIDC deployment identity only (`deployment_identity = "oidc"`).**
+  * Microsoft Entra ID P2 or Microsoft Entra ID Governance, for the time-bound role assignments the operator grants before each workflow run.
+  * A subscription `Owner` (for example, the operator with `Owner` activated through PIM) to grant those assignments.
+  * A GitHub repository administrator to set the repository's OIDC subject claim template once.
+
+  See [Optional: Deployment Identity for OIDC Workflow Applies](#optional-deployment-identity-for-oidc-workflow-applies).
 
 ### Other Prerequisites
 
@@ -163,6 +171,15 @@ and owner approval. Keep their deployment branch restrictions on `main`,
 the trusted workflow context, and explicitly allow `pull_request_target`
 and `workflow_dispatch` in an Actions event policy scoped only to
 `.github/workflows/sandbox-deployment.yml`.
+
+The workflow authenticates the sandbox providers only with GitHub OIDC:
+`SANDBOX_TFVARS_HCL` must set `auth_mode = "oidc"` and `client_id` to the
+OIDC deployment identity's client id, and preflight rejects any other mode.
+Only the `sandbox` job has `id-token: write`. Before approving a run, the
+operator grants the identity time-bound roles in the Azure portal; preflight
+waits for them and refuses to start unless enough of the grant remains. The
+state backend still uses the virtual machine's system-assigned identity. See
+[Optional: Deployment Identity for OIDC Workflow Applies](#optional-deployment-identity-for-oidc-workflow-applies).
 
 Before any approval request, a release PR run calls the six static CI
 workflows (`ci-bash`, `ci-powershell`, `ci-docs`, `ci-actions`, `ci-secrets`,
@@ -440,6 +457,76 @@ The script reads the identity from the `deployment_identity_principal_id` output
 
 Managed identities have no app registration, so the Entra admin center **API permissions** steps used for a service principal do not apply. Use the script above instead. The grant is removed automatically if the identity is deleted.
 
+#### **Optional: Deployment Identity for OIDC Workflow Applies**
+
+The [Sandbox deployment workflow](../../../.github/workflows/sandbox-deployment.yml) authenticates the root sandbox providers with GitHub OIDC (`auth_mode = "oidc"`; see [Deployment Identity and Authentication](#deployment-identity-and-authentication)). It federates to a user-assigned managed identity that is **not** attached to any virtual machine, so code on `jumplinux2` can't get tokens for it from the managed identity endpoint. Only an approved run of the trusted workflow can. The identity holds standing `Reader` only. Before each run, the operator grants it time-bound deployment roles. This is **disabled by default**.
+
+`deployment_identity` takes a single value, so this replaces the attached `managed_identity` identity. Switching an existing deployment from `managed_identity` to `oidc` keeps the same identity and client id, removes its standing deployment roles, and detaches it from `jumplinux2` in place.
+
+To enable it, add the following to the `terraform.tfvars` file:
+
+```hcl
+deployment_identity  = "oidc"
+github_runner_url    = "https://github.com/OWNER/NAME" # must be a repository URL
+github_repository_id = "123456789"                     # gh api repos/OWNER/NAME --jq .id
+```
+
+The federated credentials trust the repository in `github_runner_url`, so the runner must be registered at repository level. `github_oidc_environments` and `github_oidc_workflow_ref` default to the workflow's two environments (`sandbox-deployment` and `sandbox-release-gate`) and to `.github/workflows/sandbox-deployment.yml@refs/heads/main`. See [Root Module Input Variables](#root-module-input-variables).
+
+When enabled, the identity is:
+
+* Created in the resource group provisioned by this configuration.
+* Assigned standing `Reader` at the subscription scope, so the workflow can sign in and check its own grant before it changes anything.
+* Given one federated identity credential per environment, with issuer `https://token.actions.githubusercontent.com` and audience `api://AzureADTokenExchange`. Each subject combines the repository id, the environment and the workflow file and ref. The `deployment_identity_github_subjects` output lists them.
+* Not attached to `jumplinux2`. The state backend keeps using the virtual machine's system-assigned identity.
+
+After the apply, complete these one-time steps:
+
+1. If the sandbox will be deployed with the `mssql` module enabled, grant the Microsoft Graph application permissions with `./scripts/grant-graph-permissions.sh`, as described in [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies). Microsoft Graph application permissions can't be time-bound, so they stay standing. Only approved workflow runs can use them.
+1. As a repository administrator, set the repository's OIDC subject claim template. Do this **after** the federated credentials exist, because it changes the subject of every OIDC token the repository issues:
+
+   ```bash
+   gh api --method PUT repos/OWNER/NAME/actions/oidc/customization/sub --input - <<'EOF'
+   {"use_default":false,"include_claim_keys":["repository_id","environment","workflow_ref"]}
+   EOF
+   gh api repos/OWNER/NAME/actions/oidc/customization/sub   # verify
+   ```
+
+   The template uses `workflow_ref` because GitHub sets `job_workflow_ref` only for reusable workflows. Any other workflow that federates to Azure from this repository must use subjects in the same format.
+1. In both the `sandbox-deployment` and `sandbox-release-gate` environments, update `SANDBOX_TFVARS_HCL` to set `auth_mode = "oidc"` and `client_id` to the `deployment_identity_client_id` output.
+1. Optionally, set the `SANDBOX_JIT_MIN_REMAINING_MINUTES` repository or environment variable (default `150`, range `0`-`1440`, where `0` skips the remaining-time check).
+
+Before approving each run, grant the identity its deployment roles just in time:
+
+1. Activate your eligible subscription `Owner` assignment through PIM. See [Least-Privilege Operator Access with Privileged Identity Management](#least-privilege-operator-access-with-privileged-identity-management).
+1. In the Azure portal, go to the subscription > *Access control (IAM)* > *Add* > *Add role assignment*. Select `Contributor`, then *Managed identity* > *User-assigned managed identity* > the deployment identity. Set *Assignment type* to *Active* and *Time bound*, with a 4-hour duration starting now. Review and assign.
+1. Repeat for `Role Based Access Control Administrator`. On the *Conditions* tab, open the advanced condition editor's code view and paste the output of `terraform output -raw deployment_identity_jit_condition`. Without this condition the identity could assign any role, including `Owner`.
+1. Approve the workflow run. Preflight waits up to 5 minutes for the roles to take effect. It fails if either role isn't active, or if less than `SANDBOX_JIT_MIN_REMAINING_MINUTES` remains on either assignment. It accepts a permanent assignment with a warning. Apply and unit-test check that both roles are still active before they start.
+1. After the run, remove the assignments or let them expire.
+
+The 4-hour grant and 2.5-hour minimum cover preflight, a full apply and unit testing. The workflow never destroys a sandbox. Tear down manually, from a terminal with your own access or while a grant is active.
+
+If the portal doesn't offer the condition with a time-bound assignment, make the equivalent request with the Azure CLI, signed in as the operator with `Owner` active:
+
+```bash
+SUB=$(az account show --query id -o tsv)
+BODY=$(jq -n \
+  --arg principal "$(terraform output -raw deployment_identity_principal_id)" \
+  --arg role "/subscriptions/$SUB/providers/Microsoft.Authorization/roleDefinitions/f58310d9-a9f6-439a-9e8d-f62e7b41a168" \
+  --arg condition "$(terraform output -raw deployment_identity_jit_condition)" \
+  '{properties: {principalId: $principal, roleDefinitionId: $role, requestType: "AdminAssign",
+    condition: $condition, conditionVersion: "2.0",
+    scheduleInfo: {startDateTime: (now | todate), expiration: {type: "AfterDuration", duration: "PT4H"}}}}')
+az rest --method put --body "$BODY" \
+  --url "https://management.azure.com/subscriptions/$SUB/providers/Microsoft.Authorization/roleAssignmentScheduleRequests/$(uuidgen)?api-version=2020-10-01"
+```
+
+Residual exposure:
+
+* The identity's standing `Reader` role and Microsoft Graph permissions are usable by any approved run of the trusted workflow in the allowed environments.
+* The time-bound roles belong to the identity, not to a single run. Another approved run during the same window can use them. The workflow's concurrency group runs one deployment at a time.
+* During a run, the job's federated token is passed to Azure CLI on the runner's command line, where other processes on `jumplinux2` can see it.
+
 ### Step 4: Validate and Apply Configuration
 
 Remember that Terraform will compare the state of existing resources in Azure with what it expects to be there when creating a plan. If the state of existing resources in Azure does not match what Terraform expects, the plan will modify existing resources to match the configuration. This can happen when resources are modified manually or via Policy outside of Terraform. This is known as "drift".
@@ -505,7 +592,7 @@ If you only need to remove Terraform state file(s) from the Azure Blob Storage c
 
 ## Deployment Identity and Authentication
 
-This section is the reference for how the root sandbox configuration authenticates to Azure and Microsoft Entra ID. Most sandbox users deploy interactively with a service principal, as described in the root README's [Service Principal](../../../README.md#service-principal) prerequisites; the managed identity mode below supports automated and secretless deployments from this configuration's Linux virtual machine.
+This section is the reference for how the root sandbox configuration authenticates to Azure and Microsoft Entra ID. Most sandbox users deploy interactively with a service principal, as described in the root README's [Service Principal](../../../README.md#service-principal) prerequisites. The managed identity and OIDC modes below support secretless deployments from this configuration's Linux virtual machine, from a terminal and from the Sandbox deployment workflow, respectively.
 
 This configuration itself does not use these modes. It always authenticates as the operator signed in to Azure CLI; see [Operator](#operator).
 
@@ -517,17 +604,18 @@ The root configuration's `auth_mode` variable selects how Terraform authenticate
 --- | --- | --- | ---
 `client_secret` (default) | Service principal `appId` | `client_secret`, supplied with the `TF_VAR_client_secret` environment variable | Interactive execution from any client. See [Service Principal](../../../README.md#service-principal) in the root README.
 `managed_identity` | Client id of a user-assigned managed identity attached to the Terraform execution host | Managed identity endpoint of the host. No secret. | Secretless execution on the rg-devops-iac Linux virtual machine.
+`oidc` | Client id of an unattached user-assigned managed identity with GitHub Actions federated identity credentials | GitHub Actions OIDC token, requested by the providers from the job's `ACTIONS_ID_TOKEN_REQUEST_URL`. No secret. | The [Sandbox deployment workflow](../../../.github/workflows/sandbox-deployment.yml) on the self-hosted runner. Works only inside a GitHub Actions job with `id-token: write`.
 
 Variable | Description
 --- | ---
-`auth_mode` | `client_secret` or `managed_identity`. Defaults to `client_secret`.
+`auth_mode` | `client_secret`, `managed_identity` or `oidc`. Defaults to `client_secret`.
 `client_id` | The client id of the identity Terraform authenticates as.
 `client_secret` | The service principal secret. Required only when `auth_mode` is `client_secret`. Set it with `TF_VAR_client_secret`; never store it in a file.
 `entra_tenant_id` | The Microsoft Entra tenant id.
 
 ### Deployment Identity Permissions
 
-The identity Terraform authenticates as needs the same permissions in every authentication mode. None of them is `Owner`.
+The identity Terraform authenticates as needs the same permissions in every authentication mode. None of them is `Owner`. In `oidc` mode, the two Azure RBAC roles are time-bound grants the operator makes before each workflow run, on top of a standing `Reader` role. See [Optional: Deployment Identity for OIDC Workflow Applies](#optional-deployment-identity-for-oidc-workflow-applies).
 
 Permission | Scope | Why
 --- | --- | ---
@@ -544,8 +632,9 @@ When you add a module that assigns a new Azure RBAC role, add the role to the `R
   ```
 
 * **Managed identity:** re-apply this configuration.
+* **OIDC:** re-apply this configuration, then use the updated `deployment_identity_jit_condition` output for the next grant.
 
-For `client_secret` mode, see [Service Principal](../../../README.md#service-principal) in the root README. For `managed_identity` mode, set `deployment_identity = "managed_identity"` in this configuration. It creates the user-assigned managed identity, assigns both Azure RBAC roles on the subscription, and attaches the identity to its Linux virtual machine. Use the `deployment_identity_client_id` output as `client_id`, and grant the Microsoft Graph permissions with `scripts/grant-graph-permissions.sh`. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies).
+For `client_secret` mode, see [Service Principal](../../../README.md#service-principal) in the root README. For `managed_identity` mode, set `deployment_identity = "managed_identity"` in this configuration. It creates the user-assigned managed identity, assigns both Azure RBAC roles on the subscription, and attaches the identity to its Linux virtual machine. Use the `deployment_identity_client_id` output as `client_id`, and grant the Microsoft Graph permissions with `scripts/grant-graph-permissions.sh`. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies). For `oidc` mode, set `deployment_identity = "oidc"`. See [Optional: Deployment Identity for OIDC Workflow Applies](#optional-deployment-identity-for-oidc-workflow-applies).
 
 ### Operator
 
@@ -591,7 +680,7 @@ Things to know:
 * PIM may not prompt for multifactor authentication on activation if the portal session already has a multifactor authentication claim. Use a Conditional Access authentication context to require it on every activation.
 * The *Check access* current view hides eligible assignments. Check the *Eligible assignments* tab.
 * Recovery path: activate Global Administrator, turn on *Access management for Azure resources*, grant `Owner`, then turn it back off. The emergency access account is the last resort.
-* Removing the operator's `Owner` assignment doesn't affect sandbox applies by the deployment identity, which keeps `Contributor` plus the conditioned `Role Based Access Control Administrator` role.
+* Removing the operator's `Owner` assignment doesn't affect sandbox applies by a `managed_identity` deployment identity, which keeps standing `Contributor` plus the conditioned `Role Based Access Control Administrator` role. An `oidc` deployment identity has only standing `Reader`, so the operator activates `Owner` to grant its time-bound roles before each workflow run.
 * In managed tenants, provider automation may re-add standing assignments, so check again after a day.
 
 ### State Backend Authentication
@@ -643,14 +732,17 @@ This section lists input variables used in the root module. Defaults can be over
 
 Variable | Default | Description
 --- | --- | ---
-deployment_identity | `none` | The identity this configuration provisions for root sandbox deployments: `none` or `managed_identity`. `managed_identity` creates a user-assigned managed identity with `Contributor` and conditioned `Role Based Access Control Administrator` role assignments on the subscription and attaches it to `jumplinux2`, for root sandbox applies with `auth_mode = "managed_identity"`. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies).
+deployment_identity | `none` | The identity this configuration provisions for root sandbox deployments: `none`, `managed_identity` or `oidc`. `managed_identity` creates a user-assigned managed identity with standing `Contributor` and conditioned `Role Based Access Control Administrator` role assignments on the subscription and attaches it to `jumplinux2`, for root sandbox applies with `auth_mode = "managed_identity"`. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies). `oidc` creates an unattached user-assigned managed identity with standing `Reader` on the subscription and GitHub Actions federated identity credentials, for workflow applies with `auth_mode = "oidc"` after the operator grants time-bound roles. See [Optional: Deployment Identity for OIDC Workflow Applies](#optional-deployment-identity-for-oidc-workflow-applies).
 enable_github_runner | false | Set to true to install and register the GitHub Actions self-hosted runner agent on `jumplinux2`. See [vm-jumpbox-linux](./modules/vm-jumpbox-linux/README.md#github-actions-self-hosted-runner).
 entra_tenant_id | | The Microsoft Entra tenant id.
+github_oidc_environments | `["sandbox-deployment", "sandbox-release-gate"]` | The GitHub Actions environments allowed to federate to the deployment identity. One federated identity credential is created per environment. Only used when `deployment_identity` is `oidc`.
+github_oidc_workflow_ref | `.github/workflows/sandbox-deployment.yml@refs/heads/main` | The workflow path and ref allowed to federate to the deployment identity, matched against the GitHub OIDC `workflow_ref` claim after the repository prefix. Only used when `deployment_identity` is `oidc`.
+github_repository_id | | The numeric id of the repository in `github_runner_url`, e.g. from `gh api repos/OWNER/NAME --jq .id`. Required when `deployment_identity` is `oidc`.
 github_runner_labels | `["azuresandbox"]` | Additional labels to apply to the GitHub Actions self-hosted runner. Only used when `enable_github_runner` is true.
 github_runner_token | | A GitHub personal access token or runner registration token used to register the self-hosted runner. Set interactively or using an environment variable 'TF_VAR_github_runner_token'. Required when `enable_github_runner` is true.
 github_runner_token_secret_version | 1 | Increment to write a new value for the GitHub runner token key vault secret.
 github_runner_token_type | `pat` | The type of token supplied in `github_runner_token`, either `pat` or `registration`.
-github_runner_url | | The GitHub repository or organization URL to register the self-hosted runner with, e.g. `https://github.com/myorg/myrepo`. Required when `enable_github_runner` is true.
+github_runner_url | | The GitHub repository or organization URL to register the self-hosted runner with, e.g. `https://github.com/myorg/myrepo`. Required when `enable_github_runner` is true. When `deployment_identity` is `oidc`, it must be a repository URL; the deployment identity trusts workflows from that repository.
 location | | The name of the Azure Region where resources will be provisioned.
 log_analytics_workspace_retention_days | 30 | The retention period in days for the Log Analytics workspace. Must be one of 30, 31, 60, 90, 120, 180, 270, 365, 550 or 730.
 storage_access_tier | Hot | The access tier for the new storage account.
@@ -678,6 +770,7 @@ azapi_update_resource.key_vault_disable_public_access | | Disables key vault pub
 azapi_update_resource.log_analytics_disable_public_access | | Disables public ingestion and query on the Log Analytics workspace after the AMPLS barrier.
 azapi_update_resource.storage_disable_public_access | | Disables storage account public network access after the storage barrier.
 azurerm_bastion_host.this | snap-devops-dev | Azure Bastion host (Standard SKU, native client support enabled). The only inbound path to the Linux virtual machine.
+azurerm_federated_identity_credential.deployment_identity_github[*] | github-sandbox-deployment, github-sandbox-release-gate | Trusts GitHub Actions OIDC tokens for the deployment identity, one per environment in `github_oidc_environments`. Created only when `deployment_identity` is `oidc`.
 azurerm_key_vault.this | kv-devops-dev-xxx | Used to store secrets for the Linux virtual machine.
 azurerm_log_analytics_workspace.this | log-devops-dev-xxx | Log Analytics workspace that receives diagnostic settings and Azure Monitor Agent data. Public ingestion and query are disabled by the AMPLS barrier.
 azurerm_monitor_data_collection_endpoint.this | dce-devops-dev-xxx | Data collection endpoint used by the Azure Monitor Agent on `jumplinux2`. Scoped to the AMPLS.
@@ -714,6 +807,7 @@ azurerm_role_assignment.key_vault_secrets_officer | | Assigns `Key Vault Secrets
 azurerm_role_assignment.storage_blob_data_contributor | | Assigns `Storage Blob Data Contributor` on the storage account to the operator signed in to Azure CLI.
 azurerm_role_assignment.deployment_identity_contributor[0] | | Assigns `Contributor` at the subscription scope to the deployment identity. Created only when `deployment_identity` is `managed_identity`.
 azurerm_role_assignment.deployment_identity_rbac_admin[0] | | Assigns `Role Based Access Control Administrator` at the subscription scope to the deployment identity, with a condition that allows only the roles in `local.deployment_identity_assignable_roles`. Created only when `deployment_identity` is `managed_identity`.
+azurerm_role_assignment.deployment_identity_reader[0] | | Assigns standing `Reader` at the subscription scope to the deployment identity. Created only when `deployment_identity` is `oidc`.
 azurerm_storage_account.this | stdevopsdevxxx | Storage account for storing Terraform state files.
 azurerm_storage_container.this | tfstate | Storage container for storing Terraform state files.
 azurerm_subnet.bastion | AzureBastionSubnet | Subnet for the Bastion host. The name is required by Azure.
@@ -721,7 +815,7 @@ azurerm_subnet.devops | snet-devops-01 | Subnet for jumplinux2 VM
 azurerm_subnet.privatelink | snet-privatelink-03 | Subnet for PrivateLink endpoints
 azurerm_subnet_nat_gateway_association.devops | vnet-devops-dev-devops| Associates the NAT gateway with the subnet.
 azurerm_subnet_network_security_group_association.this | | Associates the NSG with the subnet.
-azurerm_user_assigned_identity.deployment[0] | uai-devops-dev-xxx | Deployment identity for root sandbox applies with `auth_mode = "managed_identity"`, attached to `jumplinux2`. Created only when `deployment_identity` is `managed_identity`.
+azurerm_user_assigned_identity.deployment[0] | uai-devops-dev-xxx | Deployment identity for root sandbox applies. Attached to `jumplinux2` when `deployment_identity` is `managed_identity`; unattached and federated with GitHub Actions when it is `oidc`. Not created when `deployment_identity` is `none`.
 azurerm_virtual_network.this | vnet-devops-dev-devops | Virtual network for the Linux virtual machine.
 terraform_data.ampls_access_barrier | | Waits for every Azure Monitor write (scoped services, private endpoint, DNS zone links, diagnostic settings, and the `jumplinux2` agent and associations) before the AMPLS and workspace are closed to public networks.
 terraform_data.key_vault_access_barrier | | Waits for the key vault secret writes before key vault public access is disabled.
@@ -735,7 +829,9 @@ This section includes a list of output variables returned by the root module.
 
 Name | Comments
 --- | ---
-deployment_identity_client_id | The client id of the deployment identity, used as `client_id` for root sandbox applies with `auth_mode = "managed_identity"`, or `null` when `deployment_identity` is `none`.
+deployment_identity_client_id | The client id of the deployment identity, used as `client_id` for root sandbox applies with `auth_mode = "managed_identity"` or `"oidc"`, or `null` when `deployment_identity` is `none`.
+deployment_identity_github_subjects | The GitHub OIDC subjects accepted by the deployment identity's federated identity credentials, keyed by environment, or an empty map unless `deployment_identity` is `oidc`.
+deployment_identity_jit_condition | The condition (version 2.0) to apply to the deployment identity's time-bound `Role Based Access Control Administrator` assignment before each workflow run, or `null` unless `deployment_identity` is `oidc`.
 deployment_identity_principal_id | The principal (object) id of the deployment identity, used to grant Microsoft Graph application permissions, or `null` when `deployment_identity` is `none`.
 github_runner_name | The name the GitHub Actions self-hosted runner is registered with, or `null` when `enable_github_runner` is false.
 resource_ids | A map of resource IDs for key resources in the configuration.
