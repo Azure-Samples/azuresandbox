@@ -15,15 +15,29 @@ variable "admin_username_secret" {
   default     = "adminuser"
 }
 
+variable "data_collection_endpoint_id" {
+  type        = string
+  description = "The ID of the data collection endpoint (DCE) to associate with the virtual machine."
+
+  validation {
+    condition     = can(regex("^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[a-zA-Z0-9._()-]+/providers/Microsoft.Insights/dataCollectionEndpoints/[a-zA-Z0-9-]+$", var.data_collection_endpoint_id))
+    error_message = "Must be a valid Azure Data Collection Endpoint resource ID in the format '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Insights/dataCollectionEndpoints/{dceName}'."
+  }
+}
+
+variable "data_collection_rule_linux_id" {
+  type        = string
+  description = "The ID of the Linux data collection rule (DCR) to associate with the virtual machine."
+
+  validation {
+    condition     = can(regex("^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[a-zA-Z0-9._()-]+/providers/Microsoft.Insights/dataCollectionRules/[a-zA-Z0-9-]+$", var.data_collection_rule_linux_id))
+    error_message = "Must be a valid Azure Data Collection Rule resource ID in the format '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Insights/dataCollectionRules/{dcrName}'."
+  }
+}
+
 variable "enable_github_runner" {
   type        = bool
   description = "Set to true to install and register the GitHub Actions self-hosted runner agent on the VM, false to skip it."
-  default     = false
-}
-
-variable "enable_public_access" {
-  type        = bool
-  description = "Set to true to enable public access to the VM, false to disable it."
   default     = false
 }
 
@@ -161,6 +175,16 @@ variable "location" {
   validation {
     condition     = can(regex("^[a-z0-9-]+$", var.location))
     error_message = "Must be a valid Azure region name. It should only contain lowercase letters, numbers, and dashes."
+  }
+}
+
+variable "log_analytics_workspace_id" {
+  type        = string
+  description = "The ID of the Log Analytics workspace that receives the network interface metrics."
+
+  validation {
+    condition     = can(regex("^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[a-zA-Z0-9-_()]+/providers/Microsoft.OperationalInsights/workspaces/[a-zA-Z0-9-_()]+$", var.log_analytics_workspace_id))
+    error_message = "Must be a valid Azure Resource ID for a Log Analytics workspace. It should follow the format '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.OperationalInsights/workspaces/{workspaceName}'."
   }
 }
 

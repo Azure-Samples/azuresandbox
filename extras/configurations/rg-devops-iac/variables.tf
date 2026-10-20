@@ -82,6 +82,17 @@ variable "location" {
   }
 }
 
+variable "log_analytics_workspace_retention_days" {
+  type        = string
+  description = "The retention period in days for the Log Analytics workspace."
+  default     = "30"
+
+  validation {
+    condition     = can(regex("^(30|31|60|90|120|180|270|365|550|730)$", var.log_analytics_workspace_retention_days))
+    error_message = "Must be one of the valid retention periods: 30, 31, 60, 90, 120, 180, 270, 365, 550, or 730 days."
+  }
+}
+
 variable "storage_access_tier" {
   type        = string
   description = "The access tier for the new storage account."
@@ -123,6 +134,17 @@ variable "subnet_address_prefix" {
   validation {
     condition     = can(cidrhost(var.subnet_address_prefix, 0))
     error_message = "Must be valid IPv4 CIDR."
+  }
+}
+
+variable "subnet_bastion_address_prefix" {
+  type        = string
+  description = "The address prefix for the AzureBastionSubnet. The Standard SKU Bastion host requires a /26 or larger prefix."
+  default     = "10.0.2.0/26"
+
+  validation {
+    condition     = can(cidrhost(var.subnet_bastion_address_prefix, 0)) && try(tonumber(split("/", var.subnet_bastion_address_prefix)[1]) <= 26, false)
+    error_message = "Must be valid IPv4 CIDR with a prefix length of /26 or larger (e.g. /26, /25)."
   }
 }
 

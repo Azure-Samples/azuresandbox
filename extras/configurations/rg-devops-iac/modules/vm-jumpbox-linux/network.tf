@@ -8,23 +8,16 @@ resource "azurerm_network_interface" "this" {
     name                          = "Primary"
     subnet_id                     = var.subnet_id
     private_ip_address_allocation = "Dynamic"
-    public_ip_address_id          = var.enable_public_access ? azurerm_public_ip.this[0].id : null
   }
 }
 
-resource "azurerm_public_ip" "this" {
-  count               = var.enable_public_access ? 1 : 0
-  name                = "${module.naming.public_ip.name}-${var.vm_jumpbox_linux_name}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  allocation_method   = "Static"
-  sku                 = "Standard"
+resource "azurerm_monitor_diagnostic_setting" "network_interface" {
+  name                       = "Diagnostic Logs"
+  target_resource_id         = azurerm_network_interface.this.id
+  log_analytics_workspace_id = var.log_analytics_workspace_id
 
-  lifecycle {
-    # Azure injects ip_tags such as 'FirstPartyUsage' after creation. Since ip_tags forces
-    # replacement, reconciling that drift would destroy and recreate the public IP on every
-    # subsequent apply, changing the address and breaking SSH access to the VM.
-    ignore_changes = [ip_tags]
+  enabled_metric {
+    category = "AllMetrics"
   }
 }
 #endregion
