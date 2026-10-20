@@ -76,7 +76,9 @@ function Invoke-SandboxCommand {
         [string]$OutputPath,
         [AllowNull()][string]$InputText,
         # Logged instead of Arguments when they contain a credential.
-        [string[]]$LogArguments
+        [string[]]$LogArguments,
+        # Returns the exit code instead of stopping the stage when the command fails.
+        [switch]$AllowFailure
     )
     $logged = if ($LogArguments) { $LogArguments } else { $Arguments }
     Write-SandboxLog "`n[$([DateTimeOffset]::UtcNow.ToString('o'))] $($logged | ConvertTo-Json -Compress)`n"
@@ -140,6 +142,7 @@ function Invoke-SandboxCommand {
         Write-SandboxLog ($stdout.GetAwaiter().GetResult() + $stderr.GetAwaiter().GetResult())
         $code = $process.ExitCode
         Write-SandboxLog "[$([DateTimeOffset]::UtcNow.ToString('o'))] Exit code: $code`n"
+        if ($AllowFailure) { return $code }
         if ($code -ne 0) {
             Stop-SandboxStage 'Command failed; see the private stage log.' ([Math]::Max(1, $code))
         }
@@ -260,6 +263,73 @@ function Confirm-SandboxJitGrant {
     Write-SandboxSummary "Just-in-time grant: $([int][Math]::Floor($remaining.TotalMinutes)) minutes remaining (minimum $MinimumMinutes).`n`n"
 }
 
+function Get-SandboxTerraformVersion {
+    $version = (Get-SandboxOutput -Arguments @('terraform', 'version', '-json') -Name 'terraform-version.json' |
+        ConvertFrom-Json).terraform_version
+    if ($version -isnot [string] -or $version -cnotmatch '^[0-9]+\.[0-9]+\.[0-9]+') {
+        Stop-SandboxStage 'Could not read the runner Terraform version.'
+    }
+    $version
+}
+
+# Lets Terraform itself evaluate the constraint: init in a directory that declares only required_version
+# fails with "Unsupported Terraform Core version" when the installed CLI doesn't satisfy it.
+function Test-SandboxTerraformConstraint {
+    param([string]$Constraint)
+    $checkDirectory = Join-Path $script:directory 'terraform-version-check'
+    if ([System.IO.Directory]::Exists($checkDirectory)) { [System.IO.Directory]::Delete($checkDirectory, $true) }
+    $null = [System.IO.Directory]::CreateDirectory($checkDirectory)
+    try {
+        [System.IO.File]::WriteAllText((Join-Path $checkDirectory 'versions.tf'),
+            "terraform {`n  required_version = `"$Constraint`"`n}`n", $script:utf8)
+        $outputPath = Join-Path $checkDirectory 'init.txt'
+        $code = Invoke-SandboxCommand -AllowFailure -OutputPath $outputPath -Arguments @(
+            'bash', '-c', 'exec "$@" 2>&1', 'terraform-version-check',
+            'env', "TF_DATA_DIR=$checkDirectory/.terraform",
+            'terraform', "-chdir=$checkDirectory", 'init', '-backend=false', '-input=false', '-no-color'
+        )
+        $output = [System.IO.File]::ReadAllText($outputPath)
+        Write-SandboxLog $output
+        if ($code -eq 0) { return $true }
+        if ($output -cmatch 'Unsupported Terraform Core version') { return $false }
+        Stop-SandboxStage 'Could not check the runner Terraform version against required_version; see the private stage log.'
+    }
+    finally {
+        [System.IO.Directory]::Delete($checkDirectory, $true)
+    }
+}
+
+# Uses the runner's Terraform when it satisfies the deployed source's required_version, even if it is newer than
+# the version static CI uses. Otherwise installs the X.Y.Z that ci-terraform.yml derives, through the root-owned
+# wrapper that rg-devops-iac grants the runner service account.
+function Confirm-SandboxTerraformVersion {
+    $declarations = [regex]::Matches([System.IO.File]::ReadAllText((Join-Path $script:root 'terraform.tf')),
+        '(?m)^\s*required_version\s*=\s*"([^"\r\n]+)"')
+    if ($declarations.Count -ne 1) { Stop-SandboxStage 'The deployed terraform.tf must declare exactly one required_version.' }
+    $constraint = $declarations[0].Groups[1].Value
+    if ($constraint -cnotmatch '^[0-9A-Za-z.,~<>=! -]+$') { Stop-SandboxStage 'The deployed required_version is not a valid version constraint.' }
+    $installed = Get-SandboxTerraformVersion
+    if (Test-SandboxTerraformConstraint $constraint) {
+        Write-Host "preflight: Terraform $installed satisfies required_version `"$constraint`"; nothing to install."
+        Write-SandboxSummary "## Terraform`n`nrequired_version: ``$constraint``; runner Terraform ``$installed`` is compatible, nothing installed.`n`n"
+        return
+    }
+    $target = [regex]::Match($constraint, '^[^0-9]*([0-9]+\.[0-9]+\.[0-9]+)')
+    if (-not $target.Success) { Stop-SandboxStage "Runner Terraform $installed doesn't satisfy required_version, and no X.Y.Z version can be derived from it." }
+    $version = $target.Groups[1].Value
+    $installer = '/usr/local/sbin/azuresandbox-install-terraform'
+    if (-not [System.IO.File]::Exists($installer)) {
+        Stop-SandboxStage "Runner Terraform $installed doesn't satisfy required_version `"$constraint`", and $installer is missing. Re-provision rg-devops-iac to install it, or install Terraform $version on the runner."
+    }
+    Write-Host "preflight: Terraform $installed doesn't satisfy required_version `"$constraint`"; installing $version."
+    Invoke-SandboxCommand @('sudo', '-n', $installer, $version)
+    $current = Get-SandboxTerraformVersion
+    if ($current -cne $version -or -not (Test-SandboxTerraformConstraint $constraint)) {
+        Stop-SandboxStage "Installed Terraform $current doesn't satisfy required_version `"$constraint`"."
+    }
+    Write-SandboxSummary "## Terraform`n`nrequired_version: ``$constraint``; runner Terraform ``$installed`` was incompatible, installed ``$current``.`n`n"
+}
+
 function Confirm-SandboxInvocation {
     if ($env:GITHUB_REF -cne 'refs/heads/main') { Stop-SandboxStage 'Run the registered workflow in the trusted main context.' }
     if ($env:GITHUB_EVENT_NAME -ceq 'workflow_dispatch') { return }
@@ -334,7 +404,7 @@ function Invoke-SandboxPreflight {
     $script:childEnvironment['ARM_TENANT_ID'] = $backend.tenant_id
     Write-SandboxSummary "## Sandbox target`n`nDeployment: ``$script:deploymentId```n`nState key: ``$script:key```n`n[Originating run]($script:runBase$script:runId) / [Current run]($script:runBase$script:runId)`n`n"
     Invoke-SandboxCommand @('git', '--version')
-    Invoke-SandboxCommand @('terraform', 'version')
+    Confirm-SandboxTerraformVersion
     Invoke-SandboxCommand @('az', 'version')
     Invoke-SandboxCommand @('az', 'login', '--identity', '--allow-no-subscriptions', '--output', 'none')
     $exists = Get-SandboxOutput @(

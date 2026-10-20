@@ -264,6 +264,41 @@ resource "azurerm_federated_identity_credential" "deployment_identity_github" {
 }
 #endregion
 
+#region runner-power-state-identity
+# Identity used by the Sandbox deployment workflow's GitHub-hosted jobs to start the VM before an approved run and
+# deallocate it afterwards. It is not attached to any VM and is reachable only from jobs in its own GitHub environment,
+# so its federated identity credential never matches the deployment identity's subjects. Its only role is the built-in
+# 'Desktop Virtualization Power On Off Contributor' on the VM. Scoped to the VM, it allows only reading the VM and changing
+# its power state (start, deallocate, power off, restart); it can't run commands, change extensions or delete the VM.
+resource "azurerm_user_assigned_identity" "runner_power_state" {
+  count = var.deployment_identity == "oidc" ? 1 : 0
+
+  name                = module.naming_runner_power_state.user_assigned_identity.name_unique
+  location            = azurerm_resource_group.this.location
+  resource_group_name = azurerm_resource_group.this.name
+  tags                = var.tags
+}
+
+resource "azurerm_role_assignment" "runner_power_state" {
+  count = var.deployment_identity == "oidc" ? 1 : 0
+
+  principal_id         = azurerm_user_assigned_identity.runner_power_state[0].principal_id
+  principal_type       = "ServicePrincipal"
+  role_definition_name = "Desktop Virtualization Power On Off Contributor"
+  scope                = module.vm_jumpbox_linux.resource_ids["virtual_machine_jumplinux2"]
+}
+
+resource "azurerm_federated_identity_credential" "runner_power_state_github" {
+  count = var.deployment_identity == "oidc" ? 1 : 0
+
+  name                      = "github-${var.github_runner_power_state_environment}"
+  audience                  = ["api://AzureADTokenExchange"]
+  issuer                    = "https://token.actions.githubusercontent.com"
+  subject                   = local.github_runner_power_state_subject
+  user_assigned_identity_id = azurerm_user_assigned_identity.runner_power_state[0].id
+}
+#endregion
+
 #region public-access-management
 resource "terraform_data" "key_vault_access_barrier" {
   input = {
@@ -364,6 +399,14 @@ module "naming" {
   suffix                 = [var.tags["project"], var.tags["environment"]]
   unique-include-numbers = true
   unique-length          = 8
+}
+
+# Shares the random suffix of module.naming so the runner power state identity is named like the other resources.
+module "naming_runner_power_state" {
+  source      = "Azure/naming/azurerm"
+  version     = "~> 0.4.3"
+  suffix      = [var.tags["project"], var.tags["environment"], "runner"]
+  unique-seed = module.naming.unique-seed
 }
 
 module "vm_jumpbox_linux" {

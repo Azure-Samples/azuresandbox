@@ -181,6 +181,18 @@ waits for them and refuses to start unless enough of the grant remains. The
 state backend still uses the virtual machine's system-assigned identity. See
 [Optional: Deployment Identity for OIDC Workflow Applies](#optional-deployment-identity-for-oidc-workflow-applies).
 
+Preflight also checks that the runner's Terraform CLI satisfies the
+`required_version` in the deployed branch's root `terraform.tf`, using
+Terraform's own constraint check. A compatible runner is used as-is, even if
+it is newer than the version static CI uses. Otherwise preflight installs the
+`X.Y.Z` version that `ci-terraform.yml` derives from the same constraint,
+through a root-owned wrapper the runner service account may run with `sudo`,
+and checks again before `terraform init`. The job summary records the
+constraint, the version used, and whether it was installed. Runners
+provisioned before the wrapper existed fail preflight with a request to
+re-provision rg-devops-iac. See
+[Terraform Version on the Runner](modules/vm-jumpbox-linux/README.md#terraform-version-on-the-runner).
+
 Before any approval request, a release PR run calls the six static CI
 workflows (`ci-bash`, `ci-powershell`, `ci-docs`, `ci-actions`, `ci-secrets`,
 and `ci-terraform`) as reusable workflows from the trusted `main` revision.
@@ -420,7 +432,7 @@ Workflows running on the runner should store Terraform state in the `azurerm` ba
 
 If the registration URL is a repository URL the runner is registered as a repository level runner and runner groups do not apply. See [Runner Scope](./modules/vm-jumpbox-linux/README.md#runner-scope).
 
-By default the runner service account is granted command scoped passwordless `sudo` for the binaries used by the `vwan` point-to-site VPN integration tests. Review [Elevated Permissions for Integration Tests](./modules/vm-jumpbox-linux/README.md#elevated-permissions-for-integration-tests) and disable it if the runner will not execute those tests.
+By default the runner service account is granted command scoped passwordless `sudo` for the binaries used by the `vwan` point-to-site VPN integration tests. Review [Elevated Permissions for Integration Tests](./modules/vm-jumpbox-linux/README.md#elevated-permissions-for-integration-tests) and disable it if the runner will not execute those tests. The runner service account is also always granted passwordless `sudo` for a wrapper that installs a specific Terraform version; see [Terraform Version on the Runner](./modules/vm-jumpbox-linux/README.md#terraform-version-on-the-runner).
 
 #### **Optional: Deployment Identity for Managed Identity Sandbox Applies**
 
@@ -507,30 +519,35 @@ After the apply, complete these one-time steps:
 1. In both the `sandbox-deployment` and `sandbox-release-gate` environments, update `SANDBOX_TFVARS_HCL` to set `auth_mode = "oidc"` and `client_id` to the `deployment_identity_client_id` output.
 1. Optionally, set the `SANDBOX_JIT_MIN_REMAINING_MINUTES` repository or environment variable (default `150`, range `0`-`1440`, where `0` skips the remaining-time check).
 
-Before approving each run, grant the identity its deployment roles just in time:
-
-1. Activate your eligible subscription `Owner` assignment through PIM. See [Least-Privilege Operator Access with Privileged Identity Management](#least-privilege-operator-access-with-privileged-identity-management).
-1. In the Azure portal, go to the subscription > *Access control (IAM)* > *Add* > *Add role assignment*. Select `Contributor`, then *Managed identity* > *User-assigned managed identity* > the deployment identity. Set *Assignment type* to *Active* and *Time bound*, with a 4-hour duration starting now. Review and assign.
-1. Repeat for `Role Based Access Control Administrator`. On the *Conditions* tab, open the advanced condition editor's code view and paste the output of `terraform output -raw deployment_identity_jit_condition`. Without this condition the identity could assign any role, including `Owner`.
-1. Approve the workflow run. Preflight waits up to 5 minutes for the roles to take effect. It fails if either role isn't active, or if less than `SANDBOX_JIT_MIN_REMAINING_MINUTES` remains on either assignment. It accepts a permanent assignment with a warning. Apply and unit-test check that both roles are still active before they start.
-1. After the run, remove the assignments or let them expire.
-
-The 4-hour grant and 2.5-hour minimum cover preflight, a full apply and unit testing. The workflow never destroys a sandbox. Tear down manually, from a terminal with your own access or while a grant is active.
-
-If the portal doesn't offer the condition with a time-bound assignment, make the equivalent request with the Azure CLI, signed in as the operator with `Owner` active:
+Before approving each run, grant the identity its deployment roles just in time. Run `./scripts/grant-jit-roles.sh` as the operator, from any directory, with Azure CLI signed in:
 
 ```bash
-SUB=$(az account show --query id -o tsv)
-BODY=$(jq -n \
-  --arg principal "$(terraform output -raw deployment_identity_principal_id)" \
-  --arg role "/subscriptions/$SUB/providers/Microsoft.Authorization/roleDefinitions/f58310d9-a9f6-439a-9e8d-f62e7b41a168" \
-  --arg condition "$(terraform output -raw deployment_identity_jit_condition)" \
-  '{properties: {principalId: $principal, roleDefinitionId: $role, requestType: "AdminAssign",
-    condition: $condition, conditionVersion: "2.0",
-    scheduleInfo: {startDateTime: (now | todate), expiration: {type: "AfterDuration", duration: "PT4H"}}}}')
-az rest --method put --body "$BODY" \
-  --url "https://management.azure.com/subscriptions/$SUB/providers/Microsoft.Authorization/roleAssignmentScheduleRequests/$(uuidgen)?api-version=2020-10-01"
+./scripts/grant-jit-roles.sh             # grant both roles for 8 hours
+./scripts/grant-jit-roles.sh --hours 6   # grant a different window (1-24 hours)
+./scripts/grant-jit-roles.sh --force     # replace assignments that are already active
+./scripts/grant-jit-roles.sh --revoke    # remove both assignments after the run
 ```
+
+The script:
+
+1. Reads the identity, subscription and condition from this configuration's terraform outputs.
+1. Activates your eligible subscription `Owner` assignment through PIM for 1 hour, unless `Owner` or `User Access Administrator` is already active. If PIM requires approval or multifactor authentication that Azure CLI can't satisfy, activate `Owner` in the portal and run the script again. See [Least-Privilege Operator Access with Privileged Identity Management](#least-privilege-operator-access-with-privileged-identity-management).
+1. Assigns `Contributor`, and `Role Based Access Control Administrator` constrained by the `deployment_identity_jit_condition` output, as time-bound active assignments on the subscription. Without the condition the identity could assign any role, including `Owner`. Assignments that are already active are kept unless you pass `--force`.
+1. Lists the assignments' end times, and warns if less than `SANDBOX_JIT_MIN_REMAINING_MINUTES` remains. For `Role Based Access Control Administrator`, it lists the actions the applied condition restricts and the roles the identity can assign and remove, and checks that the condition matches the `deployment_identity_jit_condition` output.
+
+To grant the roles in the portal instead, activate `Owner`, then go to the subscription > *Access control (IAM)* > *Add* > *Add role assignment*. Assign `Contributor` to *Managed identity* > *User-assigned managed identity* > the deployment identity, with *Assignment type* set to *Active* and *Time bound* for 8 hours starting now. Repeat for `Role Based Access Control Administrator`, and on the *Conditions* tab paste the output of `terraform output -raw deployment_identity_jit_condition` into the advanced condition editor's code view.
+
+Wait for the new assignments to appear in PIM's list of active assignments before you approve the run. This can take about 5 minutes after the grant, even though the assignments already show in the portal's *Access control (IAM)* blade. Preflight reads the end times from that list, and fails with "Could not find an active assignment" if the roles aren't listed yet. Check with the Azure CLI:
+
+```bash
+az rest --method get \
+  --url "https://management.azure.com/subscriptions/$(az account show --query id -o tsv)/providers/Microsoft.Authorization/roleAssignmentScheduleInstances?api-version=2020-10-01&\$filter=principalId+eq+'$(terraform output -raw deployment_identity_principal_id)'" \
+  --query "value[].properties.{role: expandedProperties.roleDefinition.displayName, end: endDateTime}" -o table
+```
+
+Approve when `Contributor` and `Role Based Access Control Administrator` are listed with end times. Preflight waits up to 5 minutes for the roles to take effect. It fails if either role isn't active, or if less than `SANDBOX_JIT_MIN_REMAINING_MINUTES` remains on either assignment. It accepts a permanent assignment with a warning. Apply and unit-test check that both roles are still active before they start. After the run, revoke the assignments or let them expire.
+
+The 8-hour grant and 2.5-hour minimum cover preflight, a full apply and unit testing, with time left for a manual teardown while the grant is active. The workflow never destroys a sandbox. Tear down manually, from a terminal with your own access or while a grant is active.
 
 Residual exposure:
 
@@ -538,6 +555,16 @@ Residual exposure:
 * The identity's standing `Reader` role and Microsoft Graph permissions are usable by any approved run in the allowed environments.
 * The time-bound roles belong to the identity, not to a single run. Another approved run during the same window can use them. The workflow's concurrency group runs one deployment at a time.
 * During a run, the job's federated token is passed to Azure CLI on the runner's command line, where other processes on `jumplinux2` can see it.
+
+##### Runner power state identity
+
+With `deployment_identity = "oidc"`, this configuration also creates a second, separate user-assigned managed identity that starts `jumplinux2` before an approved workflow run and deallocates it afterwards, from jobs on GitHub-hosted runners. It is unrelated to the deployment identity and can't deploy anything. It is:
+
+* Not attached to any virtual machine.
+* Assigned the built-in `Desktop Virtualization Power On Off Contributor` role on `jumplinux2` only. Despite its name, it's the built-in role for starting and stopping virtual machines. Scoped to the virtual machine, it allows only reading it and changing its power state (start, deallocate, power off and restart). It can't run commands, change extensions or delete the virtual machine. `Virtual Machine Contributor` isn't used because it allows all of those.
+* Given one federated identity credential for the `github_runner_power_state_environment` environment (default `sandbox-runner-power-state`), with a subject in the same format as the deployment identity's. The `runner_power_state_identity_github_subject` output shows it. The environment must differ from those in `github_oidc_environments`, so a token issued to one identity's jobs is never accepted by the other identity.
+
+Create the `sandbox-runner-power-state` environment in the repository and restrict it to the `main` branch. Don't add required reviewers: the start job waits for the approval of the deployment environment before it starts the virtual machine, so a second approval isn't needed.
 
 ### Step 4: Validate and Apply Configuration
 
@@ -727,6 +754,7 @@ This configuration is organized into the following structure:
 │   ├── Connect-Jumplinux2.ps1            # PowerShell helper script for connecting to jumplinux2 through a Bastion tunnel with Entra ID
 │   ├── enable-public-access.sh           # Bash helper script for re-enabling public access on key vault/storage account (not the AMPLS or workspace)
 │   ├── grant-graph-permissions.sh        # Bash helper script for granting Microsoft Graph permissions to a deployment identity
+│   ├── grant-jit-roles.sh                # Bash helper script for granting the OIDC deployment identity its time-bound deployment roles
 │   └── delete-tfstate.sh                 # Bash helper script for deleting Terraform state blob(s) from the storage backend
 ├── locals.tf                             # Local variables 
 ├── main.tf                               # Resource configurations
@@ -751,6 +779,7 @@ github_oidc_environments | `["sandbox-deployment", "sandbox-release-gate"]` | Th
 github_repository_id | | The numeric id of the repository whose workflows may federate to the deployment identity, e.g. from `gh api repos/OWNER/NAME --jq .id`. Only used when `deployment_identity` is `oidc`. When empty, it is looked up anonymously from the GitHub API using the repository in `github_runner_url`; set it for a private repository.
 github_repository_owner_id | | The numeric id of the user or organization that owns the repository, e.g. from `gh api repos/OWNER/NAME --jq .owner.id`. Only used when `deployment_identity` is `oidc`. When empty, it is looked up anonymously from the GitHub API using the repository in `github_runner_url`; set it for a private repository.
 github_runner_labels | `["azuresandbox"]` | Additional labels to apply to the GitHub Actions self-hosted runner. Only used when `enable_github_runner` is true.
+github_runner_power_state_environment | `sandbox-runner-power-state` | The GitHub Actions environment allowed to federate to the runner power state identity, which starts and deallocates `jumplinux2` for workflow runs. It must not be one of `github_oidc_environments`. Only used when `deployment_identity` is `oidc`. See [Runner power state identity](#runner-power-state-identity).
 github_runner_token | | A GitHub personal access token or runner registration token used to register the self-hosted runner. Set interactively or using an environment variable 'TF_VAR_github_runner_token'. Required when `enable_github_runner` is true.
 github_runner_token_secret_version | 1 | Increment to write a new value for the GitHub runner token key vault secret.
 github_runner_token_type | `pat` | The type of token supplied in `github_runner_token`, either `pat` or `registration`.
@@ -783,6 +812,7 @@ azapi_update_resource.log_analytics_disable_public_access | | Disables public in
 azapi_update_resource.storage_disable_public_access | | Disables storage account public network access after the storage barrier.
 azurerm_bastion_host.this | snap-devops-dev | Azure Bastion host (Standard SKU, native client support enabled). The only inbound path to the Linux virtual machine.
 azurerm_federated_identity_credential.deployment_identity_github[*] | github-sandbox-deployment, github-sandbox-release-gate | Trusts GitHub Actions OIDC tokens for the deployment identity, one per environment in `github_oidc_environments`. Created only when `deployment_identity` is `oidc`.
+azurerm_federated_identity_credential.runner_power_state_github[0] | github-sandbox-runner-power-state | Trusts GitHub Actions OIDC tokens for the runner power state identity from the `github_runner_power_state_environment` environment. Created only when `deployment_identity` is `oidc`.
 azurerm_key_vault.this | kv-devops-dev-xxx | Used to store secrets for the Linux virtual machine.
 azurerm_log_analytics_workspace.this | log-devops-dev-xxx | Log Analytics workspace that receives diagnostic settings and Azure Monitor Agent data. Public ingestion and query are disabled by the AMPLS barrier.
 azurerm_monitor_data_collection_endpoint.this | dce-devops-dev-xxx | Data collection endpoint used by the Azure Monitor Agent on `jumplinux2`. Scoped to the AMPLS.
@@ -820,6 +850,7 @@ azurerm_role_assignment.storage_blob_data_contributor | | Assigns `Storage Blob 
 azurerm_role_assignment.deployment_identity_contributor[0] | | Assigns `Contributor` at the subscription scope to the deployment identity. Created only when `deployment_identity` is `managed_identity`.
 azurerm_role_assignment.deployment_identity_rbac_admin[0] | | Assigns `Role Based Access Control Administrator` at the subscription scope to the deployment identity, with a condition that allows only the roles in `local.deployment_identity_assignable_roles`. Created only when `deployment_identity` is `managed_identity`.
 azurerm_role_assignment.deployment_identity_reader[0] | | Assigns standing `Reader` at the subscription scope to the deployment identity. Created only when `deployment_identity` is `oidc`.
+azurerm_role_assignment.runner_power_state[0] | | Assigns `Desktop Virtualization Power On Off Contributor` on `jumplinux2` to the runner power state identity. Created only when `deployment_identity` is `oidc`.
 azurerm_storage_account.this | stdevopsdevxxx | Storage account for storing Terraform state files.
 azurerm_storage_container.this | tfstate | Storage container for storing Terraform state files.
 azurerm_subnet.bastion | AzureBastionSubnet | Subnet for the Bastion host. The name is required by Azure.
@@ -828,6 +859,7 @@ azurerm_subnet.privatelink | snet-privatelink-03 | Subnet for PrivateLink endpoi
 azurerm_subnet_nat_gateway_association.devops | vnet-devops-dev-devops| Associates the NAT gateway with the subnet.
 azurerm_subnet_network_security_group_association.this | | Associates the NSG with the subnet.
 azurerm_user_assigned_identity.deployment[0] | uai-devops-dev-xxx | Deployment identity for root sandbox applies. Attached to `jumplinux2` when `deployment_identity` is `managed_identity`; unattached and federated with GitHub Actions when it is `oidc`. Not created when `deployment_identity` is `none`.
+azurerm_user_assigned_identity.runner_power_state[0] | uai-devops-dev-runner-xxx | Runner power state identity that starts and deallocates `jumplinux2` for workflow runs. Unattached and federated with GitHub Actions. Created only when `deployment_identity` is `oidc`.
 azurerm_virtual_network.this | vnet-devops-dev-devops | Virtual network for the Linux virtual machine.
 terraform_data.ampls_access_barrier | | Waits for every Azure Monitor write (scoped services, private endpoint, DNS zone links, diagnostic settings, and the `jumplinux2` agent and associations) before the AMPLS and workspace are closed to public networks.
 terraform_data.key_vault_access_barrier | | Waits for the key vault secret writes before key vault public access is disabled.
@@ -847,6 +879,8 @@ deployment_identity_jit_condition | The condition (version 2.0) to apply to the 
 deployment_identity_principal_id | The principal (object) id of the deployment identity, used to grant Microsoft Graph application permissions, or `null` when `deployment_identity` is `none`.
 github_runner_name | The name the GitHub Actions self-hosted runner is registered with, or `null` when `enable_github_runner` is false.
 resource_ids | A map of resource IDs for key resources in the configuration.
+runner_power_state_identity_client_id | The client id of the runner power state identity, which the Sandbox deployment workflow uses to start and deallocate `jumplinux2`, or `null` unless `deployment_identity` is `oidc`.
+runner_power_state_identity_github_subject | The GitHub OIDC subject accepted by the runner power state identity's federated identity credential, or `null` unless `deployment_identity` is `oidc`.
 resource_names | A map of resource names for key resources in the configuration.
 
 ### Child Modules

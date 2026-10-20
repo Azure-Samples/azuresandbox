@@ -77,11 +77,20 @@ check_bash() {
 
 check_powershell() {
     have pwsh || { skip powershell "install PowerShell 7.x (pwsh)"; return; }
+    # ci-powershell.yml uses `-Path . -Recurse` on a clean checkout. Locally that
+    # would also scan git-ignored content such as .terraform/modules, so analyze
+    # only the tracked and untracked, non-ignored files CI could see.
     run_check powershell pwsh -NoProfile -Command '
         if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
             Write-Host "SKIPPED: install PSScriptAnalyzer 1.25.0 (Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0)"; exit 0
         }
-        $r = Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./PSScriptAnalyzerSettings.psd1 -Severity @("Error","Warning")
+        $list = git ls-files -z --cached --others --exclude-standard -- "*.ps1" "*.psm1" "*.psd1"
+        if ($LASTEXITCODE -ne 0) { Write-Host "git ls-files failed."; exit 1 }
+        $files = @(($list -join "") -split "`0" | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) } | Sort-Object -Unique)
+        $r = @(foreach ($f in $files) {
+            Invoke-ScriptAnalyzer -Path $f -Settings ./PSScriptAnalyzerSettings.psd1 -Severity @("Error","Warning")
+        })
+        Write-Host "PSScriptAnalyzer: analyzed $($files.Count) file(s)."
         if ($r) { $r | Format-Table -AutoSize Severity, RuleName, ScriptName, Line, Message | Out-String -Width 200 | Write-Host; exit 1 }
         Write-Host "PSScriptAnalyzer: no issues found."'
 }
