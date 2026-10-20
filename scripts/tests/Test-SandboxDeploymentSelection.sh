@@ -6,8 +6,9 @@
 # The step's run: script is extracted from the workflow YAML and executed the
 # way GitHub runs a bash step, against fixture events and environment, so the
 # test always exercises the exact code that ships. Also asserts the manual
-# source_branch input, the checkout/status wiring that depend on it, and that
-# only the sandbox job can request a GitHub OIDC token (id-token: write).
+# source_branch input, the checkout/status wiring that depend on it, that only
+# the sandbox job and the runner power state jobs (start_runner, stop_runner) can
+# request a GitHub OIDC token (id-token: write), and the power state jobs' wiring.
 #
 # Usage: ./scripts/tests/Test-SandboxDeploymentSelection.sh
 # Requires: bash, jq, python3 with PyYAML. Exit code 0 only if every case passes.
@@ -52,6 +53,19 @@ facts = {
                             if isinstance(job.get("permissions"), dict) and "id-token" in job["permissions"]),
     "sandbox_id_token": doc["jobs"]["sandbox"].get("permissions", {}).get("id-token"),
     "write_all_jobs": sorted(name for name, job in doc["jobs"].items() if isinstance(job.get("permissions"), str)),
+    "sandbox_name": doc["jobs"]["sandbox"].get("name"),
+    "sandbox_needs": doc["jobs"]["sandbox"].get("needs"),
+    "sandbox_if": doc["jobs"]["sandbox"].get("if"),
+    "power": {name: {
+        "runs_on": doc["jobs"][name].get("runs-on"),
+        "environment": doc["jobs"][name].get("environment"),
+        "permissions": doc["jobs"][name].get("permissions"),
+        "needs": doc["jobs"][name].get("needs"),
+        "if": doc["jobs"][name].get("if"),
+        "job_name_env": doc["jobs"][name].get("env", {}).get("SANDBOX_JOB_NAME"),
+        "checkout": [s.get("with", {}) for s in doc["jobs"][name]["steps"]
+                     if str(s.get("uses", "")).startswith("actions/checkout@")],
+    } for name in ("start_runner", "stop_runner") if name in doc["jobs"]},
 }
 with open(f"{work}/facts.json", "w", encoding="utf-8") as f:
     json.dump(facts, f)
@@ -237,11 +251,46 @@ else
     fail "$name" "$(jq -c '.job_if' "$facts")"
 fi
 
-name="only the sandbox job can request an OIDC token"
-if jq -e '(.permissions | type == "object" and (has("id-token") | not)) and .id_token_jobs == ["sandbox"] and .sandbox_id_token == "write" and .write_all_jobs == []' "$facts" > /dev/null; then
+name="only sandbox and the runner power state jobs can request an OIDC token"
+if jq -e '(.permissions | type == "object" and (has("id-token") | not)) and .id_token_jobs == ["sandbox", "start_runner", "stop_runner"] and .sandbox_id_token == "write" and .write_all_jobs == []' "$facts" > /dev/null; then
     pass "$name"
 else
     fail "$name" "$(jq -c '{permissions, id_token_jobs, sandbox_id_token, write_all_jobs}' "$facts")"
+fi
+
+name="runner power state jobs are GitHub-hosted in their own environment with exact permissions"
+if jq -e '.power | length == 2 and
+    (to_entries | all(.value.runs_on == "ubuntu-latest" and .value.environment == "sandbox-runner-power-state")) and
+    .start_runner.permissions == {"contents": "read", "actions": "write", "id-token": "write"} and
+    .stop_runner.permissions == {"contents": "read", "id-token": "write"}' "$facts" > /dev/null; then
+    pass "$name"
+else
+    fail "$name" "$(jq -c '.power | map_values({runs_on, environment, permissions})' "$facts")"
+fi
+
+name="runner power state jobs check out only the trusted workflow commit"
+if jq -e '.power | to_entries | all(.value.checkout | length == 1 and
+    .[0].ref == "${{ github.sha }}" and (.[0] | has("repository") | not))' "$facts" > /dev/null; then
+    pass "$name"
+else
+    fail "$name" "$(jq -c '.power | map_values(.checkout)' "$facts")"
+fi
+
+name="start_runner runs alongside sandbox and watches it by name"
+if jq -e '(.sandbox_needs | index("start_runner") | not) and
+    .power.start_runner.needs == .sandbox_needs and .power.start_runner.if == .sandbox_if and
+    .power.start_runner.job_name_env == .sandbox_name' "$facts" > /dev/null; then
+    pass "$name"
+else
+    fail "$name" "$(jq -c '{sandbox_needs, sandbox_name, start: .power.start_runner | {needs, if, job_name_env}}' "$facts")"
+fi
+
+name="stop_runner deallocates only a VM this run started"
+if jq -e '.power.stop_runner.needs == ["start_runner", "sandbox"] and
+    .power.stop_runner.if == "${{ always() && needs.start_runner.outputs.started == '\''true'\'' }}"' "$facts" > /dev/null; then
+    pass "$name"
+else
+    fail "$name" "$(jq -c '.power.stop_runner | {needs, if}' "$facts")"
 fi
 
 printf '\nPassed=%d Failed=%d\n' "$passed" "$failed"
