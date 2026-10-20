@@ -32,7 +32,8 @@ TERRAFORM_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 API_VERSION="2020-10-01"
 OWNER_ROLE_ID="8e3af657-a8ff-443c-a75c-2fe8c4bcb635"
-USER_ACCESS_ADMIN_ROLE_ID="18d7d88d-d35e-4fb5-a5c3-7773c20a72d9"
+# Built-in Azure role definition IDs are public, not secrets.
+USER_ACCESS_ADMIN_ROLE_ID="18d7d88d-d35e-4fb5-a5c3-7773c20a72d9" # gitleaks:allow
 CONTRIBUTOR_ROLE_ID="b24988ac-6180-42a0-ab88-20f7382dd24c"
 RBAC_ADMIN_ROLE_ID="f58310d9-a9f6-439a-9e8d-f62e7b41a168"
 declare -A ROLE_NAMES=(
