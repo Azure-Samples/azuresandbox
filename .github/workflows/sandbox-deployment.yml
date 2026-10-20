@@ -346,11 +346,16 @@ jobs:
       name: ${{ needs.selection.outputs.environment }}
       url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     timeout-minutes: 180
+    # id-token: write lets this job, and only this job, exchange a GitHub OIDC token for the deployment identity
+    # (auth_mode = "oidc"). The identity's federated credentials accept only this workflow on main in the deployment
+    # environments, and it has no deployment rights until the operator grants its time-bound roles.
     permissions:
       contents: read
+      id-token: write
       pull-requests: read
       statuses: read
     env:
+      SANDBOX_JIT_MIN_REMAINING_MINUTES: ${{ vars.SANDBOX_JIT_MIN_REMAINING_MINUTES }}
       SANDBOX_RUN_THROUGH: ${{ needs.selection.outputs.run_through }}
       SANDBOX_SOURCE_SHA: ${{ github.event_name == 'pull_request_target' && needs.selection.outputs.source_ref || '' }}
     outputs:
