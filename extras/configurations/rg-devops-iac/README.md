@@ -175,7 +175,10 @@ and `workflow_dispatch` in an Actions event policy scoped only to
 The workflow authenticates the sandbox providers only with GitHub OIDC:
 `SANDBOX_TFVARS_HCL` must set `auth_mode = "oidc"` and `client_id` to the
 OIDC deployment identity's client id, and preflight rejects any other mode.
-Only the `sandbox` job has `id-token: write`. Before approving a run, the
+Only the `sandbox` job can federate to the deployment identity. The jobs that
+start and deallocate the runner virtual machine use a separate identity and
+environment; see [Runner power state identity](#runner-power-state-identity).
+Before approving a run, the
 operator grants the identity time-bound roles in the Azure portal; preflight
 waits for them and refuses to start unless enough of the grant remains. The
 state backend still uses the virtual machine's system-assigned identity. See
@@ -564,7 +567,22 @@ With `deployment_identity = "oidc"`, this configuration also creates a second, s
 * Assigned the built-in `Desktop Virtualization Power On Off Contributor` role on `jumplinux2` only. Despite its name, it's the built-in role for starting and stopping virtual machines. Scoped to the virtual machine, it allows only reading it and changing its power state (start, deallocate, power off and restart). It can't run commands, change extensions or delete the virtual machine. `Virtual Machine Contributor` isn't used because it allows all of those.
 * Given one federated identity credential for the `github_runner_power_state_environment` environment (default `sandbox-runner-power-state`), with a subject in the same format as the deployment identity's. The `runner_power_state_identity_github_subject` output shows it. The environment must differ from those in `github_oidc_environments`, so a token issued to one identity's jobs is never accepted by the other identity.
 
-Create the `sandbox-runner-power-state` environment in the repository and restrict it to the `main` branch. Don't add required reviewers: the start job waits for the approval of the deployment environment before it starts the virtual machine, so a second approval isn't needed.
+Create the `sandbox-runner-power-state` environment in the repository and restrict it to the `main` branch. Don't add required reviewers: the start job waits for the approval of the deployment environment before it starts the virtual machine, so a second approval isn't needed. The workflow uses this environment name, so keep `github_runner_power_state_environment` at its default unless you change the workflow too.
+
+Add these secrets to the environment. They're secrets rather than variables so they're masked in the public run logs:
+
+Secret | Value
+--- | ---
+`RUNNER_POWER_STATE_CLIENT_ID` | `terraform output -raw runner_power_state_identity_client_id`
+`AZURE_TENANT_ID` | The Microsoft Entra tenant id
+`RUNNER_VM_ID` | `terraform output -json resource_ids \| jq -r .virtual_machine_jumplinux2`
+
+How the workflow uses it, from two jobs on GitHub-hosted runners that run the script `scripts/Invoke-RunnerPowerState.sh` from the trusted workflow commit, never from the deployed branch:
+
+* `start_runner` starts alongside the `sandbox` job and waits up to 60 minutes for its approval. If the deployment is rejected, it ends without starting the virtual machine. If no decision arrives in time, it cancels the run. Once the deployment is approved, it signs in as this identity and starts `jumplinux2` if it's deallocated or stopped. If it's already running, it's left alone and stays running after the run. It then waits up to 20 minutes for the runner to pick up the `sandbox` job, and cancels the run if that doesn't happen.
+* `stop_runner` runs after the `sandbox` job, however it ended, and deallocates `jumplinux2` only if `start_runner` started it.
+
+The jobs don't coordinate with other runs, because the deployment workflow doesn't support concurrent runs. Grant the deployment identity's time-bound roles before you approve, as usual. The window now also covers the virtual machine's boot and the runner reconnecting, which usually takes a few minutes.
 
 ### Step 4: Validate and Apply Configuration
 

@@ -132,17 +132,19 @@ Each kind of bypass has its own ruleset, so **Settings → Rules → Insights** 
 
 ### Deployment environments and OIDC
 
-The [deployment workflow](.github/workflows/sandbox-deployment.yml) signs in to Azure with GitHub OIDC, through federated credentials on a deployment identity that trust this repository's two environments. Because the credentials don't name a workflow file, these settings (**Settings → Environments** and **Settings → Actions**) are what restrict that identity to workflows on `main` that an owner approves or an admin starts. They're separate from the [branch protection](#branch-protection) bypasses, which control merges, not deployments:
+The [deployment workflow](.github/workflows/sandbox-deployment.yml) signs in to Azure with GitHub OIDC, through federated credentials on a deployment identity that trust this repository's two deployment environments, and on a separate runner power state identity that trusts a third environment. Because the credentials don't name a workflow file, these settings (**Settings → Environments** and **Settings → Actions**) are what restrict those identities to workflows on `main` that an owner approves or an admin starts. They're separate from the [branch protection](#branch-protection) bypasses, which control merges, not deployments:
 
 | Setting | Required value |
 | --- | --- |
-| `sandbox-deployment` and `sandbox-release-gate` deployment branches | `main` only |
-| Required reviewers | Owners, in both environments |
+| `sandbox-deployment`, `sandbox-release-gate` and `sandbox-runner-power-state` deployment branches | `main` only |
+| Required reviewers | Owners, in `sandbox-deployment` and `sandbox-release-gate`. None in `sandbox-runner-power-state` |
 | **Allow administrators to bypass configured protection rules** | Off in `sandbox-release-gate`, so admins can't skip release deployment approval. On in `sandbox-deployment`, so an admin can start a manual deployment without approval |
-| Environment secrets | `SANDBOX_BACKEND_HCL` and `SANDBOX_TFVARS_HCL`, with `auth_mode = "oidc"` |
+| Environment secrets | `SANDBOX_BACKEND_HCL` and `SANDBOX_TFVARS_HCL`, with `auth_mode = "oidc"`, in `sandbox-deployment` and `sandbox-release-gate`. `RUNNER_POWER_STATE_CLIENT_ID`, `AZURE_TENANT_ID` and `RUNNER_VM_ID` in `sandbox-runner-power-state` |
 | OIDC subject claim template | `use_default: false` with `include_claim_keys` `repository_owner_id`, `repository_id` and `context` |
 
-Don't change the OIDC subject claim template. It changes the subject of every OIDC token the repository issues, and the federated credentials only accept this format. Check it with `gh api repos/Azure-Samples/azuresandbox/actions/oidc/customization/sub`. A new environment can't federate to the identity until its name is added to `github_oidc_environments` in rg-devops-iac. See the [rg-devops-iac deployment guide](extras/configurations/rg-devops-iac/README.md#optional-deployment-identity-for-oidc-workflow-applies).
+`sandbox-runner-power-state` is used by the `start_runner` and `stop_runner` jobs, which start the self-hosted runner virtual machine after a deployment is approved and deallocate it afterwards. It has no reviewers because `start_runner` waits for the deployment's own approval before it starts anything, and its identity can only read, start and deallocate that one virtual machine. Don't add it to `github_oidc_environments`, and don't use it for any other job. See [Runner power state identity](extras/configurations/rg-devops-iac/README.md#runner-power-state-identity).
+
+Don't change the OIDC subject claim template. It changes the subject of every OIDC token the repository issues, and the federated credentials only accept this format. Check it with `gh api repos/Azure-Samples/azuresandbox/actions/oidc/customization/sub`. A new environment can't federate to the deployment identity until its name is added to `github_oidc_environments` in rg-devops-iac. See the [rg-devops-iac deployment guide](extras/configurations/rg-devops-iac/README.md#optional-deployment-identity-for-oidc-workflow-applies).
 
 ### Emergency merges
 
