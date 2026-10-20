@@ -73,7 +73,7 @@ These prerequisites apply only if you plan to use this configuration as a self-h
 * **OIDC deployment identity only (`deployment_identity = "oidc"`).**
   * Microsoft Entra ID P2 or Microsoft Entra ID Governance, for the time-bound role assignments the operator grants before each workflow run.
   * A subscription `Owner` (for example, the operator with `Owner` activated through PIM) to grant those assignments.
-  * A GitHub repository administrator to set the repository's OIDC subject claim template once.
+  * A GitHub repository administrator to set the repository's OIDC subject claim template once, unless the repository already uses the expected template (for example, from its organization).
 
   See [Optional: Deployment Identity for OIDC Workflow Applies](#optional-deployment-identity-for-oidc-workflow-applies).
 
@@ -459,40 +459,45 @@ Managed identities have no app registration, so the Entra admin center **API per
 
 #### **Optional: Deployment Identity for OIDC Workflow Applies**
 
-The [Sandbox deployment workflow](../../../.github/workflows/sandbox-deployment.yml) authenticates the root sandbox providers with GitHub OIDC (`auth_mode = "oidc"`; see [Deployment Identity and Authentication](#deployment-identity-and-authentication)). It federates to a user-assigned managed identity that is **not** attached to any virtual machine, so code on `jumplinux2` can't get tokens for it from the managed identity endpoint. Only an approved run of the trusted workflow can. The identity holds standing `Reader` only. Before each run, the operator grants it time-bound deployment roles. This is **disabled by default**.
+The [Sandbox deployment workflow](../../../.github/workflows/sandbox-deployment.yml) authenticates the root sandbox providers with GitHub OIDC (`auth_mode = "oidc"`; see [Deployment Identity and Authentication](#deployment-identity-and-authentication)). It federates to a user-assigned managed identity that is **not** attached to any virtual machine, so code on `jumplinux2` can't get tokens for it from the managed identity endpoint. Only an approved workflow run in an allowed environment can. The identity holds standing `Reader` only. Before each run, the operator grants it time-bound deployment roles. This is **disabled by default**.
 
 `deployment_identity` takes a single value, so this replaces the attached `managed_identity` identity. Switching an existing deployment from `managed_identity` to `oidc` keeps the same identity and client id, removes its standing deployment roles, and detaches it from `jumplinux2` in place.
 
 To enable it, add the following to the `terraform.tfvars` file:
 
 ```hcl
-deployment_identity  = "oidc"
-github_runner_url    = "https://github.com/OWNER/NAME" # must be a repository URL
-github_repository_id = "123456789"                     # gh api repos/OWNER/NAME --jq .id
+deployment_identity        = "oidc"
+github_repository_id       = "123456789" # gh api repos/OWNER/NAME --jq .id
+github_repository_owner_id = "987654321" # gh api repos/OWNER/NAME --jq .owner.id
 ```
 
-The federated credentials trust the repository in `github_runner_url`, so the runner must be registered at repository level. `github_oidc_environments` and `github_oidc_workflow_ref` default to the workflow's two environments (`sandbox-deployment` and `sandbox-release-gate`) and to `.github/workflows/sandbox-deployment.yml@refs/heads/main`. See [Root Module Input Variables](#root-module-input-variables).
+The federated credentials trust workflows in that repository, by id, in the environments in `github_oidc_environments`. It defaults to the workflow's two environments, `sandbox-deployment` and `sandbox-release-gate`. See [Root Module Input Variables](#root-module-input-variables).
 
 When enabled, the identity is:
 
 * Created in the resource group provisioned by this configuration.
 * Assigned standing `Reader` at the subscription scope, so the workflow can sign in and check its own grant before it changes anything.
-* Given one federated identity credential per environment, with issuer `https://token.actions.githubusercontent.com` and audience `api://AzureADTokenExchange`. Each subject combines the repository id, the environment and the workflow file and ref. The `deployment_identity_github_subjects` output lists them.
+* Given one federated identity credential per environment, with issuer `https://token.actions.githubusercontent.com` and audience `api://AzureADTokenExchange`. Each subject combines the repository owner id, the repository id and the environment, for example `repository_owner_id:987654321:repository_id:123456789:environment:sandbox-deployment`. The `deployment_identity_github_subjects` output lists them.
 * Not attached to `jumplinux2`. The state backend keeps using the virtual machine's system-assigned identity.
 
 After the apply, complete these one-time steps:
 
 1. If the sandbox will be deployed with the `mssql` module enabled, grant the Microsoft Graph application permissions with `./scripts/grant-graph-permissions.sh`, as described in [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies). Microsoft Graph application permissions can't be time-bound, so they stay standing. Only approved workflow runs can use them.
-1. As a repository administrator, set the repository's OIDC subject claim template. Do this **after** the federated credentials exist, because it changes the subject of every OIDC token the repository issues:
+1. Check the repository's OIDC subject claim template. The subjects above need a template with `include_claim_keys` set to `["repository_owner_id","repository_id","context"]`, which uses immutable ids instead of names:
+
+   ```bash
+   gh api repos/OWNER/NAME/actions/oidc/customization/sub
+   ```
+
+   If the response shows `"use_default":false` and those keys, the repository already uses the template, often because its organization requires it. Don't change it. If it shows `"use_default":true`, a repository administrator sets it once. Do this **after** the federated credentials exist, because it changes the subject of every OIDC token the repository issues:
 
    ```bash
    gh api --method PUT repos/OWNER/NAME/actions/oidc/customization/sub --input - <<'EOF'
-   {"use_default":false,"include_claim_keys":["repository_id","environment","workflow_ref"]}
+   {"use_default":false,"include_claim_keys":["repository_owner_id","repository_id","context"]}
    EOF
-   gh api repos/OWNER/NAME/actions/oidc/customization/sub   # verify
    ```
 
-   The template uses `workflow_ref` because GitHub sets `job_workflow_ref` only for reusable workflows. Any other workflow that federates to Azure from this repository must use subjects in the same format.
+   If the repository uses a different template, follow your organization's policy rather than overriding it. Any other workflow that federates to Azure from this repository must use subjects in the same format. If a sign-in fails with `AADSTS70021`, the error shows the subject GitHub presented. Compare it with the `deployment_identity_github_subjects` output.
 1. In both the `sandbox-deployment` and `sandbox-release-gate` environments, update `SANDBOX_TFVARS_HCL` to set `auth_mode = "oidc"` and `client_id` to the `deployment_identity_client_id` output.
 1. Optionally, set the `SANDBOX_JIT_MIN_REMAINING_MINUTES` repository or environment variable (default `150`, range `0`-`1440`, where `0` skips the remaining-time check).
 
@@ -523,7 +528,8 @@ az rest --method put --body "$BODY" \
 
 Residual exposure:
 
-* The identity's standing `Reader` role and Microsoft Graph permissions are usable by any approved run of the trusted workflow in the allowed environments.
+* The subjects don't name a workflow file. Any workflow in the repository that runs in an allowed environment can federate to the identity. Restrict each environment to the `main` branch and require reviewers, so only reviewed workflows on `main` that an owner approves can use it.
+* The identity's standing `Reader` role and Microsoft Graph permissions are usable by any approved run in the allowed environments.
 * The time-bound roles belong to the identity, not to a single run. Another approved run during the same window can use them. The workflow's concurrency group runs one deployment at a time.
 * During a run, the job's federated token is passed to Azure CLI on the runner's command line, where other processes on `jumplinux2` can see it.
 
@@ -736,13 +742,13 @@ deployment_identity | `none` | The identity this configuration provisions for ro
 enable_github_runner | false | Set to true to install and register the GitHub Actions self-hosted runner agent on `jumplinux2`. See [vm-jumpbox-linux](./modules/vm-jumpbox-linux/README.md#github-actions-self-hosted-runner).
 entra_tenant_id | | The Microsoft Entra tenant id.
 github_oidc_environments | `["sandbox-deployment", "sandbox-release-gate"]` | The GitHub Actions environments allowed to federate to the deployment identity. One federated identity credential is created per environment. Only used when `deployment_identity` is `oidc`.
-github_oidc_workflow_ref | `.github/workflows/sandbox-deployment.yml@refs/heads/main` | The workflow path and ref allowed to federate to the deployment identity, matched against the GitHub OIDC `workflow_ref` claim after the repository prefix. Only used when `deployment_identity` is `oidc`.
-github_repository_id | | The numeric id of the repository in `github_runner_url`, e.g. from `gh api repos/OWNER/NAME --jq .id`. Required when `deployment_identity` is `oidc`.
+github_repository_id | | The numeric id of the repository whose workflows may federate to the deployment identity, e.g. from `gh api repos/OWNER/NAME --jq .id`. Required when `deployment_identity` is `oidc`.
+github_repository_owner_id | | The numeric id of the user or organization that owns the repository in `github_repository_id`, e.g. from `gh api repos/OWNER/NAME --jq .owner.id`. Required when `deployment_identity` is `oidc`.
 github_runner_labels | `["azuresandbox"]` | Additional labels to apply to the GitHub Actions self-hosted runner. Only used when `enable_github_runner` is true.
 github_runner_token | | A GitHub personal access token or runner registration token used to register the self-hosted runner. Set interactively or using an environment variable 'TF_VAR_github_runner_token'. Required when `enable_github_runner` is true.
 github_runner_token_secret_version | 1 | Increment to write a new value for the GitHub runner token key vault secret.
 github_runner_token_type | `pat` | The type of token supplied in `github_runner_token`, either `pat` or `registration`.
-github_runner_url | | The GitHub repository or organization URL to register the self-hosted runner with, e.g. `https://github.com/myorg/myrepo`. Required when `enable_github_runner` is true. When `deployment_identity` is `oidc`, it must be a repository URL; the deployment identity trusts workflows from that repository.
+github_runner_url | | The GitHub repository or organization URL to register the self-hosted runner with, e.g. `https://github.com/myorg/myrepo`. Required when `enable_github_runner` is true.
 location | | The name of the Azure Region where resources will be provisioned.
 log_analytics_workspace_retention_days | 30 | The retention period in days for the Log Analytics workspace. Must be one of 30, 31, 60, 90, 120, 180, 270, 365, 550 or 730.
 storage_access_tier | Hot | The access tier for the new storage account.

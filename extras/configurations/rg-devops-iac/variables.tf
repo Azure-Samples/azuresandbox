@@ -36,25 +36,25 @@ variable "github_oidc_environments" {
   }
 }
 
-variable "github_oidc_workflow_ref" {
-  type        = string
-  description = "The workflow path and git ref allowed to federate to the deployment identity, matched against the GitHub OIDC 'workflow_ref' claim after the repository prefix. Only used when var.deployment_identity is oidc."
-  default     = ".github/workflows/sandbox-deployment.yml@refs/heads/main"
-
-  validation {
-    condition     = can(regex("^\\.github/workflows/[A-Za-z0-9._-]+\\.ya?ml@refs/(heads|tags)/[A-Za-z0-9._/-]+$", var.github_oidc_workflow_ref))
-    error_message = "Must be a workflow path and ref, e.g. '.github/workflows/sandbox-deployment.yml@refs/heads/main'."
-  }
-}
-
 variable "github_repository_id" {
   type        = string
-  description = "The numeric id of the repository in var.github_runner_url, e.g. from 'gh api repos/OWNER/NAME --jq .id'. The id does not change when the repository is renamed. Required when var.deployment_identity is oidc."
+  description = "The numeric id of the repository whose workflows may federate to the deployment identity, e.g. from 'gh api repos/OWNER/NAME --jq .id'. The id does not change when the repository is renamed. Required when var.deployment_identity is oidc."
   default     = ""
 
   validation {
     condition     = var.deployment_identity != "oidc" || can(regex("^[0-9]+$", var.github_repository_id))
     error_message = "Must be the numeric GitHub repository id when deployment_identity is oidc."
+  }
+}
+
+variable "github_repository_owner_id" {
+  type        = string
+  description = "The numeric id of the user or organization that owns the repository in var.github_repository_id, e.g. from 'gh api repos/OWNER/NAME --jq .owner.id'. The id does not change when the owner is renamed. Required when var.deployment_identity is oidc."
+  default     = ""
+
+  validation {
+    condition     = var.deployment_identity != "oidc" || can(regex("^[0-9]+$", var.github_repository_owner_id))
+    error_message = "Must be the numeric GitHub repository owner id when deployment_identity is oidc."
   }
 }
 
@@ -95,17 +95,12 @@ variable "github_runner_token_type" {
 
 variable "github_runner_url" {
   type        = string
-  description = "The GitHub repository or organization URL to register the self-hosted runner with, e.g. 'https://github.com/myorg/myrepo'. Required when var.enable_github_runner is true. When var.deployment_identity is oidc, it must be a repository URL; its owner/name is the repository whose workflow federates to the deployment identity."
+  description = "The GitHub repository or organization URL to register the self-hosted runner with, e.g. 'https://github.com/myorg/myrepo'. Required when var.enable_github_runner is true."
   default     = ""
 
   validation {
     condition     = var.github_runner_url == "" || can(regex("^https://github\\.com/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)?$", var.github_runner_url))
     error_message = "Must be empty or a valid GitHub organization or repository URL, e.g. 'https://github.com/myorg' or 'https://github.com/myorg/myrepo'."
-  }
-
-  validation {
-    condition     = var.deployment_identity != "oidc" || can(regex("^https://github\\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$", var.github_runner_url))
-    error_message = "Must be a GitHub repository URL, e.g. 'https://github.com/myorg/myrepo', when deployment_identity is oidc."
   }
 }
 
