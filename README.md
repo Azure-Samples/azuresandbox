@@ -340,7 +340,7 @@ Azure DevOps, GitHub Actions, or other CI/CD tools can be used to automate the d
 
 By default, Terraform authenticates as a service principal with a client secret (`auth_mode = "client_secret"`). Create the service principal and grant its permissions as described in [Service Principal](#service-principal), and supply its secret with the `TF_VAR_client_secret` environment variable. The bootstrap script writes the other values, `client_id`, `entra_tenant_id` and `operator_object_id`, to `terraform.tfvars`.
 
-For automated or secretless deployments, such as from a GitHub Actions self-hosted runner using a managed identity, see [Deployment Identity and Authentication](./extras/configurations/rg-devops-iac/README.md#deployment-identity-and-authentication) in the rg-devops-iac configuration.
+For automated or secretless deployments, see [Deployment Identity and Authentication](./extras/configurations/rg-devops-iac/README.md#deployment-identity-and-authentication) in the rg-devops-iac configuration. It covers two more modes: `auth_mode = "managed_identity"`, for a terminal on the rg-devops-iac Linux virtual machine, and `auth_mode = "oidc"`, which the [Sandbox deployment workflow](./.github/workflows/sandbox-deployment.yml) uses to sign in with GitHub Actions OIDC to an identity whose deployment roles the operator grants for a limited time before each run.
 
 ## Getting Started (Interactive Execution)
 

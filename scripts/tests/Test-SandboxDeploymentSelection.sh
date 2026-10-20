@@ -6,7 +6,8 @@
 # The step's run: script is extracted from the workflow YAML and executed the
 # way GitHub runs a bash step, against fixture events and environment, so the
 # test always exercises the exact code that ships. Also asserts the manual
-# source_branch input and the checkout/status wiring that depend on it.
+# source_branch input, the checkout/status wiring that depend on it, and that
+# only the sandbox job can request a GitHub OIDC token (id-token: write).
 #
 # Usage: ./scripts/tests/Test-SandboxDeploymentSelection.sh
 # Requires: bash, jq, python3 with PyYAML. Exit code 0 only if every case passes.
@@ -46,6 +47,11 @@ facts = {
     "select_env": steps[0].get("env", {}),
     "checkout": [s.get("with", {}) for s in checkout],
     "job_if": {name: doc["jobs"][name].get("if", "") for name in ("pending_status", "static_ci", "deployment_status")},
+    "permissions": doc.get("permissions"),
+    "id_token_jobs": sorted(name for name, job in doc["jobs"].items()
+                            if isinstance(job.get("permissions"), dict) and "id-token" in job["permissions"]),
+    "sandbox_id_token": doc["jobs"]["sandbox"].get("permissions", {}).get("id-token"),
+    "write_all_jobs": sorted(name for name, job in doc["jobs"].items() if isinstance(job.get("permissions"), str)),
 }
 with open(f"{work}/facts.json", "w", encoding="utf-8") as f:
     json.dump(facts, f)
@@ -229,6 +235,13 @@ if jq -e '.job_if | to_entries | all(.value | contains("github.event_name == '\'
     pass "$name"
 else
     fail "$name" "$(jq -c '.job_if' "$facts")"
+fi
+
+name="only the sandbox job can request an OIDC token"
+if jq -e '(.permissions | type == "object" and (has("id-token") | not)) and .id_token_jobs == ["sandbox"] and .sandbox_id_token == "write" and .write_all_jobs == []' "$facts" > /dev/null; then
+    pass "$name"
+else
+    fail "$name" "$(jq -c '{permissions, id_token_jobs, sandbox_id_token, write_all_jobs}' "$facts")"
 fi
 
 printf '\nPassed=%d Failed=%d\n' "$passed" "$failed"

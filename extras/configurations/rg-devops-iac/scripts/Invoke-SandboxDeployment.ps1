@@ -9,6 +9,7 @@ param(
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'SandboxProgress.ps1')
+. (Join-Path $PSScriptRoot 'SandboxOidc.ps1')
 $script:utf8 = [System.Text.UTF8Encoding]::new($false)
 
 function Stop-SandboxStage {
@@ -73,9 +74,12 @@ function Invoke-SandboxCommand {
     param(
         [Parameter(Mandatory)][string[]]$Arguments,
         [string]$OutputPath,
-        [AllowNull()][string]$InputText
+        [AllowNull()][string]$InputText,
+        # Logged instead of Arguments when they contain a credential.
+        [string[]]$LogArguments
     )
-    Write-SandboxLog "`n[$([DateTimeOffset]::UtcNow.ToString('o'))] $($Arguments | ConvertTo-Json -Compress)`n"
+    $logged = if ($LogArguments) { $LogArguments } else { $Arguments }
+    Write-SandboxLog "`n[$([DateTimeOffset]::UtcNow.ToString('o'))] $($logged | ConvertTo-Json -Compress)`n"
     $destination = $script:logPath
     if ($OutputPath) {
         [System.IO.File]::WriteAllText($OutputPath, '', $script:utf8)
@@ -188,12 +192,72 @@ function Confirm-SandboxReceipt {
 function Connect-SandboxProvider {
     param([System.Collections.IDictionary]$DeploymentProfile)
     $script:childEnvironment['ARM_TENANT_ID'] = $DeploymentProfile.entra_tenant_id
-    Invoke-SandboxCommand @('az', 'login', '--identity', '--client-id', $DeploymentProfile.client_id, '--output', 'none')
+    $login = @('az', 'login', '--service-principal', '--username', $DeploymentProfile.client_id,
+        '--tenant', $DeploymentProfile.entra_tenant_id, '--allow-no-subscriptions', '--output', 'none', '--federated-token')
+    Invoke-SandboxCommand -Arguments ($login + @(Get-SandboxGitHubIdToken)) -LogArguments ($login + @('<redacted>'))
     Invoke-SandboxCommand @('az', 'account', 'set', '--subscription', $DeploymentProfile.subscription_id)
     $account = Get-SandboxOutput @('az', 'account', 'show', '--output', 'json') 'account.json' | ConvertFrom-Json -AsHashtable
     if ($account.id -cne $DeploymentProfile.subscription_id -or $account.tenantId -cne $DeploymentProfile.entra_tenant_id) {
         Stop-SandboxStage 'Azure CLI context does not match the approved deployment.'
     }
+}
+
+function ConvertTo-SandboxDateTimeOffset {
+    param($Value)
+    if ($Value -is [datetime]) { return [DateTimeOffset]$Value.ToUniversalTime() }
+    [DateTimeOffset]::Parse([string]$Value, [Globalization.CultureInfo]::InvariantCulture,
+        [Globalization.DateTimeStyles]::AssumeUniversal)
+}
+
+function Confirm-SandboxJitGrant {
+    # Confirms the deployment identity's time-bound Contributor and Role Based Access Control Administrator grants are
+    # active, waiting up to WaitSeconds for propagation, and that at least MinimumMinutes of the grants remain.
+    param([System.Collections.IDictionary]$DeploymentProfile, [int]$MinimumMinutes, [int]$WaitSeconds)
+    $subscription = "/subscriptions/$($DeploymentProfile.subscription_id)"
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($true) {
+        $permissions = Get-SandboxOutput @('az', 'rest', '--method', 'get', '--output', 'json', '--url',
+            "https://management.azure.com$subscription/providers/Microsoft.Authorization/permissions?api-version=2022-04-01"
+        ) 'jit-permissions.json' | ConvertFrom-Json -AsHashtable
+        $actions = @($permissions['value'] | ForEach-Object { $_['actions'] })
+        if ($actions -ccontains '*' -and $actions -ccontains 'Microsoft.Authorization/roleAssignments/write') { break }
+        if ($timer.Elapsed.TotalSeconds -ge $WaitSeconds) {
+            Stop-SandboxStage 'The deployment identity has no active Contributor and Role Based Access Control Administrator grant on the subscription. Grant both time-bound roles before approving the run.'
+        }
+        Start-Sleep -Seconds 30
+    }
+    if ($MinimumMinutes -le 0) { return }
+    $instances = Get-SandboxOutput @('az', 'rest', '--method', 'get', '--output', 'json', '--url',
+        "https://management.azure.com$subscription/providers/Microsoft.Authorization/roleAssignmentScheduleInstances?api-version=2020-10-01&`$filter=asTarget()"
+    ) 'jit-instances.json' | ConvertFrom-Json -AsHashtable
+    $now = [DateTimeOffset]::UtcNow
+    $remaining = [TimeSpan]::MaxValue
+    foreach ($role in $script:jitRoles.GetEnumerator()) {
+        $ends = @(foreach ($instance in @($instances['value'])) {
+                $properties = $instance['properties']
+                $scope = [string]$properties['scope']
+                if (([string]$properties['roleDefinitionId']).EndsWith("/$($role.Value)", [StringComparison]::OrdinalIgnoreCase) -and
+                    ($scope -ieq $subscription -or $scope -ceq '/' -or
+                        $scope.StartsWith('/providers/Microsoft.Management/managementGroups/', [StringComparison]::OrdinalIgnoreCase))) {
+                    if ($null -eq $properties['endDateTime']) { [DateTimeOffset]::MaxValue }
+                    else { ConvertTo-SandboxDateTimeOffset $properties['endDateTime'] }
+                }
+            })
+        if ($ends.Count -eq 0) {
+            Stop-SandboxStage "Could not find an active assignment of $($role.Key) for the deployment identity to check its remaining time."
+        }
+        $end = @($ends | Sort-Object -Descending)[0]
+        if ($end -eq [DateTimeOffset]::MaxValue) {
+            Write-SandboxSummary "Warning: the deployment identity has a permanent $($role.Key) assignment; just-in-time access isn't enforced.`n`n"
+            continue
+        }
+        if ($end - $now -lt $remaining) { $remaining = $end - $now }
+    }
+    if ($remaining -eq [TimeSpan]::MaxValue) { return }
+    if ($remaining.TotalMinutes -lt $MinimumMinutes) {
+        Stop-SandboxStage "The deployment identity's time-bound grant ends in $([int][Math]::Floor($remaining.TotalMinutes)) minutes; at least $MinimumMinutes minutes are required. Extend or renew the grant, then start a new run."
+    }
+    Write-SandboxSummary "Just-in-time grant: $([int][Math]::Floor($remaining.TotalMinutes)) minutes remaining (minimum $MinimumMinutes).`n`n"
 }
 
 function Confirm-SandboxInvocation {
@@ -238,6 +302,10 @@ function Confirm-SandboxInvocation {
 function Invoke-SandboxPreflight {
     Confirm-SandboxInvocation
     if ($env:RUNNER_NAME -cne 'jumplinux2') { Stop-SandboxStage 'Job did not run on the approved runner.' }
+    $jitMinimum = if ($env:SANDBOX_JIT_MIN_REMAINING_MINUTES) { $env:SANDBOX_JIT_MIN_REMAINING_MINUTES } else { '150' }
+    if ($jitMinimum -cnotmatch '^[0-9]{1,4}$' -or [int]$jitMinimum -gt 1440) {
+        Stop-SandboxStage 'SANDBOX_JIT_MIN_REMAINING_MINUTES must be a whole number of minutes from 0 to 1440.'
+    }
     if ([string]::IsNullOrWhiteSpace($env:SANDBOX_BACKEND_HCL) -or [string]::IsNullOrWhiteSpace($env:SANDBOX_TFVARS_HCL)) {
         Stop-SandboxStage 'Both environment HCL secrets are required.'
     }
@@ -287,14 +355,15 @@ function Invoke-SandboxPreflight {
     $expression = 'jsonencode({auth_mode=var.auth_mode,client_id=var.client_id,entra_tenant_id=var.entra_tenant_id,subscription_id=var.subscription_id,base=[var.enable_module_vnet_app,var.enable_module_vm_jumpbox_linux,var.enable_module_vm_mssql_win,var.enable_module_mssql,var.enable_module_mysql,var.enable_module_vwan],extras=[var.enable_module_avd,var.enable_module_petstore,var.enable_module_vnet_onprem]})' + "`n"
     $console = Get-SandboxOutput -Arguments @('terraform', 'console', '-no-color') -Name 'console.txt' -InputText $expression
     $deploymentProfile = ConvertFrom-Json -AsHashtable -InputObject (ConvertFrom-Json -InputObject $console)
-    if ($deploymentProfile.auth_mode -cne 'managed_identity' -or $deploymentProfile.entra_tenant_id -cne $backend.tenant_id -or
+    if ($deploymentProfile.auth_mode -cne 'oidc' -or $deploymentProfile.entra_tenant_id -cne $backend.tenant_id -or
         $deploymentProfile.subscription_id -cne $backend.subscription_id -or -not $deploymentProfile.client_id -or
         @($deploymentProfile.base | Where-Object { $_ -isnot [bool] -or -not $_ }).Count -gt 0 -or
         @($deploymentProfile.extras | Where-Object { $_ -isnot [bool] -or $_ }).Count -gt 0) {
-        Stop-SandboxStage 'Inputs do not match the approved MSI, backend, or module scope.'
+        Stop-SandboxStage 'Inputs do not match the approved OIDC, backend, or module scope.'
     }
     Write-SandboxJson (Join-Path $script:directory 'profile.json') $deploymentProfile
     Connect-SandboxProvider $deploymentProfile
+    Confirm-SandboxJitGrant $deploymentProfile ([int]$jitMinimum) 300
     Invoke-SandboxCommand @('pwsh', '-NoLogo', '-NoProfile', '-File',
         'extras/configurations/rg-devops-iac/scripts/Connect-SandboxRunner.ps1',
         '-ProfilePath', (Join-Path $script:directory 'profile.json'))
@@ -326,7 +395,9 @@ function Invoke-SandboxApply {
     }
     $record = Confirm-SandboxReceipt
     Write-SandboxLog "Verified plan SHA-256: $($record.plan_sha256)`n"
-    Connect-SandboxProvider (Read-SandboxJson (Join-Path $script:directory 'profile.json'))
+    $deploymentProfile = Read-SandboxJson (Join-Path $script:directory 'profile.json')
+    Connect-SandboxProvider $deploymentProfile
+    Confirm-SandboxJitGrant $deploymentProfile 0 0
     Invoke-SandboxCommand @('terraform', 'apply', '-input=false', '-no-color', $script:plan)
     $names = Get-SandboxOutput @('terraform', 'output', '-json', 'resource_names') 'resource-names.json' | ConvertFrom-Json -AsHashtable
     Write-SandboxJson (Join-Path $script:directory 'resource-group.json') @{
@@ -340,7 +411,9 @@ function Invoke-SandboxUnitTest {
         Stop-SandboxStage 'Unit-test requires a successful apply.'
     }
     $null = Confirm-SandboxReceipt
-    Connect-SandboxProvider (Read-SandboxJson (Join-Path $script:directory 'profile.json'))
+    $deploymentProfile = Read-SandboxJson (Join-Path $script:directory 'profile.json')
+    Connect-SandboxProvider $deploymentProfile
+    Confirm-SandboxJitGrant $deploymentProfile 0 0
     Invoke-SandboxCommand @('bash', 'scripts/manage-vms.sh', 'start')
     $names = Get-SandboxOutput @('terraform', 'output', '-json', 'resource_names') 'resource-names.json' | ConvertFrom-Json -AsHashtable
     $resourceGroup = Get-SandboxResourceGroupName $names
@@ -496,6 +569,10 @@ try {
     $script:plan = Join-Path $script:directory 'sandbox.tfplan'
     $script:receipt = Join-Path $script:directory 'plan-receipt.json'
     $script:runBase = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/"
+    $script:jitRoles = [ordered]@{
+        'Contributor'                             = 'b24988ac-6180-42a0-ab88-20f7382dd24c'
+        'Role Based Access Control Administrator' = 'f58310d9-a9f6-439a-9e8d-f62e7b41a168'
+    }
     $script:childEnvironment = @{}
     foreach ($entry in [Environment]::GetEnvironmentVariables().GetEnumerator()) {
         if ($entry.Key -cnotmatch '^(TF_VAR_|ARM_|TF_CLI_ARGS)' -and
@@ -535,6 +612,11 @@ try {
     catch {
         Write-SandboxLog "$($_ | Out-String)`n$($_.ScriptStackTrace)`n"
         $code = if ($_.Exception.Data.Contains('ExitCode')) { [int]$_.Exception.Data['ExitCode'] } else { 1 }
+    }
+    finally {
+        # Don't leave the stage's Azure CLI tokens on the runner; the next stage signs in again.
+        $azureConfig = $script:childEnvironment['AZURE_CONFIG_DIR']
+        if ([System.IO.Directory]::Exists($azureConfig)) { [System.IO.Directory]::Delete($azureConfig, $true) }
     }
     if ($Stage -eq 'unit-test') {
         try { Export-SandboxEvidence }

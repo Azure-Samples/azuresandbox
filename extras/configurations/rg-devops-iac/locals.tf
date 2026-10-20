@@ -46,4 +46,18 @@ locals {
     "((NOT ActionMatches{'Microsoft.Authorization/roleAssignments/write'}) OR (@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${local.deployment_identity_role_ids}}))",
     "((NOT ActionMatches{'Microsoft.Authorization/roleAssignments/delete'}) OR (@Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${local.deployment_identity_role_ids}}))",
   ])
+
+  # GitHub OIDC subjects accepted by the oidc deployment identity, keyed by environment. They match the subject claim
+  # template {"use_default":false,"include_claim_keys":["repository_owner_id","repository_id","context"]}, which the
+  # repository gets from its organization's template or its own. For a job in an environment, "context" is
+  # "environment:<name>". The ids come from the variables when set, otherwise from the GitHub API.
+  github_repository_lookup   = var.deployment_identity == "oidc" && (var.github_repository_id == "" || var.github_repository_owner_id == "")
+  github_repository          = local.github_repository_lookup ? jsondecode(data.http.github_repository[0].response_body) : null
+  github_repository_id       = var.github_repository_id != "" ? var.github_repository_id : try(tostring(local.github_repository.id), "")
+  github_repository_owner_id = var.github_repository_owner_id != "" ? var.github_repository_owner_id : try(tostring(local.github_repository.owner.id), "")
+
+  github_oidc_subjects = var.deployment_identity == "oidc" ? {
+    for environment in var.github_oidc_environments :
+    environment => "repository_owner_id:${local.github_repository_owner_id}:repository_id:${local.github_repository_id}:environment:${environment}"
+  } : {}
 }

@@ -56,7 +56,7 @@ CI runs on ready (non-draft) PRs to `vnext` and on every push to `vnext`. It's s
 | [`ci-actions`](.github/workflows/ci-actions.yml) | `actionlint` | [`.github/actionlint.yaml`](.github/actionlint.yaml) | `actions` |
 | [`ci-secrets`](.github/workflows/ci-secrets.yml) | `gitleaks` | — | `secrets` |
 
-The `actionlint` job also runs [`scripts/tests/Test-SandboxDeploymentSelection.sh`](scripts/tests/Test-SandboxDeploymentSelection.sh), which tests the [deployment workflow](.github/workflows/sandbox-deployment.yml)'s entry selection against sample events without GitHub or Azure access. It needs `jq` and Python 3 with PyYAML.
+The `actionlint` job also runs [`scripts/tests/Test-SandboxDeploymentSelection.sh`](scripts/tests/Test-SandboxDeploymentSelection.sh), which tests the [deployment workflow](.github/workflows/sandbox-deployment.yml)'s entry selection against sample events without GitHub or Azure access, and checks that only its `sandbox` job can request an OIDC token (`id-token: write`). It needs `jq` and Python 3 with PyYAML.
 
 [`scripts/Invoke-CIChecks.sh`](scripts/Invoke-CIChecks.sh) runs the same tools at the same pinned versions with the same config files. Its header lists the versions and install hints. A tool that isn't installed is reported as `SKIPPED`, which means only CI will verify that check. Rule exclusions are explained inline in each config file.
 
@@ -108,7 +108,7 @@ Only owners open and merge the `vnext` → `main` release PR:
 
 1. Open the release PR as a draft, then mark it ready.
 2. The [deployment workflow](.github/workflows/sandbox-deployment.yml) runs the static CI checks against the release head commit and its full diff from `main`.
-3. The deployment waits in the `sandbox-release-gate` environment until an owner approves it. Admins can't skip this approval.
+3. The deployment waits in the `sandbox-release-gate` environment until an owner approves it. Admins can't skip this approval. To merge without a deployment, see [Emergency merges](#emergency-merges).
 4. A fresh sandbox is deployed and the unit and integration tests run.
 5. If everything passes, merge with a **merge commit**.
 
@@ -129,6 +129,20 @@ The branches are protected by [rulesets](https://docs.github.com/repositories/co
 | `main` | `main-release-deployment` | `sandbox-deployment-gate` and `Publish release deployment status` | Owners |
 
 Each kind of bypass has its own ruleset, so **Settings → Rules → Insights** shows which one was used. `main` also has a classic branch protection rule that restricts pushes to `azuresandbox-owners`, enforced for admins. That's how owners merge release PRs that pass every check without needing a bypass. The CLA check (`license/cla`) is managed by the Azure-Samples organization, and no ruleset here requires it.
+
+### Deployment environments and OIDC
+
+The [deployment workflow](.github/workflows/sandbox-deployment.yml) signs in to Azure with GitHub OIDC, through federated credentials on a deployment identity that trust this repository's two environments. Because the credentials don't name a workflow file, these settings (**Settings → Environments** and **Settings → Actions**) are what restrict that identity to workflows on `main` that an owner approves or an admin starts. They're separate from the [branch protection](#branch-protection) bypasses, which control merges, not deployments:
+
+| Setting | Required value |
+| --- | --- |
+| `sandbox-deployment` and `sandbox-release-gate` deployment branches | `main` only |
+| Required reviewers | Owners, in both environments |
+| **Allow administrators to bypass configured protection rules** | Off in `sandbox-release-gate`, so admins can't skip release deployment approval. On in `sandbox-deployment`, so an admin can start a manual deployment without approval |
+| Environment secrets | `SANDBOX_BACKEND_HCL` and `SANDBOX_TFVARS_HCL`, with `auth_mode = "oidc"` |
+| OIDC subject claim template | `use_default: false` with `include_claim_keys` `repository_owner_id`, `repository_id` and `context` |
+
+Don't change the OIDC subject claim template. It changes the subject of every OIDC token the repository issues, and the federated credentials only accept this format. Check it with `gh api repos/Azure-Samples/azuresandbox/actions/oidc/customization/sub`. A new environment can't federate to the identity until its name is added to `github_oidc_environments` in rg-devops-iac. See the [rg-devops-iac deployment guide](extras/configurations/rg-devops-iac/README.md#optional-deployment-identity-for-oidc-workflow-applies).
 
 ### Emergency merges
 

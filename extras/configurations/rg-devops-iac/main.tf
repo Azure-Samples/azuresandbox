@@ -7,6 +7,27 @@ data "azurerm_role_definition" "deployment_identity_assignable" {
   name  = each.value
   scope = "/subscriptions/${var.subscription_id}"
 }
+
+# Looks up the numeric repository and owner ids for the oidc deployment identity's federated credentials, unless both
+# are supplied. The request is anonymous because data source arguments are saved in state, so it works only for
+# public repositories.
+data "http" "github_repository" {
+  count = local.github_repository_lookup ? 1 : 0
+
+  url = "https://api.github.com/repos/${trimprefix(var.github_runner_url, "https://github.com/")}"
+
+  request_headers = {
+    Accept                 = "application/vnd.github+json"
+    "X-GitHub-Api-Version" = "2022-11-28"
+  }
+
+  lifecycle {
+    postcondition {
+      condition     = self.status_code == 200
+      error_message = "Could not look up ${var.github_runner_url} anonymously (HTTP ${self.status_code}). For a private repository, or if the GitHub API rate limit is exceeded, set github_repository_id and github_repository_owner_id."
+    }
+  }
+}
 #endregion
 
 #region resources
@@ -188,10 +209,13 @@ resource "azurerm_monitor_diagnostic_setting" "data_collection_rule_linux" {
 #endregion
 
 #region deployment-identity
-# Identity used by root sandbox applies with auth_mode = "managed_identity". It is attached to the VM alongside the
-# system-assigned identity, which remains the default identity for cloud-init and the state backend.
+# Identity used by root sandbox applies. With deployment_identity = "managed_identity" it holds standing roles and is
+# attached to the VM alongside the system-assigned identity, which remains the default identity for cloud-init and the
+# state backend. With deployment_identity = "oidc" it is not attached to the VM, holds only standing Reader, and is
+# reachable only from approved GitHub Actions jobs through federated identity credentials. The operator grants it
+# time-bound Contributor and conditioned Role Based Access Control Administrator before each workflow run.
 resource "azurerm_user_assigned_identity" "deployment" {
-  count = var.deployment_identity == "managed_identity" ? 1 : 0
+  count = var.deployment_identity != "none" ? 1 : 0
 
   name                = module.naming.user_assigned_identity.name_unique
   location            = azurerm_resource_group.this.location
@@ -218,6 +242,25 @@ resource "azurerm_role_assignment" "deployment_identity_rbac_admin" {
   principal_type       = "ServicePrincipal"
   role_definition_name = "Role Based Access Control Administrator"
   scope                = "/subscriptions/${var.subscription_id}"
+}
+
+resource "azurerm_role_assignment" "deployment_identity_reader" {
+  count = var.deployment_identity == "oidc" ? 1 : 0
+
+  principal_id         = azurerm_user_assigned_identity.deployment[0].principal_id
+  principal_type       = "ServicePrincipal"
+  role_definition_name = "Reader"
+  scope                = "/subscriptions/${var.subscription_id}"
+}
+
+resource "azurerm_federated_identity_credential" "deployment_identity_github" {
+  for_each = local.github_oidc_subjects
+
+  name                      = "github-${each.key}"
+  audience                  = ["api://AzureADTokenExchange"]
+  issuer                    = "https://token.actions.githubusercontent.com"
+  subject                   = each.value
+  user_assigned_identity_id = azurerm_user_assigned_identity.deployment[0].id
 }
 #endregion
 
@@ -342,7 +385,7 @@ module "vm_jumpbox_linux" {
   storage_account_id                 = azurerm_storage_account.this.id
   subnet_id                          = azurerm_subnet.devops.id
   tags                               = var.tags
-  user_assigned_identity_ids         = azurerm_user_assigned_identity.deployment[*].id
+  user_assigned_identity_ids         = var.deployment_identity == "managed_identity" ? azurerm_user_assigned_identity.deployment[*].id : []
   vm_jumpbox_linux_size              = var.vm_jumpbox_linux_size
 
   depends_on = [time_sleep.wait_for_roles]

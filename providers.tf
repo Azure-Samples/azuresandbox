@@ -5,11 +5,16 @@
 # ---------------- | ---------------------------------- | -------------------------------------------
 # client_secret    | Service principal appId            | var.client_secret (TF_VAR_client_secret)
 # managed_identity | User-assigned managed identity id  | Managed identity endpoint of the host
+# oidc             | Federated identity client id       | GitHub Actions ID token (ACTIONS_ID_TOKEN_REQUEST_URL/TOKEN)
+#
+# use_msi and use_oidc are always set explicitly, so the providers don't fall back to ARM_USE_MSI, which the state
+# backend on jumplinux2 uses.
 provider "azuread" {
   tenant_id     = local.provider_auth.tenant_id
   client_id     = local.provider_auth.client_id
   client_secret = local.provider_auth.client_secret
   use_msi       = local.provider_auth.use_msi
+  use_oidc      = local.provider_auth.use_oidc
 }
 
 provider "azapi" {
@@ -18,6 +23,7 @@ provider "azapi" {
   client_id       = local.provider_auth.client_id
   client_secret   = local.provider_auth.client_secret
   use_msi         = local.provider_auth.use_msi
+  use_oidc        = local.provider_auth.use_oidc
 }
 
 provider "azurerm" {
@@ -26,6 +32,7 @@ provider "azurerm" {
   client_id                       = local.provider_auth.client_id
   client_secret                   = local.provider_auth.client_secret
   use_msi                         = local.provider_auth.use_msi
+  use_oidc                        = local.provider_auth.use_oidc
   resource_provider_registrations = "extended"
 
   # The "extended" set does not include the resource providers required by some
