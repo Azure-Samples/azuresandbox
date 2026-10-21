@@ -69,6 +69,22 @@ variable "github_runner_labels" {
   }
 }
 
+variable "github_runner_power_state_environment" {
+  type        = string
+  description = "The GitHub Actions environment allowed to federate to the runner power state identity, which starts and deallocates the VM for workflow runs. It must not be one of var.github_oidc_environments. Only used when var.deployment_identity is oidc."
+  default     = "sandbox-runner-power-state"
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9._-]{1,255}$", var.github_runner_power_state_environment))
+    error_message = "Must be an environment name made of alphanumeric characters, periods (.), underscores (_), or hyphens (-)."
+  }
+
+  validation {
+    condition     = !contains([for environment in var.github_oidc_environments : lower(environment)], lower(var.github_runner_power_state_environment))
+    error_message = "Must not be one of github_oidc_environments, so the runner power state identity and the deployment identity never accept the same subject."
+  }
+}
+
 variable "github_runner_token" {
   type        = string
   description = "A GitHub personal access token or runner registration token used to register the self-hosted runner. Set interactively or using an environment variable 'TF_VAR_github_runner_token'. Required when var.enable_github_runner is true."

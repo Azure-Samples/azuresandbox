@@ -170,6 +170,67 @@ else
     log "Skipping vwan sudoers drop-in, var.github_runner_enable_vwan_sudoers is disabled..."
 fi
 
+# The Sandbox deployment workflow's preflight installs a Terraform CLI version that satisfies the
+# deployed branch's required_version when the installed one doesn't. Granting 'apt-get install' through
+# sudo would let the caller add arbitrary packages, because sudoers wildcards match spaces, so grant a
+# root-owned wrapper that accepts only a validated X.Y.Z and installs only the HashiCorp terraform package.
+terraform_installer=/usr/local/sbin/azuresandbox-install-terraform
+log "Installing Terraform installer wrapper $terraform_installer..."
+cat > "$terraform_installer" << 'EOF'
+#!/bin/bash
+# Managed by cloud-init (configure-github-runner.sh). Do not edit by hand.
+# Installs one version of the terraform package from the HashiCorp apt repository, upgrading or
+# downgrading the installed one. The GitHub Actions runner service account may run only this
+# command through sudo. Usage: azuresandbox-install-terraform X.Y.Z
+set -euo pipefail
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export DEBIAN_FRONTEND=noninteractive
+
+if [ "$#" -ne 1 ] || ! [[ "$1" =~ ^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}$ ]]; then
+    echo "usage: azuresandbox-install-terraform X.Y.Z" >&2
+    exit 2
+fi
+version="$1"
+
+# The VM may have just been started, when apt-daily and unattended-upgrades can hold the dpkg lock.
+lock=(-o DPkg::Lock::Timeout=600)
+
+# Refresh only the HashiCorp repository's package list.
+apt-get "${lock[@]}" -qq \
+    -o Dir::Etc::sourcelist=sources.list.d/hashicorp.list \
+    -o Dir::Etc::sourceparts=- \
+    -o APT::Get::List-Cleanup=0 \
+    update
+
+package_version=$(apt-cache madison terraform | awk -v prefix="$version-" 'index($3, prefix) == 1 { print $3; exit }')
+if [ -z "$package_version" ]; then
+    echo "terraform $version is not available from the HashiCorp apt repository." >&2
+    exit 1
+fi
+
+apt-get "${lock[@]}" -qq install -y --allow-downgrades --no-install-recommends "terraform=$package_version"
+terraform version
+EOF
+chown root:root "$terraform_installer"
+chmod 0755 "$terraform_installer"
+
+terraform_sudoers=/etc/sudoers.d/azuresandbox-github-runner-terraform
+log "Granting '$runner_user' sudo for $terraform_installer only..."
+cat > "$terraform_sudoers" << EOF
+# Managed by cloud-init (configure-github-runner.sh). Do not edit by hand.
+# Lets the Sandbox deployment workflow install a Terraform CLI version that satisfies the
+# deployed branch's required_version. The wrapper validates its only argument.
+$runner_user ALL=(root) NOPASSWD: $terraform_installer
+EOF
+chown root:root "$terraform_sudoers"
+chmod 0440 "$terraform_sudoers"
+
+# A malformed drop-in breaks sudo for every user, so validate and discard it if invalid.
+if ! visudo -cf "$terraform_sudoers" > /dev/null; then
+    rm -f "$terraform_sudoers"
+    fail "generated sudoers file $terraform_sudoers is invalid and has been removed"
+fi
+
 log "Downloading GitHub Actions runner v$runner_version..."
 install -d -o "$runner_user" -g "$runner_user" -m 0755 "$runner_home"
 tarball="actions-runner-linux-x64-$runner_version.tar.gz"

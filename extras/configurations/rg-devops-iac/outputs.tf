@@ -12,6 +12,9 @@ output "resource_ids" {
       virtual_network            = azurerm_virtual_network.this.id
     },
     var.deployment_identity != "none" ? { deployment_identity = azurerm_user_assigned_identity.deployment[0].id } : {},
+    var.deployment_identity == "oidc" ? {
+      runner_power_state_identity = azurerm_user_assigned_identity.runner_power_state[0].id
+    } : {},
     module.vm_jumpbox_linux.resource_ids
   )
 }
@@ -30,6 +33,9 @@ output "resource_names" {
       virtual_network            = azurerm_virtual_network.this.name
     },
     var.deployment_identity != "none" ? { deployment_identity = azurerm_user_assigned_identity.deployment[0].name } : {},
+    var.deployment_identity == "oidc" ? {
+      runner_power_state_identity = azurerm_user_assigned_identity.runner_power_state[0].name
+    } : {},
     module.vm_jumpbox_linux.resource_names
   )
 }
@@ -57,4 +63,14 @@ output "deployment_identity_principal_id" {
 output "github_runner_name" {
   value       = module.vm_jumpbox_linux.github_runner_name
   description = "The name the GitHub Actions self-hosted runner is registered with, or null when var.enable_github_runner is false."
+}
+
+output "runner_power_state_identity_client_id" {
+  value       = var.deployment_identity == "oidc" ? azurerm_user_assigned_identity.runner_power_state[0].client_id : null
+  description = "The client id of the runner power state identity, which the Sandbox deployment workflow uses to start and deallocate the VM, or null unless var.deployment_identity is oidc."
+}
+
+output "runner_power_state_identity_github_subject" {
+  value       = local.github_runner_power_state_subject
+  description = "The GitHub OIDC subject accepted by the runner power state identity's federated identity credential, or null unless var.deployment_identity is oidc."
 }

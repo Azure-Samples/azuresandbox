@@ -129,6 +129,18 @@ When `github_runner_enable_vwan_sudoers` is true (the default), the configuratio
 
 **IMPORTANT:** This is a privilege grant. Passwordless root `cat`, `tail`, `kill` and `pkill` allow the runner service account to read any file on the VM and signal any process, which means any workflow job that runs on this runner inherits that capability. Set `github_runner_enable_vwan_sudoers` to `false` if the runner will not execute the `vwan` integration tests.
 
+### Terraform Version on the Runner
+
+Cloud-init installs the latest Terraform from the HashiCorp apt repository, which may not satisfy the `required_version` of the branch a workflow run deploys. Preflight in the [Sandbox deployment workflow](../../../../../.github/workflows/sandbox-deployment.yml) checks compatibility and, only when the runner's Terraform doesn't satisfy the constraint, installs the version static CI uses.
+
+To allow this without broader root access, the configuration script always installs a root-owned wrapper, `/usr/local/sbin/azuresandbox-install-terraform` (`0755`), and a separate sudoers drop-in, `/etc/sudoers.d/azuresandbox-github-runner-terraform`, granting the runner service account passwordless `sudo` for that wrapper only. The drop-in is written with `0440` permissions and validated with `visudo -cf`, with the same fail-closed handling as the `vwan` drop-in. The wrapper:
+
+* Accepts exactly one argument in `X.Y.Z` form and rejects anything else.
+* Refreshes only the HashiCorp apt source, then installs the matching `terraform` package version, downgrading if needed.
+* Waits up to 10 minutes for the apt lock, since the VM may have just booted and automatic updates may be running.
+
+**IMPORTANT:** This is a privilege grant, limited to installing a HashiCorp-signed `terraform` package version from the configured repository. It changes the system-wide Terraform, so attended sessions on *jumplinux2* use whichever version the last workflow run installed.
+
 ## Smoke Testing
 
 This section describes how to connect to *jumplinux2* and test the module after deployment.
