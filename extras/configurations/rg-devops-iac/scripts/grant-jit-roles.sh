@@ -117,12 +117,11 @@ fi
 SCOPE="/subscriptions/${SUBSCRIPTION_ID}"
 ARM="https://management.azure.com${SCOPE}/providers/Microsoft.Authorization"
 
-if ! az account show --output none 2>/dev/null; then
+if ! ACCOUNT_TYPE=$(az account show --query user.type -o tsv 2>/dev/null); then
   echo "Error: Azure CLI isn't signed in. Run 'az login' as the operator."
   exit 1
 fi
-OPERATOR_ID=$(az ad signed-in-user show --query id -o tsv 2>/dev/null) || OPERATOR_ID=""
-if [[ -z "${OPERATOR_ID}" ]]; then
+if [[ "${ACCOUNT_TYPE}" != "user" ]]; then
   echo "Error: Azure CLI must be signed in as a user (the operator), not a service principal or managed identity."
   exit 1
 fi
@@ -189,6 +188,14 @@ else
       | .roleEligibilityScheduleId][0] // empty')
   if [[ -z "${ELIGIBILITY_ID}" ]]; then
     echo "Error: you have no active or eligible Owner assignment on the subscription."
+    exit 1
+  fi
+
+  # Only PIM self-activation needs the operator's object ID, which comes from Microsoft Graph.
+  if ! OPERATOR_ID=$(az ad signed-in-user show --query id -o tsv 2>&1) || [[ -z "${OPERATOR_ID}" ]]; then
+    echo "Error: couldn't look up your user object ID in Microsoft Graph:"
+    echo "${OPERATOR_ID}"
+    echo "If Azure CLI asks you to sign in again, run 'az login' and run this script again."
     exit 1
   fi
 
