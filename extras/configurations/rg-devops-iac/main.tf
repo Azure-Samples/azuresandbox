@@ -346,7 +346,7 @@ resource "terraform_data" "ampls_access_barrier" {
     ampls_scope_log_analytics  = azurerm_monitor_private_link_scoped_service.log_analytics.id
     ampls_scope_dce            = azurerm_monitor_private_link_scoped_service.dce.id
     ampls_private_endpoint     = azurerm_private_endpoint.ampls.id
-    ampls_dns_zone_links       = join(",", [for link in azurerm_private_dns_zone_virtual_network_link.ampls : link.id])
+    ampls_dns_zone_links       = terraform_data.private_dns_zone_links_complete.id
     diagnostic_settings = join(",", [
       azurerm_monitor_diagnostic_setting.bastion.id,
       azurerm_monitor_diagnostic_setting.data_collection_rule_linux.id,

@@ -7,6 +7,16 @@ locals {
     "privatelink.oms.opinsights.azure.com",      # Log Analytics agent onboarding
   ]
 
+  # All private DNS zones in this configuration, each linked to the devops virtual network. When adding a private
+  # endpoint, add its zone here.
+  private_dns_zones = concat(
+    local.ampls_private_dns_zones,
+    [
+      "privatelink.blob.core.windows.net", # Azure Blob Storage (Terraform state)
+      "privatelink.vaultcore.azure.net",   # Azure Key Vault
+    ]
+  )
+
   # Roles the sandbox assigns, grouped by module. Each role is listed once, under the first module that needs it.
   # Keep in sync with the ROLES list in the Azure Sandbox README's Service Principal commands.
   deployment_identity_assignable_roles = [

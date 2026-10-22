@@ -852,12 +852,8 @@ azurerm_nat_gateway.this | ng-devops-dev | NAT gateway for outbound internet con
 azurerm_nat_gateway_public_ip_association.this | | Associates the NAT gateway with the public IP address.
 azurerm_network_security_group.groups[*] | nsg-devops-dev.AzureBastionSubnet, nsg-devops-dev.snet-devops-01 | One NSG for each subnet in `local.subnets` that has NSG rules. The private link subnet has no NSG.
 azurerm_network_security_rule.rules[*] | | NSG rules from `local.nsg_rules`, assigned to subnets in `local.subnets`. `AzureBastionSubnet` gets the [rules required by Azure Bastion](https://learn.microsoft.com/azure/bastion/bastion-nsg); `snet-devops-01` allows inbound SSH (port 22) only from the `AzureBastionSubnet`.
-azurerm_private_dns_zone.ampls[*] | privatelink.monitor.azure.com, privatelink.oms.opinsights.azure.com, privatelink.ods.opinsights.azure.com, privatelink.agentsvc.azure-automation.net | Private DNS zones for the AMPLS private endpoint
-azurerm_private_dns_zone.key_vault | privatelink.vaultcore.azure.net | Private DNS zone for Azure Key Vault
-azurerm_private_dns_zone.storage_blob | privatelink.blob.core.windows.net | Private DNS zone for Azure blob storage
-azurerm_private_dns_zone_virtual_network_link.ampls[*] | | Links the AMPLS private dns zones to azurerm_virtual_network.this
-azurerm_private_dns_zone_virtual_network_link.key_vault | | Links private dns zone to azurerm_virtual_network.this
-azurerm_private_dns_zone_virtual_network_link.storage_blob | | Links private dns zone to azurerm_virtual_network.this
+azurerm_private_dns_zone.zones[*] | privatelink.agentsvc.azure-automation.net, privatelink.monitor.azure.com, privatelink.ods.opinsights.azure.com, privatelink.oms.opinsights.azure.com, privatelink.blob.core.windows.net, privatelink.vaultcore.azure.net | Private DNS zones from `local.private_dns_zones`: the AMPLS zones (`local.ampls_private_dns_zones`), Azure Blob Storage and Azure Key Vault.
+azurerm_private_dns_zone_virtual_network_link.zones[*] | | Links each private DNS zone to azurerm_virtual_network.this with fallback to internet (`resolution_policy = "NxDomainRedirect"`).
 azurerm_private_endpoint.ampls | pe-devops-dev-ampls | Private endpoint for the AMPLS (`azuremonitor` subresource)
 azurerm_private_endpoint.key_vault | pe-devops-dev-key-vault | Private endpoint for Azure key vault
 azurerm_private_endpoint.storage_blob | pe-devops-dev-storage-blob | Private endpoint for Azure blob storage
@@ -880,6 +876,7 @@ azurerm_user_assigned_identity.runner_power_state[0] | uai-devops-dev-runner-xxx
 azurerm_virtual_network.this | vnet-devops-dev-devops | Virtual network for the Linux virtual machine.
 terraform_data.ampls_access_barrier | | Waits for every Azure Monitor write (scoped services, private endpoint, DNS zone links, diagnostic settings, and the `jumplinux2` agent and associations) before the AMPLS and workspace are closed to public networks.
 terraform_data.key_vault_access_barrier | | Waits for the key vault secret writes before key vault public access is disabled.
+terraform_data.private_dns_zone_links_complete | | Dependency signal that completes when every private DNS zone virtual network link exists. The private endpoints and the AMPLS barrier wait for it.
 terraform_data.storage_access_barrier | | Waits for the storage container before storage account public access is disabled.
 
 Diagnostic settings are not created for resources that don't support exporting logs or metrics through a diagnostic setting: the NAT gateway (its flow logs require the StandardV2 SKU), private endpoints, private DNS zones, the AMPLS, the data collection endpoint and the user-assigned managed identity. Their platform metrics remain available in Azure Monitor metrics explorer. The Linux virtual machine sends guest data through the Azure Monitor Agent instead of a diagnostic setting.
@@ -918,7 +915,7 @@ This configuration implements a virtual network. Default address ranges are set 
 
 Every subnet is created with `default_outbound_access_enabled = false`, so it is a [private subnet](https://learn.microsoft.com/azure/virtual-network/ip-services/default-outbound-access) with no implicit outbound internet access. Egress from the Linux virtual machine goes through a Standard SKU NAT gateway associated with the devops subnet, which translates outbound connections to its static public IP address. This lets the virtual machine install packages, download tools, reach the GitHub Actions service and call Azure public endpoints without a public IP address or any inbound exposure, and gives it a predictable source IP address that can be added to allow lists. The NAT gateway handles outbound connections only; inbound access is through Azure Bastion. The Bastion host manages its own egress, and the PrivateLink subnet needs none.
 
-All private DNS zones are linked to the virtual network with `resolution_policy = "NxDomainRedirect"` (fallback to internet). This setting affects name resolution only: when a linked zone has no record for a name, Azure DNS resolves the name publicly instead of returning `NXDOMAIN`. It doesn't route traffic, and the target resource's own network settings still apply.
+The private DNS zones (Azure Key Vault, Azure Blob Storage and the four AMPLS zones) are listed in `local.private_dns_zones` and linked to the virtual network with [fallback to internet](https://learn.microsoft.com/azure/dns/private-dns-fallback) (`resolution_policy = "NxDomainRedirect"`). The private endpoints aren't created until every link exists. Fallback affects name resolution only: when a linked zone has no record for a name, such as a key vault or storage account in another deployment that has no private endpoint in this virtual network, Azure DNS resolves the name publicly instead of returning `NXDOMAIN`. It doesn't route traffic, and the target resource's own network settings still apply.
 
 #### Observability network isolation
 

@@ -172,48 +172,31 @@ resource "azurerm_monitor_diagnostic_setting" "network_security_groups" {
 #endregion
 
 #region private-dns-zones
-resource "azurerm_private_dns_zone" "key_vault" {
-  name                = "privatelink.vaultcore.azure.net"
-  resource_group_name = azurerm_resource_group.this.name
-  tags                = var.tags
-}
-
-resource "azurerm_private_dns_zone" "storage_blob" {
-  name                = "privatelink.blob.core.windows.net"
-  resource_group_name = azurerm_resource_group.this.name
-  tags                = var.tags
-}
-
-resource "azurerm_private_dns_zone_virtual_network_link" "key_vault" {
-  name                = "link-${azurerm_private_dns_zone.key_vault.name}-${azurerm_virtual_network.this.name}"
-  private_dns_zone_id = azurerm_private_dns_zone.key_vault.id
-  virtual_network_id  = azurerm_virtual_network.this.id
-  resolution_policy   = "NxDomainRedirect"
-}
-
-
-resource "azurerm_private_dns_zone_virtual_network_link" "storage_blob" {
-  name                = "link-${azurerm_private_dns_zone.storage_blob.name}-${azurerm_virtual_network.this.name}"
-  private_dns_zone_id = azurerm_private_dns_zone.storage_blob.id
-  virtual_network_id  = azurerm_virtual_network.this.id
-  resolution_policy   = "NxDomainRedirect"
-}
-
-resource "azurerm_private_dns_zone" "ampls" {
-  for_each = toset(local.ampls_private_dns_zones)
+# Fallback to internet (NxDomainRedirect) is enabled on every link. When a zone has no record for a name, such as a
+# key vault, storage account or Azure Monitor resource that isn't behind a private endpoint in this virtual network,
+# Azure DNS resolves the name publicly instead of returning NXDOMAIN.
+# See https://learn.microsoft.com/azure/dns/private-dns-fallback
+resource "azurerm_private_dns_zone" "zones" {
+  for_each = toset(local.private_dns_zones)
 
   name                = each.value
   resource_group_name = azurerm_resource_group.this.name
   tags                = var.tags
 }
 
-resource "azurerm_private_dns_zone_virtual_network_link" "ampls" {
-  for_each = azurerm_private_dns_zone.ampls
+resource "azurerm_private_dns_zone_virtual_network_link" "zones" {
+  for_each = azurerm_private_dns_zone.zones
 
   name                = "link-${each.value.name}-${azurerm_virtual_network.this.name}"
   private_dns_zone_id = each.value.id
   virtual_network_id  = azurerm_virtual_network.this.id
   resolution_policy   = "NxDomainRedirect"
+}
+
+# Dependency signal consumed by the private endpoints, so they are not created until every private DNS zone
+# virtual network link exists.
+resource "terraform_data" "private_dns_zone_links_complete" {
+  input = join(",", [for link in azurerm_private_dns_zone_virtual_network_link.zones : link.id])
 }
 #endregion
 
@@ -284,8 +267,10 @@ resource "azurerm_private_endpoint" "key_vault" {
 
   private_dns_zone_group {
     name                 = "default"
-    private_dns_zone_ids = [azurerm_private_dns_zone.key_vault.id]
+    private_dns_zone_ids = [azurerm_private_dns_zone.zones["privatelink.vaultcore.azure.net"].id]
   }
+
+  depends_on = [terraform_data.private_dns_zone_links_complete]
 }
 
 resource "azurerm_private_endpoint" "storage_blob" {
@@ -304,8 +289,10 @@ resource "azurerm_private_endpoint" "storage_blob" {
 
   private_dns_zone_group {
     name                 = "default"
-    private_dns_zone_ids = [azurerm_private_dns_zone.storage_blob.id]
+    private_dns_zone_ids = [azurerm_private_dns_zone.zones["privatelink.blob.core.windows.net"].id]
   }
+
+  depends_on = [terraform_data.private_dns_zone_links_complete]
 }
 
 resource "azurerm_private_endpoint" "ampls" {
@@ -324,7 +311,7 @@ resource "azurerm_private_endpoint" "ampls" {
 
   private_dns_zone_group {
     name                 = "default"
-    private_dns_zone_ids = [for zone in local.ampls_private_dns_zones : azurerm_private_dns_zone.ampls[zone].id]
+    private_dns_zone_ids = [for zone in local.ampls_private_dns_zones : azurerm_private_dns_zone.zones[zone].id]
   }
 
   # Creating the private endpoint updates the AMPLS. If the scoped services or the jumplinux2 data collection
@@ -333,8 +320,8 @@ resource "azurerm_private_endpoint" "ampls" {
   depends_on = [
     azurerm_monitor_private_link_scoped_service.dce,
     azurerm_monitor_private_link_scoped_service.log_analytics,
-    azurerm_private_dns_zone_virtual_network_link.ampls,
     module.vm_jumpbox_linux,
+    terraform_data.private_dns_zone_links_complete,
   ]
 }
 #endregion
