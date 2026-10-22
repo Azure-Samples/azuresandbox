@@ -42,7 +42,7 @@ output "resource_names" {
 
 output "deployment_identity_client_id" {
   value       = var.deployment_identity != "none" ? azurerm_user_assigned_identity.deployment[0].client_id : null
-  description = "The client id of the deployment identity, used as 'client_id' for root sandbox applies with auth_mode = \"managed_identity\" or \"oidc\", or null when var.deployment_identity is none."
+  description = "The client id of the deployment identity, used as 'client_id' for Azure Sandbox applies with auth_mode = \"managed_identity\" or \"oidc\", or null when var.deployment_identity is none."
 }
 
 output "deployment_identity_github_subjects" {

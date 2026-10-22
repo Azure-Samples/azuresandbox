@@ -8,7 +8,7 @@ locals {
   ]
 
   # Roles the sandbox assigns, grouped by module. Each role is listed once, under the first module that needs it.
-  # Keep in sync with the ROLES list in the root README's Service Principal commands.
+  # Keep in sync with the ROLES list in the Azure Sandbox README's Service Principal commands.
   deployment_identity_assignable_roles = [
     # vnet_shared
     "Key Vault Secrets Officer",
@@ -41,7 +41,7 @@ locals {
 
   # The identity can create (write) or remove (delete) a role assignment only if the role is in the list above.
   # This prevents it from assigning highly privileged roles such as Owner, User Access Administrator or
-  # Role Based Access Control Administrator. Keep in sync with the CONDITION in the root README's Service Principal commands.
+  # Role Based Access Control Administrator. Keep in sync with the CONDITION in the Azure Sandbox README's Service Principal commands.
   deployment_identity_rbac_condition = join(" AND ", [
     "((NOT ActionMatches{'Microsoft.Authorization/roleAssignments/write'}) OR (@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${local.deployment_identity_role_ids}}))",
     "((NOT ActionMatches{'Microsoft.Authorization/roleAssignments/delete'}) OR (@Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {${local.deployment_identity_role_ids}}))",
@@ -63,4 +63,148 @@ locals {
 
   # GitHub OIDC subject accepted by the runner power state identity, in the same format.
   github_runner_power_state_subject = var.deployment_identity == "oidc" ? "repository_owner_id:${local.github_repository_owner_id}:repository_id:${local.github_repository_id}:environment:${var.github_runner_power_state_environment}" : null
+
+  network_security_group_rules = flatten([
+    for subnet_key, subnet in local.subnets : [
+      for nsg_rule_key in subnet.nsg_rules : {
+        subnet_name                = subnet_key
+        nsg_rule_name              = nsg_rule_key
+        access                     = local.nsg_rules[nsg_rule_key].access
+        destination_address_prefix = local.nsg_rules[nsg_rule_key].destination_address_prefix
+        destination_port_ranges    = local.nsg_rules[nsg_rule_key].destination_port_ranges
+        direction                  = local.nsg_rules[nsg_rule_key].direction
+        priority                   = 100 + (index(subnet.nsg_rules, nsg_rule_key) * 10)
+        protocol                   = local.nsg_rules[nsg_rule_key].protocol
+        source_address_prefix      = local.nsg_rules[nsg_rule_key].source_address_prefix
+        source_port_ranges         = local.nsg_rules[nsg_rule_key].source_port_ranges
+      }
+    ]
+  ])
+
+  # The AzureBastionSubnet rules are the complete set required by Azure Bastion.
+  # See https://learn.microsoft.com/azure/bastion/bastion-nsg
+  nsg_rules = {
+    AllowAzureCloudOutbound = {
+      access                     = "Allow"
+      destination_address_prefix = "AzureCloud"
+      destination_port_ranges    = ["443"]
+      direction                  = "Outbound"
+      protocol                   = "Tcp"
+      source_address_prefix      = "*"
+      source_port_ranges         = ["*"]
+    }
+
+    AllowAzureLoadBalancerInbound = {
+      access                     = "Allow"
+      destination_address_prefix = "*"
+      destination_port_ranges    = ["443"]
+      direction                  = "Inbound"
+      protocol                   = "Tcp"
+      source_address_prefix      = "AzureLoadBalancer"
+      source_port_ranges         = ["*"]
+    }
+
+    AllowBastionCommunicationInbound = {
+      access                     = "Allow"
+      destination_address_prefix = "VirtualNetwork"
+      destination_port_ranges    = ["8080", "5701"]
+      direction                  = "Inbound"
+      protocol                   = "*"
+      source_address_prefix      = "VirtualNetwork"
+      source_port_ranges         = ["*"]
+    }
+
+    AllowBastionCommunicationOutbound = {
+      access                     = "Allow"
+      destination_address_prefix = "VirtualNetwork"
+      destination_port_ranges    = ["8080", "5701"]
+      direction                  = "Outbound"
+      protocol                   = "*"
+      source_address_prefix      = "VirtualNetwork"
+      source_port_ranges         = ["*"]
+    }
+
+    AllowBastionSshInbound = {
+      access                     = "Allow"
+      destination_address_prefix = "*"
+      destination_port_ranges    = ["22"]
+      direction                  = "Inbound"
+      protocol                   = "Tcp"
+      source_address_prefix      = var.subnet_bastion_address_prefix
+      source_port_ranges         = ["*"]
+    }
+
+    AllowGatewayManagerInbound = {
+      access                     = "Allow"
+      destination_address_prefix = "*"
+      destination_port_ranges    = ["443"]
+      direction                  = "Inbound"
+      protocol                   = "Tcp"
+      source_address_prefix      = "GatewayManager"
+      source_port_ranges         = ["*"]
+    }
+
+    AllowGetSessionInformationOutbound = {
+      access                     = "Allow"
+      destination_address_prefix = "Internet"
+      destination_port_ranges    = ["80"]
+      direction                  = "Outbound"
+      protocol                   = "*"
+      source_address_prefix      = "*"
+      source_port_ranges         = ["*"]
+    }
+
+    AllowHttpsInbound = {
+      access                     = "Allow"
+      destination_address_prefix = "*"
+      destination_port_ranges    = ["443"]
+      direction                  = "Inbound"
+      protocol                   = "Tcp"
+      source_address_prefix      = "Internet"
+      source_port_ranges         = ["*"]
+    }
+
+    AllowSshRdpOutbound = {
+      access                     = "Allow"
+      destination_address_prefix = "VirtualNetwork"
+      destination_port_ranges    = ["22", "3389"]
+      direction                  = "Outbound"
+      protocol                   = "*"
+      source_address_prefix      = "*"
+      source_port_ranges         = ["*"]
+    }
+  }
+
+  subnets = {
+    AzureBastionSubnet = {
+      address_prefix                    = var.subnet_bastion_address_prefix
+      private_endpoint_network_policies = "Disabled"
+
+      nsg_rules = [
+        "AllowHttpsInbound",
+        "AllowGatewayManagerInbound",
+        "AllowAzureLoadBalancerInbound",
+        "AllowBastionCommunicationInbound",
+        "AllowSshRdpOutbound",
+        "AllowAzureCloudOutbound",
+        "AllowBastionCommunicationOutbound",
+        "AllowGetSessionInformationOutbound"
+      ]
+    }
+
+    (var.subnet_devops_name) = {
+      address_prefix                    = var.subnet_address_prefix
+      private_endpoint_network_policies = "Disabled"
+
+      nsg_rules = [
+        "AllowBastionSshInbound"
+      ]
+    }
+
+    (var.subnet_privatelink_name) = {
+      address_prefix                    = var.subnet_privatelink_address_prefix
+      private_endpoint_network_policies = "Disabled"
+      nsg_rules                         = []
+    }
+  }
 }

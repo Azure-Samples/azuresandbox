@@ -1,6 +1,6 @@
 variable "deployment_identity" {
   type        = string
-  description = "The identity this configuration provisions for root sandbox deployments. Use none to provision no deployment identity; managed_identity to create a user-assigned managed identity with standing 'Contributor' and conditioned 'Role Based Access Control Administrator' role assignments on the subscription and attach it to the Linux virtual machine, for root sandbox applies with auth_mode = \"managed_identity\"; or oidc to create an unattached user-assigned managed identity with standing 'Reader' on the subscription and GitHub Actions federated identity credentials, for workflow applies with auth_mode = \"oidc\" after the operator grants time-bound roles."
+  description = "The identity this configuration provisions for Azure Sandbox deployments. Use none to provision no deployment identity; managed_identity to create a user-assigned managed identity with standing 'Contributor' and conditioned 'Role Based Access Control Administrator' role assignments on the subscription and attach it to the Linux virtual machine, for Azure Sandbox applies with auth_mode = \"managed_identity\"; or oidc to create an unattached user-assigned managed identity with standing 'Reader' on the subscription and GitHub Actions federated identity credentials, for workflow applies with auth_mode = \"oidc\" after the operator grants time-bound roles."
   default     = "none"
 
   validation {
@@ -182,7 +182,7 @@ variable "storage_replication_type" {
 variable "subnet_address_prefix" {
   type        = string
   description = "The address prefix for the miscellaneous subnet."
-  default     = "10.0.0.0/24"
+  default     = "10.0.1.0/24"
 
   validation {
     condition     = can(cidrhost(var.subnet_address_prefix, 0))
@@ -193,7 +193,7 @@ variable "subnet_address_prefix" {
 variable "subnet_bastion_address_prefix" {
   type        = string
   description = "The address prefix for the AzureBastionSubnet. The Standard SKU Bastion host requires a /26 or larger prefix."
-  default     = "10.0.2.0/26"
+  default     = "10.0.0.0/26"
 
   validation {
     condition     = can(cidrhost(var.subnet_bastion_address_prefix, 0)) && try(tonumber(split("/", var.subnet_bastion_address_prefix)[1]) <= 26, false)
@@ -201,13 +201,13 @@ variable "subnet_bastion_address_prefix" {
   }
 }
 
-variable "subnet_name" {
+variable "subnet_devops_name" {
   type        = string
-  description = "The name of the subnet to be created in the new virtual network."
+  description = "The name of the devops subnet for the Linux virtual machine."
   default     = "snet-devops-01"
 
   validation {
-    condition     = can(regex("^[a-zA-Z0-9-]{1,64}$", var.subnet_name))
+    condition     = can(regex("^[a-zA-Z0-9-]{1,64}$", var.subnet_devops_name))
     error_message = "Must conform to Azure subnet naming standards: it can only contain alphanumeric characters and hyphens (-), must start and end with an alphanumeric character, and must be between 1 and 64 characters long."
   }
 }
@@ -215,7 +215,7 @@ variable "subnet_name" {
 variable "subnet_privatelink_address_prefix" {
   type        = string
   description = "The address prefix for the private link subnet."
-  default     = "10.0.1.0/24"
+  default     = "10.0.2.0/24"
 
   validation {
     condition     = can(cidrhost(var.subnet_privatelink_address_prefix, 0))

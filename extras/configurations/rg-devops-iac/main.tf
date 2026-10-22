@@ -209,7 +209,7 @@ resource "azurerm_monitor_diagnostic_setting" "data_collection_rule_linux" {
 #endregion
 
 #region deployment-identity
-# Identity used by root sandbox applies. With deployment_identity = "managed_identity" it holds standing roles and is
+# Identity used by Azure Sandbox applies. With deployment_identity = "managed_identity" it holds standing roles and is
 # attached to the VM alongside the system-assigned identity, which remains the default identity for cloud-init and the
 # state backend. With deployment_identity = "oidc" it is not attached to the VM, holds only standing Reader, and is
 # reachable only from approved GitHub Actions jobs through federated identity credentials. The operator grants it
@@ -352,7 +352,7 @@ resource "terraform_data" "ampls_access_barrier" {
       azurerm_monitor_diagnostic_setting.data_collection_rule_linux.id,
       azurerm_monitor_diagnostic_setting.key_vault.id,
       azurerm_monitor_diagnostic_setting.log_analytics.id,
-      azurerm_monitor_diagnostic_setting.network_security_group_devops.id,
+      join(",", [for setting in azurerm_monitor_diagnostic_setting.network_security_groups : setting.id]),
       azurerm_monitor_diagnostic_setting.public_ip_bastion.id,
       azurerm_monitor_diagnostic_setting.public_ip_nat.id,
       azurerm_monitor_diagnostic_setting.storage_account.id,
@@ -426,11 +426,16 @@ module "vm_jumpbox_linux" {
   log_analytics_workspace_id         = azurerm_log_analytics_workspace.this.id
   resource_group_name                = azurerm_resource_group.this.name
   storage_account_id                 = azurerm_storage_account.this.id
-  subnet_id                          = azurerm_subnet.devops.id
+  subnet_id                          = azurerm_subnet.subnets[var.subnet_devops_name].id
   tags                               = var.tags
   user_assigned_identity_ids         = var.deployment_identity == "managed_identity" ? azurerm_user_assigned_identity.deployment[*].id : []
   vm_jumpbox_linux_size              = var.vm_jumpbox_linux_size
 
-  depends_on = [time_sleep.wait_for_roles]
+  # The VM needs the NAT gateway for outbound access during cloud-init, and its NIC must not be created while the
+  # subnet associations are still being written.
+  depends_on = [
+    azurerm_subnet_nat_gateway_association.devops,
+    time_sleep.wait_for_roles,
+  ]
 }
 #endregion

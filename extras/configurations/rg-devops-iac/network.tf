@@ -21,32 +21,18 @@ resource "azurerm_monitor_diagnostic_setting" "virtual_network" {
   }
 }
 
-resource "azurerm_subnet" "devops" {
-  name                            = var.subnet_name
-  resource_group_name             = azurerm_resource_group.this.name
-  virtual_network_name            = azurerm_virtual_network.this.name
-  address_prefixes                = [var.subnet_address_prefix]
-  default_outbound_access_enabled = false
+resource "azurerm_subnet" "subnets" {
+  for_each                          = local.subnets
+  name                              = each.key
+  resource_group_name               = azurerm_resource_group.this.name
+  virtual_network_name              = azurerm_virtual_network.this.name
+  address_prefixes                  = [each.value.address_prefix]
+  private_endpoint_network_policies = each.value.private_endpoint_network_policies
+  default_outbound_access_enabled   = false
 
   lifecycle {
     ignore_changes = [delegation]
   }
-}
-
-resource "azurerm_subnet" "privatelink" {
-  name                              = var.subnet_privatelink_name
-  resource_group_name               = azurerm_resource_group.this.name
-  virtual_network_name              = azurerm_virtual_network.this.name
-  address_prefixes                  = [var.subnet_privatelink_address_prefix]
-  default_outbound_access_enabled   = false
-  private_endpoint_network_policies = "Disabled"
-}
-
-resource "azurerm_subnet" "bastion" {
-  name                 = "AzureBastionSubnet" # Name is fixed by Azure
-  resource_group_name  = azurerm_resource_group.this.name
-  virtual_network_name = azurerm_virtual_network.this.name
-  address_prefixes     = [var.subnet_bastion_address_prefix]
 }
 #endregion
 
@@ -64,9 +50,11 @@ resource "azurerm_bastion_host" "this" {
   sku               = "Standard"
   tunneling_enabled = true
 
+  depends_on = [azurerm_subnet.subnets]
+
   ip_configuration {
     name                 = "Primary"
-    subnet_id            = azurerm_subnet.bastion.id
+    subnet_id            = azurerm_subnet.subnets["AzureBastionSubnet"].id
     public_ip_address_id = azurerm_public_ip.bastion.id
   }
 
@@ -126,32 +114,55 @@ resource "azurerm_monitor_diagnostic_setting" "public_ip_bastion" {
 #endregion
 
 #region nsgs
-resource "azurerm_network_security_group" "devops" {
-  name                = "${module.naming.network_security_group.name}-${var.subnet_name}"
+resource "azurerm_network_security_group" "groups" {
+  for_each = { for k, v in local.subnets : k => v if length(v.nsg_rules) > 0 }
+
+  name                = "${module.naming.network_security_group.name}.${each.key}"
   location            = var.location
   resource_group_name = azurerm_resource_group.this.name
-
-  security_rule {
-    name                       = "Allow-SSH"
-    priority                   = 1000
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_ranges    = ["22"]
-    source_address_prefix      = var.subnet_bastion_address_prefix
-    destination_address_prefix = "*"
-  }
 }
 
-resource "azurerm_subnet_network_security_group_association" "devops" {
-  subnet_id                 = azurerm_subnet.devops.id
-  network_security_group_id = azurerm_network_security_group.devops.id
+# Associating an NSG with AzureBastionSubnet before the Bastion host exists causes the Bastion
+# deployment to fail, so every association waits for the Bastion host and the NSG rules.
+resource "azurerm_subnet_network_security_group_association" "associations" {
+  for_each = azurerm_network_security_group.groups
+
+  subnet_id                 = azurerm_subnet.subnets[each.key].id
+  network_security_group_id = azurerm_network_security_group.groups[each.key].id
+
+  depends_on = [
+    azurerm_network_security_rule.rules,
+    azurerm_bastion_host.this
+  ]
 }
 
-resource "azurerm_monitor_diagnostic_setting" "network_security_group_devops" {
+resource "azurerm_network_security_rule" "rules" {
+  for_each = { for network_security_group_rule in local.network_security_group_rules : "${network_security_group_rule.subnet_name}.${network_security_group_rule.nsg_rule_name}" => network_security_group_rule }
+
+  access                      = each.value.access
+  destination_address_prefix  = each.value.destination_address_prefix
+  destination_port_range      = length(each.value.destination_port_ranges) == 1 ? each.value.destination_port_ranges[0] : null
+  destination_port_ranges     = length(each.value.destination_port_ranges) > 1 ? each.value.destination_port_ranges : null
+  direction                   = each.value.direction
+  name                        = each.value.nsg_rule_name
+  network_security_group_name = "${module.naming.network_security_group.name}.${each.value.subnet_name}"
+  priority                    = each.value.priority
+  protocol                    = each.value.protocol
+  resource_group_name         = azurerm_resource_group.this.name
+  source_address_prefix       = each.value.source_address_prefix
+  source_port_range           = length(each.value.source_port_ranges) == 1 ? each.value.source_port_ranges[0] : null
+  source_port_ranges          = length(each.value.source_port_ranges) > 1 ? each.value.source_port_ranges : null
+
+  depends_on = [
+    azurerm_network_security_group.groups
+  ]
+}
+
+resource "azurerm_monitor_diagnostic_setting" "network_security_groups" {
+  for_each = azurerm_network_security_group.groups
+
   name                       = "Diagnostic Logs"
-  target_resource_id         = azurerm_network_security_group.devops.id
+  target_resource_id         = each.value.id
   log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
 
   enabled_log {
@@ -249,8 +260,10 @@ resource "azurerm_monitor_diagnostic_setting" "public_ip_nat" {
 }
 
 resource "azurerm_subnet_nat_gateway_association" "devops" {
-  subnet_id      = azurerm_subnet.devops.id
+  subnet_id      = azurerm_subnet.subnets[var.subnet_devops_name].id
   nat_gateway_id = azurerm_nat_gateway.this.id
+
+  depends_on = [azurerm_subnet_network_security_group_association.associations]
 }
 #endregion
 
@@ -259,7 +272,7 @@ resource "azurerm_private_endpoint" "key_vault" {
   name                = "${module.naming.private_endpoint.name}-key-vault"
   location            = var.location
   resource_group_name = azurerm_resource_group.this.name
-  subnet_id           = azurerm_subnet.privatelink.id
+  subnet_id           = azurerm_subnet.subnets[var.subnet_privatelink_name].id
   tags                = var.tags
 
   private_service_connection {
@@ -279,7 +292,7 @@ resource "azurerm_private_endpoint" "storage_blob" {
   name                = "${module.naming.private_endpoint.name}-storage-blob"
   location            = var.location
   resource_group_name = azurerm_resource_group.this.name
-  subnet_id           = azurerm_subnet.privatelink.id
+  subnet_id           = azurerm_subnet.subnets[var.subnet_privatelink_name].id
   tags                = var.tags
 
   private_service_connection {
@@ -299,7 +312,7 @@ resource "azurerm_private_endpoint" "ampls" {
   name                = "${module.naming.private_endpoint.name}-ampls"
   location            = var.location
   resource_group_name = azurerm_resource_group.this.name
-  subnet_id           = azurerm_subnet.privatelink.id
+  subnet_id           = azurerm_subnet.subnets[var.subnet_privatelink_name].id
   tags                = var.tags
 
   private_service_connection {

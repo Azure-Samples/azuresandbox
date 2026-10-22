@@ -393,7 +393,7 @@ module "vm_jumpbox_linux" {
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
   storage_account_id  = azurerm_storage_account.this.id
-  subnet_id           = azurerm_subnet.this.id
+  subnet_id           = azurerm_subnet.subnets[var.subnet_devops_name].id
   tags                = var.tags
 
   depends_on = [time_sleep.wait_for_roles]
@@ -439,7 +439,7 @@ By default the runner service account is granted command scoped passwordless `su
 
 #### **Optional: Deployment Identity for Managed Identity Sandbox Applies**
 
-The root Azure Sandbox configuration can authenticate with a managed identity instead of a service principal secret (`auth_mode = "managed_identity"`; see [Deployment Identity and Authentication](#deployment-identity-and-authentication)), for example from a CD workflow running on the self-hosted runner. That mode requires a **user-assigned** managed identity attached to the Terraform execution environment. This configuration can create one for you. This is **disabled by default**.
+The Azure Sandbox configuration can authenticate with a managed identity instead of a service principal secret (`auth_mode = "managed_identity"`; see [Deployment Identity and Authentication](#deployment-identity-and-authentication)), for example from a CD workflow running on the self-hosted runner. That mode requires a **user-assigned** managed identity attached to the Terraform execution environment. This configuration can create one for you. This is **disabled by default**.
 
 To enable it, add the following to the `terraform.tfvars` file:
 
@@ -459,7 +459,7 @@ When enabled, the identity is:
 
 Enabling or disabling the identity on an existing deployment updates the VM in place. It does not replace the VM.
 
-After the apply, use the `deployment_identity_client_id` output as `client_id` in the root sandbox `terraform.tfvars`, together with `auth_mode = "managed_identity"`.
+After the apply, use the `deployment_identity_client_id` output as `client_id` in the Azure Sandbox `terraform.tfvars`, together with `auth_mode = "managed_identity"`.
 
 If the sandbox will be deployed with the `mssql` module enabled, the identity also needs the Microsoft Graph `Group.Create`, `GroupMember.Read.All`, `User.Read.All` and `Application.Read.All` application permissions, which this configuration cannot grant. A Global Administrator or Privileged Role Administrator must grant them once, after the identity is created:
 
@@ -474,7 +474,7 @@ Managed identities have no app registration, so the Entra admin center **API per
 
 #### **Optional: Deployment Identity for OIDC Workflow Applies**
 
-The [Sandbox deployment workflow](../../../.github/workflows/sandbox-deployment.yml) authenticates the root sandbox providers with GitHub OIDC (`auth_mode = "oidc"`; see [Deployment Identity and Authentication](#deployment-identity-and-authentication)). It federates to a user-assigned managed identity that is **not** attached to any virtual machine, so code on `jumplinux2` can't get tokens for it from the managed identity endpoint. Only an approved workflow run in an allowed environment can. The identity holds standing `Reader` only. Before each run, the operator grants it time-bound deployment roles. This is **disabled by default**.
+The [Sandbox deployment workflow](../../../.github/workflows/sandbox-deployment.yml) authenticates the Azure Sandbox providers with GitHub OIDC (`auth_mode = "oidc"`; see [Deployment Identity and Authentication](#deployment-identity-and-authentication)). It federates to a user-assigned managed identity that is **not** attached to any virtual machine, so code on `jumplinux2` can't get tokens for it from the managed identity endpoint. Only an approved workflow run in an allowed environment can. The identity holds standing `Reader` only. Before each run, the operator grants it time-bound deployment roles. This is **disabled by default**.
 
 `deployment_identity` takes a single value, so this replaces the attached `managed_identity` identity. Switching an existing deployment from `managed_identity` to `oidc` keeps the same identity and client id, removes its standing deployment roles, and detaches it from `jumplinux2` in place.
 
@@ -649,17 +649,17 @@ If you only need to remove Terraform state file(s) from the Azure Blob Storage c
 
 ## Deployment Identity and Authentication
 
-This section is the reference for how the root sandbox configuration authenticates to Azure and Microsoft Entra ID. Most sandbox users deploy interactively with a service principal, as described in the root README's [Service Principal](../../../README.md#service-principal) prerequisites. The managed identity and OIDC modes below support secretless deployments from this configuration's Linux virtual machine, from a terminal and from the Sandbox deployment workflow, respectively.
+This section is the reference for how the Azure Sandbox configuration authenticates to Azure and Microsoft Entra ID. Most sandbox users deploy interactively with a service principal, as described in the Azure Sandbox README's [Service Principal](../../../README.md#service-principal) prerequisites. The managed identity and OIDC modes below support secretless deployments from this configuration's Linux virtual machine, from a terminal and from the Sandbox deployment workflow, respectively.
 
 This configuration itself does not use these modes. It always authenticates as the operator signed in to Azure CLI; see [Operator](#operator).
 
 ### Authentication Modes
 
-The root configuration's `auth_mode` variable selects how Terraform authenticates the `azurerm`, `azapi` and `azuread` providers. Every provider uses the same settings, derived once in the `provider_auth` local in the root [`locals.tf`](../../../locals.tf).
+The Azure Sandbox configuration's `auth_mode` variable selects how Terraform authenticates the `azurerm`, `azapi` and `azuread` providers. Every provider uses the same settings, derived once in the `provider_auth` local in the Azure Sandbox [`locals.tf`](../../../locals.tf).
 
 `auth_mode` | Identity (`client_id`) | Credential | Typical use
 --- | --- | --- | ---
-`client_secret` (default) | Service principal `appId` | `client_secret`, supplied with the `TF_VAR_client_secret` environment variable | Interactive execution from any client. See [Service Principal](../../../README.md#service-principal) in the root README.
+`client_secret` (default) | Service principal `appId` | `client_secret`, supplied with the `TF_VAR_client_secret` environment variable | Interactive execution from any client. See [Service Principal](../../../README.md#service-principal) in the Azure Sandbox README.
 `managed_identity` | Client id of a user-assigned managed identity attached to the Terraform execution host | Managed identity endpoint of the host. No secret. | Secretless execution on the rg-devops-iac Linux virtual machine.
 `oidc` | Client id of an unattached user-assigned managed identity with GitHub Actions federated identity credentials | GitHub Actions OIDC token, requested by the providers from the job's `ACTIONS_ID_TOKEN_REQUEST_URL`. No secret. | The [Sandbox deployment workflow](../../../.github/workflows/sandbox-deployment.yml) on the self-hosted runner. Works only inside a GitHub Actions job with `id-token: write`.
 
@@ -677,10 +677,10 @@ The identity Terraform authenticates as needs the same permissions in every auth
 Permission | Scope | Why
 --- | --- | ---
 `Contributor` Azure RBAC role | Sandbox subscription | Creates and manages the sandbox resources.
-`Role Based Access Control Administrator` Azure RBAC role, with a condition | Sandbox subscription | Creates and removes the sandbox's role assignments. The condition allows only the roles listed in `ROLES` in the root README's [Service Principal](../../../README.md#service-principal) commands, so the identity cannot grant `Owner`, `User Access Administrator` or `Role Based Access Control Administrator`.
+`Role Based Access Control Administrator` Azure RBAC role, with a condition | Sandbox subscription | Creates and removes the sandbox's role assignments. The condition allows only the roles listed in `ROLES` in the Azure Sandbox README's [Service Principal](../../../README.md#service-principal) commands, so the identity cannot grant `Owner`, `User Access Administrator` or `Role Based Access Control Administrator`.
 `Group.Create`, `GroupMember.Read.All`, `User.Read.All` and `Application.Read.All` Microsoft Graph application permissions | Microsoft Entra tenant | Creates the SQL administrators security group, with a user and a managed identity as members. The identity becomes the group's owner, which lets it manage and delete the group. Required only when the mssql module is enabled.
 
-When you add a module that assigns a new Azure RBAC role, add the role to the `ROLES` list in the root README's [Service Principal](../../../README.md#service-principal) commands and to `deployment_identity_assignable_roles` in [`locals.tf`](./locals.tf). Then re-grant:
+When you add a module that assigns a new Azure RBAC role, add the role to the `ROLES` list in the Azure Sandbox README's [Service Principal](../../../README.md#service-principal) commands and to `deployment_identity_assignable_roles` in [`locals.tf`](./locals.tf). Then re-grant:
 
 * **Service principal:** remove the existing assignment, then re-run the `Role Based Access Control Administrator` commands in [Service Principal](../../../README.md#service-principal):
 
@@ -691,14 +691,14 @@ When you add a module that assigns a new Azure RBAC role, add the role to the `R
 * **Managed identity:** re-apply this configuration.
 * **OIDC:** re-apply this configuration, then use the updated `deployment_identity_jit_condition` output for the next grant.
 
-For `client_secret` mode, see [Service Principal](../../../README.md#service-principal) in the root README. For `managed_identity` mode, set `deployment_identity = "managed_identity"` in this configuration. It creates the user-assigned managed identity, assigns both Azure RBAC roles on the subscription, and attaches the identity to its Linux virtual machine. Use the `deployment_identity_client_id` output as `client_id`, and grant the Microsoft Graph permissions with `scripts/grant-graph-permissions.sh`. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies). For `oidc` mode, set `deployment_identity = "oidc"`. See [Optional: Deployment Identity for OIDC Workflow Applies](#optional-deployment-identity-for-oidc-workflow-applies).
+For `client_secret` mode, see [Service Principal](../../../README.md#service-principal) in the Azure Sandbox README. For `managed_identity` mode, set `deployment_identity = "managed_identity"` in this configuration. It creates the user-assigned managed identity, assigns both Azure RBAC roles on the subscription, and attaches the identity to its Linux virtual machine. Use the `deployment_identity_client_id` output as `client_id`, and grant the Microsoft Graph permissions with `scripts/grant-graph-permissions.sh`. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies). For `oidc` mode, set `deployment_identity = "oidc"`. See [Optional: Deployment Identity for OIDC Workflow Applies](#optional-deployment-identity-for-oidc-workflow-applies).
 
 ### Operator
 
 The operator is the signed-in user who provisions a configuration. It is separate from the deployment identity.
 
 * **This configuration:** Terraform authenticates as the operator signed in to Azure CLI (`use_cli = true` in [`providers.tf`](./providers.tf)), so the operator needs `Owner` on the subscription, or `Contributor` plus an unconditioned role-assignment role such as `User Access Administrator`, for the duration of the apply. The operator's identity is read from the Azure CLI sign-in and granted `Key Vault Secrets Officer` and `Storage Blob Data Contributor` on the resources this configuration creates, and `Virtual Machine Administrator Login` on `jumplinux2` for Microsoft Entra ID SSH sign-in.
-* **Root sandbox:** `operator_object_id` is the Microsoft Entra object id of the operator. The operator is granted data-plane role assignments, such as Key Vault and Storage roles, on the sandbox resources. The root bootstrap scripts default it to the signed-in Azure CLI or Azure PowerShell user.
+* **Azure Sandbox:** `operator_object_id` is the Microsoft Entra object id of the operator. The operator is granted data-plane role assignments, such as Key Vault and Storage roles, on the sandbox resources. The Azure Sandbox bootstrap scripts default it to the signed-in Azure CLI or Azure PowerShell user.
 
 #### Least-Privilege Operator Access with Privileged Identity Management
 
@@ -790,7 +790,7 @@ This section lists input variables used in the root module. Defaults can be over
 
 Variable | Default | Description
 --- | --- | ---
-deployment_identity | `none` | The identity this configuration provisions for root sandbox deployments: `none`, `managed_identity` or `oidc`. `managed_identity` creates a user-assigned managed identity with standing `Contributor` and conditioned `Role Based Access Control Administrator` role assignments on the subscription and attaches it to `jumplinux2`, for root sandbox applies with `auth_mode = "managed_identity"`. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies). `oidc` creates an unattached user-assigned managed identity with standing `Reader` on the subscription and GitHub Actions federated identity credentials, for workflow applies with `auth_mode = "oidc"` after the operator grants time-bound roles. See [Optional: Deployment Identity for OIDC Workflow Applies](#optional-deployment-identity-for-oidc-workflow-applies).
+deployment_identity | `none` | The identity this configuration provisions for Azure Sandbox deployments: `none`, `managed_identity` or `oidc`. `managed_identity` creates a user-assigned managed identity with standing `Contributor` and conditioned `Role Based Access Control Administrator` role assignments on the subscription and attaches it to `jumplinux2`, for Azure Sandbox applies with `auth_mode = "managed_identity"`. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies). `oidc` creates an unattached user-assigned managed identity with standing `Reader` on the subscription and GitHub Actions federated identity credentials, for workflow applies with `auth_mode = "oidc"` after the operator grants time-bound roles. See [Optional: Deployment Identity for OIDC Workflow Applies](#optional-deployment-identity-for-oidc-workflow-applies).
 enable_github_runner | false | Set to true to install and register the GitHub Actions self-hosted runner agent on `jumplinux2`. See [vm-jumpbox-linux](./modules/vm-jumpbox-linux/README.md#github-actions-self-hosted-runner).
 entra_tenant_id | | The Microsoft Entra tenant id.
 github_oidc_environments | `["sandbox-deployment", "sandbox-release-gate"]` | The GitHub Actions environments allowed to federate to the deployment identity. One federated identity credential is created per environment. Only used when `deployment_identity` is `oidc`.
@@ -806,10 +806,10 @@ location | | The name of the Azure Region where resources will be provisioned.
 log_analytics_workspace_retention_days | 30 | The retention period in days for the Log Analytics workspace. Must be one of 30, 31, 60, 90, 120, 180, 270, 365, 550 or 730.
 storage_access_tier | Hot | The access tier for the new storage account.
 storage_replication_type | LRS | The type of replication for the new storage account.
-subnet_bastion_address_prefix | 10.0.2.0/26 | The address prefix for the `AzureBastionSubnet`. Must be /26 or larger.
-subnet_address_prefix | 10.0.0.0/24 | The address prefix for the miscellaneous subnet. The minimum size is /29.
-subnet_name | snet-devops-01 | The name of the subnet to be created in the new virtual network.
-subnet_privatelink_address_prefix | 10.0.1.0/24 | The address prefix for the PrivateLink subnet
+subnet_bastion_address_prefix | 10.0.0.0/26 | The address prefix for the `AzureBastionSubnet`. Must be /26 or larger.
+subnet_address_prefix | 10.0.1.0/24 | The address prefix for the miscellaneous subnet. The minimum size is /29.
+subnet_devops_name | snet-devops-01 | The name of the devops subnet for the Linux virtual machine.
+subnet_privatelink_address_prefix | 10.0.2.0/24 | The address prefix for the PrivateLink subnet
 subnet_privatelink_name | snet-privatelink-03 | The name of the subnet for PrivateLink endpoints
 subscription_id | | The Azure subscription id used to provision resources.
 storage_container_name | tfstate | The name of the storage container to be created in the new storage account.
@@ -839,7 +839,7 @@ azurerm_monitor_diagnostic_setting.bastion | Diagnostic Logs | Sends `BastionAud
 azurerm_monitor_diagnostic_setting.data_collection_rule_linux | Diagnostic Logs | Sends data collection errors (`allLogs`) and metrics for the Linux data collection rule to the workspace.
 azurerm_monitor_diagnostic_setting.key_vault | Audit Logs | Sends key vault `audit` logs (including secret reads) and metrics to the workspace.
 azurerm_monitor_diagnostic_setting.log_analytics | Diagnostic Logs | Sends workspace query `audit` logs and metrics to the workspace itself.
-azurerm_monitor_diagnostic_setting.network_security_group_devops | Diagnostic Logs | Sends NSG event and rule counter logs (`allLogs`) to the workspace.
+azurerm_monitor_diagnostic_setting.network_security_groups[*] | Diagnostic Logs | Sends NSG event and rule counter logs (`allLogs`) for each NSG to the workspace.
 azurerm_monitor_diagnostic_setting.public_ip_bastion | Diagnostic Logs | Sends DDoS logs (`allLogs`) and metrics for the Bastion public IP to the workspace.
 azurerm_monitor_diagnostic_setting.public_ip_nat | Diagnostic Logs | Sends DDoS logs (`allLogs`) and metrics for the NAT gateway public IP to the workspace.
 azurerm_monitor_diagnostic_setting.storage_account | Diagnostic Logs | Sends storage account `Transaction` metrics to the workspace.
@@ -850,7 +850,8 @@ azurerm_monitor_private_link_scoped_service.dce | ampls-scope-dce | Adds the dat
 azurerm_monitor_private_link_scoped_service.log_analytics | ampls-scope-log-analytics | Adds the Log Analytics workspace to the AMPLS.
 azurerm_nat_gateway.this | ng-devops-dev | NAT gateway for outbound internet connectivity.
 azurerm_nat_gateway_public_ip_association.this | | Associates the NAT gateway with the public IP address.
-azurerm_network_security_group.devops | nsg-devops-dev-snet-devops-01 | NSG that allows inbound SSH (port 22) to the Linux virtual machine only from the `AzureBastionSubnet`.
+azurerm_network_security_group.groups[*] | nsg-devops-dev.AzureBastionSubnet, nsg-devops-dev.snet-devops-01 | One NSG for each subnet in `local.subnets` that has NSG rules. The private link subnet has no NSG.
+azurerm_network_security_rule.rules[*] | | NSG rules from `local.nsg_rules`, assigned to subnets in `local.subnets`. `AzureBastionSubnet` gets the [rules required by Azure Bastion](https://learn.microsoft.com/azure/bastion/bastion-nsg); `snet-devops-01` allows inbound SSH (port 22) only from the `AzureBastionSubnet`.
 azurerm_private_dns_zone.ampls[*] | privatelink.monitor.azure.com, privatelink.oms.opinsights.azure.com, privatelink.ods.opinsights.azure.com, privatelink.agentsvc.azure-automation.net | Private DNS zones for the AMPLS private endpoint
 azurerm_private_dns_zone.key_vault | privatelink.vaultcore.azure.net | Private DNS zone for Azure Key Vault
 azurerm_private_dns_zone.storage_blob | privatelink.blob.core.windows.net | Private DNS zone for Azure blob storage
@@ -871,12 +872,10 @@ azurerm_role_assignment.deployment_identity_reader[0] | | Assigns standing `Read
 azurerm_role_assignment.runner_power_state[0] | | Assigns `Desktop Virtualization Power On Off Contributor` on `jumplinux2` to the runner power state identity. Created only when `deployment_identity` is `oidc`.
 azurerm_storage_account.this | stdevopsdevxxx | Storage account for storing Terraform state files.
 azurerm_storage_container.this | tfstate | Storage container for storing Terraform state files.
-azurerm_subnet.bastion | AzureBastionSubnet | Subnet for the Bastion host. The name is required by Azure.
-azurerm_subnet.devops | snet-devops-01 | Subnet for jumplinux2 VM
-azurerm_subnet.privatelink | snet-privatelink-03 | Subnet for PrivateLink endpoints
+azurerm_subnet.subnets[*] | AzureBastionSubnet, snet-devops-01, snet-privatelink-03 | Subnets from `local.subnets`: the Bastion host subnet (the name is required by Azure), the subnet for `jumplinux2` and the subnet for PrivateLink endpoints.
 azurerm_subnet_nat_gateway_association.devops | vnet-devops-dev-devops| Associates the NAT gateway with the subnet.
-azurerm_subnet_network_security_group_association.this | | Associates the NSG with the subnet.
-azurerm_user_assigned_identity.deployment[0] | uai-devops-dev-xxx | Deployment identity for root sandbox applies. Attached to `jumplinux2` when `deployment_identity` is `managed_identity`; unattached and federated with GitHub Actions when it is `oidc`. Not created when `deployment_identity` is `none`.
+azurerm_subnet_network_security_group_association.associations[*] | | Associates each NSG with its subnet. Waits for the NSG rules and the Bastion host, because associating an NSG with `AzureBastionSubnet` before the Bastion host exists makes the Bastion deployment fail.
+azurerm_user_assigned_identity.deployment[0] | uai-devops-dev-xxx | Deployment identity for Azure Sandbox applies. Attached to `jumplinux2` when `deployment_identity` is `managed_identity`; unattached and federated with GitHub Actions when it is `oidc`. Not created when `deployment_identity` is `none`.
 azurerm_user_assigned_identity.runner_power_state[0] | uai-devops-dev-runner-xxx | Runner power state identity that starts and deallocates `jumplinux2` for workflow runs. Unattached and federated with GitHub Actions. Created only when `deployment_identity` is `oidc`.
 azurerm_virtual_network.this | vnet-devops-dev-devops | Virtual network for the Linux virtual machine.
 terraform_data.ampls_access_barrier | | Waits for every Azure Monitor write (scoped services, private endpoint, DNS zone links, diagnostic settings, and the `jumplinux2` agent and associations) before the AMPLS and workspace are closed to public networks.
@@ -891,7 +890,7 @@ This section includes a list of output variables returned by the root module.
 
 Name | Comments
 --- | ---
-deployment_identity_client_id | The client id of the deployment identity, used as `client_id` for root sandbox applies with `auth_mode = "managed_identity"` or `"oidc"`, or `null` when `deployment_identity` is `none`.
+deployment_identity_client_id | The client id of the deployment identity, used as `client_id` for Azure Sandbox applies with `auth_mode = "managed_identity"` or `"oidc"`, or `null` when `deployment_identity` is `none`.
 deployment_identity_github_subjects | The GitHub OIDC subjects accepted by the deployment identity's federated identity credentials, keyed by environment, or an empty map unless `deployment_identity` is `oidc`.
 deployment_identity_jit_condition | The condition (version 2.0) to apply to the deployment identity's time-bound `Role Based Access Control Administrator` assignment before each workflow run, or `null` unless `deployment_identity` is `oidc`.
 deployment_identity_principal_id | The principal (object) id of the deployment identity, used to grant Microsoft Graph application permissions, or `null` when `deployment_identity` is `none`.
@@ -911,11 +910,13 @@ Name | Required | Depends On | Description
 
 ### Virtual Network Design
 
-This configuration implements a virtual network. Default address ranges are set artificially high for demos and readability and can be overridden with smaller ranges to meet specific requirements. An firewall is not included in this configuration by design as it may be used as an startup environment to provision a platform landing zone or sandbox that does include a firewall. The virtual network includes three subnets:
+This configuration implements a virtual network. Default address ranges are set artificially high for demos and readability and can be overridden with smaller ranges to meet specific requirements. The virtual network includes three subnets, defined in `local.subnets` and listed in address range order:
 
-* A subnet for the Linux virtual machine. The subnet is configured with a NAT gateway for outbound internet connectivity and an NSG that allows inbound SSH only from the `AzureBastionSubnet`.
-* A subnet for PrivateLink endpoints for Azure Key Vault, Azure Blob Storage and the Azure Monitor Private Link Scope (AMPLS)
-* The `AzureBastionSubnet` for the Azure Bastion host, which is the only inbound path to the Linux virtual machine. The Linux virtual machine has no public IP address.
+* The `AzureBastionSubnet` (`10.0.0.0/26`) for the Azure Bastion host, which is the only inbound path to the Linux virtual machine. The Linux virtual machine has no public IP address. The subnet has an NSG with the [rules required by Azure Bastion](https://learn.microsoft.com/azure/bastion/bastion-nsg), as recommended in [Secure your Azure Bastion deployment](https://learn.microsoft.com/azure/bastion/secure-bastion#network-security).
+* A subnet for the Linux virtual machine (`10.0.1.0/24`). The subnet is configured with a NAT gateway for outbound internet connectivity and an NSG that allows inbound SSH only from the `AzureBastionSubnet`.
+* A subnet for PrivateLink endpoints (`10.0.2.0/24`) for Azure Key Vault, Azure Blob Storage and the Azure Monitor Private Link Scope (AMPLS).
+
+Every subnet is created with `default_outbound_access_enabled = false`, so it is a [private subnet](https://learn.microsoft.com/azure/virtual-network/ip-services/default-outbound-access) with no implicit outbound internet access. Egress from the Linux virtual machine goes through a Standard SKU NAT gateway associated with the devops subnet, which translates outbound connections to its static public IP address. This lets the virtual machine install packages, download tools, reach the GitHub Actions service and call Azure public endpoints without a public IP address or any inbound exposure, and gives it a predictable source IP address that can be added to allow lists. The NAT gateway handles outbound connections only; inbound access is through Azure Bastion. The Bastion host manages its own egress, and the PrivateLink subnet needs none.
 
 All private DNS zones are linked to the virtual network with `resolution_policy = "NxDomainRedirect"` (fallback to internet). This setting affects name resolution only: when a linked zone has no record for a name, Azure DNS resolves the name publicly instead of returning `NXDOMAIN`. It doesn't route traffic, and the target resource's own network settings still apply.
 
@@ -925,8 +926,8 @@ The AMPLS private endpoint changes how Azure Monitor endpoints resolve across th
 
 * Shared (global and regional) Azure Monitor endpoints, such as the `api` endpoint used for Log Analytics and Application Insights queries, have records in the `privatelink.monitor.azure.com` zone, so they always resolve to this AMPLS private endpoint.
 * After the barrier sets the AMPLS to `PrivateOnly`, clients in the devops virtual network can reach only the Azure Monitor resources in this AMPLS through those shared endpoints.
-* Names for Azure Monitor resources outside this AMPLS, such as a root sandbox workspace, fall back to public resolution and are governed by those resources' own public network settings.
-* Don't link the AMPLS private DNS zones to any other virtual network, such as a root sandbox virtual network that has its own AMPLS.
+* Names for Azure Monitor resources outside this AMPLS, such as an Azure Sandbox workspace, fall back to public resolution and are governed by those resources' own public network settings.
+* Don't link the AMPLS private DNS zones to any other virtual network, such as an Azure Sandbox virtual network that has its own AMPLS.
 
 After the barrier closes, the Log Analytics workspace accepts queries only from inside the devops virtual network, for example from `jumplinux2` using `az monitor log-analytics query`. Portal and Azure CLI queries from outside the virtual network fail. `./scripts/enable-public-access.sh` intentionally doesn't reopen the AMPLS or the workspace: it reopens only the key vault (secrets) and storage account (Terraform state). Terraform's Azure Monitor writes, such as diagnostic settings, use the Azure Resource Manager control plane and don't need public access.
 
