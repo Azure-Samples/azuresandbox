@@ -105,37 +105,40 @@ Multiple SQL database options are provided to suit various use cases and require
 
 ### Secure by Default, Secure by Design
 
-Azure Sandbox is built with security as a core principle, ensuring that all resources are deployed with secure configurations by default. Key security features include:
+Azure Sandbox demonstrates layered security controls across identity, authorization, networking, secrets, data protection, and monitoring. Key security features include:
 
-* **Azure Key Vault Integration**:
-  * Securely stores sensitive information, such as:
-    * Service principal credentials
-    * Shared keys
-    * Administrator passwords
-  * Ensures secrets are encrypted at rest and accessed only by authorized users or services.
-  * Network isolated endpoints for secure access to secrets.
-
-* **Microsoft Entra ID Authentication**:
-  * Simplifies access management by leveraging Microsoft Entra ID for identity and access control.
+* **Identity and Authentication**:
+  * Uses Microsoft Entra ID for Azure identities and authentication, including managed identities for supported workload access.
+  * Uses Microsoft Entra ID for service authentication where configured, such as Microsoft Entra-only authentication in the mssql module.
+  * Uses Active Directory Domain Services (AD DS) to domain-join Windows Servers and enable Windows integrated authentication to SQL Servers.
+  * Uses service-specific identities where Microsoft Entra ID integration is not configured, such as in the MySQL module.
   * See [Authentication](#authentication) for more information.
 
-* **Role-Based Access Control (RBAC) / Attribute-Based Access Control (ABAC)**:
-  * Enforces least-privilege access by assigning roles to users, groups, and services based on their specific needs (RBAC).
-  * Privileged role assignments are further restricted with conditions, such as limiting what roles can be assigned (ABAC).
-  * Ensures that only authorized entities can access or manage Azure resources.
+* **Authorization**:
+  * Assigns Azure roles to users, groups, and service identities based on their operational responsibilities (Azure RBAC).
+  * Uses Azure role assignment conditions to restrict which roles the deployment identity can assign or remove (Azure ABAC).
+  * Uses operating-system and service-specific permissions to control access within workloads.
   * See [Authorization](#authorization) for more information.
 
+* **Network Isolation**:
+  * Uses network segmentation, private endpoints, and access controls to restrict public exposure and connectivity between workloads.
+  * Uses dependency barriers to keep public access available on selected shared services while Terraform completes required data-plane operations from outside the private network, then disables public access once those operations finish.
+
+* **Azure Key Vault Integration**:
+  * Centrally stores the shared administrator username and password, plus SSH and VPN client certificate private keys when their modules are enabled.
+  * Encrypts secrets at rest and controls access through Microsoft Entra ID and Azure RBAC.
+  * Assigns one-year expiration dates to secrets; automatic rotation is not configured.
+  * Provides private endpoint access with private DNS integration; public network access is disabled after provisioning completes.
+
 * **Data Encryption**:
-  * All data stored in the sandbox environment is encrypted at rest using platform-managed keys.
-  * Supports end-to-end encryption for data in transit using TLS and host encryption for virtual machines.
+  * Uses platform-managed keys for encryption at rest in Azure storage services.
+  * Enables encryption at host for supported VM configurations.
+  * Configures TLS for supported service connections to protect data in transit.
 
 * **Compliance and Monitoring**:
-  * Integrates with Azure Policy to enforce compliance with organizational or regulatory standards.
+  * Supports deployment under existing Azure Policy controls, subject to configuration adjustments required by applicable policies.
   * Configures diagnostic settings to log resource activity and monitor for potential security threats.
-  * Supports integration with Microsoft Defender for Cloud to provide advanced threat protection and security recommendations.
-
-* **Network Isolation**:
-  * All sandbox resources are deployed within separate virtual networks, ensuring that they are isolated from the public internet and other Azure resources.
+  * Can be assessed through Microsoft Defender for Cloud for security recommendations; advanced threat protection requires separately enabled Defender plans.
 
 ### Documentation and Videos
 
