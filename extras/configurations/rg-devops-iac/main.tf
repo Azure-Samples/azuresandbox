@@ -1,6 +1,9 @@
 #region data
+
+# Used to get the signed-in operator's object ID for role assignments
 data "azurerm_client_config" "current" {}
 
+# Looks up the role definition ID (GUID) for each allow-listed role name.
 data "azurerm_role_definition" "deployment_identity_assignable" {
   for_each = toset(local.deployment_identity_assignable_roles)
 
@@ -8,9 +11,9 @@ data "azurerm_role_definition" "deployment_identity_assignable" {
   scope = "/subscriptions/${var.subscription_id}"
 }
 
-# Looks up the numeric repository and owner ids for the oidc deployment identity's federated credentials, unless both
-# are supplied. The request is anonymous because data source arguments are saved in state, so it works only for
-# public repositories.
+# Looks up the numeric repository and owner ids used in the GitHub OIDC subjects, when they aren't set in variables.
+# The request is anonymous, because a token would be saved in state, so it works only for public repositories and is rate-limited.
+# For a private repository, set github_repository_id and github_repository_owner_id in terraform.tfvars.
 data "http" "github_repository" {
   count = local.github_repository_lookup ? 1 : 0
 
@@ -30,7 +33,7 @@ data "http" "github_repository" {
 }
 #endregion
 
-#region resources
+#region key-vault
 resource "azurerm_resource_group" "this" {
   name     = module.naming.resource_group.name_unique
   location = var.location
@@ -51,7 +54,7 @@ resource "azurerm_key_vault" "this" {
   }
 }
 
-# Audit events include secret reads, such as retrieval of the jumplinux2 break-glass SSH private key.
+# Audit events include secret reads
 resource "azurerm_monitor_diagnostic_setting" "key_vault" {
   name                       = "Audit Logs"
   target_resource_id         = azurerm_key_vault.this.id
@@ -87,14 +90,13 @@ resource "azurerm_log_analytics_workspace" "this" {
   retention_in_days              = var.log_analytics_workspace_retention_days
   internet_ingestion_access_type = "Enabled" # Note: The barrier pattern will disable this on apply.
   internet_query_access_type     = "Enabled" # Note: The barrier pattern will disable this on apply.
-  tags                           = var.tags
 
   lifecycle {
     ignore_changes = [internet_ingestion_access_type, internet_query_access_type]
   }
 }
 
-# The Audit category records the queries run against the workspace (LAQueryLogs table).
+# The "audit" category records the queries run against the workspace (LAQueryLogs table).
 resource "azurerm_monitor_diagnostic_setting" "log_analytics" {
   name                       = "Diagnostic Logs"
   target_resource_id         = azurerm_log_analytics_workspace.this.id
@@ -114,7 +116,6 @@ resource "azurerm_monitor_private_link_scope" "this" {
   resource_group_name   = azurerm_resource_group.this.name
   ingestion_access_mode = "Open" # Note: The barrier pattern will set this to PrivateOnly on apply.
   query_access_mode     = "Open" # Note: The barrier pattern will set this to PrivateOnly on apply.
-  tags                  = var.tags
 
   lifecycle {
     ignore_changes = [ingestion_access_mode, query_access_mode]
@@ -209,15 +210,18 @@ resource "azurerm_monitor_diagnostic_setting" "data_collection_rule_linux" {
 #endregion
 
 #region deployment-identity
-# Identity used by Azure Sandbox applies. With deployment_identity = "managed_identity" it holds standing roles and is
-# attached to the VM alongside the system-assigned identity, which remains the default identity for cloud-init and the
-# state backend. With deployment_identity = "oidc" it is not attached to the VM, holds only standing Reader, and is
-# reachable only from approved GitHub Actions jobs through federated identity credentials. The operator grants it
-# time-bound Contributor and conditioned Role Based Access Control Administrator before each workflow run.
+
+# User-assigned managed identity (UAMI) used by the Azure Sandbox configuration's azurerm, azapi and azuread providers.
+# The VM's (jumplinux2) system-assigned managed identity, not the UAMI, is used for the Terraform state backend.
+# The UAMI and its roles depend on the deployment_identity setting:
+# - "none" (default): no deployment UAMI is created.
+# - "managed_identity": the deployment UAMI is attached to jumplinux2 and holds standing Contributor and Role Based Access Control Administrator, restricted by the allow-list ABAC condition.
+# - "oidc": the deployment UAMI is NOT attached to jumplinux2. Instead, it is used by approved GitHub Actions jobs on jumplinux2's self-hosted runner through federated identity credentials.
+#   It holds only standing Reader; before approving each workflow run, the operator grants time-bound Contributor and Role Based Access Control Administrator, restricted by the allow-list ABAC condition.
 resource "azurerm_user_assigned_identity" "deployment" {
   count = var.deployment_identity != "none" ? 1 : 0
 
-  name                = module.naming.user_assigned_identity.name_unique
+  name                = "${module.naming.user_assigned_identity.name}-deployment"
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
   tags                = var.tags
@@ -253,6 +257,9 @@ resource "azurerm_role_assignment" "deployment_identity_reader" {
   scope                = "/subscriptions/${var.subscription_id}"
 }
 
+# Trusts GitHub Actions OIDC tokens for the oidc deployment identity, one credential per subject in local.github_oidc_subjects.
+# A workflow job can exchange its GitHub token for an Azure token only if the token's issuer, audience and subject exactly match a credential.
+# This limits sign-in to jobs from this repository that run in one of the allowed GitHub environments, with no stored secret.
 resource "azurerm_federated_identity_credential" "deployment_identity_github" {
   for_each = local.github_oidc_subjects
 
@@ -265,15 +272,15 @@ resource "azurerm_federated_identity_credential" "deployment_identity_github" {
 #endregion
 
 #region runner-power-state-identity
-# Identity used by the Sandbox deployment workflow's GitHub-hosted jobs to start the VM before an approved run and
-# deallocate it afterwards. It is not attached to any VM and is reachable only from jobs in its own GitHub environment,
-# so its federated identity credential never matches the deployment identity's subjects. Its only role is the built-in
-# 'Desktop Virtualization Power On Off Contributor' on the VM. Scoped to the VM, it allows only reading the VM and changing
-# its power state (start, deallocate, power off, restart); it can't run commands, change extensions or delete the VM.
+
+# UAMI used by the Azure Sandbox deployment workflow's start_runner and stop_runner jobs, which run on GitHub-hosted runners, to start jumplinux2 before an approved run and deallocate it afterwards.
+# Created only when deployment_identity is "oidc"; jumplinux2 stays deallocated between runs to reduce cost and exposure.
+# The UAMI isn't attached to any VM and is reachable only from jobs in its own GitHub environment, which must differ from the deployment identity's environments, so neither identity's credentials match the other's subjects.
+# It holds a standing 'Desktop Virtualization Power On Off Contributor' role assignment scoped to jumplinux2, which allows reading the VM and changing its power state but not running commands, changing extensions or deleting it.
 resource "azurerm_user_assigned_identity" "runner_power_state" {
   count = var.deployment_identity == "oidc" ? 1 : 0
 
-  name                = module.naming_runner_power_state.user_assigned_identity.name_unique
+  name                = "${module.naming.user_assigned_identity.name}-runner"
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
   tags                = var.tags
@@ -288,6 +295,10 @@ resource "azurerm_role_assignment" "runner_power_state" {
   scope                = module.vm_jumpbox_linux.resource_ids["virtual_machine_jumplinux2"]
 }
 
+# Trusts GitHub Actions OIDC tokens for the runner power state UAMI.
+# Only one credential is needed, because the UAMI accepts one subject: local.github_runner_power_state_subject, for var.github_runner_power_state_environment.
+# A workflow job can exchange its GitHub token for an Azure token only if the token's issuer, audience and subject exactly match the credential.
+# This limits sign-in to jobs from this repository that run in the runner power state environment, with no stored secret.
 resource "azurerm_federated_identity_credential" "runner_power_state_github" {
   count = var.deployment_identity == "oidc" ? 1 : 0
 
@@ -353,11 +364,8 @@ resource "terraform_data" "ampls_access_barrier" {
       azurerm_monitor_diagnostic_setting.key_vault.id,
       azurerm_monitor_diagnostic_setting.log_analytics.id,
       join(",", [for setting in azurerm_monitor_diagnostic_setting.network_security_groups : setting.id]),
-      azurerm_monitor_diagnostic_setting.public_ip_bastion.id,
-      azurerm_monitor_diagnostic_setting.public_ip_nat.id,
       azurerm_monitor_diagnostic_setting.storage_account.id,
       azurerm_monitor_diagnostic_setting.storage_blob.id,
-      azurerm_monitor_diagnostic_setting.virtual_network.id,
     ])
     vm_jumpbox_linux = module.vm_jumpbox_linux.log_analytics_operations_complete
   }
@@ -401,14 +409,6 @@ module "naming" {
   unique-length          = 8
 }
 
-# Shares the random suffix of module.naming so the runner power state identity is named like the other resources.
-module "naming_runner_power_state" {
-  source      = "Azure/naming/azurerm"
-  version     = "~> 0.4.3"
-  suffix      = [var.tags["project"], var.tags["environment"], "runner"]
-  unique-seed = module.naming.unique-seed
-}
-
 module "vm_jumpbox_linux" {
   source = "./modules/vm-jumpbox-linux"
 
@@ -435,7 +435,7 @@ module "vm_jumpbox_linux" {
   # subnet associations are still being written.
   depends_on = [
     azurerm_subnet_nat_gateway_association.devops,
-    time_sleep.wait_for_roles,
+    time_sleep.wait_for_roles
   ]
 }
 #endregion

@@ -40,37 +40,32 @@ output "resource_names" {
   )
 }
 
-output "deployment_identity_client_id" {
-  value       = var.deployment_identity != "none" ? azurerm_user_assigned_identity.deployment[0].client_id : null
-  description = "The client id of the deployment identity, used as 'client_id' for Azure Sandbox applies with auth_mode = \"managed_identity\" or \"oidc\", or null when var.deployment_identity is none."
+# The deployment identity, or null when var.deployment_identity is none.
+#   client_id:       Used as 'client_id' for Azure Sandbox applies with auth_mode = "managed_identity" or "oidc".
+#   github_subjects: The GitHub OIDC subjects accepted by its federated identity credentials, keyed by environment.
+#                    An empty map unless var.deployment_identity is oidc.
+#   jit_condition:   The condition (version 2.0) the operator applies to its time-bound 'Role Based Access Control Administrator' assignment before each workflow run.
+#                    Null unless var.deployment_identity is oidc.
+#   principal_id:    The principal (object) id, used to grant Microsoft Graph application permissions.
+output "deployment_identity" {
+  value = var.deployment_identity != "none" ? {
+    client_id       = azurerm_user_assigned_identity.deployment[0].client_id
+    github_subjects = local.github_oidc_subjects
+    jit_condition   = var.deployment_identity == "oidc" ? local.deployment_identity_rbac_condition : null
+    principal_id    = azurerm_user_assigned_identity.deployment[0].principal_id
+  } : null
 }
 
-output "deployment_identity_github_subjects" {
-  value       = local.github_oidc_subjects
-  description = "The GitHub OIDC subjects accepted by the deployment identity's federated identity credentials, keyed by environment, or an empty map unless var.deployment_identity is oidc."
-}
-
-output "deployment_identity_jit_condition" {
-  value       = var.deployment_identity == "oidc" ? local.deployment_identity_rbac_condition : null
-  description = "The condition (version 2.0) the operator applies to the deployment identity's time-bound 'Role Based Access Control Administrator' assignment before each workflow run, or null unless var.deployment_identity is oidc."
-}
-
-output "deployment_identity_principal_id" {
-  value       = var.deployment_identity != "none" ? azurerm_user_assigned_identity.deployment[0].principal_id : null
-  description = "The principal (object) id of the deployment identity, used to grant Microsoft Graph application permissions, or null when var.deployment_identity is none."
-}
-
-output "github_runner_name" {
-  value       = module.vm_jumpbox_linux.github_runner_name
-  description = "The name the GitHub Actions self-hosted runner is registered with, or null when var.enable_github_runner is false."
-}
-
-output "runner_power_state_identity_client_id" {
-  value       = var.deployment_identity == "oidc" ? azurerm_user_assigned_identity.runner_power_state[0].client_id : null
-  description = "The client id of the runner power state identity, which the Sandbox deployment workflow uses to start and deallocate the VM, or null unless var.deployment_identity is oidc."
-}
-
-output "runner_power_state_identity_github_subject" {
-  value       = local.github_runner_power_state_subject
-  description = "The GitHub OIDC subject accepted by the runner power state identity's federated identity credential, or null unless var.deployment_identity is oidc."
+# The GitHub Actions self-hosted runner, or null when var.enable_github_runner is false.
+#   name:                                The name the runner is registered with.
+#   power_state_identity_client_id:      The client id of the runner power state identity, which the Sandbox deployment workflow uses to start and deallocate the VM.
+#                                        Null unless var.deployment_identity is oidc.
+#   power_state_identity_github_subject: The GitHub OIDC subject accepted by the runner power state identity's federated identity credential.
+#                                        Null unless var.deployment_identity is oidc.
+output "github_runner" {
+  value = var.enable_github_runner ? {
+    name                                = module.vm_jumpbox_linux.github_runner_name
+    power_state_identity_client_id      = var.deployment_identity == "oidc" ? azurerm_user_assigned_identity.runner_power_state[0].client_id : null
+    power_state_identity_github_subject = local.github_runner_power_state_subject
+  } : null
 }

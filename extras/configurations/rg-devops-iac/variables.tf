@@ -1,6 +1,6 @@
 variable "deployment_identity" {
   type        = string
-  description = "The identity this configuration provisions for Azure Sandbox deployments. Use none to provision no deployment identity; managed_identity to create a user-assigned managed identity with standing 'Contributor' and conditioned 'Role Based Access Control Administrator' role assignments on the subscription and attach it to the Linux virtual machine, for Azure Sandbox applies with auth_mode = \"managed_identity\"; or oidc to create an unattached user-assigned managed identity with standing 'Reader' on the subscription and GitHub Actions federated identity credentials, for workflow applies with auth_mode = \"oidc\" after the operator grants time-bound roles."
+  description = "The deployment identity to create for Azure Sandbox applies. Use none for no identity; managed_identity for an identity attached to the Linux virtual machine, with standing roles on the subscription (auth_mode = \"managed_identity\"); or oidc for an identity that GitHub Actions workflows sign in as, with time-bound roles the operator grants before each run (auth_mode = \"oidc\")."
   default     = "none"
 
   validation {
@@ -27,7 +27,7 @@ variable "entra_tenant_id" {
 
 variable "github_oidc_environments" {
   type        = list(string)
-  description = "The GitHub Actions environments allowed to federate to the deployment identity. One federated identity credential is created per environment. Only used when var.deployment_identity is oidc."
+  description = "The GitHub Actions environments whose jobs can sign in as the deployment identity. One federated identity credential is created per environment. Only used when var.deployment_identity is oidc."
   default     = ["sandbox-deployment", "sandbox-release-gate"]
 
   validation {
@@ -38,7 +38,7 @@ variable "github_oidc_environments" {
 
 variable "github_repository_id" {
   type        = string
-  description = "The numeric id of the repository whose workflows may federate to the deployment identity, e.g. from 'gh api repos/OWNER/NAME --jq .id'. Only used when var.deployment_identity is oidc. When empty, it is looked up anonymously from the GitHub API using the repository in var.github_runner_url; set it for a private repository."
+  description = "The numeric id of the GitHub repository, e.g. from 'gh api repos/OWNER/NAME --jq .id'. Only used when var.deployment_identity is oidc. When empty, it is looked up from the repository in var.github_runner_url, which works only for public repositories."
   default     = ""
 
   validation {
@@ -49,7 +49,7 @@ variable "github_repository_id" {
 
 variable "github_repository_owner_id" {
   type        = string
-  description = "The numeric id of the user or organization that owns the repository, e.g. from 'gh api repos/OWNER/NAME --jq .owner.id'. Only used when var.deployment_identity is oidc. When empty, it is looked up anonymously from the GitHub API using the repository in var.github_runner_url; set it for a private repository."
+  description = "The numeric id of the user or organization that owns the GitHub repository, e.g. from 'gh api repos/OWNER/NAME --jq .owner.id'. Only used when var.deployment_identity is oidc. When empty, it is looked up from the repository in var.github_runner_url, which works only for public repositories."
   default     = ""
 
   validation {
@@ -71,7 +71,7 @@ variable "github_runner_labels" {
 
 variable "github_runner_power_state_environment" {
   type        = string
-  description = "The GitHub Actions environment allowed to federate to the runner power state identity, which starts and deallocates the VM for workflow runs. It must not be one of var.github_oidc_environments. Only used when var.deployment_identity is oidc."
+  description = "The GitHub Actions environment whose jobs can sign in as the runner power state identity, which starts and deallocates the Linux virtual machine for workflow runs. Must not be one of var.github_oidc_environments. Only used when var.deployment_identity is oidc."
   default     = "sandbox-runner-power-state"
 
   validation {
@@ -111,7 +111,7 @@ variable "github_runner_token_type" {
 
 variable "github_runner_url" {
   type        = string
-  description = "The GitHub repository or organization URL to register the self-hosted runner with, e.g. 'https://github.com/myorg/myrepo'. Required when var.enable_github_runner is true. When var.deployment_identity is oidc and the repository ids are not set, it must be a repository URL; the ids are looked up from it."
+  description = "The GitHub repository or organization URL to register the self-hosted runner with, e.g. 'https://github.com/myorg/myrepo'. Required when var.enable_github_runner is true. Must be a repository URL when var.deployment_identity is oidc and the repository ids are not set."
   default     = ""
 
   validation {
@@ -159,7 +159,7 @@ variable "storage_access_tier" {
 
 variable "storage_container_name" {
   type        = string
-  description = "The name of the storage container to be created in the new storage account."
+  description = "The name of the storage container for Terraform state."
   default     = "tfstate"
 
   validation {
@@ -181,7 +181,7 @@ variable "storage_replication_type" {
 
 variable "subnet_address_prefix" {
   type        = string
-  description = "The address prefix for the miscellaneous subnet."
+  description = "The address prefix for the devops subnet."
   default     = "10.0.1.0/24"
 
   validation {
@@ -203,7 +203,7 @@ variable "subnet_bastion_address_prefix" {
 
 variable "subnet_devops_name" {
   type        = string
-  description = "The name of the devops subnet for the Linux virtual machine."
+  description = "The name of the devops subnet, which hosts the Linux virtual machine."
   default     = "snet-devops-01"
 
   validation {
@@ -214,7 +214,7 @@ variable "subnet_devops_name" {
 
 variable "subnet_privatelink_address_prefix" {
   type        = string
-  description = "The address prefix for the private link subnet."
+  description = "The address prefix for the private link subnet, which hosts the private endpoints."
   default     = "10.0.2.0/24"
 
   validation {
@@ -225,7 +225,7 @@ variable "subnet_privatelink_address_prefix" {
 
 variable "subnet_privatelink_name" {
   type        = string
-  description = "The name of the private link subnet to be created in the new virtual network."
+  description = "The name of the private link subnet."
   default     = "snet-privatelink-03"
 
   validation {
@@ -261,7 +261,7 @@ variable "tags" {
 
 variable "vm_jumpbox_linux_size" {
   type        = string
-  description = "The size of the virtual machine"
+  description = "The size of the Linux virtual machine."
   default     = "Standard_D2ls_v6"
 
   validation {
@@ -272,7 +272,7 @@ variable "vm_jumpbox_linux_size" {
 
 variable "vnet_address_space" {
   type        = string
-  description = "The address space in CIDR notation for the new virtual network."
+  description = "The address space in CIDR notation for the virtual network."
   default     = "10.0.0.0/16"
 
   validation {
@@ -283,7 +283,7 @@ variable "vnet_address_space" {
 
 variable "vnet_name" {
   type        = string
-  description = "The name of the new virtual network to be provisioned."
+  description = "The suffix appended to the generated virtual network name."
   default     = "devops"
 
   validation {

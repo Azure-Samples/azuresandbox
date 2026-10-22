@@ -4,7 +4,7 @@
 # operator approves a Sandbox deployment workflow run:
 #   * Contributor                               time-bound active assignment on the subscription.
 #   * Role Based Access Control Administrator   time-bound active assignment on the subscription, constrained by
-#                                               the 'deployment_identity_jit_condition' terraform output.
+#                                               'jit_condition' in the 'deployment_identity' terraform output.
 #
 # Run as the operator with Azure CLI signed in. Creating role assignments requires an active subscription Owner
 # or User Access Administrator assignment. If neither is active, the script activates your eligible Owner
@@ -98,13 +98,13 @@ OUTPUTS=$(terraform -chdir="${TERRAFORM_DIR}" output -json) || {
   exit 1
 }
 
-PRINCIPAL_ID=$(jq -r '.deployment_identity_principal_id.value // empty' <<<"${OUTPUTS}")
-CONDITION=$(jq -r '.deployment_identity_jit_condition.value // empty' <<<"${OUTPUTS}")
+PRINCIPAL_ID=$(jq -r '.deployment_identity.value.principal_id // empty' <<<"${OUTPUTS}")
+CONDITION=$(jq -r '.deployment_identity.value.jit_condition // empty' <<<"${OUTPUTS}")
 IDENTITY_NAME=$(jq -r '.resource_names.value.deployment_identity // empty' <<<"${OUTPUTS}")
 RESOURCE_GROUP_ID=$(jq -r '.resource_ids.value.resource_group // empty' <<<"${OUTPUTS}")
 
 if [[ -z "${PRINCIPAL_ID}" || -z "${CONDITION}" ]]; then
-  echo "Error: the 'deployment_identity_principal_id' or 'deployment_identity_jit_condition' output is empty."
+  echo "Error: 'principal_id' or 'jit_condition' in the 'deployment_identity' output is empty."
   echo "Set deployment_identity = \"oidc\" and run 'terraform apply'."
   exit 1
 fi
@@ -252,7 +252,7 @@ for role_id in "${GRANT_ROLE_IDS[@]}"; do
         echo "  ${role_name}: already active until ${end} ($(minutes_until "${end}") minutes). Kept; use --force to replace it."
       fi
       if [[ "${role_id}" == "${RBAC_ADMIN_ROLE_ID}" ]] && [[ "$(jq -r '.condition // empty' <<<"${current}")" != "${CONDITION}" ]]; then
-        echo "  Warning: its condition doesn't match 'deployment_identity_jit_condition'. Run again with --force to replace it."
+        echo "  Warning: its condition doesn't match the 'deployment_identity' output's 'jit_condition'. Run again with --force to replace it."
       fi
       continue
     fi
@@ -330,9 +330,9 @@ else
     jq -r --arg id "${allowed_id}" '"    - \(.[$id] // "<unknown role>") (\($id))"' <<<"${ROLE_DEFINITIONS}"
   done | sort
   if [[ "${APPLIED_CONDITION}" == "${CONDITION}" ]]; then
-    echo "  Matches the 'deployment_identity_jit_condition' output."
+    echo "  Matches the the 'deployment_identity' output's 'jit_condition' output."
   else
-    echo "  Warning: doesn't match the 'deployment_identity_jit_condition' output. Run again with --force to replace it."
+    echo "  Warning: doesn't match the the 'deployment_identity' output's 'jit_condition' output. Run again with --force to replace it."
   fi
 fi
 

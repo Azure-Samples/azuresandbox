@@ -7,20 +7,6 @@ resource "azurerm_virtual_network" "this" {
   dns_servers         = ["168.63.129.16"]
 }
 
-resource "azurerm_monitor_diagnostic_setting" "virtual_network" {
-  name                       = "Diagnostic Logs"
-  target_resource_id         = azurerm_virtual_network.this.id
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
-
-  enabled_log {
-    category_group = "allLogs"
-  }
-
-  enabled_metric {
-    category = "AllMetrics"
-  }
-}
-
 resource "azurerm_subnet" "subnets" {
   for_each                          = local.subnets
   name                              = each.key
@@ -97,20 +83,6 @@ resource "azurerm_public_ip" "bastion" {
     ignore_changes = [ip_tags]
   }
 }
-
-resource "azurerm_monitor_diagnostic_setting" "public_ip_bastion" {
-  name                       = "Diagnostic Logs"
-  target_resource_id         = azurerm_public_ip.bastion.id
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
-
-  enabled_log {
-    category_group = "allLogs"
-  }
-
-  enabled_metric {
-    category = "AllMetrics"
-  }
-}
 #endregion
 
 #region nsgs
@@ -172,10 +144,6 @@ resource "azurerm_monitor_diagnostic_setting" "network_security_groups" {
 #endregion
 
 #region private-dns-zones
-# Fallback to internet (NxDomainRedirect) is enabled on every link. When a zone has no record for a name, such as a
-# key vault, storage account or Azure Monitor resource that isn't behind a private endpoint in this virtual network,
-# Azure DNS resolves the name publicly instead of returning NXDOMAIN.
-# See https://learn.microsoft.com/azure/dns/private-dns-fallback
 resource "azurerm_private_dns_zone" "zones" {
   for_each = toset(local.private_dns_zones)
 
@@ -190,7 +158,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "zones" {
   name                = "link-${each.value.name}-${azurerm_virtual_network.this.name}"
   private_dns_zone_id = each.value.id
   virtual_network_id  = azurerm_virtual_network.this.id
-  resolution_policy   = "NxDomainRedirect"
+  resolution_policy   = "NxDomainRedirect" # Enables fallback to internet when a zone has no record for a name.
 }
 
 # Dependency signal consumed by the private endpoints, so they are not created until every private DNS zone
@@ -226,20 +194,6 @@ resource "azurerm_public_ip" "this" {
 resource "azurerm_nat_gateway_public_ip_association" "this" {
   nat_gateway_id       = azurerm_nat_gateway.this.id
   public_ip_address_id = azurerm_public_ip.this.id
-}
-
-resource "azurerm_monitor_diagnostic_setting" "public_ip_nat" {
-  name                       = "Diagnostic Logs"
-  target_resource_id         = azurerm_public_ip.this.id
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
-
-  enabled_log {
-    category_group = "allLogs"
-  }
-
-  enabled_metric {
-    category = "AllMetrics"
-  }
 }
 
 resource "azurerm_subnet_nat_gateway_association" "devops" {
