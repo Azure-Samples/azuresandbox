@@ -38,9 +38,11 @@ This module can optionally install and register the [GitHub Actions runner](http
 
 When `enable_github_runner` is `true`:
 
-* The GitHub personal access token (PAT) or runner registration token is stored as a **write-only** key vault secret (`value_wo`), so it is never written to Terraform state. It is also never written to the VM custom data.
-* The VM managed identity is granted the `Key Vault Secrets User` role, and cloud-init reads the secret from key vault at provisioning time using that managed identity.
-* When `github_runner_token_type` is `pat` (the default), the PAT is exchanged on the VM for a short lived runner registration token using the GitHub REST API. Use `registration` instead if you already have a registration token.
+* Cloud-init is unchanged: the runner is installed by a separate managed Run Command (`ConfigureGitHubRunner`, an `azapi_resource`) that runs [configure-github-runner.sh](./scripts/configure-github-runner.sh) after cloud-init and the VM extensions finish. Because the base VM is identical with or without the runner, enabling or disabling the runner never replaces the VM.
+* The GitHub token in `github_runner_token` is an [ephemeral](https://developer.hashicorp.com/terraform/language/values/variables#exclude-values-from-state) input passed to the Run Command as a protected parameter through the write-only `sensitive_body` argument. It is never written to Terraform state, the saved plan, the VM custom data or Key Vault.
+* The token is needed only when the runner is registered: when the Run Command is created, or when `github_runner_token_version` is incremented. Later applies don't need it.
+* By default (`github_runner_token_type = "registration"`) the token is a runner registration token, which expires after one hour and can only register runners. See [Registration Token](#registration-token). Set `github_runner_token_type` to `pat` to supply a [personal access token](#personal-access-token-optional) instead, which is exchanged on the VM for a registration token.
+* Registration errors fail `terraform apply` (`treatFailureAsDeploymentFailure`), and the script output is shown in the Run Command instance view.
 * The runner agent is installed to `/opt/actions-runner`, registered with the configured repository or organization URL and labels, then installed as a **systemd service** (`actions.runner.*`) so it starts automatically after a reboot.
 * The service runs under a non-root local service account (`githubrunner` by default). The pre-installed toolchain (`terraform`, `az`, `pwsh` with Az modules) is on the runner `PATH`, and `ARM_USE_MSI` / `ARM_TENANT_ID` are set in the runner service environment file (`/opt/actions-runner/.env`) so workflows authenticate to Azure with the VM managed identity. No Azure secrets are stored on the VM.
 
@@ -97,7 +99,25 @@ has to live on the Terraform execution environment running the apply - a worksta
 Terraform execution environment, never this runner, which does not exist until that apply completes.
 See the root [README](../../README.md) for details.
 
-### Token Permissions
+### Registration Token
+
+A runner registration token is the default and preferred credential. It expires after one hour, can only be used to register runners, and is scoped to the repository or organization it was created for. Create one right before `terraform plan` with the helper script in the root module, in the shell that will run Terraform. The script reads `github_runner_url` from `terraform.tfvars` and sets `TF_VAR_github_runner_token` without displaying the token. The bash script must be sourced, and refuses to print the token to a terminal:
+
+```bash
+source ./scripts/new-runner-registration-token.sh
+```
+
+```powershell
+./scripts/New-RunnerRegistrationToken.ps1
+```
+
+The helper scripts use the GitHub CLI (`gh`), signed in as a repository admin (repository runner) or with the `admin:org` scope (organization runner). Because the variable is ephemeral, keep it set for both `terraform plan` and `terraform apply`. Run both within the token's one-hour lifetime.
+
+If registration fails, for example because the token expired, create a new token, increment `github_runner_token_version` and apply again. The VM is not replaced.
+
+### Personal Access Token (Optional)
+
+Set `github_runner_token_type = "pat"` to supply a personal access token instead, for example when registration can't happen within an hour of creating the token. A plan fails if a value that looks like a personal access token (`github_pat_` or `ghp_` prefix) is supplied while `github_runner_token_type` is `registration`.
 
 Use a *fine-grained* personal access token. Classic personal access tokens are legacy, cannot be scoped as narrowly, and may be blocked by organization or enterprise policy.
 
@@ -108,7 +128,7 @@ The PAT supplied in `github_runner_token` is only used to obtain a registration 
 
 A token that is missing these permissions returns `403 Resource not accessible by personal access token` when exchanging the PAT for a registration token.
 
-Grant no other permissions. The PAT is stored as a write-only key vault secret, read at boot by the virtual machine's managed identity, and exchanged for a short lived registration token. The runner agent itself never uses the PAT. Note that the PAT is long lived and must be rotated manually.
+Grant no other permissions, and use a short expiration. The PAT is passed to the Run Command as a protected parameter and exchanged on the VM for a registration token. The runner agent itself never uses the PAT.
 
 ### Runner Scope
 
@@ -125,7 +145,7 @@ Runner groups are an organization and enterprise feature. Passing a runner group
 
 The runner service account is unprivileged. The `vwan` integration tests in [Test-Integration-VwanConnectivity.ps1](../../../../../scripts/Test-Integration-VwanConnectivity.ps1) establish a point-to-site VPN tunnel, which requires root to create the `tun` device and update the routing table.
 
-When `github_runner_enable_vwan_sudoers` is true (the default), the configuration script installs a command scoped sudoers drop-in at `/etc/sudoers.d/azuresandbox-github-runner` granting the runner service account passwordless `sudo` for only the binaries those tests invoke: `openvpn`, `cat`, `tail`, `kill` and `pkill`. The drop-in is written with `0440` permissions, owned by `root`, and validated with `visudo -cf` before it takes effect. If validation fails it is removed and cloud-init fails rather than leaving `sudo` broken.
+When `github_runner_enable_vwan_sudoers` is true (the default), the configuration script installs a command scoped sudoers drop-in at `/etc/sudoers.d/azuresandbox-github-runner` granting the runner service account passwordless `sudo` for only the binaries those tests invoke: `openvpn`, `cat`, `tail`, `kill` and `pkill`. The drop-in is written with `0440` permissions, owned by `root`, and validated with `visudo -cf` before it takes effect. If validation fails it is removed and the Run Command fails rather than leaving `sudo` broken.
 
 **IMPORTANT:** This is a privilege grant. Passwordless root `cat`, `tail`, `kill` and `pkill` allow the runner service account to read any file on the VM and signal any process, which means any workflow job that runs on this runner inherits that capability. Set `github_runner_enable_vwan_sudoers` to `false` if the runner will not execute the `vwan` integration tests.
 
@@ -223,7 +243,7 @@ To set up the tunnel manually instead of using the script, run `az network basti
 
 ##### Integration tests that need `sudo`
 
-The `vwan` point-to-site VPN integration tests run privileged commands (`openvpn`, `cat`, `tail`, `kill`, `pkill`) and probe for passwordless `sudo` with `sudo -n cat /dev/null`. An operator signed in through Microsoft Entra ID with *Virtual Machine Administrator Login* already has passwordless `sudo`, so interactive `Invoke-UnitTests.ps1` runs with `vwan` enabled work without the hand-made `/etc/sudoers.d/azuresandbox-vwan` drop-in, which was only needed for the local admin account. The runner service account's drop-in, installed by cloud-init when `github_runner_enable_vwan_sudoers` is true, is unchanged. See [Elevated Permissions for Integration Tests](#elevated-permissions-for-integration-tests).
+The `vwan` point-to-site VPN integration tests run privileged commands (`openvpn`, `cat`, `tail`, `kill`, `pkill`) and probe for passwordless `sudo` with `sudo -n cat /dev/null`. An operator signed in through Microsoft Entra ID with *Virtual Machine Administrator Login* already has passwordless `sudo`, so interactive `Invoke-UnitTests.ps1` runs with `vwan` enabled work without the hand-made `/etc/sudoers.d/azuresandbox-vwan` drop-in, which was only needed for the local admin account. The runner service account's drop-in, installed by the `ConfigureGitHubRunner` Run Command when `github_runner_enable_vwan_sudoers` is true, is unchanged. See [Elevated Permissions for Integration Tests](#elevated-permissions-for-integration-tests).
 
 #### 3. Break-glass: Azure Bastion with the local admin account
 
@@ -279,13 +299,19 @@ echo $ARM_TENANT_ID
 
 Only applicable when `enable_github_runner` is set to `true`.
 
+* From the operator's workstation, review the runner configuration script output captured by the `ConfigureGitHubRunner` Run Command (the instance view keeps the last 4 KB of output):
+
+  ```bash
+  RG=$(az group list --query "[?starts_with(name, 'rg-devops-')].name" -o tsv | head -1)
+  NAME=$(az vm run-command list -g "$RG" --vm-name jumplinux2 --query "[?ends_with(name, 'ConfigureGitHubRunner')].name" -o tsv)
+  az vm run-command show -g "$RG" --vm-name jumplinux2 --name "$NAME" --instance-view \
+    --query "instanceView.{state:executionState, exitCode:exitCode, output:output, error:error}"
+  ```
+
 * Connect to *jumplinux2* using one of the [connection paths](#connection-paths) described above.
 * Verify the runner agent was installed and registered:
 
   ```bash
-  # Review the cloud-init output for the runner configuration script
-  sudo grep configure-github-runner /var/log/cloud-init-output.log
-
   # Confirm the runner is registered
   sudo cat /opt/actions-runner/.runner
 
@@ -322,12 +348,12 @@ This module is organized as follows:
 ├── images/
 |   └── vm-jumpbox-linux-diagram.drawio.svg # Architecture diagram
 ├── scripts/
-|   ├── configure-github-runner.sh          # cloud-init shell script to install/register the GitHub Actions runner
-|   ├── configure-github-runner.yaml        # cloud-init cloud-config file with GitHub Actions runner settings
+|   ├── configure-github-runner.sh          # Managed Run Command script to install/register the GitHub Actions runner
 |   ├── configure-powershell.ps1            # cloud-init shell script to configure PowerShell
 |   ├── configure-vm-jumpbox-linux.yaml     # cloud-init cloud-config file to configure the VM
 |   └── wait-for-cloud-init.sh              # Managed Run Command completion and package-manager wait
 ├── compute.tf                              # Compute resource configurations
+├── locals.tf                               # Local values
 ├── main.tf                                 # Resource configurations
 ├── network.tf                              # Network resource configurations
 ├── outputs.tf                              # Output variables
@@ -351,14 +377,12 @@ github_runner_group | `Default` | The name of the GitHub Actions runner group to
 github_runner_labels | `["azuresandbox"]` | Additional labels to apply to the self-hosted runner. Only used when `enable_github_runner` is true.
 github_runner_name | | The name to register the runner with. Defaults to the VM name when left empty. Only used when `enable_github_runner` is true.
 github_runner_service_account | `githubrunner` | The name of the non-root local service account the runner runs under. Only used when `enable_github_runner` is true.
-github_runner_token | | A GitHub personal access token or runner registration token used to register the runner. Set using an environment variable `TF_VAR_github_runner_token`. Required when `enable_github_runner` is true. Stored as a write-only key vault secret so it never lands in Terraform state.
-github_runner_token_secret | `github-runner-token` | The name of the key vault secret used to pass the GitHub registration token to the VM at provisioning time.
-github_runner_token_secret_version | 1 | Increment to write a new value for the `github_runner_token` key vault secret.
-github_runner_token_type | `pat` | The type of token supplied in `github_runner_token`. Use `pat` for a personal access token, which is exchanged for a short lived registration token on the VM, or `registration` for a registration token obtained from the GitHub API.
+github_runner_token | | Ephemeral. The GitHub token used to register the runner, of the type in `github_runner_token_type`. Passed to the Run Command through a write-only protected parameter, so it never lands in Terraform state or the saved plan. Required only when the runner is registered (when the Run Command is created or `github_runner_token_version` changes).
+github_runner_token_type | `registration` | The type of token supplied in `github_runner_token`. Use `registration` for a runner registration token obtained from the GitHub API (expires after 1 hour), or `pat` for a personal access token, which is exchanged for a registration token on the VM. A value that looks like a personal access token is rejected when set to `registration`.
+github_runner_token_version | 1 | Increment to send a new `github_runner_token` to the VM and re-run runner registration, for example after a failed registration.
 github_runner_url | | The GitHub repository or organization URL to register the runner with, e.g. `https://github.com/myorg/myrepo`. Required when `enable_github_runner` is true.
 github_runner_version | `2.338.0` | The version of the GitHub Actions runner agent to install, without the leading `v`.
 key_vault_id | | The ID of the key vault defined in the root module.
-key_vault_name | | The name of the key vault defined in the root module. Used by cloud-init to read secrets from the VM using the managed identity.
 location | | The Azure region where the resources will be created. Defined in the root module.
 log_analytics_workspace_id | | The ID of the Log Analytics workspace defined in the root module. Receives the network interface metrics.
 resource_group_name | | The name of the resource group defined in the root module.
@@ -381,8 +405,8 @@ This section lists the resources included in this configuration.
 
 Address | Name | Notes
 --- | --- | ---
+module.vm_jumpbox_linux.azapi_resource.github_runner[0] | | Managed Run Command that installs and registers the GitHub Actions runner after `ama`. The GitHub token is a write-only protected parameter. Created only when `var.enable_github_runner` is enabled.
 module.vm_jumpbox_linux.azurerm_key_vault_secret.adminuser | adminuser | The Key Vault secret containing the break-glass admin username for the Linux virtual machine.
-module.vm_jumpbox_linux.azurerm_key_vault_secret.github_runner_token[0] | github&#8209;runner&#8209;token | The write-only Key Vault secret containing the GitHub registration token, created only when `var.enable_github_runner` is enabled. The value is never stored in Terraform state.
 module.vm_jumpbox_linux.azurerm_key_vault_secret.ssh_private_key | jumplinux2&#8209;ssh&#8209;private&#8209;key | The break-glass private SSH key for the admin account, stored in Azure Key Vault.
 module.vm_jumpbox_linux[0].azurerm_linux_virtual_machine.this | jumplinux2 | The Linux virtual machine resource.
 module.vm_jumpbox_linux[0].azurerm_network_interface.this | nic&#8209;devops&#8209;dev&#8209;jumplinux2 | The network interface associated with the Linux virtual machine.
@@ -390,11 +414,10 @@ module.vm_jumpbox_linux.azurerm_monitor_data_collection_rule_association.dce | c
 module.vm_jumpbox_linux.azurerm_monitor_data_collection_rule_association.dcr | dcr&#8209;devops&#8209;dev&#8209;jumplinux2&#8209;association | Associates the VM with the Linux data collection rule.
 module.vm_jumpbox_linux.azurerm_monitor_diagnostic_setting.network_interface | Diagnostic Logs | Sends network interface metrics to the Log Analytics workspace.
 module.vm_jumpbox_linux.azurerm_role_assignment.operator_vm_admin_login | | Grants `Virtual Machine Administrator Login` role on jumplinux2 to the operator applying the configuration, enabling Microsoft Entra ID SSH sign-in with passwordless `sudo`.
-module.vm_jumpbox_linux.azurerm_role_assignment.github_runner_key_vault[0] | | Grants `Key Vault Secrets User` role to the managed identity of jumplinux2 so cloud-init can read the GitHub registration token. Created only when `var.enable_github_runner` is enabled.
 module.vm_jumpbox_linux.azurerm_role_assignment.this | | Grants `Storage Blob Data Contributor` role to the managed identity of jumplinux2. This is intended to be used for accessing a Terraform state backend hosted in Azure Blob Storage.
 module.vm_jumpbox_linux.azurerm_virtual_machine_extension.aad_ssh_login | | The `AADSSHLoginForLinux` extension that enables Microsoft Entra ID SSH sign-in. Installed after `wait_for_cloud_init` to avoid apt lock contention.
 module.vm_jumpbox_linux.azurerm_virtual_machine_extension.ama | AzureMonitorLinuxAgent | The Azure Monitor Agent. Installed after `aad_ssh_login` to avoid apt lock contention.
-module.vm_jumpbox_linux.azurerm_virtual_machine_run_command.wait_for_cloud_init | | Waits for cloud-init termination and dpkg/apt idle checks, with or without the optional runner.
+module.vm_jumpbox_linux.azurerm_virtual_machine_run_command.wait_for_cloud_init | | Waits for cloud-init termination and dpkg/apt idle checks.
 module.vm_jumpbox_linux.terraform_data.log_analytics_operations_complete | | Dependency signal for the root module's AMPLS barrier.
 module.vm_jumpbox_linux.tls_private_key.ssh_key | | The break-glass SSH key pair for the admin account.
 

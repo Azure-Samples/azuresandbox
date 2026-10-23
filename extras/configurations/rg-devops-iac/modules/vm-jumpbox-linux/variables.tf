@@ -93,37 +93,37 @@ variable "github_runner_service_account" {
 
 variable "github_runner_token" {
   type        = string
-  description = "A GitHub personal access token or runner registration token used to register the self-hosted runner. Set using an environment variable 'TF_VAR_github_runner_token'. Required when var.enable_github_runner is true."
+  description = "The GitHub token used to register the self-hosted runner, of the type in var.github_runner_token_type. Ephemeral: delivered to the VM through a write-only Run Command protected parameter and never stored in Terraform state or the saved plan. Required only when the runner is registered (when the Run Command is created or var.github_runner_token_version changes)."
   sensitive   = true
+  ephemeral   = true
   default     = ""
-}
-
-variable "github_runner_token_secret" {
-  type        = string
-  description = "The name of the key vault secret used to pass the GitHub registration token to the VM at provisioning time."
-  default     = "github-runner-token"
-
-  validation {
-    condition     = can(regex("^[a-zA-Z0-9-]{1,127}$", var.github_runner_token_secret))
-    error_message = "Must conform to Azure Key Vault secret naming requirements: it can only contain alphanumeric characters and hyphens (-), and must be between 1 and 127 characters long."
-  }
-}
-
-variable "github_runner_token_secret_version" {
-  type        = number
-  description = "Increment to write a new value for the github_runner_token key vault secret."
-  default     = 1
 }
 
 variable "github_runner_token_type" {
   type        = string
-  description = "The type of token supplied in var.github_runner_token. Use 'pat' for a personal access token, which is exchanged for a short lived registration token on the VM, or 'registration' for a registration token obtained from the GitHub API."
-  default     = "pat"
+  description = "The type of token supplied in var.github_runner_token. Use 'registration' for a runner registration token obtained from the GitHub API (expires after 1 hour), or 'pat' for a personal access token, which is exchanged for a registration token on the VM."
+  default     = "registration"
 
   validation {
     condition     = contains(["pat", "registration"], var.github_runner_token_type)
     error_message = "Must be either 'pat' or 'registration'."
   }
+
+  validation {
+    condition     = !var.enable_github_runner || var.github_runner_token_type != "registration" || !can(regex("^(github_pat_|ghp_)", var.github_runner_token))
+    error_message = "var.github_runner_token looks like a personal access token. Set var.github_runner_token_type to 'pat', or supply a runner registration token."
+  }
+}
+
+# Controls when the ephemeral github_runner_token is sent to the VM. Terraform can't store an ephemeral value
+# to detect changes, so the Run Command's write-only sensitive_body_version tracks this number instead: the
+# token is sent when the Run Command is created (including when the VM is replaced, which then needs a fresh
+# token) and whenever this value changes, and is omitted otherwise. Leave it at 1 in normal use. Increment it
+# only to retry a failed registration with a new token, e.g. after the token expired before the Run Command ran.
+variable "github_runner_token_version" {
+  type        = number
+  description = "Increment to send a new var.github_runner_token to the VM and re-run runner registration, e.g. after a failed registration. The token is sent only when the Run Command is created or this value changes."
+  default     = 1
 }
 
 variable "github_runner_url" {
@@ -155,16 +155,6 @@ variable "key_vault_id" {
   validation {
     condition     = can(regex("^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[a-zA-Z0-9-_()]+/providers/Microsoft.KeyVault/vaults/[a-zA-Z0-9-]+$", var.key_vault_id))
     error_message = "Must be a valid Azure Resource ID for a Key Vault. It should follow the format '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.KeyVault/vaults/{keyVaultName}'."
-  }
-}
-
-variable "key_vault_name" {
-  type        = string
-  description = "The name of the existing key vault where secrets are stored."
-
-  validation {
-    condition     = can(regex("^[a-zA-Z0-9-]{3,24}$", var.key_vault_name))
-    error_message = "Must conform to Azure Key Vault naming requirements: it can only contain alphanumeric characters and hyphens (-), and must be between 3 and 24 characters long."
   }
 }
 

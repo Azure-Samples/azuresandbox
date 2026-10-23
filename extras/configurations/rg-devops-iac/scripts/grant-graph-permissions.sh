@@ -11,8 +11,9 @@
 # Works for any deployment identity: the service principal used with auth_mode = "client_secret", or the
 # user-assigned managed identity this configuration creates (deployment_identity = "managed_identity").
 #
-# Must be run with Azure CLI signed in as a Microsoft Entra Privileged Role Administrator or Global
-# Administrator. Azure RBAC roles, including subscription Owner, cannot grant application permissions.
+# Must be run with Azure CLI signed in as a Microsoft Entra Privileged Role Administrator, the least privileged
+# role that can grant Microsoft Graph application permissions (Global Administrator also works). Azure RBAC
+# roles, including subscription Owner, cannot grant application permissions.
 #
 # Usage: ./scripts/grant-graph-permissions.sh [client-id-or-object-id]
 # The identity defaults to 'principal_id' in the 'deployment_identity' terraform output, which requires jq.

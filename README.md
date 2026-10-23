@@ -259,7 +259,7 @@ The simplest way to let **sandbox users** deploy sandboxes is for the **sandbox 
 
   See [Delegate Azure role assignment management to others with conditions](https://learn.microsoft.com/azure/role-based-access-control/delegate-role-assignments-portal) for more information.
 
-* If you want to deploy the Azure SQL Database module, a Microsoft Entra Global Administrator or Privileged Role Administrator must grant the service principal the Microsoft Graph application permissions it needs to create the SQL administrators security group. Run these commands in Azure Cloud Shell:
+* If you want to deploy the Azure SQL Database module, a Microsoft Entra Privileged Role Administrator (the least privileged role that can do this; Global Administrator also works) must grant the service principal the Microsoft Graph application permissions it needs to create the SQL administrators security group. Run these commands in Azure Cloud Shell:
 
   ```bash
   SPN_APP_ID="<service-principal-app-id-here>"
@@ -284,8 +284,8 @@ The simplest way to let **sandbox users** deploy sandboxes is for the **sandbox 
 
   Alternatively you can perform these steps manually from the Entra portal:
 
-  1. Sign in to [Microsoft Entra admin center](https://entra.microsoft.com) as a Global
-    Administrator or Privileged Role Administrator.
+  1. Sign in to [Microsoft Entra admin center](https://entra.microsoft.com) as a Privileged
+    Role Administrator.
   2. Navigate to **Identity** > **Applications** > **App registrations**.
   3. Search for and select the service principal's app registration (matching `<service-principal-app-id-here>`).
   4. Select **API permissions** in the left menu.
@@ -766,7 +766,7 @@ Azure Sandbox separates authorization into three roles, each designed with the p
 
 Role | Who | Privileges | Purpose
 --- | --- | --- | ---
-Sandbox administrator | Subscription owner | `Owner` on the subscription; Global Administrator or Privileged Role Administrator in Microsoft Entra ID (only to grant Microsoft Graph permissions) | Assign roles to sandbox users and create the deployment identity
+Sandbox administrator | Subscription owner | `Owner` on the subscription; Privileged Role Administrator in Microsoft Entra ID (only to grant Microsoft Graph permissions) | Assign roles to sandbox users and create the deployment identity
 Deployment identity | Service principal (`client_secret`), managed identity (`managed_identity`) or GitHub Actions OIDC identity (`oidc`) | `Contributor` and `Role Based Access Control Administrator` (ABAC limited\*) on the subscription; Microsoft Graph `Group.Create`, `GroupMember.Read.All`, `User.Read.All` and `Application.Read.All` | Create sandbox resources and the role assignments they need
 Sandbox user (operator) | Each person who deploys and uses sandboxes | `Contributor` on the subscription; data-plane roles on their own sandbox's Key Vault and Storage Account, granted by the deployment | Run Terraform as the deployment identity, manage sandbox resources, read secrets and files
 

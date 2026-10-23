@@ -87,26 +87,37 @@ variable "github_runner_power_state_environment" {
 
 variable "github_runner_token" {
   type        = string
-  description = "A GitHub personal access token or runner registration token used to register the self-hosted runner. Set interactively or using an environment variable 'TF_VAR_github_runner_token'. Required when var.enable_github_runner is true."
+  description = "The GitHub token used to register the self-hosted runner, of the type in var.github_runner_token_type, e.g. from 'scripts/new-runner-registration-token.sh'. Set using the environment variable 'TF_VAR_github_runner_token' for both 'terraform plan' and 'terraform apply'. Ephemeral: never stored in Terraform state or the saved plan. Required only when the runner is registered (on first deployment or when var.github_runner_token_version changes)."
   sensitive   = true
+  ephemeral   = true
   default     = ""
-}
-
-variable "github_runner_token_secret_version" {
-  type        = number
-  description = "Increment to write a new value for the GitHub runner token key vault secret."
-  default     = 1
 }
 
 variable "github_runner_token_type" {
   type        = string
-  description = "The type of token supplied in var.github_runner_token. Use 'pat' for a personal access token, which is exchanged for a short lived registration token on the VM, or 'registration' for a registration token obtained from the GitHub API."
-  default     = "pat"
+  description = "The type of token supplied in var.github_runner_token. Use 'registration' for a runner registration token obtained from the GitHub API (expires after 1 hour), or 'pat' for a personal access token, which is exchanged for a registration token on the VM."
+  default     = "registration"
 
   validation {
     condition     = contains(["pat", "registration"], var.github_runner_token_type)
     error_message = "Must be either 'pat' or 'registration'."
   }
+
+  validation {
+    condition     = !var.enable_github_runner || var.github_runner_token_type != "registration" || !can(regex("^(github_pat_|ghp_)", var.github_runner_token))
+    error_message = "github_runner_token looks like a personal access token. Set github_runner_token_type to 'pat', or supply a runner registration token."
+  }
+}
+
+# Controls when the ephemeral github_runner_token is sent to the VM. Terraform can't store an ephemeral value
+# to detect changes, so the Run Command's write-only sensitive_body_version tracks this number instead: the
+# token is sent when the Run Command is created (including when the VM is replaced, which then needs a fresh
+# token) and whenever this value changes, and is omitted otherwise. Leave it at 1 in normal use. Increment it
+# only to retry a failed registration with a new token, e.g. after the token expired before the Run Command ran.
+variable "github_runner_token_version" {
+  type        = number
+  description = "Increment to send a new var.github_runner_token to the VM and re-run runner registration, e.g. after a failed registration. Only used when var.enable_github_runner is true."
+  default     = 1
 }
 
 variable "github_runner_url" {

@@ -2,33 +2,30 @@
 
 # Installs and registers the GitHub Actions self-hosted runner agent on the VM.
 #
-# This script is delivered to the VM as a cloud-init 'text/x-shellscript' part, so it runs once per
-# instance after packages (azure-cli, terraform, powershell) have been installed. It is NOT a
-# Terraform template: all deployment specific settings are read from the configuration file written
-# by the companion cloud-config part (configure-github-runner.yaml), which keeps this script
-# lintable by ShellCheck.
+# This script is run as root by the ConfigureGitHubRunner managed Run Command, after cloud-init has
+# finished and the VM extensions are installed. It is NOT a Terraform template: deployment specific
+# settings arrive as Run Command parameters, which Linux exposes to the script as environment
+# variables, so this script stays lintable by ShellCheck.
 #
-# The GitHub registration secret is never embedded in this script or in the VM custom data. It is
-# read at provisioning time from Azure Key Vault using the VM managed identity, so it is never
-# written to Terraform state.
+# The GitHub token arrives as the protected parameter RUNNER_TOKEN. Terraform passes it through the
+# write-only azapi sensitive_body argument, so it is never written to Terraform state, the saved plan,
+# the VM custom data or Azure Key Vault.
 
 set -euo pipefail
 
-config_file=/etc/github-runner.conf
+runner_url="${RUNNER_URL:-}"
+runner_name="${RUNNER_NAME:-}"
+runner_group="${RUNNER_GROUP:-Default}"
+runner_labels="${RUNNER_LABELS:-}"
+runner_version="${RUNNER_VERSION:-}"
+runner_user="${RUNNER_USER:-githubrunner}"
+runner_home="${RUNNER_HOME:-/opt/actions-runner}"
+token_type="${RUNNER_TOKEN_TYPE:-registration}"
+aad_tenant_id="${AAD_TENANT_ID:-}"
+vwan_sudoers="${RUNNER_VWAN_SUDOERS:-true}"
 
-# Defaults, overridden by $config_file.
-runner_url=""
-runner_name=""
-runner_group="Default"
-runner_labels=""
-runner_version=""
-runner_user="githubrunner"
-runner_home="/opt/actions-runner"
-key_vault_name=""
-token_secret_name=""
-token_type="pat"
-aad_tenant_id=""
-vwan_sudoers="true"
+github_token="${RUNNER_TOKEN:-}"
+unset RUNNER_TOKEN
 
 log() {
     printf '%s configure-github-runner: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"
@@ -39,9 +36,8 @@ fail() {
     exit 1
 }
 
-# Retries transient failures rather than failing the whole provisioning run, e.g. the VM may boot
-# before the managed identity role assignment has propagated or the key vault private endpoint is
-# reachable, or while another process holds the apt lock.
+# Retries transient failures rather than failing the whole registration, e.g. a GitHub API hiccup
+# or another process holding the apt lock.
 retry() {
     local description="$1"
     shift
@@ -59,17 +55,6 @@ retry() {
     done
 }
 
-read_secret() {
-    github_token=$(az keyvault secret show \
-        --vault-name "$key_vault_name" \
-        --name "$token_secret_name" \
-        --query value \
-        --output tsv \
-        --only-show-errors)
-
-    [ -n "$github_token" ]
-}
-
 get_registration_token() {
     registration_token=$(curl -sSf -X POST \
         -H "Accept: application/vnd.github+json" \
@@ -81,31 +66,25 @@ get_registration_token() {
     [ -n "$registration_token" ]
 }
 
-if [ ! -f "$config_file" ]; then
-    fail "configuration file $config_file not found"
-fi
+[ -n "$runner_url" ] || fail "required parameter 'RUNNER_URL' is not set"
+[ -n "$runner_name" ] || fail "required parameter 'RUNNER_NAME' is not set"
+[ -n "$runner_version" ] || fail "required parameter 'RUNNER_VERSION' is not set"
 
-# shellcheck source=/dev/null
-. "$config_file"
-
-for required in runner_url runner_name runner_version key_vault_name token_secret_name; do
-    if [ -z "${!required}" ]; then
-        fail "required setting '$required' is not set in $config_file"
-    fi
-done
-
+# The Run Command runs again whenever Azure re-applies it (e.g. a changed parameter or script), usually
+# without RUNNER_TOKEN. A registered runner is left as-is.
 if [ -f "$runner_home/.runner" ]; then
     log "runner is already configured at $runner_home, nothing to do..."
     exit 0
 fi
 
-log "Logging in to Azure using the VM managed identity..."
-retry "Azure managed identity login" \
-    az login --identity --allow-no-subscriptions --only-show-errors --output none
+if [ -z "$github_token" ]; then
+    fail "RUNNER_TOKEN is empty and the runner is not registered. Set TF_VAR_github_runner_token, increment github_runner_token_version and apply again."
+fi
 
-log "Reading secret '$token_secret_name' from key vault '$key_vault_name'..."
-github_token=""
-retry "Key vault secret read" read_secret
+case "$token_type" in
+    pat | registration) ;;
+    *) fail "RUNNER_TOKEN_TYPE must be 'pat' or 'registration', got '$token_type'" ;;
+esac
 
 # A repository URL contains exactly one '/' after the github.com prefix, an organization URL none.
 api_path=${runner_url#https://github.com/}
@@ -151,7 +130,7 @@ if [ "$vwan_sudoers" = "true" ]; then
     sudoers_file=/etc/sudoers.d/azuresandbox-github-runner
 
     cat > "$sudoers_file" << EOF
-# Managed by cloud-init (configure-github-runner.sh). Do not edit by hand.
+# Managed by the ConfigureGitHubRunner Run Command (configure-github-runner.sh). Do not edit by hand.
 # Command-scoped NOPASSWD sudo for the privileged binaries invoked by
 # scripts/Test-Integration-VwanConnectivity.ps1 when the vwan P2S VPN integration
 # tests run on this self-hosted runner.
@@ -178,7 +157,7 @@ terraform_installer=/usr/local/sbin/azuresandbox-install-terraform
 log "Installing Terraform installer wrapper $terraform_installer..."
 cat > "$terraform_installer" << 'EOF'
 #!/bin/bash
-# Managed by cloud-init (configure-github-runner.sh). Do not edit by hand.
+# Managed by the ConfigureGitHubRunner Run Command (configure-github-runner.sh). Do not edit by hand.
 # Installs one version of the terraform package from the HashiCorp apt repository, upgrading or
 # downgrading the installed one. The GitHub Actions runner service account may run only this
 # command through sudo. Usage: azuresandbox-install-terraform X.Y.Z
@@ -217,7 +196,7 @@ chmod 0755 "$terraform_installer"
 terraform_sudoers=/etc/sudoers.d/azuresandbox-github-runner-terraform
 log "Granting '$runner_user' sudo for $terraform_installer only..."
 cat > "$terraform_sudoers" << EOF
-# Managed by cloud-init (configure-github-runner.sh). Do not edit by hand.
+# Managed by the ConfigureGitHubRunner Run Command (configure-github-runner.sh). Do not edit by hand.
 # Lets the Sandbox deployment workflow install a Terraform CLI version that satisfies the
 # deployed branch's required_version. The wrapper validates its only argument.
 $runner_user ALL=(root) NOPASSWD: $terraform_installer
@@ -242,7 +221,7 @@ chown -R "$runner_user:$runner_user" "$runner_home"
 
 # installdependencies.sh calls apt-get without waiting for the apt/dpkg locks, so it fails if another
 # process (e.g. unattended-upgrades, apt-daily or a policy deployed VM extension) is using apt at
-# the same time. It is idempotent, so retry rather than failing the whole provisioning run.
+# the same time. It is idempotent, so retry rather than failing the whole registration.
 log "Installing GitHub Actions runner dependencies..."
 retry "Runner dependency installation" "$runner_home/bin/installdependencies.sh"
 

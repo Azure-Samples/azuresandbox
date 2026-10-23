@@ -11,10 +11,7 @@ output "resource_names" {
 }
 
 output "key_vault_operations_complete" {
-  value = join(",", concat(
-    [azurerm_key_vault_secret.ssh_private_key.id],
-    azurerm_key_vault_secret.github_runner_token[*].id
-  ))
+  value = azurerm_key_vault_secret.ssh_private_key.id
 }
 
 output "log_analytics_operations_complete" {

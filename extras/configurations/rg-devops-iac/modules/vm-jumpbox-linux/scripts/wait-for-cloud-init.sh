@@ -1,7 +1,7 @@
 #!/bin/bash
 # Ported from modules/vm-jumpbox-linux/scripts/wait-for-cloud-init.sh.
-# Enforces ordering, not successful provisioning or GitHub runner readiness.
-# Diagnostics use the standalone bootstrap's cloud-init logs, never runner credentials.
+# Enforces ordering, not successful provisioning.
+# Diagnostics use the standalone bootstrap's cloud-init logs.
 
 set -uo pipefail
 
@@ -77,14 +77,6 @@ user_script_step() {
     /Installing PowerShell Az module/ { step = "installing-az" }
     /Installing [0-9]+ Az packages from offline bundle/ { step = "installing-az-offline" }
     /PowerShell Az.Automation version .* is installed/ { step = "powershell-configured" }
-    /configure-github-runner: Logging in to Azure/ { step = "runner-identity-login" }
-    /configure-github-runner: Reading secret/ { step = "runner-secret-read" }
-    /configure-github-runner: Exchanging personal access token/ { step = "runner-token-exchange" }
-    /configure-github-runner: Downloading GitHub Actions runner/ { step = "runner-download" }
-    /configure-github-runner: Installing GitHub Actions runner dependencies/ { step = "runner-dependencies" }
-    /configure-github-runner: Registering runner/ { step = "runner-registration" }
-    /configure-github-runner: Installing and starting the GitHub Actions runner service/ { step = "runner-service" }
-    /configure-github-runner: GitHub Actions runner registration complete/ { step = "runner-script-complete" }
     END { print step }
   ' /var/log/cloud-init-output.log 2>/dev/null)
   echo "step=\"${step:-none}\""

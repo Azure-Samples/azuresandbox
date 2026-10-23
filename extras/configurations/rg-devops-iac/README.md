@@ -68,8 +68,8 @@ This section describes the prerequisites required in order to provision this con
 
 These prerequisites apply only if you plan to use this configuration as a self-hosted runner that deploys Azure Sandbox with a deployment identity (`enable_github_runner = true` and `deployment_identity = "managed_identity"` or `"oidc"`). Arrange them **before** provisioning, because some of them need privileged roles that the person running the deployment may not hold.
 
-* **GitHub repository administrator.** Registering a repository-level runner needs a fine-grained personal access token with `Administration: Read and write` on the target repository, created by a repository administrator. See [Optional: GitHub Actions Self-Hosted Runner](#optional-github-actions-self-hosted-runner).
-* **Microsoft Entra Privileged Role Administrator or Global Administrator.** Required only if the sandbox will be deployed with the `mssql` module enabled. The user-assigned managed identity then needs the Microsoft Graph `Group.Create`, `GroupMember.Read.All`, `User.Read.All` and `Application.Read.All` application permissions, and only one of these Entra roles can grant them. An Owner on the subscription cannot grant them. Read-only Entra roles such as Global Reader are not enough. Privileged Role Administrator is the least privileged role that works. If your organization uses [Privileged Identity Management](https://learn.microsoft.com/entra/id-governance/privileged-identity-management/pim-configure), activate an eligible assignment for the grant, or arrange for an administrator to run it. The grant is a one-time step after the identity is created. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies).
+* **GitHub repository administrator.** Registering a repository-level runner needs a runner registration token, which only a repository administrator can create (an organization runner needs an organization owner). The operator can create it with the GitHub CLI right before the apply, or a repository administrator can provide one. See [Optional: GitHub Actions Self-Hosted Runner](#optional-github-actions-self-hosted-runner).
+* **Microsoft Entra Privileged Role Administrator.** Required only if the sandbox will be deployed with the `mssql` module enabled. The user-assigned managed identity then needs the Microsoft Graph `Group.Create`, `GroupMember.Read.All`, `User.Read.All` and `Application.Read.All` application permissions. Privileged Role Administrator is the least privileged Entra role that can grant them (Global Administrator also works, but has far broader rights). An Owner on the subscription, Cloud Application Administrator and read-only Entra roles such as Global Reader cannot grant them. If your organization uses [Privileged Identity Management](https://learn.microsoft.com/entra/id-governance/privileged-identity-management/pim-configure), activate an eligible assignment for the grant, or arrange for an administrator to run it. The grant is a one-time step after the identity is created. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies).
 * **OIDC deployment identity only (`deployment_identity = "oidc"`).**
   * Microsoft Entra ID P2 or Microsoft Entra ID Governance, for the time-bound role assignments the operator grants before each workflow run.
   * A subscription `Owner` (for example, the operator with `Owner` activated through PIM) to grant those assignments.
@@ -409,18 +409,6 @@ The Linux virtual machine can optionally be registered as a [GitHub Actions self
 
 To enable it:
 
-* Create a GitHub personal access token (PAT) with `administration:write` on the target repository, or `organization_self_hosted_runners:write` on the target organization. Set it using an environment variable so it is not stored in the `terraform.tfvars` file:
-
-  ```bash
-  # Set environment variable in bash
-  export TF_VAR_github_runner_token=YOUR-GITHUB-PAT-HERE
-  ```
-
-  ```pwsh
-  # Set environment variable in PowerShell
-  $env:TF_VAR_github_runner_token = "YOUR-GITHUB-PAT-HERE"
-  ```
-
 * Add the following to the `terraform.tfvars` file:
 
   ```hcl
@@ -429,7 +417,29 @@ To enable it:
   github_runner_labels = ["azuresandbox"]
   ```
 
-The token is stored as a **write-only** key vault secret, so it is never written to Terraform state, and it is read on the VM at provisioning time using the VM managed identity. When `enable_github_runner` is `false` no runner software is installed and the VM behaves exactly as it did before.
+* Right before [Step 4](#step-4-validate-and-apply-configuration), create a runner registration token with the helper script, in the shell that will run Terraform. The script sets the `TF_VAR_github_runner_token` environment variable without displaying the token. The bash script must be sourced, and refuses to print the token to a terminal. The scripts use the [GitHub CLI](https://cli.github.com) (`gh`), signed in as a repository administrator (or with the `admin:org` scope for an organization runner), and read `github_runner_url` from `terraform.tfvars`:
+
+  ```bash
+  # bash
+  source ./scripts/new-runner-registration-token.sh
+  ```
+
+  ```pwsh
+  # PowerShell
+  ./scripts/New-RunnerRegistrationToken.ps1
+  ```
+
+  A registration token expires after one hour and can only register runners. Keep the environment variable set for both `terraform plan` and `terraform apply`, and run them within the hour. To use a fine-grained personal access token instead, set `github_runner_token_type = "pat"`. See [Personal Access Token (Optional)](./modules/vm-jumpbox-linux/README.md#personal-access-token-optional).
+
+`github_runner_token` is an ephemeral variable. Terraform passes it to a managed Run Command on the VM through a write-only argument, so it is never written to Terraform state, the saved plan, the VM custom data or Key Vault. When `enable_github_runner` is `false` no runner software is installed and the VM behaves exactly as it did before.
+
+The token is needed only when the runner is registered. `github_runner_token_version` (default `1`) controls when it is sent: Terraform can't store an ephemeral value to detect changes, so the token is sent only when the Run Command is created or this number changes.
+
+* **Later applies:** leave `github_runner_token_version` at `1` and don't set `TF_VAR_github_runner_token`. No token is sent, and the plan shows a `github_runner_token is empty` warning that can be ignored. If a change updates the Run Command's settings, such as the labels or the runner version, the script runs again without a token, finds the runner already registered and changes nothing. Changes to the runner's name or labels are therefore not applied to a registered runner; remove the runner and register it again to change them.
+* **VM or Run Command replaced:** if the plan shows `module.vm_jumpbox_linux.azapi_resource.github_runner[0]` being created or replaced, for example because `jumplinux2` is replaced, the runner is registered again and needs a new token. Run `source ./scripts/new-runner-registration-token.sh` before `terraform plan`. You don't need to change `github_runner_token_version`.
+* **Failed registration:** if registration fails, for example because the token expired before the Run Command ran, create a new token, increment `github_runner_token_version` and apply again. The VM is not replaced.
+
+**Upgrading from an earlier version:** the default `github_runner_token_type` is now `registration`, `github_runner_token_secret_version` is renamed to `github_runner_token_version`, and the token is no longer stored in Key Vault. If you supply a personal access token, set `github_runner_token_type = "pat"`. An existing runner-enabled `jumplinux2` is replaced once, because the runner is no longer part of its cloud-init configuration.
 
 Workflows running on the runner should store Terraform state in the `azurerm` backend hosted in the storage account provisioned by this configuration, not in a local state file on the runner. See [Terraform State for CD Workflows](./modules/vm-jumpbox-linux/README.md#terraform-state-for-cd-workflows).
 
@@ -455,16 +465,16 @@ When enabled, the identity is:
   * `Role Based Access Control Administrator`, with a condition that allows assigning and removing only the roles the sandbox assigns, listed in `local.deployment_identity_assignable_roles` in [`locals.tf`](./locals.tf). The identity cannot grant `Owner`, `User Access Administrator` or `Role Based Access Control Administrator`.
 
   This is still a standing, privileged identity. Contributor on the subscription also includes this configuration's own resource group, so anything running on `jumplinux2` that uses this identity can modify or delete it. When that list changes, re-apply this configuration to update the condition.
-* Attached to `jumplinux2` **in addition to** the system-assigned identity. The system-assigned identity remains the VM's default identity, so cloud-init, the runner registration script, `az login --identity` and the `azurerm` state backend (`ARM_USE_MSI`) keep using it. Use the user-assigned identity explicitly by its client id, e.g. `az login --identity --client-id <client-id>` or `Connect-AzAccount -Identity -AccountId <client-id>`.
+* Attached to `jumplinux2` **in addition to** the system-assigned identity. The system-assigned identity remains the VM's default identity, so cloud-init, `az login --identity` and the `azurerm` state backend (`ARM_USE_MSI`) keep using it. Use the user-assigned identity explicitly by its client id, e.g. `az login --identity --client-id <client-id>` or `Connect-AzAccount -Identity -AccountId <client-id>`.
 
 Enabling or disabling the identity on an existing deployment updates the VM in place. It does not replace the VM.
 
 After the apply, use `client_id` from the `deployment_identity` output as `client_id` in the Azure Sandbox `terraform.tfvars`, together with `auth_mode = "managed_identity"`.
 
-If the sandbox will be deployed with the `mssql` module enabled, the identity also needs the Microsoft Graph `Group.Create`, `GroupMember.Read.All`, `User.Read.All` and `Application.Read.All` application permissions, which this configuration cannot grant. A Global Administrator or Privileged Role Administrator must grant them once, after the identity is created:
+If the sandbox will be deployed with the `mssql` module enabled, the identity also needs the Microsoft Graph `Group.Create`, `GroupMember.Read.All`, `User.Read.All` and `Application.Read.All` application permissions, which this configuration cannot grant. A Privileged Role Administrator (the least privileged Entra role that can grant them; Global Administrator also works) must grant them once, after the identity is created. If your organization uses PIM, activate Privileged Role Administrator for the grant and deactivate it afterward:
 
 ```bash
-# Run from this configuration's directory, signed in to Azure CLI as a Privileged Role Administrator or Global Administrator
+# Run from this configuration's directory, signed in to Azure CLI as a Privileged Role Administrator
 ./scripts/grant-graph-permissions.sh
 ```
 
@@ -708,7 +718,8 @@ Access | How it's granted
 --- | ---
 Azure RBAC `Reader` on the subscription | Standing (active, permanent)
 Azure RBAC `Owner` on the subscription | PIM eligible, activated just in time for `terraform plan` and `terraform apply`
-Microsoft Entra directory roles, such as Global Administrator | PIM eligible
+Microsoft Entra Privileged Role Administrator (only to grant Microsoft Graph permissions) | PIM eligible, activated just in time for `grant-graph-permissions.sh`
+Other Microsoft Entra directory roles, such as Global Administrator | PIM eligible, activated only when needed
 `User Access Administrator` at root scope (`/`) | Removed
 
 Apply it in the Azure portal in this order, so you don't lock yourself out:
@@ -773,6 +784,8 @@ This configuration is organized into the following structure:
 │   ├── enable-public-access.sh           # Bash helper script for re-enabling public access on key vault/storage account (not the AMPLS or workspace)
 │   ├── grant-graph-permissions.sh        # Bash helper script for granting Microsoft Graph permissions to a deployment identity
 │   ├── grant-jit-roles.sh                # Bash helper script for granting the OIDC deployment identity its time-bound deployment roles
+│   ├── new-runner-registration-token.sh  # Bash helper script (sourced) that sets TF_VAR_github_runner_token to a new runner registration token
+│   ├── New-RunnerRegistrationToken.ps1   # PowerShell helper script that sets TF_VAR_github_runner_token to a new runner registration token
 │   └── delete-tfstate.sh                 # Bash helper script for deleting Terraform state blob(s) from the storage backend
 ├── locals.tf                             # Local variables 
 ├── main.tf                               # Resource configurations
@@ -798,9 +811,9 @@ github_repository_id | | The numeric id of the GitHub repository, e.g. from `gh 
 github_repository_owner_id | | The numeric id of the user or organization that owns the GitHub repository, e.g. from `gh api repos/OWNER/NAME --jq .owner.id`. Only used when `deployment_identity` is `oidc`. When empty, it is looked up from the repository in `github_runner_url`, which works only for public repositories.
 github_runner_labels | `["azuresandbox"]` | Additional labels to apply to the GitHub Actions self-hosted runner. Only used when `enable_github_runner` is true.
 github_runner_power_state_environment | `sandbox-runner-power-state` | The GitHub Actions environment whose jobs can sign in as the runner power state identity, which starts and deallocates `jumplinux2` for workflow runs. Must not be one of `github_oidc_environments`. Only used when `deployment_identity` is `oidc`.
-github_runner_token | | A GitHub personal access token or runner registration token used to register the self-hosted runner. Set interactively or using an environment variable 'TF_VAR_github_runner_token'. Required when `enable_github_runner` is true.
-github_runner_token_secret_version | 1 | Increment to write a new value for the GitHub runner token key vault secret.
-github_runner_token_type | `pat` | The type of token supplied in `github_runner_token`, either `pat` or `registration`.
+github_runner_token | | Ephemeral. The GitHub token used to register the self-hosted runner, of the type in `github_runner_token_type`, e.g. from `scripts/new-runner-registration-token.sh`. Set using the environment variable `TF_VAR_github_runner_token` for both `terraform plan` and `terraform apply`. Never stored in Terraform state or the saved plan. Required only when the runner is registered (on first deployment or when `github_runner_token_version` changes).
+github_runner_token_type | `registration` | The type of token supplied in `github_runner_token`: `registration` for a runner registration token (expires after 1 hour), or `pat` for a personal access token, which is exchanged for a registration token on the VM.
+github_runner_token_version | 1 | Increment to send a new `github_runner_token` to the VM and re-run runner registration, e.g. after a failed registration. Only used when `enable_github_runner` is true.
 github_runner_url | | The GitHub repository or organization URL to register the self-hosted runner with, e.g. `https://github.com/myorg/myrepo`. Required when `enable_github_runner` is true. Must be a repository URL when `deployment_identity` is `oidc` and the repository ids are not set.
 location | | The name of the Azure Region where resources will be provisioned.
 log_analytics_workspace_retention_days | 30 | The retention period in days for the Log Analytics workspace. Must be one of 30, 31, 60, 90, 120, 180, 270, 365, 550 or 730.

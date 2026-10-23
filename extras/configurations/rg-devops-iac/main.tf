@@ -412,24 +412,23 @@ module "naming" {
 module "vm_jumpbox_linux" {
   source = "./modules/vm-jumpbox-linux"
 
-  data_collection_endpoint_id        = azurerm_monitor_data_collection_endpoint.this.id
-  data_collection_rule_linux_id      = azurerm_monitor_data_collection_rule.linux.id
-  enable_github_runner               = var.enable_github_runner
-  github_runner_labels               = var.github_runner_labels
-  github_runner_token                = var.github_runner_token
-  github_runner_token_secret_version = var.github_runner_token_secret_version
-  github_runner_token_type           = var.github_runner_token_type
-  github_runner_url                  = var.github_runner_url
-  key_vault_id                       = azurerm_key_vault.this.id
-  key_vault_name                     = azurerm_key_vault.this.name
-  location                           = azurerm_resource_group.this.location
-  log_analytics_workspace_id         = azurerm_log_analytics_workspace.this.id
-  resource_group_name                = azurerm_resource_group.this.name
-  storage_account_id                 = azurerm_storage_account.this.id
-  subnet_id                          = azurerm_subnet.subnets[var.subnet_devops_name].id
-  tags                               = var.tags
-  user_assigned_identity_ids         = var.deployment_identity == "managed_identity" ? azurerm_user_assigned_identity.deployment[*].id : []
-  vm_jumpbox_linux_size              = var.vm_jumpbox_linux_size
+  data_collection_endpoint_id   = azurerm_monitor_data_collection_endpoint.this.id
+  data_collection_rule_linux_id = azurerm_monitor_data_collection_rule.linux.id
+  enable_github_runner          = var.enable_github_runner
+  github_runner_labels          = var.github_runner_labels
+  github_runner_token           = var.github_runner_token
+  github_runner_token_type      = var.github_runner_token_type
+  github_runner_token_version   = var.github_runner_token_version
+  github_runner_url             = var.github_runner_url
+  key_vault_id                  = azurerm_key_vault.this.id
+  location                      = azurerm_resource_group.this.location
+  log_analytics_workspace_id    = azurerm_log_analytics_workspace.this.id
+  resource_group_name           = azurerm_resource_group.this.name
+  storage_account_id            = azurerm_storage_account.this.id
+  subnet_id                     = azurerm_subnet.subnets[var.subnet_devops_name].id
+  tags                          = var.tags
+  user_assigned_identity_ids    = var.deployment_identity == "managed_identity" ? azurerm_user_assigned_identity.deployment[*].id : []
+  vm_jumpbox_linux_size         = var.vm_jumpbox_linux_size
 
   # The VM needs the NAT gateway for outbound access during cloud-init, and its NIC must not be created while the
   # subnet associations are still being written.
@@ -437,5 +436,15 @@ module "vm_jumpbox_linux" {
     azurerm_subnet_nat_gateway_association.devops,
     time_sleep.wait_for_roles
   ]
+}
+#endregion
+
+#region checks
+# The runner token is needed only when the runner is registered, so a missing token is a warning, not an error.
+check "github_runner_token" {
+  assert {
+    condition     = !var.enable_github_runner || var.github_runner_token != ""
+    error_message = "github_runner_token is empty. It is required to register the GitHub Actions runner (on first deployment or when github_runner_token_version changes): run 'source scripts/new-runner-registration-token.sh'. Ignore this warning if the runner is already registered."
+  }
 }
 #endregion
