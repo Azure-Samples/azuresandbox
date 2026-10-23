@@ -44,7 +44,6 @@ variable "enable_github_runner" {
 variable "github_runner_labels" {
   type        = list(string)
   description = "Additional labels to apply to the GitHub Actions self-hosted runner. Only used when var.enable_github_runner is true."
-  default     = ["azuresandbox"]
 
   validation {
     condition     = alltrue([for label in var.github_runner_labels : can(regex("^[a-zA-Z0-9._-]{1,64}$", label))])

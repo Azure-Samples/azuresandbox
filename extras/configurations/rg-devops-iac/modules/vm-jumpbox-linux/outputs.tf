@@ -11,7 +11,8 @@ output "resource_names" {
 }
 
 output "key_vault_operations_complete" {
-  value = azurerm_key_vault_secret.ssh_private_key.id
+  value       = azurerm_key_vault_secret.ssh_private_key.id
+  description = "Dependency signal: the SSH private key Key Vault secret write is complete. Consumed by the root key_vault_access_barrier."
 }
 
 output "log_analytics_operations_complete" {

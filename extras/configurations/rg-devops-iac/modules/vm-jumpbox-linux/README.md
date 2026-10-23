@@ -13,7 +13,7 @@
 
 ## Overview
 
-This module implements a stand-alone Linux virtual machine for use as a general purpose Terraform execution environment. The VM is configured using cloud-init and offers the following capabilities:
+This module implements a stand-alone Linux virtual machine for use as a general purpose Terraform execution environment. The VM is pre-configured with the following capabilities:
 
 * Automatic swapfile provisioning sized to the VM's memory (larger VMs get no swap).
 * Pre-installed software packages, including:
@@ -25,13 +25,16 @@ This module implements a stand-alone Linux virtual machine for use as a general 
   * python3-pip
   * terraform
 * Pre-configured environment variables for using Azure Blob Storage as a Terraform state backend.
+* Pre-configured platform patch assesssment.
 * `AzureMonitorLinuxAgent` VM extension is pre-installed and pre-configured.
+* `AADSSHLoginForLinux` VM extension is pre-installed and pre-configured.
+* A system-assigned managed identity with role assignents to an Azure Blob Storage container to be used as a Terraform state backend.
 
-The module can optionally install the [GitHub Actions runner](https://github.com/actions/runner) agent to allow the VM to be used as a self-hosted runner for GitHub Actions associated with the [Azure Sandbox](https://github.com/Azure-Samples/azuresandbox) repository.
+See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration) for additional use cases.
 
 ## Smoke Testing
 
-Use Bastion to connect to the *jumplinux2* with your Microsoft Entra ID credentials. After connecting, verify the VM is fully configured for use as a Terraform execution environment:
+Use Bastion to connect to *jumplinux2* with your Microsoft Entra ID credentials. After connecting, verify the VM is fully configured for use as a Terraform execution environment:
 
 ```bash
 # Check software versions
@@ -60,7 +63,7 @@ This section provides additional information on various aspects of this module.
 
 This module depends upon resources provisioned in the following modules:
 
-* Root module
+* Root module (rg-devops-iac)
 
 ### Module Structure
 
@@ -88,8 +91,6 @@ This module is organized as follows:
 This section lists the default values for the input variables used in this module.
 Defaults can be overridden by specifying a different value in the root module.
 
-#### Terraform Execution Environment Variables
-
 Variable | Default | Description
 --- | --- | ---
 admin_username | `devopsbootstrapadmin` | The user name for the admin account on the VM.
@@ -100,8 +101,8 @@ key_vault_id | | The ID of the key vault defined in the root module.
 location | | The Azure region where the resources will be created. Defined in the root module.
 resource_group_name | | The name of the resource group defined in the root module.
 ssh_private_key_version | 1 | Increment to rewrite the break-glass `ssh_private_key` key vault secret, for example after replacing `tls_private_key.ssh_key`.
-storage_account_id | | The resource ID of of the storage account defined in the root module.
-subnet_id | | The resource ID of the subnet where the VM will be deployed. Defined in the vnet-shared module.
+storage_account_id | | The resource ID of the storage account defined in the root module.
+subnet_id | | The resource ID of the subnet where the VM will be deployed. Defined in the root module.
 tags | | The tags from the root module.
 user_assigned_identity_ids | `[]` | The resource ids of user-assigned managed identities to attach to the VM in addition to its system-assigned identity, which remains the default identity on the VM.
 vm_jumpbox_linux_image_offer | `ubuntu-24_04-lts` | The offer type of the virtual machine image used to create the VM.
@@ -112,15 +113,13 @@ vm_jumpbox_linux_name | jumplinux2 | The name of the VM.
 vm_jumpbox_linux_size | | The size of the virtual machine.
 vm_jumpbox_linux_storage_account_type | `StandardSSD_LRS` | The storage type to be used for the VM's OS disk. Standard HDD (`Standard_LRS`) is not permitted because Azure is retiring Standard HDD OS disks on September 8, 2028.
 
-#### GitHub Actions Self-Hosted Runner Variables
-
 These variables are used only when `enable_github_runner` is `true`, except `enable_github_runner` itself.
-See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration).
+See [Optional GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration).
 
 Variable | Default | Description
 --- | --- | ---
 enable_github_runner | false | When enabled the GitHub Actions self-hosted runner agent is installed on the VM and registered with the repository specified in `github_runner_url`. When disabled nothing is installed.
-github_runner_labels | `["azuresandbox"]` | Additional labels to apply to the self-hosted runner.
+github_runner_labels | | Additional labels to apply to the self-hosted runner.
 github_runner_token | | Ephemeral. The runner registration token used to register the runner (expires after 1 hour). Passed to the Run Command through a write-only protected parameter, so it never lands in Terraform state or the saved plan. Required only when the runner is registered (when the Run Command is created or `github_runner_token_version` changes).
 github_runner_token_version | 1 | Increment to send a new `github_runner_token` to the VM and re-run runner registration, for example after a failed registration.
 github_runner_url | | The GitHub repository URL to register the runner with, e.g. `https://github.com/myorg/myrepo`. Required when `enable_github_runner` is true.
@@ -132,11 +131,11 @@ This section lists the resources included in this configuration.
 
 Address | Name | Notes
 --- | --- | ---
-module.vm_jumpbox_linux.azapi_resource.github_runner[0] | | Managed Run Command that installs and registers the GitHub Actions runner after `ama`. The GitHub token is a write-only protected parameter. Created only when `var.enable_github_runner` is enabled.
+module.vm_jumpbox_linux.azapi_resource.github_runner[0] | | Managed Run Command that installs and registers the GitHub Actions runner after `ama`. The runner registration token is a write-only protected parameter. Created only when `var.enable_github_runner` is enabled.
 module.vm_jumpbox_linux.azurerm_key_vault_secret.adminuser | adminuser | The Key Vault secret containing the break-glass admin username for the Linux virtual machine.
 module.vm_jumpbox_linux.azurerm_key_vault_secret.ssh_private_key | jumplinux2&#8209;ssh&#8209;private&#8209;key | The break-glass private SSH key for the admin account, stored in Azure Key Vault.
-module.vm_jumpbox_linux[0].azurerm_linux_virtual_machine.this | jumplinux2 | The Linux virtual machine resource.
-module.vm_jumpbox_linux[0].azurerm_network_interface.this | nic&#8209;devops&#8209;dev&#8209;jumplinux2 | The network interface associated with the Linux virtual machine.
+module.vm_jumpbox_linux.azurerm_linux_virtual_machine.this | jumplinux2 | The Linux virtual machine resource.
+module.vm_jumpbox_linux.azurerm_network_interface.this | nic&#8209;devops&#8209;dev&#8209;jumplinux2 | The network interface associated with the Linux virtual machine.
 module.vm_jumpbox_linux.azurerm_monitor_data_collection_rule_association.dce | configurationAccessEndpoint | Associates the VM with the data collection endpoint so the Azure Monitor Agent retrieves its configuration through the AMPLS private endpoint.
 module.vm_jumpbox_linux.azurerm_monitor_data_collection_rule_association.dcr | dcr&#8209;devops&#8209;dev&#8209;jumplinux2&#8209;association | Associates the VM with the Linux data collection rule.
 module.vm_jumpbox_linux.azurerm_role_assignment.operator_vm_admin_login | | Grants `Virtual Machine Administrator Login` role on jumplinux2 to the operator applying the configuration, enabling Microsoft Entra ID SSH sign-in with passwordless `sudo`.
@@ -153,19 +152,16 @@ This section includes a list of output variables returned by the module.
 
 Name | Description
 --- | ---
-log_analytics_operations_complete | Dependency signal: the Azure Monitor Agent and the data collection rule and endpoint associations are complete. Consumed by the root module's `ampls_access_barrier`.
 resource_ids | A map of resource IDs for key resources in the module.
 resource_names | A map of resource names for key resources in the module.
 
 ### Optional: GitHub Self-Hosted Runner Configuration
 
-The module can optionally install the [GitHub Actions runner](https://github.com/actions/runner) agent as a self-hosted runner. It is **disabled by default** (`enable_github_runner = false`).
-When disabled, nothing runner-related is installed. When `enable_github_runner` is `true`:
+The module can optionally install the [GitHub Actions runner](https://github.com/actions/runner) agent to allow the VM to be used as a self-hosted runner for GitHub Actions associated with the [Azure Sandbox](https://github.com/Azure-Samples/azuresandbox) repository.
 
 * **Installation**
   * A managed Run Command (`ConfigureGitHubRunner`) runs [configure-github-runner.sh](./scripts/configure-github-runner.sh).
   * It runs after cloud-init and the VM extensions finish.
-  * Cloud-init is the same with or without the runner, so toggling the runner never replaces the VM.
 * **Token**
   * `github_runner_token` is an [ephemeral](https://developer.hashicorp.com/terraform/language/values/variables#exclude-values-from-state) input.
   * It is passed as a protected parameter through the write-only `sensitive_body` argument.
@@ -177,20 +173,19 @@ When disabled, nothing runner-related is installed. When `enable_github_runner` 
   * Script output is in the Run Command instance view.
 * **Runner service**
   * Installed to `/opt/actions-runner`.
+  * Named using the VM name (*jumplinux2*).
   * Registered with the configured URL and labels.
   * Runs as a systemd service (`actions.runner.*`) that starts on boot.
   * Runs as the non-root service account `githubrunner`.
+  * Agent automatically updates itself.
 * **Azure access**
   * `terraform`, `az` and `pwsh` (with Az modules) are on the runner `PATH`.
   * `ARM_USE_MSI` and `ARM_TENANT_ID` are set in `/opt/actions-runner/.env`.
   * Workflows authenticate with the VM managed identity. No Azure secrets are stored on the VM.
 * **Terraform state**
-  * No local state directory is provisioned. Workflows use the remote backend.
+  * No local state directory is provisioned. Workflows should use the remote state backend.
 
-See [Optional: GitHub Actions Self-Hosted Runner](../../README.md#optional-github-actions-self-hosted-runner) in the rg-devops-iac README for token creation and the token lifecycle.
-See [Terraform State for CD Workflows](../../README.md#terraform-state-for-cd-workflows) for the backend configuration.
-
-### Elevated Permissions for Integration Tests
+#### Elevated Permissions for Integration Tests
 
 The runner service account is unprivileged. The `vwan` integration tests in [Test-Integration-VwanConnectivity.ps1](../../../../../scripts/Test-Integration-VwanConnectivity.ps1) establish a point-to-site VPN tunnel, which requires root to create the `tun` device and update the routing table.
 
@@ -198,7 +193,7 @@ The configuration script installs a command scoped sudoers drop-in at `/etc/sudo
 
 **IMPORTANT:** This is a privilege grant. Passwordless root `cat`, `tail`, `kill` and `pkill` allow the runner service account to read any file on the VM and signal any process, which means any workflow job that runs on this runner inherits that capability.
 
-### Terraform Version on the Runner
+#### Terraform Version on the Runner
 
 Cloud-init installs the latest Terraform from the HashiCorp apt repository, which may not satisfy the `required_version` of the branch a workflow run deploys. Preflight in the [Sandbox deployment workflow](../../../../../.github/workflows/sandbox-deployment.yml) checks compatibility and, only when the runner's Terraform doesn't satisfy the constraint, installs the version static CI uses.
 
@@ -210,31 +205,6 @@ To allow this without broader root access, the configuration script always insta
 
 **IMPORTANT:** This is a privilege grant, limited to installing a HashiCorp-signed `terraform` package version from the configured repository. It changes the system-wide Terraform, so attended sessions on *jumplinux2* use whichever version the last workflow run installed.
 
-### Verify the GitHub Actions self-hosted runner
-
-Only applicable when `enable_github_runner` is set to `true`.
-
-* From the operator's workstation, review the runner configuration script output captured by the `ConfigureGitHubRunner` Run Command (the instance view keeps the last 4 KB of output):
-
-  ```bash
-  RG=$(az group list --query "[?starts_with(name, 'rg-devops-')].name" -o tsv | head -1)
-  NAME=$(az vm run-command list -g "$RG" --vm-name jumplinux2 --query "[?ends_with(name, 'ConfigureGitHubRunner')].name" -o tsv)
-  az vm run-command show -g "$RG" --vm-name jumplinux2 --name "$NAME" --instance-view \
-    --query "instanceView.{state:executionState, exitCode:exitCode, output:output, error:error}"
-  ```
-
-* Connect to *jumplinux2* using one of the [connection paths](../../README.md#connection-paths).
-* Verify the runner agent was installed and registered:
-
-  ```bash
-  # Confirm the runner is registered
-  sudo cat /opt/actions-runner/.runner
-
-  # Confirm the runner service is installed and running
-  sudo systemctl status 'actions.runner.*'
-
-  # Confirm the runner service environment
-  sudo cat /opt/actions-runner/.env
-  ```
+#### Verify the GitHub Actions self-hosted runner
 
 * Navigate to the target repository on GitHub > *Settings* > *Actions* > *Runners* and verify that a runner named *jumplinux2* is listed with an *Idle* status and the expected labels.
