@@ -89,8 +89,12 @@ resource "tls_private_key" "ssh_key" {
 #endregion
 
 #region github-runner
-# The registration secret is stored as a write-only key vault secret so it never lands in Terraform
-# state. The VM reads it at provisioning time using its managed identity.
+
+# This secret is a fine-grained PAT (Personal Access Token) used for GitHub runner registration.
+# The PAT is manually created by the operator and supplied using an environment variable prior to apply.
+# The registration secret is stored as a write-only key vault secret so it never lands in Terraform # state. 
+# The VM reads it once at provisioning time using its system-assigned managed identity.
+# Since it is only used once during provisioning the key vault secret is set to expire in 24 hours.
 resource "azurerm_key_vault_secret" "github_runner_token" {
   count = var.enable_github_runner ? 1 : 0
 
@@ -98,7 +102,7 @@ resource "azurerm_key_vault_secret" "github_runner_token" {
   value_wo         = var.github_runner_token
   value_wo_version = var.github_runner_token_secret_version
   key_vault_id     = var.key_vault_id
-  expiration_date  = timeadd(timestamp(), "8760h")
+  expiration_date  = timeadd(timestamp(), "24h")
 
   lifecycle {
     ignore_changes = [expiration_date]
@@ -133,13 +137,6 @@ resource "terraform_data" "log_analytics_operations_complete" {
     dce_association           = azurerm_monitor_data_collection_rule_association.dce.id
     network_interface_metrics = azurerm_monitor_diagnostic_setting.network_interface.id
   }
-}
-#endregion
-
-#region locals
-locals {
-  github_runner_home = "/opt/actions-runner"
-  github_runner_name = var.github_runner_name != "" ? var.github_runner_name : var.vm_jumpbox_linux_name
 }
 #endregion
 
