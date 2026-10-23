@@ -413,11 +413,15 @@ To enable it:
 
   ```hcl
   enable_github_runner = true
-  github_runner_url    = "https://github.com/YOUR-ORG-HERE/YOUR-REPO-HERE"
-  github_runner_labels = ["azuresandbox"]
   ```
 
-* Right before [Step 4](#step-4-validate-and-apply-configuration), create a runner registration token with the helper script, in the shell that will run Terraform. The script sets the `TF_VAR_github_runner_token` environment variable without displaying the token. The bash script must be sourced, and refuses to print the token to a terminal. The scripts use the [GitHub CLI](https://cli.github.com) (`gh`), signed in as a repository administrator, and read `github_runner_url` from `terraform.tfvars`:
+  The runner is pre-configured for the [Azure Sandbox](https://github.com/Azure-Samples/azuresandbox) repository:
+
+  * `github_runner_url` defaults to `https://github.com/Azure-Samples/azuresandbox`.
+  * `github_runner_labels` defaults to `["azuresandbox"]`, the label the [Sandbox deployment workflow](../../../.github/workflows/sandbox-deployment.yml) targets.
+  * Set either variable in `terraform.tfvars` only to override the default.
+
+* Right before [Step 4](#step-4-validate-and-apply-configuration), create a runner registration token with the helper script, in the shell that will run Terraform. The script sets the `TF_VAR_github_runner_token` environment variable without displaying the token. The bash script must be sourced, and refuses to print the token to a terminal. The scripts use the [GitHub CLI](https://cli.github.com) (`gh`), signed in as a repository administrator. They read `github_runner_url` from `terraform.tfvars`, falling back to the default Azure Sandbox repository URL:
 
   ```bash
   # bash
@@ -526,10 +530,9 @@ To enable it, add the following to the `terraform.tfvars` file:
 
 ```hcl
 deployment_identity = "oidc"
-github_runner_url   = "https://github.com/OWNER/NAME" # a repository URL
 ```
 
-The federated credentials trust workflows in that repository in the environments in `github_oidc_environments`. It defaults to the workflow's two environments, `sandbox-deployment` and `sandbox-release-gate`. The credentials identify the repository and its owner by numeric id, which doesn't change if either is renamed. Terraform looks the ids up from the GitHub API on each plan. The request is anonymous, because data source arguments are saved in state, so it works only for public repositories and is subject to GitHub's rate limit for unauthenticated requests. For a private repository, or to avoid the lookup, set both ids:
+The federated credentials trust workflows in the repository in `github_runner_url` (default: the Azure Sandbox repository) in the environments in `github_oidc_environments`. It defaults to the workflow's two environments, `sandbox-deployment` and `sandbox-release-gate`. The credentials identify the repository and its owner by numeric id, which doesn't change if either is renamed. Terraform looks the ids up from the GitHub API on each plan. The request is anonymous, because data source arguments are saved in state, so it works only for public repositories and is subject to GitHub's rate limit for unauthenticated requests. For a private repository, or to avoid the lookup, set both ids:
 
 ```hcl
 github_repository_id       = "123456789" # gh api repos/OWNER/NAME --jq .id
@@ -953,7 +956,7 @@ github_runner_labels | `["azuresandbox"]` | Additional labels to apply to the Gi
 github_runner_power_state_environment | `sandbox-runner-power-state` | The GitHub Actions environment whose jobs can sign in as the runner power state identity, which starts and deallocates `jumplinux2` for workflow runs. Must not be one of `github_oidc_environments`. Only used when `deployment_identity` is `oidc`.
 github_runner_token | | Ephemeral. The runner registration token used to register the self-hosted runner (expires after 1 hour), e.g. from `scripts/new-runner-registration-token.sh`. Set using the environment variable `TF_VAR_github_runner_token` for both `terraform plan` and `terraform apply`. Never stored in Terraform state or the saved plan. Required only when the runner is registered (on first deployment or when `github_runner_token_version` changes).
 github_runner_token_version | 1 | Increment to send a new `github_runner_token` to the VM and re-run runner registration, e.g. after a failed registration. Only used when `enable_github_runner` is true.
-github_runner_url | | The GitHub repository URL to register the self-hosted runner with, e.g. `https://github.com/myorg/myrepo`. Required when `enable_github_runner` is true, or when `deployment_identity` is `oidc` and the repository ids are not set.
+github_runner_url | `https://github.com/Azure-Samples/azuresandbox` | The GitHub repository URL to register the self-hosted runner with. Defaults to the Azure Sandbox repository. Used when `enable_github_runner` is true, or when `deployment_identity` is `oidc` and the repository ids are not set.
 location | | The name of the Azure Region where resources will be provisioned.
 log_analytics_workspace_retention_days | 30 | The retention period in days for the Log Analytics workspace. Must be one of 30, 31, 60, 90, 120, 180, 270, 365, 550 or 730.
 storage_access_tier | Hot | The access tier for the new storage account.

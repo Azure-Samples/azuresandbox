@@ -14,7 +14,8 @@
     so run terraform plan and terraform apply right away, in the same PowerShell session.
 
 .PARAMETER RunnerUrl
-    The GitHub repository URL. Defaults to github_runner_url in ../terraform.tfvars.
+    The GitHub repository URL. Defaults to github_runner_url in ../terraform.tfvars, then to the
+    variable's default, the Azure Sandbox repository.
 
 .EXAMPLE
     # From extras/configurations/rg-devops-iac
@@ -30,19 +31,16 @@ $ErrorActionPreference = 'Stop'
 
 $tfvars = Join-Path (Split-Path -Parent $PSScriptRoot) 'terraform.tfvars'
 
-if (-not $RunnerUrl) {
-    if (-not (Test-Path -Path $tfvars -PathType Leaf)) {
-        throw "$tfvars not found. Pass the runner URL with -RunnerUrl."
-    }
-
+if (-not $RunnerUrl -and (Test-Path -Path $tfvars -PathType Leaf)) {
     $match = Select-String -Path $tfvars -Pattern '^\s*github_runner_url\s*=\s*"([^"]*)"' | Select-Object -Last 1
     if ($match) {
         $RunnerUrl = $match.Matches[0].Groups[1].Value
     }
+}
 
-    if (-not $RunnerUrl) {
-        throw "github_runner_url is not set in $tfvars. Pass the runner URL with -RunnerUrl."
-    }
+# Matches the default of github_runner_url in ../variables.tf.
+if (-not $RunnerUrl) {
+    $RunnerUrl = 'https://github.com/Azure-Samples/azuresandbox'
 }
 
 if ($RunnerUrl -notmatch '^https://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$') {

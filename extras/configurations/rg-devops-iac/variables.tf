@@ -106,8 +106,8 @@ variable "github_runner_token_version" {
 
 variable "github_runner_url" {
   type        = string
-  description = "The GitHub repository URL to register the self-hosted runner with, e.g. 'https://github.com/myorg/myrepo'. Required when var.enable_github_runner is true, or when var.deployment_identity is oidc and the repository ids are not set."
-  default     = ""
+  description = "The GitHub repository URL to register the self-hosted runner with. Defaults to the Azure Sandbox repository. Used when var.enable_github_runner is true, or when var.deployment_identity is oidc and the repository ids are not set."
+  default     = "https://github.com/Azure-Samples/azuresandbox"
 
   validation {
     condition     = var.github_runner_url == "" || can(regex("^https://github\\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$", var.github_runner_url))

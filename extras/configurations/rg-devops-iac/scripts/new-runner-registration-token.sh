@@ -9,7 +9,8 @@
 # refuses to print the token to a terminal; its output can only be captured, e.g.
 #   export TF_VAR_github_runner_token="$(./scripts/new-runner-registration-token.sh)"
 #
-# runner_url is the GitHub repository URL and defaults to github_runner_url in ../terraform.tfvars.
+# runner_url is the GitHub repository URL. It defaults to github_runner_url in ../terraform.tfvars,
+# then to the variable's default, the Azure Sandbox repository.
 #
 # Requires the GitHub CLI (gh) signed in as a repository admin. The token is never displayed. It expires after 1 hour, so run terraform plan
 # and terraform apply right away, in the same shell.
@@ -27,11 +28,12 @@ _new_runner_registration_token() (
     shift
     runner_url="${1:-}"
 
-    if [ -z "$runner_url" ]; then
-        [ -f "$tfvars" ] || die "$tfvars not found. Pass the runner URL as an argument."
+    if [ -z "$runner_url" ] && [ -f "$tfvars" ]; then
         runner_url=$(sed -nE 's/^[[:space:]]*github_runner_url[[:space:]]*=[[:space:]]*"([^"]*)".*$/\1/p' "$tfvars" | tail -n 1)
-        [ -n "$runner_url" ] || die "github_runner_url is not set in $tfvars. Pass the runner URL as an argument."
     fi
+
+    # Matches the default of github_runner_url in ../variables.tf.
+    runner_url="${runner_url:-https://github.com/Azure-Samples/azuresandbox}"
 
     if ! [[ "$runner_url" =~ ^https://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]]; then
         die "'$runner_url' is not a GitHub repository URL, e.g. 'https://github.com/myorg/myrepo'."
