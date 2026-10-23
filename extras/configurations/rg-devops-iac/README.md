@@ -16,35 +16,31 @@
 
 ## Overview
 
-This configuration provides a minimal set of resources to function as an execution environment for Terraform which is often a critical part of a DevOps pipeline. It is a useful starting point for DevOps / Infrastructure-As-Code (IaC) projects that require a secure and isolated environment for deploying and managing infrastructure using Terraform. The root module creates network, storage and security prerequisites. The virtual machine used as a Terraform execution environment is implemented in a child module which can be repurposed in other environments (such as a platform landing zone) where the resources defined in the root module already exist.
+This configuration provides a minimal set of resources to function as a Terraform execution environment, which is often a critical part of a DevOps pipeline. It is a useful starting point for DevOps / Infrastructure-As-Code (IaC) projects that require a secure and isolated environment for deploying and managing infrastructure using Terraform. The root module creates network, storage and security prerequisites. The virtual machine used as a Terraform execution environment is implemented in a child module which can be repurposed in other environments (such as a platform landing zone) where the resources defined in the root module already exist. The virtual machine has no public IP address: operators reach it only through Azure Bastion and sign in with their Microsoft Entra ID identity, so access is governed by Azure RBAC and Conditional Access rather than long-lived SSH keys.
 
 ## Features
 
-This section provides a brief overview of the features included in this configuration.
-
-* A pre-configured virtual network, including:
-  * A subnet for use by the Linux virtual machine
-  * A NAT gateway for outbound internet connectivity
-  * An Azure Bastion host (Standard SKU with native client support) in its own `AzureBastionSubnet`, which is the only inbound path to the Linux virtual machine
-* A pre-configured storage account, including:
-  * A container for storing Terraform state files
-  * Public access is enabled by design since there may be the first environment provisioned in Azure. This can be disabled once a platform landing zone is in place.
-  * Shared access keys are disabled by default and Azure RBAC is used for authorization.
-* A pre-configured key vault for managing secrets
-* Network-isolated observability, including:
-  * A Log Analytics workspace that accepts ingestion and queries only through an Azure Monitor Private Link Scope (AMPLS) private endpoint in the devops virtual network
-  * Diagnostic settings that send logs and metrics to the workspace for every resource in this configuration that supports them, for example key vault audit events (including break-glass SSH key retrieval), Terraform state blob reads and writes, and Bastion sign-ins
-  * Azure Monitor Agent on the Linux virtual machine, with a data collection rule for syslog (including SSH sign-in and `sudo` activity) and performance counters
-* A pre-configured Linux virtual machine for use as a Terraform execution environment implemented as a module for inclusion in other configurations, including:
-  * No public IP address. Operators connect through Azure Bastion and sign in with Microsoft Entra ID using short-lived OpenSSH certificates, including Visual Studio Code Remote-SSH through a Bastion tunnel
-  * Key vault secrets for a break-glass local admin account, used only when Microsoft Entra ID sign-in fails
-  * Managed identity role assignments for Azure Blob Storage for use as a Terraform state backend
-  * Pre-configured environment variables for Terraform azurerm provider to use managed identities
-  * Pre-installed software for IaC / DevOps projects
-  * Optional registration as a GitHub Actions self-hosted runner for CI/CD workflows (disabled by default)
-  * Optional deployment identity (disabled by default), either:
-    * a user-assigned managed identity attached to the Linux virtual machine, with standing subscription `Contributor` and conditioned `Role Based Access Control Administrator`, for sandbox applies with `auth_mode = "managed_identity"`, or
-    * an unattached user-assigned managed identity with standing subscription `Reader` and GitHub Actions federated identity credentials, for approval-gated workflow applies with `auth_mode = "oidc"` after the operator grants time-bound roles
+* **Pre-configured DevOps VM for IaC** (Terraform)
+  * Pre-installed and pre-configured environment for Terraform init / plan / apply operations.
+  * Managed-identity access to a pre-configured Terraform state backend (Azure Blob Storage).
+  * Pre-installed Azure CLI and PowerShell + Azure PowerShell for custom automation.
+* **Network isolation**
+  * Virtual network with subnets for the virtual machine, private endpoints and Azure Bastion.
+  * NAT gateway for outbound internet access.
+  * Network security groups that allow SSH only from Azure Bastion.
+  * Private endpoints and private DNS zones for the storage account, key vault and Azure Monitor. Public network access is disabled.
+* **Secure access**
+  * Azure Bastion (Standard SKU) is the only inbound path to the virtual machine.
+  * Microsoft Entra ID sign-in with Azure RBAC (passwordless).
+  * Break-glass local admin credentials stored in Key Vault.
+  * Role separation follows principle of least privilege for Azure RBAC role assignments.
+* **Observability**
+  * Log Analytics workspace reachable only through an Azure Monitor Private Link Scope (AMPLS).
+  * Azure Monitor Agent collecting syslog and performance counters from the virtual machine.
+  * Pre-configured diagnostic settings for security-sensitive resources (Bastion, NSGs, Key Vault and Storage).
+* **Optional features** (disabled by default)
+  * Enable a GitHub Actions self-hosted runner for the Azure Sandbox deployment workflows.
+  * Deployment identity for sandbox applies, either attached to the virtual machine (`managed_identity`) or federated with GitHub Actions for approval-gated workflow runs (`oidc`).
 
 **NOTE:** The Linux virtual machine is implemented as a module so it can be easily reused in other configurations. It is not intended to be used as a production jumpbox. It is intended to be used as a Terraform execution environment for DevOps / IaC projects.
 
