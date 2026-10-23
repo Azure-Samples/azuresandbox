@@ -64,7 +64,7 @@ output "deployment_identity" {
 #                                        Null unless var.deployment_identity is oidc.
 output "github_runner" {
   value = var.enable_github_runner ? {
-    name                                = module.vm_jumpbox_linux.github_runner_name
+    name                                = module.vm_jumpbox_linux.resource_names["virtual_machine_jumplinux2"]
     power_state_identity_client_id      = var.deployment_identity == "oidc" ? azurerm_user_assigned_identity.runner_power_state[0].client_id : null
     power_state_identity_github_subject = local.github_runner_power_state_subject
   } : null

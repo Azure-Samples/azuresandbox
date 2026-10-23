@@ -7,7 +7,7 @@
 # settings arrive as Run Command parameters, which Linux exposes to the script as environment
 # variables, so this script stays lintable by ShellCheck.
 #
-# The GitHub token arrives as the protected parameter RUNNER_TOKEN. Terraform passes it through the
+# The runner registration token arrives as the protected parameter RUNNER_TOKEN. Terraform passes it through the
 # write-only azapi sensitive_body argument, so it is never written to Terraform state, the saved plan,
 # the VM custom data or Azure Key Vault.
 
@@ -15,16 +15,13 @@ set -euo pipefail
 
 runner_url="${RUNNER_URL:-}"
 runner_name="${RUNNER_NAME:-}"
-runner_group="${RUNNER_GROUP:-Default}"
 runner_labels="${RUNNER_LABELS:-}"
 runner_version="${RUNNER_VERSION:-}"
-runner_user="${RUNNER_USER:-githubrunner}"
+runner_user="githubrunner"
 runner_home="${RUNNER_HOME:-/opt/actions-runner}"
-token_type="${RUNNER_TOKEN_TYPE:-registration}"
 aad_tenant_id="${AAD_TENANT_ID:-}"
-vwan_sudoers="${RUNNER_VWAN_SUDOERS:-true}"
 
-github_token="${RUNNER_TOKEN:-}"
+registration_token="${RUNNER_TOKEN:-}"
 unset RUNNER_TOKEN
 
 log() {
@@ -36,8 +33,8 @@ fail() {
     exit 1
 }
 
-# Retries transient failures rather than failing the whole registration, e.g. a GitHub API hiccup
-# or another process holding the apt lock.
+# Retries transient failures rather than failing the whole registration, e.g. another process
+# holding the apt lock.
 retry() {
     local description="$1"
     shift
@@ -55,17 +52,6 @@ retry() {
     done
 }
 
-get_registration_token() {
-    registration_token=$(curl -sSf -X POST \
-        -H "Accept: application/vnd.github+json" \
-        -H "Authorization: Bearer $github_token" \
-        -H "X-GitHub-Api-Version: 2022-11-28" \
-        "$registration_api" \
-        | python3 -c 'import json,sys; print(json.load(sys.stdin).get("token",""))')
-
-    [ -n "$registration_token" ]
-}
-
 [ -n "$runner_url" ] || fail "required parameter 'RUNNER_URL' is not set"
 [ -n "$runner_name" ] || fail "required parameter 'RUNNER_NAME' is not set"
 [ -n "$runner_version" ] || fail "required parameter 'RUNNER_VERSION' is not set"
@@ -77,41 +63,9 @@ if [ -f "$runner_home/.runner" ]; then
     exit 0
 fi
 
-if [ -z "$github_token" ]; then
+if [ -z "$registration_token" ]; then
     fail "RUNNER_TOKEN is empty and the runner is not registered. Set TF_VAR_github_runner_token, increment github_runner_token_version and apply again."
 fi
-
-case "$token_type" in
-    pat | registration) ;;
-    *) fail "RUNNER_TOKEN_TYPE must be 'pat' or 'registration', got '$token_type'" ;;
-esac
-
-# A repository URL contains exactly one '/' after the github.com prefix, an organization URL none.
-api_path=${runner_url#https://github.com/}
-
-if [ "$(printf '%s' "$api_path" | tr -cd '/' | wc -c)" -eq 1 ]; then
-    runner_scope="repository"
-else
-    runner_scope="organization"
-fi
-
-# A personal access token must be exchanged for a short lived runner registration token. A token
-# supplied as a registration token is used as-is.
-if [ "$token_type" = "pat" ]; then
-    if [ "$runner_scope" = "repository" ]; then
-        registration_api="https://api.github.com/repos/$api_path/actions/runners/registration-token"
-    else
-        registration_api="https://api.github.com/orgs/$api_path/actions/runners/registration-token"
-    fi
-
-    log "Exchanging personal access token for a runner registration token..."
-    registration_token=""
-    retry "Runner registration token request" get_registration_token
-else
-    registration_token="$github_token"
-fi
-
-github_token=""
 
 if id -u "$runner_user" > /dev/null 2>&1; then
     log "Service account '$runner_user' already exists..."
@@ -125,11 +79,10 @@ fi
 # service account is unprivileged, so grant command-scoped NOPASSWD sudo for exactly the binaries
 # those tests invoke. This mirrors the /etc/sudoers.d/azuresandbox-vwan drop-in used on interactive
 # Terraform execution environments.
-if [ "$vwan_sudoers" = "true" ]; then
-    log "Granting '$runner_user' command-scoped sudo for the vwan P2S VPN integration tests..."
-    sudoers_file=/etc/sudoers.d/azuresandbox-github-runner
+log "Granting '$runner_user' command-scoped sudo for the vwan P2S VPN integration tests..."
+sudoers_file=/etc/sudoers.d/azuresandbox-github-runner
 
-    cat > "$sudoers_file" << EOF
+cat > "$sudoers_file" << EOF
 # Managed by the ConfigureGitHubRunner Run Command (configure-github-runner.sh). Do not edit by hand.
 # Command-scoped NOPASSWD sudo for the privileged binaries invoked by
 # scripts/Test-Integration-VwanConnectivity.ps1 when the vwan P2S VPN integration
@@ -137,16 +90,13 @@ if [ "$vwan_sudoers" = "true" ]; then
 $runner_user ALL=(root) NOPASSWD: /usr/sbin/openvpn, /usr/bin/cat, /usr/bin/tail, /usr/bin/kill, /usr/bin/pkill
 EOF
 
-    chown root:root "$sudoers_file"
-    chmod 0440 "$sudoers_file"
+chown root:root "$sudoers_file"
+chmod 0440 "$sudoers_file"
 
-    # A malformed drop-in breaks sudo for every user, so validate and discard it if invalid.
-    if ! visudo -cf "$sudoers_file" > /dev/null; then
-        rm -f "$sudoers_file"
-        fail "generated sudoers file $sudoers_file is invalid and has been removed"
-    fi
-else
-    log "Skipping vwan sudoers drop-in, var.github_runner_enable_vwan_sudoers is disabled..."
+# A malformed drop-in breaks sudo for every user, so validate and discard it if invalid.
+if ! visudo -cf "$sudoers_file" > /dev/null; then
+    rm -f "$sudoers_file"
+    fail "generated sudoers file $sudoers_file is invalid and has been removed"
 fi
 
 # The Sandbox deployment workflow's preflight installs a Terraform CLI version that satisfies the
@@ -247,12 +197,6 @@ config_args=(
     --name "$runner_name"
     --work "$runner_home/_work"
 )
-
-# Runner groups are an organization/enterprise feature. Passing --runnergroup when registering a
-# repository level runner fails with "Could not find any self-hosted runner group named ...".
-if [ "$runner_scope" = "organization" ] && [ -n "$runner_group" ]; then
-    config_args+=(--runnergroup "$runner_group")
-fi
 
 if [ -n "$runner_labels" ]; then
     config_args+=(--labels "$runner_labels")

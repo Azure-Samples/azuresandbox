@@ -33,12 +33,15 @@ resource "tls_private_key" "ssh_key" {
 #endregion
 
 #region utilities
+
+# Signal for the root ampls_access_barrier (public-access barrier pattern).
+# These Azure Monitor writes need the AMPLS and workspace to still accept public traffic.
+# The root closes public access only after this resource, via the log_analytics_operations_complete output.
 resource "terraform_data" "log_analytics_operations_complete" {
   input = {
-    ama                       = azurerm_virtual_machine_extension.ama.id
-    dcr_association           = azurerm_monitor_data_collection_rule_association.dcr.id
-    dce_association           = azurerm_monitor_data_collection_rule_association.dce.id
-    network_interface_metrics = azurerm_monitor_diagnostic_setting.network_interface.id
+    ama             = azurerm_virtual_machine_extension.ama.id
+    dcr_association = azurerm_monitor_data_collection_rule_association.dcr.id
+    dce_association = azurerm_monitor_data_collection_rule_association.dce.id
   }
 }
 #endregion

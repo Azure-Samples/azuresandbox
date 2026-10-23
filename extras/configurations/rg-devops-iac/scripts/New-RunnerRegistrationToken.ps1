@@ -10,13 +10,11 @@
     variable of the current PowerShell session, for use when enable_github_runner = true. Not needed
     otherwise. The token is never displayed.
 
-    A repository URL mints a repository runner token, an organization URL an organization runner
-    token. Requires the GitHub CLI (gh) signed in as a repository admin, or with the admin:org scope
-    for an organization runner. The token expires after 1 hour, so run terraform plan and terraform
-    apply right away, in the same PowerShell session.
+    Requires the GitHub CLI (gh) signed in as a repository admin. The token expires after 1 hour,
+    so run terraform plan and terraform apply right away, in the same PowerShell session.
 
 .PARAMETER RunnerUrl
-    The GitHub repository or organization URL. Defaults to github_runner_url in ../terraform.tfvars.
+    The GitHub repository URL. Defaults to github_runner_url in ../terraform.tfvars.
 
 .EXAMPLE
     # From extras/configurations/rg-devops-iac
@@ -47,26 +45,19 @@ if (-not $RunnerUrl) {
     }
 }
 
-if ($RunnerUrl -notmatch '^https://github\.com/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)?$') {
-    throw "'$RunnerUrl' is not a GitHub organization or repository URL, e.g. 'https://github.com/myorg/myrepo'."
+if ($RunnerUrl -notmatch '^https://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$') {
+    throw "'$RunnerUrl' is not a GitHub repository URL, e.g. 'https://github.com/myorg/myrepo'."
 }
 
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
     throw 'The GitHub CLI (gh) is not installed. See https://cli.github.com.'
 }
 
-$apiPath = $RunnerUrl.Substring('https://github.com/'.Length)
-
-if ($apiPath.Contains('/')) {
-    $endpoint = "repos/$apiPath/actions/runners/registration-token"
-}
-else {
-    $endpoint = "orgs/$apiPath/actions/runners/registration-token"
-}
+$endpoint = "repos/$($RunnerUrl.Substring('https://github.com/'.Length))/actions/runners/registration-token"
 
 $token = gh api --method POST $endpoint --jq '.token'
 if ($LASTEXITCODE -ne 0) {
-    throw "Could not create a registration token for $RunnerUrl. Sign in with 'gh auth login' as a repository admin (or with the admin:org scope for an organization)."
+    throw "Could not create a registration token for $RunnerUrl. Sign in with 'gh auth login' as a repository admin."
 }
 
 if (-not $token) {

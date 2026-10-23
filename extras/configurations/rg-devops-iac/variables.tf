@@ -87,26 +87,10 @@ variable "github_runner_power_state_environment" {
 
 variable "github_runner_token" {
   type        = string
-  description = "The GitHub token used to register the self-hosted runner, of the type in var.github_runner_token_type, e.g. from 'scripts/new-runner-registration-token.sh'. Set using the environment variable 'TF_VAR_github_runner_token' for both 'terraform plan' and 'terraform apply'. Ephemeral: never stored in Terraform state or the saved plan. Required only when the runner is registered (on first deployment or when var.github_runner_token_version changes)."
+  description = "The GitHub runner registration token used to register the self-hosted runner (expires after 1 hour), e.g. from 'scripts/new-runner-registration-token.sh'. Set using the environment variable 'TF_VAR_github_runner_token' for both 'terraform plan' and 'terraform apply'. Ephemeral: never stored in Terraform state or the saved plan. Required only when the runner is registered (on first deployment or when var.github_runner_token_version changes)."
   sensitive   = true
   ephemeral   = true
   default     = ""
-}
-
-variable "github_runner_token_type" {
-  type        = string
-  description = "The type of token supplied in var.github_runner_token. Use 'registration' for a runner registration token obtained from the GitHub API (expires after 1 hour), or 'pat' for a personal access token, which is exchanged for a registration token on the VM."
-  default     = "registration"
-
-  validation {
-    condition     = contains(["pat", "registration"], var.github_runner_token_type)
-    error_message = "Must be either 'pat' or 'registration'."
-  }
-
-  validation {
-    condition     = !var.enable_github_runner || var.github_runner_token_type != "registration" || !can(regex("^(github_pat_|ghp_)", var.github_runner_token))
-    error_message = "github_runner_token looks like a personal access token. Set github_runner_token_type to 'pat', or supply a runner registration token."
-  }
 }
 
 # Controls when the ephemeral github_runner_token is sent to the VM. Terraform can't store an ephemeral value
@@ -122,17 +106,17 @@ variable "github_runner_token_version" {
 
 variable "github_runner_url" {
   type        = string
-  description = "The GitHub repository or organization URL to register the self-hosted runner with, e.g. 'https://github.com/myorg/myrepo'. Required when var.enable_github_runner is true. Must be a repository URL when var.deployment_identity is oidc and the repository ids are not set."
+  description = "The GitHub repository URL to register the self-hosted runner with, e.g. 'https://github.com/myorg/myrepo'. Required when var.enable_github_runner is true, or when var.deployment_identity is oidc and the repository ids are not set."
   default     = ""
 
   validation {
-    condition     = var.github_runner_url == "" || can(regex("^https://github\\.com/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)?$", var.github_runner_url))
-    error_message = "Must be empty or a valid GitHub organization or repository URL, e.g. 'https://github.com/myorg' or 'https://github.com/myorg/myrepo'."
+    condition     = var.github_runner_url == "" || can(regex("^https://github\\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$", var.github_runner_url))
+    error_message = "Must be empty or a GitHub repository URL, e.g. 'https://github.com/myorg/myrepo'."
   }
 
   validation {
-    condition     = var.deployment_identity != "oidc" || (var.github_repository_id != "" && var.github_repository_owner_id != "") || can(regex("^https://github\\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$", var.github_runner_url))
-    error_message = "Must be a GitHub repository URL when deployment_identity is oidc, unless github_repository_id and github_repository_owner_id are both set."
+    condition     = var.deployment_identity != "oidc" || (var.github_repository_id != "" && var.github_repository_owner_id != "") || var.github_runner_url != ""
+    error_message = "Must be set when deployment_identity is oidc, unless github_repository_id and github_repository_owner_id are both set."
   }
 }
 

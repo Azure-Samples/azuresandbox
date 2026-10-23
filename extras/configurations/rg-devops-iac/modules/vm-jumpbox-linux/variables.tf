@@ -41,23 +41,6 @@ variable "enable_github_runner" {
   default     = false
 }
 
-variable "github_runner_enable_vwan_sudoers" {
-  type        = bool
-  description = "Set to true to grant the runner service account command-scoped NOPASSWD sudo for the binaries used by the vwan P2S VPN integration tests (openvpn, cat, tail, kill, pkill). Required for unattended vwan integration testing. Only used when var.enable_github_runner is true."
-  default     = true
-}
-
-variable "github_runner_group" {
-  type        = string
-  description = "The name of the GitHub Actions runner group to register the runner with. Only used when var.enable_github_runner is true."
-  default     = "Default"
-
-  validation {
-    condition     = can(regex("^[a-zA-Z0-9 ._-]{1,64}$", var.github_runner_group))
-    error_message = "Must be 1-64 characters long and consist of alphanumeric characters, periods (.), underscores (_), spaces, or hyphens (-)."
-  }
-}
-
 variable "github_runner_labels" {
   type        = list(string)
   description = "Additional labels to apply to the GitHub Actions self-hosted runner. Only used when var.enable_github_runner is true."
@@ -69,50 +52,12 @@ variable "github_runner_labels" {
   }
 }
 
-variable "github_runner_name" {
-  type        = string
-  description = "The name to register the GitHub Actions self-hosted runner with. Defaults to the VM name when left empty. Only used when var.enable_github_runner is true."
-  default     = ""
-
-  validation {
-    condition     = var.github_runner_name == "" || can(regex("^[a-zA-Z0-9._-]{1,64}$", var.github_runner_name))
-    error_message = "Must be empty or 1-64 characters long and consist of alphanumeric characters, periods (.), underscores (_), or hyphens (-)."
-  }
-}
-
-variable "github_runner_service_account" {
-  type        = string
-  description = "The name of the non-root local service account the GitHub Actions self-hosted runner runs under. Only used when var.enable_github_runner is true."
-  default     = "githubrunner"
-
-  validation {
-    condition     = can(regex("^[a-z_][a-z0-9_-]{0,31}$", var.github_runner_service_account))
-    error_message = "Must conform to Linux user name requirements: it must start with a lowercase letter or underscore and can only contain lowercase letters, digits, underscores and hyphens, up to 32 characters long."
-  }
-}
-
 variable "github_runner_token" {
   type        = string
-  description = "The GitHub token used to register the self-hosted runner, of the type in var.github_runner_token_type. Ephemeral: delivered to the VM through a write-only Run Command protected parameter and never stored in Terraform state or the saved plan. Required only when the runner is registered (when the Run Command is created or var.github_runner_token_version changes)."
+  description = "The GitHub runner registration token used to register the self-hosted runner (expires after 1 hour). Ephemeral: delivered to the VM through a write-only Run Command protected parameter and never stored in Terraform state or the saved plan. Required only when the runner is registered (when the Run Command is created or var.github_runner_token_version changes)."
   sensitive   = true
   ephemeral   = true
   default     = ""
-}
-
-variable "github_runner_token_type" {
-  type        = string
-  description = "The type of token supplied in var.github_runner_token. Use 'registration' for a runner registration token obtained from the GitHub API (expires after 1 hour), or 'pat' for a personal access token, which is exchanged for a registration token on the VM."
-  default     = "registration"
-
-  validation {
-    condition     = contains(["pat", "registration"], var.github_runner_token_type)
-    error_message = "Must be either 'pat' or 'registration'."
-  }
-
-  validation {
-    condition     = !var.enable_github_runner || var.github_runner_token_type != "registration" || !can(regex("^(github_pat_|ghp_)", var.github_runner_token))
-    error_message = "var.github_runner_token looks like a personal access token. Set var.github_runner_token_type to 'pat', or supply a runner registration token."
-  }
 }
 
 # Controls when the ephemeral github_runner_token is sent to the VM. Terraform can't store an ephemeral value
@@ -128,12 +73,12 @@ variable "github_runner_token_version" {
 
 variable "github_runner_url" {
   type        = string
-  description = "The GitHub repository or organization URL to register the self-hosted runner with, e.g. 'https://github.com/myorg/myrepo'. Required when var.enable_github_runner is true."
+  description = "The GitHub repository URL to register the self-hosted runner with, e.g. 'https://github.com/myorg/myrepo'. Required when var.enable_github_runner is true."
   default     = ""
 
   validation {
-    condition     = var.github_runner_url == "" || can(regex("^https://github\\.com/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)?$", var.github_runner_url))
-    error_message = "Must be empty or a valid GitHub organization or repository URL, e.g. 'https://github.com/myorg' or 'https://github.com/myorg/myrepo'."
+    condition     = var.github_runner_url == "" || can(regex("^https://github\\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$", var.github_runner_url))
+    error_message = "Must be empty or a GitHub repository URL, e.g. 'https://github.com/myorg/myrepo'."
   }
 }
 
@@ -165,16 +110,6 @@ variable "location" {
   validation {
     condition     = can(regex("^[a-z0-9-]+$", var.location))
     error_message = "Must be a valid Azure region name. It should only contain lowercase letters, numbers, and dashes."
-  }
-}
-
-variable "log_analytics_workspace_id" {
-  type        = string
-  description = "The ID of the Log Analytics workspace that receives the network interface metrics."
-
-  validation {
-    condition     = can(regex("^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[a-zA-Z0-9-_()]+/providers/Microsoft.OperationalInsights/workspaces/[a-zA-Z0-9-_()]+$", var.log_analytics_workspace_id))
-    error_message = "Must be a valid Azure Resource ID for a Log Analytics workspace. It should follow the format '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.OperationalInsights/workspaces/{workspaceName}'."
   }
 }
 

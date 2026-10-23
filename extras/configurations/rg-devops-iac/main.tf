@@ -417,12 +417,10 @@ module "vm_jumpbox_linux" {
   enable_github_runner          = var.enable_github_runner
   github_runner_labels          = var.github_runner_labels
   github_runner_token           = var.github_runner_token
-  github_runner_token_type      = var.github_runner_token_type
   github_runner_token_version   = var.github_runner_token_version
   github_runner_url             = var.github_runner_url
   key_vault_id                  = azurerm_key_vault.this.id
   location                      = azurerm_resource_group.this.location
-  log_analytics_workspace_id    = azurerm_log_analytics_workspace.this.id
   resource_group_name           = azurerm_resource_group.this.name
   storage_account_id            = azurerm_storage_account.this.id
   subnet_id                     = azurerm_subnet.subnets[var.subnet_devops_name].id

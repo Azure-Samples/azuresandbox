@@ -78,12 +78,10 @@ resource "azurerm_role_assignment" "this" {
   role_definition_name = "Storage Blob Data Contributor"
   scope                = var.storage_account_id
 }
-#endregion
 
-#region entra-id-ssh
-# Enables Microsoft Entra ID sign-in over SSH using short-lived OpenSSH certificates, so operators sign in
-# as their own Entra identity through Azure Bastion instead of the local admin account. Installing the
-# extension uses apt, so it waits for cloud-init and the dpkg/apt locks to be released first.
+# Enables Microsoft Entra ID SSH sign-in through Azure Bastion with short-lived OpenSSH certificates.
+# Operators sign in as their own Entra identity instead of the local admin account.
+# The extension installs with apt, so it waits for cloud-init and the dpkg/apt locks.
 resource "azurerm_virtual_machine_extension" "aad_ssh_login" {
   name                       = "${module.naming.virtual_machine_extension.name}-${var.vm_jumpbox_linux_name}-AADSSHLoginForLinux"
   virtual_machine_id         = azurerm_linux_virtual_machine.this.id
@@ -101,9 +99,7 @@ resource "azurerm_role_assignment" "operator_vm_admin_login" {
   role_definition_name = "Virtual Machine Administrator Login"
   scope                = azurerm_linux_virtual_machine.this.id
 }
-#endregion
 
-#region azure-monitor
 # Installing the agent uses apt, so it waits for the Entra ID SSH extension (which waits for cloud-init)
 # to avoid contending for the dpkg/apt locks.
 resource "azurerm_virtual_machine_extension" "ama" {
@@ -132,15 +128,12 @@ resource "azurerm_monitor_data_collection_rule_association" "dce" {
 
   depends_on = [azurerm_virtual_machine_extension.ama]
 }
-#endregion
 
-#region github-runner
-# Optional: installs and registers the GitHub Actions self-hosted runner agent. Runs after cloud-init and
-# the VM extensions, so the base VM is identical with or without the runner and nothing above depends on it.
-# The GitHub token is passed as a protected parameter through the write-only sensitive_body argument, so it
-# never lands in Terraform state, the saved plan, the VM custom data or Key Vault. It is sent only when the
-# Run Command is created or var.github_runner_token_version changes; other updates re-run the script without
-# it, and the script leaves an already registered runner as-is.
+# Optional: installs and registers the GitHub Actions self-hosted runner.
+# Runs after cloud-init and the VM extensions, so the base VM is identical with or without the runner.
+# The token goes through write-only sensitive_body, so it never lands in state, the plan, custom data or Key Vault.
+# It is sent only on create or when var.github_runner_token_version changes.
+# Other updates re-run the script without it, and the script leaves a registered runner as-is.
 resource "azapi_resource" "github_runner" {
   count = var.enable_github_runner ? 1 : 0
 
@@ -156,14 +149,10 @@ resource "azapi_resource" "github_runner" {
       }
       parameters = [
         { name = "RUNNER_URL", value = var.github_runner_url },
-        { name = "RUNNER_NAME", value = local.github_runner_name },
-        { name = "RUNNER_GROUP", value = var.github_runner_group },
+        { name = "RUNNER_NAME", value = var.vm_jumpbox_linux_name },
         { name = "RUNNER_LABELS", value = join(",", var.github_runner_labels) },
         { name = "RUNNER_VERSION", value = var.github_runner_version },
-        { name = "RUNNER_USER", value = var.github_runner_service_account },
         { name = "RUNNER_HOME", value = local.github_runner_home },
-        { name = "RUNNER_TOKEN_TYPE", value = var.github_runner_token_type },
-        { name = "RUNNER_VWAN_SUDOERS", value = tostring(var.github_runner_enable_vwan_sudoers) },
         { name = "AAD_TENANT_ID", value = data.azurerm_client_config.current.tenant_id }
       ]
       asyncExecution                  = false
