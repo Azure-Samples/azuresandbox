@@ -36,7 +36,7 @@ This configuration provides a minimal set of resources to function as a Terrafor
 * **Observability**
   * Log Analytics workspace reachable only through an Azure Monitor Private Link Scope (AMPLS).
   * Azure Monitor Agent collecting syslog and performance counters from the virtual machine.
-  * Pre-configured diagnostic settings for security-sensitive resources (Bastion, NSGs, Key Vault and Storage).
+  * Pre-configured diagnostic settings for security-sensitive resources (Bastion, Key Vault and Storage).
 * **Optional features** (disabled by default)
   * Deployment identity for sandbox applies, either attached to the virtual machine (`managed_identity`) or federated with GitHub Actions for approval-gated workflow runs (`oidc`).
   * See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration)
@@ -326,41 +326,27 @@ This configuration is organized into the following structure:
 
 ### Root Module Input Variables
 
-This section lists input variables used in the root module. Defaults can be overridden by specifying a different value in terraform.tfvars.
+This section lists input variables used in the root module. Defaults can be overridden by specifying a different value in terraform.tfvars. This table lists input variables that are common to all the scenarios this configuration supports.
 
 Variable | Default | Description
 --- | --- | ---
 entra_tenant_id | | The Microsoft Entra tenant id.
 location | | The name of the Azure Region where resources will be provisioned.
 log_analytics_workspace_retention_days | 30 | The retention period in days for the Log Analytics workspace. Must be one of 30, 31, 60, 90, 120, 180, 270, 365, 550 or 730.
-storage_access_tier | Hot | The access tier for the new storage account.
-storage_container_name | tfstate | The name of the storage container for Terraform state.
-storage_replication_type | LRS | The type of replication for the new storage account.
-subnet_address_prefix | 10.0.1.0/24 | The address prefix for the devops subnet. The minimum size is /29.
-subnet_bastion_address_prefix | 10.0.0.0/26 | The address prefix for the `AzureBastionSubnet`. Must be /26 or larger.
+storage_access_tier | Hot | The access tier for the storage account.
+storage_container_name | tfstate | The name of the blob storage container used by Terraform state backend.
+storage_replication_type | LRS | The type of replication for the storage account.
+subnet_bastion_address_prefix | 10.0.0.0/26 | The address prefix for the `AzureBastionSubnet`.
+subnet_devops_address_prefix | 10.0.1.0/29 | The address prefix for the devops subnet.
 subnet_devops_name | snet-devops-01 | The name of the devops subnet, which hosts `jumplinux2`.
-subnet_privatelink_address_prefix | 10.0.2.0/24 | The address prefix for the private link subnet, which hosts the private endpoints.
+subnet_privatelink_address_prefix | 10.0.2.0/27 | The address prefix for the private link subnet, which hosts the private endpoints.
 subnet_privatelink_name | snet-privatelink-03 | The name of the private link subnet.
 subscription_id | | The Azure subscription id used to provision resources.
 tags | | The tags in map format to be used when creating new resources.
 vm_jumpbox_linux_size | `Standard_D2ls_v6` | The size of the Linux virtual machine (`jumplinux2`).
-vnet_address_space | 10.0.0.0/16 | The address space in CIDR notation for the virtual network. The minimum size is /24.
-vnet_name | devops | The suffix appended to the generated virtual network name.
+vnet_address_space | 10.0.0.0/16 | The address space in CIDR notation for the virtual network.
 
-These variables are used only by the optional GitHub self-hosted runner and Sandbox deployment workflow. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration).
-
-Variable | Default | Description
---- | --- | ---
-deployment_identity | `none` | The deployment identity to create for Azure Sandbox applies: `none`, `managed_identity` or `oidc`. `managed_identity` creates an identity attached to `jumplinux2`, with standing roles on the subscription (`auth_mode = "managed_identity"`). See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies). `oidc` creates an identity that GitHub Actions workflows sign in as, with time-bound roles the operator grants before each run (`auth_mode = "oidc"`). See [Optional: Deployment Identity for OIDC Workflow Applies](#optional-deployment-identity-for-oidc-workflow-applies).
-enable_github_runner | false | Set to true to install and register the GitHub Actions self-hosted runner agent on `jumplinux2`. See [vm-jumpbox-linux](./modules/vm-jumpbox-linux/README.md#optional-github-self-hosted-runner-configuration).
-github_oidc_environments | `["sandbox-deployment", "sandbox-release-gate"]` | The GitHub Actions environments whose jobs can sign in as the deployment identity. One federated identity credential is created per environment. Only used when `deployment_identity` is `oidc`.
-github_repository_id | | The numeric id of the GitHub repository, e.g. from `gh api repos/OWNER/NAME --jq .id`. Only used when `deployment_identity` is `oidc`. When empty, it is looked up from the repository in `github_runner_url`, which works only for public repositories.
-github_repository_owner_id | | The numeric id of the user or organization that owns the GitHub repository, e.g. from `gh api repos/OWNER/NAME --jq .owner.id`. Only used when `deployment_identity` is `oidc`. When empty, it is looked up from the repository in `github_runner_url`, which works only for public repositories.
-github_runner_labels | `["azuresandbox"]` | Additional labels to apply to the GitHub Actions self-hosted runner. Only used when `enable_github_runner` is true.
-github_runner_power_state_environment | `sandbox-runner-power-state` | The GitHub Actions environment whose jobs can sign in as the runner power state identity, which starts and deallocates `jumplinux2` for workflow runs. Must not be one of `github_oidc_environments`. Only used when `deployment_identity` is `oidc`.
-github_runner_token | | Ephemeral. The runner registration token used to register the self-hosted runner (expires after 1 hour), e.g. from `scripts/new-runner-registration-token.sh`. Set using the environment variable `TF_VAR_github_runner_token` for both `terraform plan` and `terraform apply`. Never stored in Terraform state or the saved plan. Required only when the runner is registered (on first deployment or when `github_runner_token_version` changes).
-github_runner_token_version | 1 | Increment to send a new `github_runner_token` to the VM and re-run runner registration, e.g. after a failed registration. Only used when `enable_github_runner` is true.
-github_runner_url | `https://github.com/Azure-Samples/azuresandbox` | The GitHub repository URL to register the self-hosted runner with. Defaults to the Azure Sandbox repository. Used when `enable_github_runner` is true, or when `deployment_identity` is `oidc` and the repository ids are not set.
+There are additional input variables used for optional use cases. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration).
 
 ### Root Module Resources
 
@@ -372,18 +358,14 @@ azapi_update_resource.ampls_disable_public_access | | Sets the AMPLS ingestion a
 azapi_update_resource.key_vault_disable_public_access | | Disables key vault public network access after the key vault barrier.
 azapi_update_resource.log_analytics_disable_public_access | | Disables public ingestion and query on the Log Analytics workspace after the AMPLS barrier.
 azapi_update_resource.storage_disable_public_access | | Disables storage account public network access after the storage barrier.
-azurerm_bastion_host.this | snap-devops-dev | Azure Bastion host (Standard SKU, native client support enabled). The only inbound path to the Linux virtual machine.
-azurerm_federated_identity_credential.deployment_identity_github[*] | github-sandbox-deployment, github-sandbox-release-gate | Trusts GitHub Actions OIDC tokens for the deployment identity, one per environment in `github_oidc_environments`. Created only when `deployment_identity` is `oidc`.
-azurerm_federated_identity_credential.runner_power_state_github[0] | github-sandbox-runner-power-state | Trusts GitHub Actions OIDC tokens for the runner power state identity from the `github_runner_power_state_environment` environment. Created only when `deployment_identity` is `oidc`.
-azurerm_key_vault.this | kv-devops-dev-xxx | Used to store secrets for the Linux virtual machine.
-azurerm_log_analytics_workspace.this | log-devops-dev-xxx | Log Analytics workspace that receives diagnostic settings and Azure Monitor Agent data. Public ingestion and query are disabled by the AMPLS barrier.
-azurerm_monitor_data_collection_endpoint.this | dce-devops-dev-xxx | Data collection endpoint used by the Azure Monitor Agent on `jumplinux2`. Scoped to the AMPLS.
+azurerm_bastion_host.this | snap-devops-dev | Bastion host for secure remote access to `jumplinux2`.
+azurerm_key_vault.this | kv-devops-dev-xxx | Key vault for secure secret storage.
+azurerm_log_analytics_workspace.this | log-devops-dev-xxx | Azure Monitor LAW workspace for observability (diagnostic logs and metrics).
+azurerm_monitor_data_collection_endpoint.this | dce-devops-dev-xxx | Data collection endpoint used by the Azure Monitor Agent on `jumplinux2`.
 azurerm_monitor_data_collection_rule.linux | dcr-devops-dev-linux | Linux data collection rule: syslog (`auth` and `authpriv` at `Info` and above, other facilities at `Warning` and above) and performance counters.
 azurerm_monitor_diagnostic_setting.bastion | Diagnostic Logs | Sends `BastionAuditLogs` and metrics for the Bastion host to the workspace.
 azurerm_monitor_diagnostic_setting.data_collection_rule_linux | Diagnostic Logs | Sends data collection errors (`allLogs`) and metrics for the Linux data collection rule to the workspace.
 azurerm_monitor_diagnostic_setting.key_vault | Audit Logs | Sends key vault `audit` logs (including secret reads) and metrics to the workspace.
-azurerm_monitor_diagnostic_setting.log_analytics | Diagnostic Logs | Sends workspace query `audit` logs and metrics to the workspace itself.
-azurerm_monitor_diagnostic_setting.network_security_groups[*] | Diagnostic Logs | Sends NSG event and rule counter logs (`allLogs`) for each NSG to the workspace.
 azurerm_monitor_diagnostic_setting.storage_account | Diagnostic Logs | Sends storage account `Transaction` metrics to the workspace.
 azurerm_monitor_diagnostic_setting.storage_blob | Diagnostic Logs | Sends blob service `StorageRead`, `StorageWrite` and `StorageDelete` logs (Terraform state access) and `Transaction` metrics to the workspace.
 azurerm_monitor_private_link_scope.this | ampls-devops-dev | Azure Monitor Private Link Scope. Starts in `Open` mode and is set to `PrivateOnly` by the AMPLS barrier.
@@ -391,10 +373,10 @@ azurerm_monitor_private_link_scoped_service.dce | ampls-scope-dce | Adds the dat
 azurerm_monitor_private_link_scoped_service.log_analytics | ampls-scope-log-analytics | Adds the Log Analytics workspace to the AMPLS.
 azurerm_nat_gateway.this | ng-devops-dev | NAT gateway for outbound internet connectivity.
 azurerm_nat_gateway_public_ip_association.this | | Associates the NAT gateway with the public IP address.
-azurerm_network_security_group.groups[*] | nsg-devops-dev.AzureBastionSubnet, nsg-devops-dev.snet-devops-01 | One NSG for each subnet in `local.subnets` that has NSG rules. The private link subnet has no NSG.
-azurerm_network_security_rule.rules[*] | | NSG rules from `local.nsg_rules`, assigned to subnets in `local.subnets`. `AzureBastionSubnet` gets the [rules required by Azure Bastion](https://learn.microsoft.com/azure/bastion/bastion-nsg); `snet-devops-01` allows inbound SSH (port 22) only from the `AzureBastionSubnet`.
-azurerm_private_dns_zone.zones[*] | privatelink.agentsvc.azure-automation.net, privatelink.monitor.azure.com, privatelink.ods.opinsights.azure.com, privatelink.oms.opinsights.azure.com, privatelink.blob.core.windows.net, privatelink.vaultcore.azure.net | Private DNS zones from `local.private_dns_zones`: the AMPLS zones (`local.ampls_private_dns_zones`), Azure Blob Storage and Azure Key Vault.
-azurerm_private_dns_zone_virtual_network_link.zones[*] | | Links each private DNS zone to azurerm_virtual_network.this with fallback to internet (`resolution_policy = "NxDomainRedirect"`).
+azurerm_network_security_group.groups[*] | | One NSG for each subnet in `local.subnets` that has NSG rules. The private link subnet has no NSG.
+azurerm_network_security_rule.rules[*] | | NSG rules from `local.nsg_rules`. See [Virtual Network Design](#virtual-network-design).
+azurerm_private_dns_zone.zones[*] | | Private DNS zones from `local.private_dns_zones`. See [Virtual Network Design](#virtual-network-design).
+azurerm_private_dns_zone_virtual_network_link.zones[*] | | Links each private DNS zone to the virtual network. See [Virtual Network Design](#virtual-network-design).
 azurerm_private_endpoint.ampls | pe-devops-dev-ampls | Private endpoint for the AMPLS (`azuremonitor` subresource)
 azurerm_private_endpoint.key_vault | pe-devops-dev-key-vault | Private endpoint for Azure key vault
 azurerm_private_endpoint.storage_blob | pe-devops-dev-storage-blob | Private endpoint for Azure blob storage
@@ -403,24 +385,14 @@ azurerm_public_ip.this | pip-devops-dev-nat | Public IP address for the NAT gate
 azurerm_resource_group.this | rg-devops-dev-xxx | Resource group for all resources in this configuration.
 azurerm_role_assignment.key_vault_secrets_officer | | Assigns `Key Vault Secrets Officer` on the key vault to the operator signed in to Azure CLI.
 azurerm_role_assignment.storage_blob_data_contributor | | Assigns `Storage Blob Data Contributor` on the storage account to the operator signed in to Azure CLI.
-azurerm_role_assignment.deployment_identity_contributor[0] | | Assigns `Contributor` at the subscription scope to the deployment identity. Created only when `deployment_identity` is `managed_identity`.
-azurerm_role_assignment.deployment_identity_rbac_admin[0] | | Assigns `Role Based Access Control Administrator` at the subscription scope to the deployment identity, with a condition that allows only the roles in `local.deployment_identity_assignable_roles`. Created only when `deployment_identity` is `managed_identity`.
-azurerm_role_assignment.deployment_identity_reader[0] | | Assigns standing `Reader` at the subscription scope to the deployment identity. Created only when `deployment_identity` is `oidc`.
-azurerm_role_assignment.runner_power_state[0] | | Assigns `Desktop Virtualization Power On Off Contributor` on `jumplinux2` to the runner power state identity. Created only when `deployment_identity` is `oidc`.
 azurerm_storage_account.this | stdevopsdevxxx | Storage account for storing Terraform state files.
 azurerm_storage_container.this | tfstate | Storage container for storing Terraform state files.
-azurerm_subnet.subnets[*] | AzureBastionSubnet, snet-devops-01, snet-privatelink-03 | Subnets from `local.subnets`: the Bastion host subnet (the name is required by Azure), the subnet for `jumplinux2` and the subnet for PrivateLink endpoints.
-azurerm_subnet_nat_gateway_association.devops | vnet-devops-dev-devops| Associates the NAT gateway with the subnet.
-azurerm_subnet_network_security_group_association.associations[*] | | Associates each NSG with its subnet. Waits for the NSG rules and the Bastion host, because associating an NSG with `AzureBastionSubnet` before the Bastion host exists makes the Bastion deployment fail.
-azurerm_user_assigned_identity.deployment[0] | uai-devops-dev-deployment | Deployment identity for Azure Sandbox applies. Attached to `jumplinux2` when `deployment_identity` is `managed_identity`; unattached and federated with GitHub Actions when it is `oidc`. Not created when `deployment_identity` is `none`.
-azurerm_user_assigned_identity.runner_power_state[0] | uai-devops-dev-runner | Runner power state identity that starts and deallocates `jumplinux2` for workflow runs. Unattached and federated with GitHub Actions. Created only when `deployment_identity` is `oidc`.
-azurerm_virtual_network.this | vnet-devops-dev-devops | Virtual network for the Linux virtual machine.
-terraform_data.ampls_access_barrier | | Waits for every Azure Monitor write (scoped services, private endpoint, DNS zone links, diagnostic settings, and the `jumplinux2` agent and associations) before the AMPLS and workspace are closed to public networks.
-terraform_data.key_vault_access_barrier | | Waits for the key vault secret writes before key vault public access is disabled.
-terraform_data.private_dns_zone_links_complete | | Dependency signal that completes when every private DNS zone virtual network link exists. The private endpoints and the AMPLS barrier wait for it.
-terraform_data.storage_access_barrier | | Waits for the storage container before storage account public access is disabled.
+azurerm_subnet.subnets[*] | | Subnets from `local.subnets`. See [Virtual Network Design](#virtual-network-design).
+azurerm_subnet_nat_gateway_association.devops | | Associates the NAT gateway with the subnet.
+azurerm_subnet_network_security_group_association.associations[*] | | Associates each NSG with its subnet.
+azurerm_virtual_network.this | vnet-devops-dev | Virtual network for the Linux virtual machine.
 
-Diagnostic settings are not created for resources that don't support exporting logs or metrics through a diagnostic setting: the NAT gateway (its flow logs require the StandardV2 SKU), private endpoints, private DNS zones, the AMPLS, the data collection endpoint and the user-assigned managed identity. Their platform metrics remain available in Azure Monitor metrics explorer. The Linux virtual machine sends guest data through the Azure Monitor Agent instead of a diagnostic setting.
+There are additional resources used for optional use cases. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration).
 
 ### Root Module Output Variables
 
@@ -428,10 +400,10 @@ This section includes a list of output variables returned by the root module.
 
 Name | Comments
 --- | ---
-deployment_identity | The deployment identity, or `null` when `deployment_identity` is `none`. An object with `client_id` (used as `client_id` for Azure Sandbox applies with `auth_mode = "managed_identity"` or `"oidc"`), `github_subjects` (the GitHub OIDC subjects accepted by its federated identity credentials, keyed by environment, or an empty map unless `deployment_identity` is `oidc`), `jit_condition` (the condition, version 2.0, to apply to its time-bound `Role Based Access Control Administrator` assignment before each workflow run, or `null` unless `deployment_identity` is `oidc`) and `principal_id` (the principal (object) id, used to grant Microsoft Graph application permissions).
-github_runner | The GitHub Actions self-hosted runner, or `null` when `enable_github_runner` is false. An object with `name` (the name the runner is registered with), `power_state_identity_client_id` (the client id of the runner power state identity, which the Sandbox deployment workflow uses to start and deallocate `jumplinux2`, or `null` unless `deployment_identity` is `oidc`) and `power_state_identity_github_subject` (the GitHub OIDC subject accepted by the runner power state identity's federated identity credential, or `null` unless `deployment_identity` is `oidc`).
 resource_ids | A map of resource IDs for key resources in the configuration.
 resource_names | A map of resource names for key resources in the configuration.
+
+There are additional output variables for optional use cases. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration).
 
 ### Child Modules
 
@@ -443,28 +415,32 @@ Name | Required | Depends On | Description
 
 ### Virtual Network Design
 
-This configuration implements a virtual network. Default address ranges are set artificially high for demos and readability and can be overridden with smaller ranges to meet specific requirements. The virtual network includes three subnets, defined in `local.subnets` and listed in address range order:
+This configuration implements a virtual network and network-isolated Azure services. A barrier pattern is used to ensure public access is disabled for key vault, blob storate and AMPLS when deployment completes. AMPLS is used to ensure Azure Monitor-related traffic is network isolated. Default address ranges are set artificially high for readability and can be overridden with smaller ranges to meet specific requirements.
 
-* The `AzureBastionSubnet` (`10.0.0.0/26`) for the Azure Bastion host, which is the only inbound path to the Linux virtual machine. The Linux virtual machine has no public IP address. The subnet has an NSG with the [rules required by Azure Bastion](https://learn.microsoft.com/azure/bastion/bastion-nsg), as recommended in [Secure your Azure Bastion deployment](https://learn.microsoft.com/azure/bastion/secure-bastion#network-security).
-* A subnet for the Linux virtual machine (`10.0.1.0/24`). The subnet is configured with a NAT gateway for outbound internet connectivity and an NSG that allows inbound SSH only from the `AzureBastionSubnet`.
-* A subnet for PrivateLink endpoints (`10.0.2.0/24`) for Azure Key Vault, Azure Blob Storage and the Azure Monitor Private Link Scope (AMPLS).
+VNet Property | Default Value | Notes
+--- | --- | ---
+Name | `vnet-devops-dev` | N/A
+Address Space | `10.0.0.0/16` | Minimum /25 required (128 IP addresses) when subnets are contiguous.
+DNS Server | `168.63.129.16` | Azure DNS with private DNS zones.
 
-Every subnet is created with `default_outbound_access_enabled = false`, so it is a [private subnet](https://learn.microsoft.com/azure/virtual-network/ip-services/default-outbound-access) with no implicit outbound internet access. Egress from the Linux virtual machine goes through a Standard SKU NAT gateway associated with the devops subnet, which translates outbound connections to its static public IP address. This lets the virtual machine install packages, download tools, reach the GitHub Actions service and call Azure public endpoints without a public IP address or any inbound exposure, and gives it a predictable source IP address that can be added to allow lists. The NAT gateway handles outbound connections only; inbound access is through Azure Bastion. The Bastion host manages its own egress, and the PrivateLink subnet needs none.
+The virtual network contains the following subnets.
 
-The private DNS zones (Azure Key Vault, Azure Blob Storage and the four AMPLS zones) are listed in `local.private_dns_zones` and linked to the virtual network with [fallback to internet](https://learn.microsoft.com/azure/dns/private-dns-fallback) (`resolution_policy = "NxDomainRedirect"`). The private endpoints aren't created until every link exists. Fallback affects name resolution only: when a linked zone has no record for a name, such as a key vault or storage account in another deployment that has no private endpoint in this virtual network, Azure DNS resolves the name publicly instead of returning `NXDOMAIN`. It doesn't route traffic, and the target resource's own network settings still apply.
+Subnet | Address Prefix | IP Addresses | Notes
+--- | --- | :-: | ---
+`AzureBastionSubnet` (name required) | `10.0.0.0/26` | 64 | Requires a `/26` minimum. NSG attached as per [Secure your Azure Bastion deployment](https://learn.microsoft.com/azure/bastion/secure-bastion#network-security).
+`snet-devops-01` (default name) | `10.0.1.0/29` | 8 | Requires a `/29` minimum. NSG attached allowing inbound SSH only. Egress via NAT gateway.
+`snet-privatelink-03` (default name) | `10.0.2.0/27` | 32 | Requires a `/27` minimum for AMPLS. No NSG is attached. Hosts private endpoints for key vault, blob storage and AMPLS.
 
-#### Observability network isolation
+The following private DNS zones are linked to the virtual network and are configured for internet fallback (`NxDomainRedirect`).
 
-The AMPLS private endpoint changes how Azure Monitor endpoints resolve across the whole devops virtual network:
-
-* Shared (global and regional) Azure Monitor endpoints, such as the `api` endpoint used for Log Analytics and Application Insights queries, have records in the `privatelink.monitor.azure.com` zone, so they always resolve to this AMPLS private endpoint.
-* After the barrier sets the AMPLS to `PrivateOnly`, clients in the devops virtual network can reach only the Azure Monitor resources in this AMPLS through those shared endpoints.
-* Names for Azure Monitor resources outside this AMPLS, such as an Azure Sandbox workspace, fall back to public resolution and are governed by those resources' own public network settings.
-* Don't link the AMPLS private DNS zones to any other virtual network, such as an Azure Sandbox virtual network that has its own AMPLS.
-
-After the barrier closes, the Log Analytics workspace accepts queries only from inside the devops virtual network, for example from `jumplinux2` using `az monitor log-analytics query`. Portal and Azure CLI queries from outside the virtual network fail. `./scripts/enable-public-access.sh` intentionally doesn't reopen the AMPLS or the workspace: it reopens only the key vault (secrets) and storage account (Terraform state). Terraform's Azure Monitor writes, such as diagnostic settings, use the Azure Resource Manager control plane and don't need public access.
-
-**Cost note:** Log Analytics charges for data ingestion and for retention beyond the included period. The volume in this configuration is low: mostly key vault and blob audit events (every Terraform plan and apply reads the state blob), Bastion sign-ins, syslog and one-minute performance counters from one virtual machine. Use `log_analytics_workspace_retention_days` to control retention. See [Azure Monitor pricing](https://azure.microsoft.com/pricing/details/monitor/).
+Private DNS Zone | Notes
+--- | ---
+`privatelink.vaultcore.azure.net` | Configured with an A record for the key vault private endpoint.
+`privatelink.blob.core.windows.net` | Configured with an A record for the blob storage private endpoint.
+`privatelink.monitor.azure.com` | AMPLS: global Azure Monitor endpoints (Application Insights ingestion and live metrics, data collection endpoints, profiler).
+`privatelink.oms.opinsights.azure.com` | AMPLS: Log Analytics workspace onboarding and configuration endpoints.
+`privatelink.ods.opinsights.azure.com` | AMPLS: Log Analytics workspace data ingestion endpoints.
+`privatelink.agentsvc.azure-automation.net` | AMPLS: Log Analytics agent service and automation endpoints.
 
 ### Dependencies
 
@@ -620,6 +596,43 @@ Things to know:
 Provider authentication and state backend authentication are independent. Provider settings such as `auth_mode` affect only the providers. By default, Terraform state is stored locally. When an `azurerm` backend is configured in `backend.tf`, it authenticates with its own settings, for example the system-assigned managed identity of the rg-devops-iac Linux virtual machine (`use_msi = true` with `use_azuread_auth = true`).
 
 ### Optional: GitHub Self-Hosted Runner Configuration
+
+#### Input Variables
+
+Variable | Default | Description
+--- | --- | ---
+deployment_identity | `none` | The deployment identity to create for Azure Sandbox applies: `none`, `managed_identity` or `oidc`. `managed_identity` creates an identity attached to `jumplinux2`, with standing roles on the subscription (`auth_mode = "managed_identity"`). See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies). `oidc` creates an identity that GitHub Actions workflows sign in as, with time-bound roles the operator grants before each run (`auth_mode = "oidc"`). See [Optional: Deployment Identity for OIDC Workflow Applies](#optional-deployment-identity-for-oidc-workflow-applies).
+enable_github_runner | false | Set to true to install and register the GitHub Actions self-hosted runner agent on `jumplinux2`. See [vm-jumpbox-linux](./modules/vm-jumpbox-linux/README.md#optional-github-self-hosted-runner-configuration).
+github_oidc_environments | `["sandbox-deployment", "sandbox-release-gate"]` | The GitHub Actions environments whose jobs can sign in as the deployment identity. One federated identity credential is created per environment. Only used when `deployment_identity` is `oidc`.
+github_repository_id | | The numeric id of the GitHub repository, e.g. from `gh api repos/OWNER/NAME --jq .id`. Only used when `deployment_identity` is `oidc`. When empty, it is looked up from the repository in `github_runner_url`, which works only for public repositories.
+github_repository_owner_id | | The numeric id of the user or organization that owns the GitHub repository, e.g. from `gh api repos/OWNER/NAME --jq .owner.id`. Only used when `deployment_identity` is `oidc`. When empty, it is looked up from the repository in `github_runner_url`, which works only for public repositories.
+github_runner_labels | `["azuresandbox"]` | Additional labels to apply to the GitHub Actions self-hosted runner. Only used when `enable_github_runner` is true.
+github_runner_power_state_environment | `sandbox-runner-power-state` | The GitHub Actions environment whose jobs can sign in as the runner power state identity, which starts and deallocates `jumplinux2` for workflow runs. Must not be one of `github_oidc_environments`. Only used when `deployment_identity` is `oidc`.
+github_runner_token | | Ephemeral. The runner registration token used to register the self-hosted runner (expires after 1 hour), e.g. from `scripts/new-runner-registration-token.sh`. Set using the environment variable `TF_VAR_github_runner_token` for both `terraform plan` and `terraform apply`. Never stored in Terraform state or the saved plan. Required only when the runner is registered (on first deployment or when `github_runner_token_version` changes).
+github_runner_token_version | 1 | Increment to send a new `github_runner_token` to the VM and re-run runner registration, e.g. after a failed registration. Only used when `enable_github_runner` is true.
+github_runner_url | `https://github.com/Azure-Samples/azuresandbox` | The GitHub repository URL to register the self-hosted runner with. Defaults to the Azure Sandbox repository. Used when `enable_github_runner` is true, or when `deployment_identity` is `oidc` and the repository ids are not set.
+
+#### Resources
+
+These resources are created only when `deployment_identity` is `managed_identity` or `oidc`. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration).
+
+Address | Name | Notes
+--- | --- | ---
+azurerm_federated_identity_credential.deployment_identity_github[*] | github-sandbox-deployment, github-sandbox-release-gate | Trusts GitHub Actions OIDC tokens for the deployment identity, one per environment in `github_oidc_environments`. Created only when `deployment_identity` is `oidc`.
+azurerm_federated_identity_credential.runner_power_state_github[0] | github-sandbox-runner-power-state | Trusts GitHub Actions OIDC tokens for the runner power state identity from the `github_runner_power_state_environment` environment. Created only when `deployment_identity` is `oidc`.
+azurerm_role_assignment.deployment_identity_contributor[0] | | Assigns `Contributor` at the subscription scope to the deployment identity. Created only when `deployment_identity` is `managed_identity`.
+azurerm_role_assignment.deployment_identity_rbac_admin[0] | | Assigns `Role Based Access Control Administrator` at the subscription scope to the deployment identity, with a condition that allows only the roles in `local.deployment_identity_assignable_roles`. Created only when `deployment_identity` is `managed_identity`.
+azurerm_role_assignment.deployment_identity_reader[0] | | Assigns standing `Reader` at the subscription scope to the deployment identity. Created only when `deployment_identity` is `oidc`.
+azurerm_role_assignment.runner_power_state[0] | | Assigns `Desktop Virtualization Power On Off Contributor` on `jumplinux2` to the runner power state identity. Created only when `deployment_identity` is `oidc`.
+azurerm_user_assigned_identity.deployment[0] | uai-devops-dev-deployment | Deployment identity for Azure Sandbox applies. Attached to `jumplinux2` when `deployment_identity` is `managed_identity`; unattached and federated with GitHub Actions when it is `oidc`. Not created when `deployment_identity` is `none`.
+azurerm_user_assigned_identity.runner_power_state[0] | uai-devops-dev-runner | Runner power state identity that starts and deallocates `jumplinux2` for workflow runs. Unattached and federated with GitHub Actions. Created only when `deployment_identity` is `oidc`.
+
+#### Output Variables
+
+Name | Comments
+--- | ---
+deployment_identity | The deployment identity, or `null` when `deployment_identity` is `none`. An object with `client_id` (used as `client_id` for Azure Sandbox applies with `auth_mode = "managed_identity"` or `"oidc"`), `github_subjects` (the GitHub OIDC subjects accepted by its federated identity credentials, keyed by environment, or an empty map unless `deployment_identity` is `oidc`), `jit_condition` (the condition, version 2.0, to apply to its time-bound `Role Based Access Control Administrator` assignment before each workflow run, or `null` unless `deployment_identity` is `oidc`) and `principal_id` (the principal (object) id, used to grant Microsoft Graph application permissions).
+github_runner | The GitHub Actions self-hosted runner, or `null` when `enable_github_runner` is false. An object with `name` (the name the runner is registered with), `power_state_identity_client_id` (the client id of the runner power state identity, which the Sandbox deployment workflow uses to start and deallocate `jumplinux2`, or `null` unless `deployment_identity` is `oidc`) and `power_state_identity_github_subject` (the GitHub OIDC subject accepted by the runner power state identity's federated identity credential, or `null` unless `deployment_identity` is `oidc`).
 
 #### Self-Hosted Runner and Managed Identity Prerequisites (Optional)
 

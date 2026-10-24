@@ -174,17 +174,6 @@ variable "storage_replication_type" {
   }
 }
 
-variable "subnet_address_prefix" {
-  type        = string
-  description = "The address prefix for the devops subnet."
-  default     = "10.0.1.0/24"
-
-  validation {
-    condition     = can(cidrhost(var.subnet_address_prefix, 0))
-    error_message = "Must be valid IPv4 CIDR."
-  }
-}
-
 variable "subnet_bastion_address_prefix" {
   type        = string
   description = "The address prefix for the AzureBastionSubnet. The Standard SKU Bastion host requires a /26 or larger prefix."
@@ -193,6 +182,17 @@ variable "subnet_bastion_address_prefix" {
   validation {
     condition     = can(cidrhost(var.subnet_bastion_address_prefix, 0)) && try(tonumber(split("/", var.subnet_bastion_address_prefix)[1]) <= 26, false)
     error_message = "Must be valid IPv4 CIDR with a prefix length of /26 or larger (e.g. /26, /25)."
+  }
+}
+
+variable "subnet_devops_address_prefix" {
+  type        = string
+  description = "The address prefix for the devops subnet."
+  default     = "10.0.1.0/29"
+
+  validation {
+    condition     = can(cidrhost(var.subnet_devops_address_prefix, 0))
+    error_message = "Must be valid IPv4 CIDR."
   }
 }
 
@@ -210,7 +210,7 @@ variable "subnet_devops_name" {
 variable "subnet_privatelink_address_prefix" {
   type        = string
   description = "The address prefix for the private link subnet, which hosts the private endpoints."
-  default     = "10.0.2.0/24"
+  default     = "10.0.2.0/27"
 
   validation {
     condition     = can(cidrhost(var.subnet_privatelink_address_prefix, 0))
@@ -273,16 +273,5 @@ variable "vnet_address_space" {
   validation {
     condition     = can(cidrhost(var.vnet_address_space, 0))
     error_message = "Must be valid IPv4 CIDR."
-  }
-}
-
-variable "vnet_name" {
-  type        = string
-  description = "The suffix appended to the generated virtual network name."
-  default     = "devops"
-
-  validation {
-    condition     = can(regex("^[a-zA-Z0-9-]{1,64}$", var.vnet_name))
-    error_message = "Must conform to Azure virtual network naming standards: it can only contain alphanumeric characters and hyphens (-), must start and end with an alphanumeric character, and must be between 1 and 64 characters long."
   }
 }

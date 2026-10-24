@@ -96,21 +96,6 @@ resource "azurerm_log_analytics_workspace" "this" {
   }
 }
 
-# The "audit" category records the queries run against the workspace (LAQueryLogs table).
-resource "azurerm_monitor_diagnostic_setting" "log_analytics" {
-  name                       = "Diagnostic Logs"
-  target_resource_id         = azurerm_log_analytics_workspace.this.id
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
-
-  enabled_log {
-    category_group = "audit"
-  }
-
-  enabled_metric {
-    category = "AllMetrics"
-  }
-}
-
 resource "azurerm_monitor_private_link_scope" "this" {
   name                  = "ampls-${var.tags["project"]}-${var.tags["environment"]}"
   resource_group_name   = azurerm_resource_group.this.name
@@ -362,8 +347,6 @@ resource "terraform_data" "ampls_access_barrier" {
       azurerm_monitor_diagnostic_setting.bastion.id,
       azurerm_monitor_diagnostic_setting.data_collection_rule_linux.id,
       azurerm_monitor_diagnostic_setting.key_vault.id,
-      azurerm_monitor_diagnostic_setting.log_analytics.id,
-      join(",", [for setting in azurerm_monitor_diagnostic_setting.network_security_groups : setting.id]),
       azurerm_monitor_diagnostic_setting.storage_account.id,
       azurerm_monitor_diagnostic_setting.storage_blob.id,
     ])

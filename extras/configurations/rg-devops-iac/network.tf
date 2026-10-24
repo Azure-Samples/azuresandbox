@@ -1,6 +1,6 @@
 #region vnets-and-subnets
 resource "azurerm_virtual_network" "this" {
-  name                = "${module.naming.virtual_network.name}-${var.vnet_name}"
+  name                = module.naming.virtual_network.name
   location            = var.location
   resource_group_name = azurerm_resource_group.this.name
   address_space       = [var.vnet_address_space]
@@ -128,18 +128,6 @@ resource "azurerm_network_security_rule" "rules" {
   depends_on = [
     azurerm_network_security_group.groups
   ]
-}
-
-resource "azurerm_monitor_diagnostic_setting" "network_security_groups" {
-  for_each = azurerm_network_security_group.groups
-
-  name                       = "Diagnostic Logs"
-  target_resource_id         = each.value.id
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
-
-  enabled_log {
-    category_group = "allLogs"
-  }
 }
 #endregion
 

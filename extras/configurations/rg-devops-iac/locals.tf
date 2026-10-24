@@ -195,7 +195,7 @@ locals {
   subnets = {
     AzureBastionSubnet = {
       address_prefix                    = var.subnet_bastion_address_prefix
-      private_endpoint_network_policies = "Disabled"
+      private_endpoint_network_policies = "Disabled" # Default
 
       nsg_rules = [
         "AllowHttpsInbound",
@@ -210,8 +210,8 @@ locals {
     }
 
     (var.subnet_devops_name) = {
-      address_prefix                    = var.subnet_address_prefix
-      private_endpoint_network_policies = "Disabled"
+      address_prefix                    = var.subnet_devops_address_prefix
+      private_endpoint_network_policies = "Disabled" # Default
 
       nsg_rules = [
         "AllowBastionSshInbound"
@@ -220,7 +220,7 @@ locals {
 
     (var.subnet_privatelink_name) = {
       address_prefix                    = var.subnet_privatelink_address_prefix
-      private_endpoint_network_policies = "Disabled"
+      private_endpoint_network_policies = "Disabled" # Do not enforce NSGs for private endpoints.
       nsg_rules                         = []
     }
   }
