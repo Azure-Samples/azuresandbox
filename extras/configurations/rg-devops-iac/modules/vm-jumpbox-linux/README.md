@@ -58,6 +58,7 @@ This section provides additional information on various aspects of this module.
 * [Input Variables](#input-variables)
 * [Module Resources](#module-resources)
 * [Output Variables](#output-variables)
+* [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration)
 
 ### Dependencies
 

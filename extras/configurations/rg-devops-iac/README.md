@@ -6,8 +6,7 @@
 * [Overview](#overview)
 * [Features](#features)
 * [Prerequisites](#prerequisites)
-* [Getting Started (Interactive Execution)](#getting-started-interactive-execution)
-* [Deployment Identity and Authentication](#deployment-identity-and-authentication)
+* [Getting Started](#getting-started)
 * [Documentation](#documentation)
 
 ## Architecture
@@ -39,8 +38,8 @@ This configuration provides a minimal set of resources to function as a Terrafor
   * Azure Monitor Agent collecting syslog and performance counters from the virtual machine.
   * Pre-configured diagnostic settings for security-sensitive resources (Bastion, NSGs, Key Vault and Storage).
 * **Optional features** (disabled by default)
-  * Enable a GitHub Actions self-hosted runner for the Azure Sandbox deployment workflows.
   * Deployment identity for sandbox applies, either attached to the virtual machine (`managed_identity`) or federated with GitHub Actions for approval-gated workflow runs (`oidc`).
+  * See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration)
 
 **NOTE:** The Linux virtual machine is implemented as a module so it can be easily reused in other configurations. It is not intended to be used as a production jumpbox. It is intended to be used as a Terraform execution environment for DevOps / IaC projects.
 
@@ -57,34 +56,19 @@ This section describes the prerequisites required in order to provision this con
 
 * Identify the [Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/fundamentals/whatis) tenant to be used for identity and access management, or create a new tenant using [Quickstart: Set up a tenant](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-create-new-tenant).
 * Identify a single Azure [subscription](https://learn.microsoft.com/azure/cloud-adoption-framework/ready/considerations/fundamental-concepts#azure-terminology) or create a new Azure subscription. See [Azure Offer Details](https://azure.microsoft.com/support/legal/offer-details/) and [Associate or add an Azure subscription to your Microsoft Entra tenant](https://learn.microsoft.com/entra/fundamentals/how-subscriptions-associated-directory) for more information.
-* Identify the owner of the Azure subscription to be used to provision this configuration. This user should have an [Owner](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#owner) Azure RBAC role assignment on the subscription. See [Steps to assign an Azure role](https://learn.microsoft.com/azure/role-based-access-control/role-assignments-steps) for more information.
-* The subscription owner provisions this configuration with their own identity, signed in to Azure CLI. No service principal or client secret is needed: this is a one-time bootstrap, and a service principal with `Owner` would only duplicate the owner's access as a standing credential. If your organization uses [Privileged Identity Management](https://learn.microsoft.com/entra/id-governance/privileged-identity-management/pim-configure), activate an eligible `Owner` assignment for the duration of the deployment.
-
-### Self-Hosted Runner and Managed Identity Prerequisites (Optional)
-
-These prerequisites apply only if you plan to use this configuration as a self-hosted runner that deploys Azure Sandbox with a deployment identity (`enable_github_runner = true` and `deployment_identity = "managed_identity"` or `"oidc"`). Arrange them **before** provisioning, because some of them need privileged roles that the person running the deployment may not hold.
-
-* **GitHub repository administrator.** Registering the runner needs a runner registration token, which only a repository administrator can create. The operator can create it with the GitHub CLI right before the apply, or a repository administrator can provide one. See [Optional: GitHub Actions Self-Hosted Runner](#optional-github-actions-self-hosted-runner).
-* **Microsoft Entra Privileged Role Administrator.** Required only if the sandbox will be deployed with the `mssql` module enabled. The user-assigned managed identity then needs the Microsoft Graph `Group.Create`, `GroupMember.Read.All`, `User.Read.All` and `Application.Read.All` application permissions. Privileged Role Administrator is the least privileged Entra role that can grant them (Global Administrator also works, but has far broader rights). An Owner on the subscription, Cloud Application Administrator and read-only Entra roles such as Global Reader cannot grant them. If your organization uses [Privileged Identity Management](https://learn.microsoft.com/entra/id-governance/privileged-identity-management/pim-configure), activate an eligible assignment for the grant, or arrange for an administrator to run it. The grant is a one-time step after the identity is created. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies).
-* **OIDC deployment identity only (`deployment_identity = "oidc"`).**
-  * Microsoft Entra ID P2 or Microsoft Entra ID Governance, for the time-bound role assignments the operator grants before each workflow run.
-  * A subscription `Owner` (for example, the operator with `Owner` activated through PIM) to grant those assignments.
-  * A GitHub repository administrator to set the repository's OIDC subject claim template once, unless the repository already uses the expected template (for example, from its organization).
-
-  See [Optional: Deployment Identity for OIDC Workflow Applies](#optional-deployment-identity-for-oidc-workflow-applies).
+* Identify the operator who will provision this configuration. The operator needs the following Azure RBAC role assignments scoped to the subscription. See [Steps to assign an Azure role](https://learn.microsoft.com/azure/role-based-access-control/role-assignments-steps) for more information.
+  * [Contributor](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#contributor).
+  * [Role Based Access Control Administrator](https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/privileged#role-based-access-control-administrator).
 
 ### Other Prerequisites
 
 * Some Azure subscriptions may have low quota limits for specific Azure resources which may cause failures. See [Resolve errors for resource quotas](https://learn.microsoft.com/azure/azure-resource-manager/templates/error-resource-quota) for more information.
 * Some Azure subscriptions may not have the required resource providers registered. Terraform is configured to automatically register the required resource providers, but this may take some time on first use.
 * Some Azure subscriptions may not have the required features enabled which may cause failures. Monitor your plan application for errors related to specific subscription features and enable them as needed.
-* Connecting to the Linux virtual machine requires the Azure CLI `bastion` and `ssh` extensions on the client (`az extension add --name bastion` and `az extension add --name ssh`). See [Connection Paths](#connection-paths).
-* Azure Bastion Standard is billed hourly while deployed, plus outbound data transfer beyond the included amount. See [Azure Bastion pricing](https://azure.microsoft.com/pricing/details/azure-bastion/). Bastion is the only inbound path to the Linux virtual machine, so it's always deployed.
 * Some organizations may institute [Azure policy](https://learn.microsoft.com/azure/governance/policy/overview) which may cause failures. This can be addressed by using custom settings which pass the policy checks, or by disabling the policies on the Azure subscription being used for the configurations.
+* Additional prerequisites are required when using the [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration).
 
 ### Terraform Execution Environment
-
-#### Interactive Execution
 
 A variety of Terraform execution environments can be used to provision this configuration interactively, including:
 
@@ -110,163 +94,9 @@ A variety of Terraform execution environments can be used to provision this conf
   * Terraform
   * Visual Studio Code
 
-* **Azure Cloud Shell**: Azure Cloud Shell can be used to run Terraform. Most of the software dependencies are pre-installed.
-
-* **GitHub Codespaces**: GitHub Codespaces has not been tested but should be okay. Most of the software dependencies should be pre-installed.
-
-## Getting Started (Interactive Execution)
+## Getting Started
 
 This section covers the steps to get started with this configuration using an interactive Terraform execution environment. The steps include logging into Azure, cloning the repository, initializing Terraform, configuring variables, validating and applying the configuration, and smoke testing.
-
-The VM can serve as a GitHub Actions self-hosted runner for the
-[Sandbox deployment workflow](../../../.github/workflows/sandbox-deployment.yml),
-a manually triggered deployment with all base modules enabled and
-post-deployment unit/integration testing in three stages: `preflight`,
-`apply`, and `unit-test`. Each deployment uses its own state key, and runner
-logs stay private.
-The unit-test stage publishes default-sanitized JSON evidence as
-workflow artifacts on both test success and failure; raw logs and plans stay
-on the runner.
-
-After a successful apply, the helper reads `terraform output -json resource_names`
-and records its actual `resource_group` value for the stage-results summary.
-The exact resource group name is an operator-approved exception to public
-deployment-name sanitization; other resource names, IDs, and raw outputs remain
-private. The summary retains the name even if subsequent unit testing fails.
-Preflight-only runs and runs without a verified post-apply name explicitly report
-it as unavailable rather than guessing. Completed run summaries are not rewritten.
-
-The updated workflow restricts automation to **new Sandboxes only**:
-each workflow run derives a new ID/key, and every preflight attempt rejects an
-existing state blob. Automated updates and recovery of existing Sandboxes are
-not supported. Unit-test also finalizes evidence itself, leaving only Publish
-and Report afterward.
-
-The workflow also supports a release-PR entry path through
-`pull_request_target` for same-repository `vnext` PRs targeting `main`.
-The normal release flow is: open a draft `vnext` → `main` PR → mark it ready
-for review → static CI runs → the deployment is queued awaiting approval →
-the owner approves → deploy and unit/integration tests → if they pass, the PR
-can be merged. A GitHub-hosted job validates the event without checkout or
-environment secrets. Drafts and title/description-only edits run no static CI
-and do not deploy; opening or reopening a ready PR, marking it ready, updating
-its head, or retargeting it to `main` starts a fresh run.
-PR runs use the separate `sandbox-release-gate` environment and always run
-all stages with checkout pinned to the exact PR head SHA. Manual dispatch
-retains `sandbox-deployment` and its stage selector, and does not run or wait
-for static CI. Its `source_branch` input chooses which branch of this
-repository to deploy: `vnext` (the default, matching earlier runs) or `main`
-for released code. Both sources support every stage. The hosted selection job
-rejects any other value before checkout or environment-secret access, then
-checks out the branch tip as `refs/heads/<branch>`. The run name and summary
-show the selected source, and the stage results report the deployed commit.
-The input never affects release PR runs, and manual runs never publish or
-satisfy the release statuses.
-Both environments require `SANDBOX_BACKEND_HCL` and `SANDBOX_TFVARS_HCL`
-and owner approval. Keep their deployment branch restrictions on `main`,
-the trusted workflow context, and explicitly allow `pull_request_target`
-and `workflow_dispatch` in an Actions event policy scoped only to
-`.github/workflows/sandbox-deployment.yml`.
-
-The workflow authenticates the sandbox providers only with GitHub OIDC:
-`SANDBOX_TFVARS_HCL` must set `auth_mode = "oidc"` and `client_id` to the
-OIDC deployment identity's client id, and preflight rejects any other mode.
-Only the `sandbox` job can federate to the deployment identity. The jobs that
-start and deallocate the runner virtual machine use a separate identity and
-environment; see [Runner power state identity](#runner-power-state-identity).
-Before approving a run, the
-operator grants the identity time-bound roles in the Azure portal; preflight
-waits for them and refuses to start unless enough of the grant remains. The
-state backend still uses the virtual machine's system-assigned identity. See
-[Optional: Deployment Identity for OIDC Workflow Applies](#optional-deployment-identity-for-oidc-workflow-applies).
-
-Preflight also checks that the runner's Terraform CLI satisfies the
-`required_version` in the deployed branch's root `terraform.tf`, using
-Terraform's own constraint check. A compatible runner is used as-is, even if
-it is newer than the version static CI uses. Otherwise preflight installs the
-`X.Y.Z` version that `ci-terraform.yml` derives from the same constraint,
-through a root-owned wrapper the runner service account may run with `sudo`,
-and checks again before `terraform init`. The job summary records the
-constraint, the version used, and whether it was installed. Runners
-provisioned before the wrapper existed fail preflight with a request to
-re-provision rg-devops-iac. See
-[Terraform Version on the Runner](modules/vm-jumpbox-linux/README.md#terraform-version-on-the-runner).
-
-Before any approval request, a release PR run calls the six static CI
-workflows (`ci-bash`, `ci-powershell`, `ci-docs`, `ci-actions`, `ci-secrets`,
-and `ci-terraform`) as reusable workflows from the trusted `main` revision.
-Each checks out the exact PR head SHA read-only, with no secrets, write
-tokens, or caches, and applies its usual path filters to the **full release
-diff**: everything `vnext` adds since its merge base with `main`, not just the
-last commit. Each ends with a no-logic `release report` job that passes back
-its raw job results. The hosted `Release static CI` job applies one rule to all
-six: `pass` when every applicable check succeeded, or `not-applicable` when
-change detection succeeded, proved no relevant files changed, and the
-path-gated checks were skipped (`gitleaks` and both `terraform validate`
-contexts always run and must succeed). Anything else fails. It requires a
-`pass` or `not-applicable` verdict from every workflow, then rereads the live
-PR and requires it to be open, not a draft, and unchanged in head, base, and
-source. Only then does it
-publish `release-static-ci = success` and let the environment-protected
-deployment job request approval. A failed, cancelled, missing, or unexpected
-result publishes `release-static-ci = failure` and no deployment is requested.
-Static CI never depends on deployment-produced checks, and the organization's
-CLA check is not part of it. Results from earlier topic-PR, push, or manual
-CI runs are never reused.
-
-After approval, and after any wait for the serialized runner, the deployment
-job's first step rechecks the live PR and confirms this attempt still owns a
-passing `release-static-ci` status, before checking out candidate code or
-touching Azure. A PR that changed, closed, became a draft, or was superseded
-in the meantime stops there.
-
-Both entry paths share the existing concurrency group with active-run
-cancellation disabled. Advancing `vnext` does not change an already captured
-PR candidate or interrupt an active apply. The workflow does not implement
-cleanup/recovery. The existing run-ID state keys and unused-state requirement
-still apply. **Re-run failed jobs** is not supported for release PRs: a re-run
-attempt doesn't own the PR statuses, so it stops before static CI is accepted
-or any deployment starts. To retry after any failure, mark the PR as a draft
-and then ready again, or close and reopen it, to start a fresh run.
-
-Eligible PR runs publish `release-static-ci` and `sandbox-deployment-gate` as
-pending on the exact head SHA before static CI starts. A separate
-GitHub-hosted reporter publishes `sandbox-deployment-gate = success` only after
-Preflight, Apply, Unit-test, stage reporting, and JSON artifact upload all
-succeed. The validated JSON must also report native exit code zero,
-`result = "pass"`, positive passing counts, and no failed tests or failed
-suites. Native test-scope/optional-suite skip behavior is unchanged. Missing
-evidence, skipped required stages, failures, and cancellations cannot produce
-success. If cancellation or an API outage prevents final reporting, the status
-can remain pending rather than falsely passing.
-
-The deployment job waits for successful pending-status publication and static
-CI on PR runs; an API failure at either point does not schedule an Azure
-deployment. Manual runs explicitly skip the PR-only jobs without losing their
-deployment. Metadata-only validation does not share the status-writer lock, so
-it cannot displace a queued reporter.
-
-Status writers have a separate per-SHA lock and attempt-specific run links;
-an older attempt cannot overwrite the pending result of a newer attempt on
-the same SHA, or deploy on the strength of it. Only the hosted status jobs
-have status-write permission. Manual dispatch does not publish these PR
-statuses. Drafts and metadata-only edits do not overwrite them, and no
-workflow closes or merges a PR. Three rulesets on `main` require these checks,
-all from GitHub Actions: `main-release-source` requires
-`main-source-eligibility`, `main-release-static-ci` requires
-`release-static-ci`, and `main-release-deployment` requires
-`sandbox-deployment-gate` and the hosted `Publish release deployment status`
-check. Failed checks block ordinary release merges without closing the PR.
-Release deployments are approved by the `azuresandbox-owners` team. The
-owners' PR-only emergency bypass is described in
-[CONTRIBUTING.md](../../../CONTRIBUTING.md#emergency-merges); it never creates
-a passing result or approves a deployment.
-
-The deployment/monitor helpers replace the Python implementation
-with Bash entrypoints and PowerShell 7.3+ stage logic. The helper test sources
-and their `scripts/tests` directory are removed at the operator's request;
-existing Sandbox unit/integration tests remain unchanged. Validation uses
-existing CI gates and real executions.
 
 * [Step 0: Login](#step-0-login)
 * [Step 1: Clone the Repository](#step-1-clone-the-repository)
@@ -274,7 +104,7 @@ existing CI gates and real executions.
 * [Step 3: Configure Variables](#step-3-configure-variables)
 * [Step 4: Validate and Apply Configuration](#step-4-validate-and-apply-configuration)
 * [Step 5: Complete Smoke Testing](#step-5-complete-smoke-testing)
-* [Step 6: Use the Virtual Machine](#step-6-use-the-virtual-machine)
+* [Step 6: Use The Environment](#step-6-use-the-environment)
 * [Step 7: Clean Up](#step-7-clean-up)
 
 ### Step 0: Login
@@ -399,234 +229,6 @@ module "vm_jumpbox_linux" {
 }
 ```
 
-#### **Optional: GitHub Actions Self-Hosted Runner**
-
-The Linux virtual machine can optionally be registered as a [GitHub Actions self-hosted runner](./modules/vm-jumpbox-linux/README.md#optional-github-self-hosted-runner-configuration) so it can run CI/CD workflows using the pre-installed IaC toolchain and the VM managed identity. This is **disabled by default**.
-
-To enable it:
-
-* Add the following to the `terraform.tfvars` file:
-
-  ```hcl
-  enable_github_runner = true
-  ```
-
-  The runner is pre-configured for the [Azure Sandbox](https://github.com/Azure-Samples/azuresandbox) repository:
-
-  * `github_runner_url` defaults to `https://github.com/Azure-Samples/azuresandbox`.
-  * `github_runner_labels` defaults to `["azuresandbox"]`, the label the [Sandbox deployment workflow](../../../.github/workflows/sandbox-deployment.yml) targets.
-  * Set either variable in `terraform.tfvars` only to override the default.
-
-* Right before [Step 4](#step-4-validate-and-apply-configuration), create a runner registration token with the helper script, in the shell that will run Terraform. The script sets the `TF_VAR_github_runner_token` environment variable without displaying the token. The bash script must be sourced, and refuses to print the token to a terminal. The scripts use the [GitHub CLI](https://cli.github.com) (`gh`), signed in as a repository administrator. They read `github_runner_url` from `terraform.tfvars`, falling back to the default Azure Sandbox repository URL:
-
-  ```bash
-  # bash
-  source ./scripts/new-runner-registration-token.sh
-  ```
-
-  ```pwsh
-  # PowerShell
-  ./scripts/New-RunnerRegistrationToken.ps1
-  ```
-
-  A registration token expires after one hour and can only register runners. Keep the environment variable set for both `terraform plan` and `terraform apply`, and run them within the hour.
-
-`github_runner_token` is an ephemeral variable. Terraform passes it to a managed Run Command on the VM through a write-only argument, so it is never written to Terraform state, the saved plan, the VM custom data or Key Vault. When `enable_github_runner` is `false` no runner software is installed and the VM behaves exactly as it did before.
-
-The token is needed only when the runner is registered. `github_runner_token_version` (default `1`) controls when it is sent: Terraform can't store an ephemeral value to detect changes, so the token is sent only when the Run Command is created or this number changes.
-
-* **Later applies:** leave `github_runner_token_version` at `1` and don't set `TF_VAR_github_runner_token`. No token is sent, and the plan shows a `github_runner_token is empty` warning that can be ignored. If a change updates the Run Command's settings, such as the labels or the runner version, the script runs again without a token, finds the runner already registered and changes nothing. Changes to the runner's name or labels are therefore not applied to a registered runner; remove the runner and register it again to change them.
-* **VM or Run Command replaced:** if the plan shows `module.vm_jumpbox_linux.azapi_resource.github_runner[0]` being created or replaced, for example because `jumplinux2` is replaced, the runner is registered again and needs a new token. Run `source ./scripts/new-runner-registration-token.sh` before `terraform plan`. You don't need to change `github_runner_token_version`.
-* **Failed registration:** if registration fails, for example because the token expired before the Run Command ran, create a new token, increment `github_runner_token_version` and apply again. The VM is not replaced.
-
-**Upgrading from an earlier version:** the runner is registered with a runner registration token only, and the token is no longer stored in Key Vault. `github_runner_token_type` is removed, so personal access tokens are no longer supported. `github_runner_token_secret_version` is renamed to `github_runner_token_version`. `github_runner_url` must be a repository URL; organization runners are no longer supported. An existing runner-enabled `jumplinux2` is replaced once, because the runner is no longer part of its cloud-init configuration.
-
-The runner service account is granted command scoped passwordless `sudo` for the binaries used by the `vwan` point-to-site VPN integration tests; review [Elevated Permissions for Integration Tests](./modules/vm-jumpbox-linux/README.md#elevated-permissions-for-integration-tests). It is also granted passwordless `sudo` for a wrapper that installs a specific Terraform version; see [Terraform Version on the Runner](./modules/vm-jumpbox-linux/README.md#terraform-version-on-the-runner).
-
-##### Terraform State for CD Workflows
-
-Workflows running on this self-hosted runner should **always** use the `azurerm` backend hosted in the storage account provisioned by this configuration. A runner is disposable infrastructure, so a local state file on it is an anti-pattern:
-
-* **Locking.** The `azurerm` backend takes a blob lease, so concurrent workflow runs - or a workflow run and an interactive `terraform apply` on the same VM - cannot corrupt state. A local state file has no lock beyond a single Terraform invocation.
-* **Durability.** The VM is replaceable. Resizing, reimaging or recreating it destroys anything held only on the OS disk, including a local state file. Blob storage supports versioning and soft delete.
-* **Secrets at rest.** Terraform state contains sensitive values. In the backend it is encrypted, scoped by Azure RBAC and reachable only over the storage account private endpoint. On the VM it is a plain file readable by the runner service account and by anything that compromises a workflow job.
-* **Shared source of truth.** Interactive runs on the VM and CD runs operate on the same state instead of diverging.
-
-The VM managed identity is already granted `Storage Blob Data Contributor` on the storage account, so no secrets are required:
-
-```hcl
-# backend.tf
-terraform {
-  backend "azurerm" {
-    use_azuread_auth     = true
-    use_msi              = true
-    tenant_id            = "YOUR-ENTRA-TENANT-ID-HERE"
-    subscription_id      = "YOUR-AZURE-SUBSCRIPTION-ID-HERE"
-    storage_account_name = "YOUR-STORAGE-ACCOUNT-NAME-HERE"
-    container_name       = "tfstate"
-    key                  = "YOUR-STATE-FILE-NAME-HERE.tfstate"
-  }
-}
-```
-
-```yaml
-- uses: actions/checkout@v5
-
-- run: terraform init
-
-- run: terraform apply -auto-approve
-```
-
-Because the runner always uses a remote backend, the `vm-jumpbox-linux` module deliberately does **not** provision a persistent local state directory on the VM. Nothing a workflow writes to the runner work directory is guaranteed to survive the next job, since `actions/checkout` cleans the workspace by default.
-
-Local state is only used during the **bootstrap apply of this configuration**, which is a separate concern: that apply creates the storage account, so the backend does not exist yet and the state file has to live on the Terraform execution environment running the apply - a workstation or an existing Terraform execution environment, never this runner, which does not exist until that apply completes.
-
-#### **Optional: Deployment Identity for Managed Identity Sandbox Applies**
-
-The Azure Sandbox configuration can authenticate with a managed identity instead of a service principal secret (`auth_mode = "managed_identity"`; see [Deployment Identity and Authentication](#deployment-identity-and-authentication)), for example from a CD workflow running on the self-hosted runner. That mode requires a **user-assigned** managed identity attached to the Terraform execution environment. This configuration can create one for you. This is **disabled by default**.
-
-To enable it, add the following to the `terraform.tfvars` file:
-
-```hcl
-deployment_identity = "managed_identity"
-```
-
-When enabled, the identity is:
-
-* Created in the resource group provisioned by this configuration.
-* Assigned two roles at the subscription scope, as described in [Deployment Identity Permissions](#deployment-identity-permissions):
-  * `Contributor`, to create and manage sandbox resources.
-  * `Role Based Access Control Administrator`, with a condition that allows assigning and removing only the roles the sandbox assigns, listed in `local.deployment_identity_assignable_roles` in [`locals.tf`](./locals.tf). The identity cannot grant `Owner`, `User Access Administrator` or `Role Based Access Control Administrator`.
-
-  This is still a standing, privileged identity. Contributor on the subscription also includes this configuration's own resource group, so anything running on `jumplinux2` that uses this identity can modify or delete it. When that list changes, re-apply this configuration to update the condition.
-* Attached to `jumplinux2` **in addition to** the system-assigned identity. The system-assigned identity remains the VM's default identity, so cloud-init, `az login --identity` and the `azurerm` state backend (`ARM_USE_MSI`) keep using it. Use the user-assigned identity explicitly by its client id, e.g. `az login --identity --client-id <client-id>` or `Connect-AzAccount -Identity -AccountId <client-id>`.
-
-Enabling or disabling the identity on an existing deployment updates the VM in place. It does not replace the VM.
-
-After the apply, use `client_id` from the `deployment_identity` output as `client_id` in the Azure Sandbox `terraform.tfvars`, together with `auth_mode = "managed_identity"`.
-
-If the sandbox will be deployed with the `mssql` module enabled, the identity also needs the Microsoft Graph `Group.Create`, `GroupMember.Read.All`, `User.Read.All` and `Application.Read.All` application permissions, which this configuration cannot grant. A Privileged Role Administrator (the least privileged Entra role that can grant them; Global Administrator also works) must grant them once, after the identity is created. If your organization uses PIM, activate Privileged Role Administrator for the grant and deactivate it afterward:
-
-```bash
-# Run from this configuration's directory, signed in to Azure CLI as a Privileged Role Administrator
-./scripts/grant-graph-permissions.sh
-```
-
-The script reads the identity from `principal_id` in the `deployment_identity` output (which requires `jq`) (or takes a client id or object id as its first argument), and skips permissions that are already granted, so it is safe to re-run. It warns, and prints the removal command, if the identity still has `Group.ReadWrite.All` from an earlier setup. If you activated the Entra role just before running it, sign in again with `az login` so the new role is included in your token.
-
-Managed identities have no app registration, so the Entra admin center **API permissions** steps used for a service principal do not apply. Use the script above instead. The grant is removed automatically if the identity is deleted.
-
-#### **Optional: Deployment Identity for OIDC Workflow Applies**
-
-The [Sandbox deployment workflow](../../../.github/workflows/sandbox-deployment.yml) authenticates the Azure Sandbox providers with GitHub OIDC (`auth_mode = "oidc"`; see [Deployment Identity and Authentication](#deployment-identity-and-authentication)). It federates to a user-assigned managed identity that is **not** attached to any virtual machine, so code on `jumplinux2` can't get tokens for it from the managed identity endpoint. Only an approved workflow run in an allowed environment can. The identity holds standing `Reader` only. Before each run, the operator grants it time-bound deployment roles. This is **disabled by default**.
-
-`deployment_identity` takes a single value, so this replaces the attached `managed_identity` identity. Switching an existing deployment from `managed_identity` to `oidc` keeps the same identity and client id, removes its standing deployment roles, and detaches it from `jumplinux2` in place.
-
-To enable it, add the following to the `terraform.tfvars` file:
-
-```hcl
-deployment_identity = "oidc"
-```
-
-The federated credentials trust workflows in the repository in `github_runner_url` (default: the Azure Sandbox repository) in the environments in `github_oidc_environments`. It defaults to the workflow's two environments, `sandbox-deployment` and `sandbox-release-gate`. The credentials identify the repository and its owner by numeric id, which doesn't change if either is renamed. Terraform looks the ids up from the GitHub API on each plan. The request is anonymous, because data source arguments are saved in state, so it works only for public repositories and is subject to GitHub's rate limit for unauthenticated requests. For a private repository, or to avoid the lookup, set both ids:
-
-```hcl
-github_repository_id       = "123456789" # gh api repos/OWNER/NAME --jq .id
-github_repository_owner_id = "987654321" # gh api repos/OWNER/NAME --jq .owner.id
-```
-
-See [Root Module Input Variables](#root-module-input-variables).
-
-When enabled, the identity is:
-
-* Created in the resource group provisioned by this configuration.
-* Assigned standing `Reader` at the subscription scope, so the workflow can sign in and check its own grant before it changes anything.
-* Given one federated identity credential per environment, with issuer `https://token.actions.githubusercontent.com` and audience `api://AzureADTokenExchange`. Each subject combines the repository owner id, the repository id and the environment, for example `repository_owner_id:987654321:repository_id:123456789:environment:sandbox-deployment`. `github_subjects` in the `deployment_identity` output lists them.
-* Not attached to `jumplinux2`. The state backend keeps using the virtual machine's system-assigned identity.
-
-After the apply, complete these one-time steps:
-
-1. If the sandbox will be deployed with the `mssql` module enabled, grant the Microsoft Graph application permissions with `./scripts/grant-graph-permissions.sh`, as described in [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies). Microsoft Graph application permissions can't be time-bound, so they stay standing. Only approved workflow runs can use them.
-1. Check the repository's OIDC subject claim template. The subjects above need a template with `include_claim_keys` set to `["repository_owner_id","repository_id","context"]`, which uses immutable ids instead of names:
-
-   ```bash
-   gh api repos/OWNER/NAME/actions/oidc/customization/sub
-   ```
-
-   If the response shows `"use_default":false` and those keys, the repository already uses the template, often because its organization requires it. Don't change it. If it shows `"use_default":true`, a repository administrator sets it once. Do this **after** the federated credentials exist, because it changes the subject of every OIDC token the repository issues:
-
-   ```bash
-   gh api --method PUT repos/OWNER/NAME/actions/oidc/customization/sub --input - <<'EOF'
-   {"use_default":false,"include_claim_keys":["repository_owner_id","repository_id","context"]}
-   EOF
-   ```
-
-   If the repository uses a different template, follow your organization's policy rather than overriding it. Any other workflow that federates to Azure from this repository must use subjects in the same format. If a sign-in fails with `AADSTS70021`, the error shows the subject GitHub presented. Compare it with `github_subjects` in the `deployment_identity` output.
-1. In both the `sandbox-deployment` and `sandbox-release-gate` environments, update `SANDBOX_TFVARS_HCL` to set `auth_mode = "oidc"` and `client_id` to `client_id` from the `deployment_identity` output.
-1. Optionally, set the `SANDBOX_JIT_MIN_REMAINING_MINUTES` repository or environment variable (default `150`, range `0`-`1440`, where `0` skips the remaining-time check).
-
-Before approving each run, grant the identity its deployment roles just in time. Run `./scripts/grant-jit-roles.sh` as the operator, from any directory, with Azure CLI signed in:
-
-```bash
-./scripts/grant-jit-roles.sh             # grant both roles for 8 hours
-./scripts/grant-jit-roles.sh --hours 6   # grant a different window (1-24 hours)
-./scripts/grant-jit-roles.sh --force     # replace assignments that are already active
-./scripts/grant-jit-roles.sh --revoke    # remove both assignments after the run
-```
-
-The script:
-
-1. Reads the identity, subscription and condition from this configuration's terraform outputs.
-1. Activates your eligible subscription `Owner` assignment through PIM for 1 hour, unless `Owner` or `User Access Administrator` is already active. If PIM requires approval or multifactor authentication that Azure CLI can't satisfy, activate `Owner` in the portal and run the script again. See [Least-Privilege Operator Access with Privileged Identity Management](#least-privilege-operator-access-with-privileged-identity-management).
-1. Assigns `Contributor`, and `Role Based Access Control Administrator` constrained by `jit_condition` from the `deployment_identity` output, as time-bound active assignments on the subscription. Without the condition the identity could assign any role, including `Owner`. Assignments that are already active are kept unless you pass `--force`.
-1. Lists the assignments' end times, and warns if less than `SANDBOX_JIT_MIN_REMAINING_MINUTES` remains. For `Role Based Access Control Administrator`, it lists the actions the applied condition restricts and the roles the identity can assign and remove, and checks that the condition matches `jit_condition` from the `deployment_identity` output.
-
-To grant the roles in the portal instead, activate `Owner`, then go to the subscription > *Access control (IAM)* > *Add* > *Add role assignment*. Assign `Contributor` to *Managed identity* > *User-assigned managed identity* > the deployment identity, with *Assignment type* set to *Active* and *Time bound* for 8 hours starting now. Repeat for `Role Based Access Control Administrator`, and on the *Conditions* tab paste the output of `terraform output -json deployment_identity | jq -r .jit_condition` into the advanced condition editor's code view.
-
-Wait for the new assignments to appear in PIM's list of active assignments before you approve the run. This can take about 5 minutes after the grant, even though the assignments already show in the portal's *Access control (IAM)* blade. Preflight reads the end times from that list, and fails with "Could not find an active assignment" if the roles aren't listed yet. Check with the Azure CLI:
-
-```bash
-az rest --method get \
-  --url "https://management.azure.com/subscriptions/$(az account show --query id -o tsv)/providers/Microsoft.Authorization/roleAssignmentScheduleInstances?api-version=2020-10-01&\$filter=principalId+eq+'$(terraform output -json deployment_identity | jq -r .principal_id)'" \
-  --query "value[].properties.{role: expandedProperties.roleDefinition.displayName, end: endDateTime}" -o table
-```
-
-Approve when `Contributor` and `Role Based Access Control Administrator` are listed with end times. Preflight waits up to 5 minutes for the roles to take effect. It fails if either role isn't active, or if less than `SANDBOX_JIT_MIN_REMAINING_MINUTES` remains on either assignment. It accepts a permanent assignment with a warning. Apply and unit-test check that both roles are still active before they start. After the run, revoke the assignments or let them expire.
-
-The 8-hour grant and 2.5-hour minimum cover preflight, a full apply and unit testing, with time left for a manual teardown while the grant is active. The workflow never destroys a sandbox. Tear down manually, from a terminal with your own access or while a grant is active.
-
-Residual exposure:
-
-* The subjects don't name a workflow file. Any workflow in the repository that runs in an allowed environment can federate to the identity. Restrict each environment to the `main` branch and require reviewers, so only reviewed workflows on `main` that an owner approves can use it.
-* The identity's standing `Reader` role and Microsoft Graph permissions are usable by any approved run in the allowed environments.
-* The time-bound roles belong to the identity, not to a single run. Another approved run during the same window can use them. The workflow's concurrency group runs one deployment at a time.
-* During a run, the job's federated token is passed to Azure CLI on the runner's command line, where other processes on `jumplinux2` can see it.
-
-##### Runner power state identity
-
-With `deployment_identity = "oidc"`, this configuration also creates a second, separate user-assigned managed identity that starts `jumplinux2` before an approved workflow run and deallocates it afterwards, from jobs on GitHub-hosted runners. It is unrelated to the deployment identity and can't deploy anything. It is:
-
-* Not attached to any virtual machine.
-* Assigned the built-in `Desktop Virtualization Power On Off Contributor` role on `jumplinux2` only. Despite its name, it's the built-in role for starting and stopping virtual machines. Scoped to the virtual machine, it allows only reading it and changing its power state (start, deallocate, power off and restart). It can't run commands, change extensions or delete the virtual machine. `Virtual Machine Contributor` isn't used because it allows all of those.
-* Given one federated identity credential for the `github_runner_power_state_environment` environment (default `sandbox-runner-power-state`), with a subject in the same format as the deployment identity's. `power_state_identity_github_subject` in the `github_runner` output shows it. The environment must differ from those in `github_oidc_environments`, so a token issued to one identity's jobs is never accepted by the other identity.
-
-Create the `sandbox-runner-power-state` environment in the repository and restrict it to the `main` branch. Don't add required reviewers: the start job waits for the approval of the deployment environment before it starts the virtual machine, so a second approval isn't needed. The workflow uses this environment name, so keep `github_runner_power_state_environment` at its default unless you change the workflow too.
-
-Add these secrets to the environment. They're secrets rather than variables so they're masked in the public run logs:
-
-Secret | Value
---- | ---
-`RUNNER_POWER_STATE_CLIENT_ID` | `terraform output -json github_runner \| jq -r .power_state_identity_client_id`
-`AZURE_TENANT_ID` | The Microsoft Entra tenant id
-`RUNNER_VM_ID` | `terraform output -json resource_ids \| jq -r .virtual_machine_jumplinux2`
-
-How the workflow uses it, from two jobs on GitHub-hosted runners that run the script `scripts/Invoke-RunnerPowerState.sh` from the trusted workflow commit, never from the deployed branch:
-
-* `start_runner` starts alongside the `sandbox` job and waits up to 60 minutes for its approval. If the deployment is rejected, it ends without starting the virtual machine. If no decision arrives in time, it cancels the run. Once the deployment is approved, it signs in as this identity and starts `jumplinux2` if it's deallocated or stopped. If it's already running, it's left alone and stays running after the run. It then waits up to 20 minutes for the runner to pick up the `sandbox` job, and cancels the run if that doesn't happen.
-* `stop_runner` runs after the `sandbox` job, however it ended, and deallocates `jumplinux2` only if `start_runner` started it.
-
-The jobs don't coordinate with other runs, because the deployment workflow doesn't support concurrent runs. Grant the deployment identity's time-bound roles before you approve, as usual. The window now also covers the virtual machine's boot and the runner reconnecting, which usually takes a few minutes.
-
 ### Step 4: Validate and Apply Configuration
 
 Remember that Terraform will compare the state of existing resources in Azure with what it expects to be there when creating a plan. If the state of existing resources in Azure does not match what Terraform expects, the plan will modify existing resources to match the configuration. This can happen when resources are modified manually or via Policy outside of Terraform. This is known as "drift".
@@ -661,238 +263,17 @@ Follow these steps to validate and apply the configuration:
 
 ### Step 5: Complete Smoke Testing
 
-After the configuration has been provisioned, connect to *jumplinux2* using one of the [connection paths](#connection-paths), then complete the [smoke testing](./modules/vm-jumpbox-linux/README.md#smoke-testing) procedures in the `vm-jumpbox-linux` module.
+See [Smoke Testing](./modules/vm-jumpbox-linux/README.md#smoke-testing) in the `vm-jumpbox-linux` module.
 
-#### Connection Paths
+### Step 6: Use The Environment
 
-*jumplinux2* has no public IP address. All access goes through the Azure Bastion host (Standard SKU, native client support enabled) provisioned by this configuration, and the network security group only allows SSH from the `AzureBastionSubnet`. Operators sign in as their own Microsoft Entra ID identity using short-lived OpenSSH certificates. The local admin account (`devopsbootstrapadmin`) and its SSH key in Key Vault are reserved for break-glass use.
+You now have a fully provisioned Terraform execution environment you can use to interactively deploy the [Azure Sandbox](https://github.com/Azure-Samples/azuresandbox) Terraform configuration, or other Terraform configurations of your choosing.
 
-Use the connection paths in the following order of preference.
-
-Prerequisites on the client:
-
-* Azure CLI signed in with `az login`, with the `bastion` and `ssh` extensions installed:
-
-  ```bash
-  az extension add --name bastion
-  az extension add --name ssh
-  ```
-
-* The *Virtual Machine Administrator Login* role on *jumplinux2*, which the `vm-jumpbox-linux` module assigns to the operator that applies the configuration, and at least *Reader* on the VM, its network interface and the Bastion host. Users with *Virtual Machine Administrator Login* can run `sudo` without a password. Microsoft Entra ID authentication happens at `az login`, including multifactor authentication and Conditional Access, before the SSH certificate is issued.
-* The resource names used below are available from the outputs of this configuration, for example `terraform output -json resource_names` and `terraform output -json resource_ids`.
-
-Operators sign in with their Microsoft Entra user principal name, and a home directory is created on first sign-in. Use `sudo` for root access.
-
-##### 1. Azure Bastion with Microsoft Entra ID
-
-Opens an interactive terminal session directly, with no tunnel or `~/.ssh/config` to manage:
-
-```bash
-az network bastion ssh \
-  --name BASTION-NAME-HERE \
-  --resource-group RESOURCE-GROUP-NAME-HERE \
-  --target-resource-id VM-RESOURCE-ID-HERE \
-  --auth-type AAD
-```
-
-Microsoft Entra ID authentication requires targeting the VM resource ID; IP-based Bastion connections are not supported.
-
-##### 2. SSH and Visual Studio Code through a Bastion tunnel with Microsoft Entra ID
-
-This is the path for Visual Studio Code Remote-SSH and any other OpenSSH client. Run the helper script from the root directory of this configuration: [connect-jumplinux2.sh](./scripts/connect-jumplinux2.sh) on Linux, macOS or WSL, or [Connect-Jumplinux2.ps1](./scripts/Connect-Jumplinux2.ps1) on Windows:
-
-```bash
-./scripts/connect-jumplinux2.sh
-```
-
-```powershell
-./scripts/Connect-Jumplinux2.ps1
-```
-
-The script:
-
-* Reads the Bastion host, resource group and VM resource ID from the Terraform outputs. Override them with `--bastion-name`, `--resource-group` and `--vm-id` (`-BastionName`, `-ResourceGroupName` and `-VmId` in PowerShell) when the state isn't available locally.
-* Requests a Microsoft Entra ID OpenSSH certificate with `az ssh cert`, using a dedicated RSA key pair in `~/.ssh/az_ssh_config/jumplinux2/`.
-* Writes a managed `Host jumplinux2` block to `~/.ssh/config` pointing at `127.0.0.1` on the local tunnel port (default `2222`). Re-running the script replaces the block rather than duplicating it.
-* Opens `az network bastion tunnel` to the VM in the foreground.
-
-**Keep the script's terminal open while connected, because it hosts the Bastion tunnel.** Press *Ctrl+C* to close the tunnel. Certificates are valid for about an hour, so the script renews the certificate about every 50 minutes while the tunnel is up. Sessions that are already connected keep working when a certificate expires. If renewal fails, for example because the `az login` session expired, run `az login` and restart the script.
-
-Then connect from another terminal or from Visual Studio Code:
-
-* Terminal: `ssh jumplinux2`
-* Visual Studio Code:
-  * Click on the blue *Open a Remote Window* icon in the lower left corner.
-  * Choose *Connect to Host...* and select *jumplinux2*.
-  * For *Select the platform of the remote host "jumplinux2"* choose *Linux*.
-  * For *"jumplinux2" has fingerprint...* choose *Continue*.
-  * Verify that *SSH: jumplinux2* is displayed in the status bar, then use *View* > *Explorer* > *Open Folder* to open your home directory.
-
-The host key is stored in `known_hosts` under the alias `jumplinux2`. If the VM is redeployed, remove the stale entry with `ssh-keygen -R jumplinux2` before reconnecting.
-
-To set up the tunnel manually instead of using the script, run `az network bastion tunnel --name BASTION-NAME-HERE --resource-group RESOURCE-GROUP-NAME-HERE --target-resource-id VM-RESOURCE-ID-HERE --resource-port 22 --port 2222`, then in another terminal run `az ssh cert --file ~/.ssh/jumplinux2/id_rsa-cert.pub`, which generates a key pair in the same directory, and connect with `ssh -p 2222 -i ~/.ssh/jumplinux2/id_rsa -o CertificateFile=~/.ssh/jumplinux2/id_rsa-cert.pub YOUR-UPN-HERE@127.0.0.1`.
-
-###### Integration tests that need `sudo`
-
-The `vwan` point-to-site VPN integration tests run privileged commands (`openvpn`, `cat`, `tail`, `kill`, `pkill`) and probe for passwordless `sudo` with `sudo -n cat /dev/null`. An operator signed in through Microsoft Entra ID with *Virtual Machine Administrator Login* already has passwordless `sudo`, so interactive `Invoke-UnitTests.ps1` runs with `vwan` enabled work without the hand-made `/etc/sudoers.d/azuresandbox-vwan` drop-in, which was only needed for the local admin account. The runner service account's drop-in, installed by the `ConfigureGitHubRunner` Run Command, is unchanged. See [Elevated Permissions for Integration Tests](./modules/vm-jumpbox-linux/README.md#elevated-permissions-for-integration-tests).
-
-##### 3. Break-glass: Azure Bastion with the local admin account
-
-Use this path only when Microsoft Entra ID sign-in fails, for example if the `AADSSHLoginForLinux` extension is broken or Microsoft Entra ID is unavailable. The username and SSH private key for the local admin account are stored in Key Vault as the `adminuser` and `jumplinux2-ssh-private-key` secrets.
-
-Key Vault public network access is disabled by this configuration after each apply, so retrieving the secrets requires reopening it, which needs an elevated (for example PIM-activated) role:
-
-1. From the root directory of this configuration, run `./scripts/enable-public-access.sh`.
-1. Retrieve the secrets:
-
-   ```bash
-   KV_NAME=KEY-VAULT-NAME-HERE
-   ADMIN_USER=$(az keyvault secret show --vault-name "$KV_NAME" --name adminuser --query value -o tsv)
-   (umask 077 && az keyvault secret show --vault-name "$KV_NAME" --name jumplinux2-ssh-private-key --query value -o tsv > ~/.ssh/jumplinux2-break-glass.pem)
-   ```
-
-1. Connect through Bastion:
-
-   ```bash
-   az network bastion ssh \
-     --name BASTION-NAME-HERE \
-     --resource-group RESOURCE-GROUP-NAME-HERE \
-     --target-resource-id VM-RESOURCE-ID-HERE \
-     --auth-type ssh-key \
-     --username "$ADMIN_USER" \
-     --ssh-key ~/.ssh/jumplinux2-break-glass.pem
-   ```
-
-1. When finished, delete the local key file (`rm ~/.ssh/jumplinux2-break-glass.pem`) and run `terraform apply` from the root directory of this configuration to disable Key Vault public network access again.
-
-The key vault secrets expire one year after creation. The key is not rotated automatically; `admin_ssh_key` is set when the VM is created, so generating a new key (`terraform apply -replace=module.vm_jumpbox_linux.tls_private_key.ssh_key` with an incremented `ssh_private_key_version`) also replaces the VM. Audit logging and alerting for break-glass key retrieval are tracked in [#896](https://github.com/Azure-Samples/azuresandbox/issues/896).
-
-If Bastion itself is unavailable, use the Azure-native recovery options instead: reset access with `az vm user update` (VMAccess extension), run commands with `az vm run-command invoke`, or use the Serial Console.
-
-### Step 6: Use The Virtual Machine
-
-You now have a fully provisioned DevOps IaC environment! You can use it as a Terraform execution environment interactively or via DevOps pipelines. For interactive use, connect with Visual Studio Code Remote-SSH through a Bastion tunnel using `./scripts/connect-jumplinux2.sh` or `./scripts/Connect-Jumplinux2.ps1`. See [Connection Paths](#connection-paths).
+If you are interested in enabling automated deployments of the Azure Sandbox configuration, see [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration).
 
 ### Step 7: Clean Up
 
 Don't forget to delete your DevOps IaC environment when you're done. You don't want to have to explain to your boss why you left an unused resources laying around that costs your company money. The quickest way to clean up is to delete the DevOps IaC resource group. Do this with care because data loss will occur, including any Terraform state files in the Azure Blob Storage container.
-
-**NOTE:** If you enabled `enable_github_runner`, deleting the virtual machine does not deregister the self-hosted runner from GitHub. Either remove the runner from the VM before deleting it:
-
-```bash
-# Run on jumplinux2
-sudo /opt/actions-runner/svc.sh stop
-sudo /opt/actions-runner/svc.sh uninstall
-sudo -u githubrunner /opt/actions-runner/config.sh remove --token YOUR-REMOVAL-TOKEN-HERE
-```
-
-...or delete the stale offline runner afterwards from GitHub > *Settings* > *Actions* > *Runners*.
-
-If you only need to remove Terraform state file(s) from the Azure Blob Storage container without deleting the whole environment, use `scripts/delete-tfstate.sh`. It authenticates with Azure CLI / Microsoft Entra ID only (the storage account has shared access keys disabled) and relies on the built-in RBAC role assignments granted to the caller (e.g. jumplinux2's managed identity) to delete blobs over the storage account's private endpoint — it does not enable public network access, so it must be run from a host with private network connectivity to the storage account, such as jumplinux2. Run it with no arguments to list and select blob(s) interactively, or pass a blob name (e.g. `azuresandbox.tfstate`) to delete it directly:
-
-```bash
-./scripts/delete-tfstate.sh                       # list and select interactively
-./scripts/delete-tfstate.sh azuresandbox.tfstate  # delete a specific blob
-./scripts/delete-tfstate.sh --yes azuresandbox.tfstate  # skip confirmation prompt
-```
-
-## Deployment Identity and Authentication
-
-This section is the reference for how the Azure Sandbox configuration authenticates to Azure and Microsoft Entra ID. Most sandbox users deploy interactively with a service principal, as described in the Azure Sandbox README's [Service Principal](../../../README.md#service-principal) prerequisites. The managed identity and OIDC modes below support secretless deployments from this configuration's Linux virtual machine, from a terminal and from the Sandbox deployment workflow, respectively.
-
-This configuration itself does not use these modes. It always authenticates as the operator signed in to Azure CLI; see [Operator](#operator).
-
-### Authentication Modes
-
-The Azure Sandbox configuration's `auth_mode` variable selects how Terraform authenticates the `azurerm`, `azapi` and `azuread` providers. Every provider uses the same settings, derived once in the `provider_auth` local in the Azure Sandbox [`locals.tf`](../../../locals.tf).
-
-`auth_mode` | Identity (`client_id`) | Credential | Typical use
---- | --- | --- | ---
-`client_secret` (default) | Service principal `appId` | `client_secret`, supplied with the `TF_VAR_client_secret` environment variable | Interactive execution from any client. See [Service Principal](../../../README.md#service-principal) in the Azure Sandbox README.
-`managed_identity` | Client id of a user-assigned managed identity attached to the Terraform execution host | Managed identity endpoint of the host. No secret. | Secretless execution on the rg-devops-iac Linux virtual machine.
-`oidc` | Client id of an unattached user-assigned managed identity with GitHub Actions federated identity credentials | GitHub Actions OIDC token, requested by the providers from the job's `ACTIONS_ID_TOKEN_REQUEST_URL`. No secret. | The [Sandbox deployment workflow](../../../.github/workflows/sandbox-deployment.yml) on the self-hosted runner. Works only inside a GitHub Actions job with `id-token: write`.
-
-Variable | Description
---- | ---
-`auth_mode` | `client_secret`, `managed_identity` or `oidc`. Defaults to `client_secret`.
-`client_id` | The client id of the identity Terraform authenticates as.
-`client_secret` | The service principal secret. Required only when `auth_mode` is `client_secret`. Set it with `TF_VAR_client_secret`; never store it in a file.
-`entra_tenant_id` | The Microsoft Entra tenant id.
-
-### Deployment Identity Permissions
-
-The identity Terraform authenticates as needs the same permissions in every authentication mode. None of them is `Owner`. In `oidc` mode, the two Azure RBAC roles are time-bound grants the operator makes before each workflow run, on top of a standing `Reader` role. See [Optional: Deployment Identity for OIDC Workflow Applies](#optional-deployment-identity-for-oidc-workflow-applies).
-
-Permission | Scope | Why
---- | --- | ---
-`Contributor` Azure RBAC role | Sandbox subscription | Creates and manages the sandbox resources.
-`Role Based Access Control Administrator` Azure RBAC role, with a condition | Sandbox subscription | Creates and removes the sandbox's role assignments. The condition allows only the roles listed in `ROLES` in the Azure Sandbox README's [Service Principal](../../../README.md#service-principal) commands, so the identity cannot grant `Owner`, `User Access Administrator` or `Role Based Access Control Administrator`.
-`Group.Create`, `GroupMember.Read.All`, `User.Read.All` and `Application.Read.All` Microsoft Graph application permissions | Microsoft Entra tenant | Creates the SQL administrators security group, with a user and a managed identity as members. The identity becomes the group's owner, which lets it manage and delete the group. Required only when the mssql module is enabled.
-
-When you add a module that assigns a new Azure RBAC role, add the role to the `ROLES` list in the Azure Sandbox README's [Service Principal](../../../README.md#service-principal) commands and to `deployment_identity_assignable_roles` in [`locals.tf`](./locals.tf). Then re-grant:
-
-* **Service principal:** remove the existing assignment, then re-run the `Role Based Access Control Administrator` commands in [Service Principal](../../../README.md#service-principal):
-
-  ```bash
-  az role assignment delete --assignee "$SPN_APP_ID" --role "Role Based Access Control Administrator" --scope "$SCOPE"
-  ```
-
-* **Managed identity:** re-apply this configuration.
-* **OIDC:** re-apply this configuration, then use the updated `jit_condition` from the `deployment_identity` output for the next grant.
-
-For `client_secret` mode, see [Service Principal](../../../README.md#service-principal) in the Azure Sandbox README. For `managed_identity` mode, set `deployment_identity = "managed_identity"` in this configuration. It creates the user-assigned managed identity, assigns both Azure RBAC roles on the subscription, and attaches the identity to its Linux virtual machine. Use `client_id` from the `deployment_identity` output as `client_id`, and grant the Microsoft Graph permissions with `scripts/grant-graph-permissions.sh`. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies). For `oidc` mode, set `deployment_identity = "oidc"`. See [Optional: Deployment Identity for OIDC Workflow Applies](#optional-deployment-identity-for-oidc-workflow-applies).
-
-### Operator
-
-The operator is the signed-in user who provisions a configuration. It is separate from the deployment identity.
-
-* **This configuration:** Terraform authenticates as the operator signed in to Azure CLI (`use_cli = true` in [`providers.tf`](./providers.tf)), so the operator needs `Owner` on the subscription, or `Contributor` plus an unconditioned role-assignment role such as `User Access Administrator`, for the duration of the apply. The operator's identity is read from the Azure CLI sign-in and granted `Key Vault Secrets Officer` and `Storage Blob Data Contributor` on the resources this configuration creates, and `Virtual Machine Administrator Login` on `jumplinux2` for Microsoft Entra ID SSH sign-in.
-* **Azure Sandbox:** `operator_object_id` is the Microsoft Entra object id of the operator. The operator is granted data-plane role assignments, such as Key Vault and Storage roles, on the sandbox resources. The Azure Sandbox bootstrap scripts default it to the signed-in Azure CLI or Azure PowerShell user.
-
-#### Least-Privilege Operator Access with Privileged Identity Management
-
-Day-to-day use of `jumplinux2` doesn't need `Owner`. Connecting through Bastion needs only `Reader` on the virtual machine, its network interface and the Bastion host, plus the `Virtual Machine Administrator Login` role this configuration assigns. Use [Microsoft Entra Privileged Identity Management](https://learn.microsoft.com/entra/id-governance/privileged-identity-management/pim-configure) (PIM) so the operator holds `Owner` only while running `terraform plan` or `terraform apply`. The recommended end state is:
-
-Access | How it's granted
---- | ---
-Azure RBAC `Reader` on the subscription | Standing (active, permanent)
-Azure RBAC `Owner` on the subscription | PIM eligible, activated just in time for `terraform plan` and `terraform apply`
-Microsoft Entra Privileged Role Administrator (only to grant Microsoft Graph permissions) | PIM eligible, activated just in time for `grant-graph-permissions.sh`
-Other Microsoft Entra directory roles, such as Global Administrator | PIM eligible, activated only when needed
-`User Access Administrator` at root scope (`/`) | Removed
-
-Apply it in the Azure portal in this order, so you don't lock yourself out:
-
-1. Confirm the prerequisites: Microsoft Entra ID P2, at least two multifactor authentication methods registered, and an [emergency access account](https://learn.microsoft.com/entra/identity/role-based-access-control/security-emergency-access) with permanent Global Administrator.
-1. Go to *PIM* > *Azure resources* > your subscription > *Settings* > *Owner*. Set the activation duration to 4-8 hours, require multifactor authentication and a justification, don't require approval, and allow permanent eligible assignments.
-1. Add an **eligible** `Owner` assignment for the operator on the subscription, and a standing `Reader` assignment.
-1. Test activation and deactivation **before** removing any standing access.
-1. Remove the operator's standing `Owner` assignment. Check inherited scopes too; it may be assigned on a management group such as the Tenant Root Group rather than on the subscription.
-1. Remove the standing root-scope `User Access Administrator`: activate Global Administrator, then go to *Microsoft Entra ID* > *Properties* > *Access management for Azure resources* and select *No*. This grant persists after Global Administrator is deactivated, so it's easy to leave in place by accident.
-1. Verify with read-only checks:
-
-   ```bash
-   OID=$(az ad signed-in-user show --query id -o tsv)
-   SUB=$(az account show --query id -o tsv)
-   az role assignment list --assignee "$OID" --scope "/subscriptions/$SUB" --include-inherited -o table
-   az rest --method get --url "https://management.azure.com/subscriptions/$SUB/providers/Microsoft.Authorization/permissions?api-version=2022-04-01"
-   ```
-
-   With `Owner` active, the permissions output includes an `"actions": ["*"]` entry. With only standing access, the only entry is `*/read`.
-
-Things to know:
-
-* Activate Azure resource roles, such as subscription `Owner`, in the Azure portal under *PIM* > *My roles* > *Azure resources*. The Microsoft Entra admin center's PIM pages show only Microsoft Entra roles and groups.
-* You don't need a new `az login` after activating an Azure RBAC role. Azure Resource Manager evaluates role assignments on each request, so allow about a minute for propagation. Microsoft Entra directory roles and PIM for Groups do need a new token.
-* PIM may not prompt for multifactor authentication on activation if the portal session already has a multifactor authentication claim. Use a Conditional Access authentication context to require it on every activation.
-* The *Check access* current view hides eligible assignments. Check the *Eligible assignments* tab.
-* Recovery path: activate Global Administrator, turn on *Access management for Azure resources*, grant `Owner`, then turn it back off. The emergency access account is the last resort.
-* Removing the operator's `Owner` assignment doesn't affect sandbox applies by a `managed_identity` deployment identity, which keeps standing `Contributor` plus the conditioned `Role Based Access Control Administrator` role. An `oidc` deployment identity has only standing `Reader`, so the operator activates `Owner` to grant its time-bound roles before each workflow run.
-* In managed tenants, provider automation may re-add standing assignments, so check again after a day.
-
-### State Backend Authentication
-
-Provider authentication and state backend authentication are independent. Provider settings such as `auth_mode` affect only the providers. By default, Terraform state is stored locally. When an `azurerm` backend is configured in `backend.tf`, it authenticates with its own settings, for example the system-assigned managed identity of the rg-devops-iac Linux virtual machine (`use_msi = true` with `use_azuread_auth = true`).
 
 ## Documentation
 
@@ -904,32 +285,39 @@ This section provides documentation regarding the overall structure of the root 
 * [Child Modules](#child-modules)
 * [Virtual Network Design](#virtual-network-design)
 * [Dependencies](#dependencies)
+* [Authentication](#authentication)
+* [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration)
 
 ### Root Module Structure
 
 This configuration is organized into the following structure:
 
 ```plaintext
-├── images/                               # 
+├── images/                               # Diagrams
 │   └── rg-devops-iac-diagram.drawio.svg  # Architecture diagram
-├── modules/                              # 
-│   └── vm-jumpbox-linux/                 # Linux jumpbox virtual machine module
-├── scripts/                              # 
-│   ├── bootstrap.sh                      # Bash helper script for generating terraform.tfvars
-│   ├── bootstrap.ps1                     # PowerShell helper script for generating terraform.tfvars
-│   ├── cleanterraformtemp.sh             # Bash helper script for removing Terraform temp/local files
-│   ├── connect-jumplinux2.sh             # Bash helper script for connecting to jumplinux2 through a Bastion tunnel with Entra ID
-│   ├── Connect-Jumplinux2.ps1            # PowerShell helper script for connecting to jumplinux2 through a Bastion tunnel with Entra ID
-│   ├── enable-public-access.sh           # Bash helper script for re-enabling public access on key vault/storage account (not the AMPLS or workspace)
-│   ├── grant-graph-permissions.sh        # Bash helper script for granting Microsoft Graph permissions to a deployment identity
-│   ├── grant-jit-roles.sh                # Bash helper script for granting the OIDC deployment identity its time-bound deployment roles
-│   ├── new-runner-registration-token.sh  # Bash helper script (sourced) that sets TF_VAR_github_runner_token to a new runner registration token
-│   ├── New-RunnerRegistrationToken.ps1   # PowerShell helper script that sets TF_VAR_github_runner_token to a new runner registration token
-│   └── delete-tfstate.sh                 # Bash helper script for deleting Terraform state blob(s) from the storage backend
-├── locals.tf                             # Local variables 
+├── modules/                              # Child modules
+│   └── vm-jumpbox-linux/                 # Linux jumpbox virtual machine module (jumplinux2)
+├── scripts/                              # Helper scripts
+│   ├── bootstrap.ps1                     # PowerShell: generates terraform.tfvars
+│   ├── bootstrap.sh                      # Bash: generates terraform.tfvars
+│   ├── cleanterraformtemp.sh             # Bash: removes Terraform temp/local files
+│   ├── Connect-Jumplinux2.ps1            # PowerShell: connects to jumplinux2 through a Bastion tunnel with Entra ID
+│   ├── connect-jumplinux2.sh             # Bash: connects to jumplinux2 through a Bastion tunnel with Entra ID
+│   ├── Connect-SandboxRunner.ps1         # Workflow: signs in as the deployment identity and runs the sandbox unit tests
+│   ├── delete-tfstate.sh                 # Bash: deletes Terraform state blob(s) from the storage backend
+│   ├── enable-public-access.sh           # Bash: re-enables public access on the key vault and storage account (not the AMPLS or workspace)
+│   ├── grant-graph-permissions.sh        # Bash: grants Microsoft Graph permissions to a deployment identity
+│   ├── grant-jit-roles.sh                # Bash: grants the OIDC deployment identity its time-bound deployment roles
+│   ├── Invoke-RunnerPowerState.sh        # Workflow: starts and deallocates jumplinux2 for a workflow run
+│   ├── Invoke-SandboxDeployment.ps1      # Workflow: runs the preflight, apply, unit-test and summary stages on the runner
+│   ├── Invoke-SandboxDeployment.sh       # Workflow: Bash entry point for Invoke-SandboxDeployment.ps1
+│   ├── new-runner-registration-token.sh  # Bash (sourced): sets TF_VAR_github_runner_token to a new runner registration token
+│   ├── SandboxOidc.ps1                   # Workflow: shared GitHub Actions OIDC sign-in helpers
+│   └── SandboxProgress.ps1               # Workflow: shared apply and unit test progress parsing helpers
+├── locals.tf                             # Local variables
 ├── main.tf                               # Resource configurations
 ├── network.tf                            # Network resource blocks
-├── outputs.tf                            # Output variables 
+├── outputs.tf                            # Output variables
 ├── providers.tf                          # Provider configuration blocks
 ├── storage.tf                            # Storage resource blocks
 ├── terraform.tf                          # Terraform configuration block
@@ -942,9 +330,29 @@ This section lists input variables used in the root module. Defaults can be over
 
 Variable | Default | Description
 --- | --- | ---
+entra_tenant_id | | The Microsoft Entra tenant id.
+location | | The name of the Azure Region where resources will be provisioned.
+log_analytics_workspace_retention_days | 30 | The retention period in days for the Log Analytics workspace. Must be one of 30, 31, 60, 90, 120, 180, 270, 365, 550 or 730.
+storage_access_tier | Hot | The access tier for the new storage account.
+storage_container_name | tfstate | The name of the storage container for Terraform state.
+storage_replication_type | LRS | The type of replication for the new storage account.
+subnet_address_prefix | 10.0.1.0/24 | The address prefix for the devops subnet. The minimum size is /29.
+subnet_bastion_address_prefix | 10.0.0.0/26 | The address prefix for the `AzureBastionSubnet`. Must be /26 or larger.
+subnet_devops_name | snet-devops-01 | The name of the devops subnet, which hosts `jumplinux2`.
+subnet_privatelink_address_prefix | 10.0.2.0/24 | The address prefix for the private link subnet, which hosts the private endpoints.
+subnet_privatelink_name | snet-privatelink-03 | The name of the private link subnet.
+subscription_id | | The Azure subscription id used to provision resources.
+tags | | The tags in map format to be used when creating new resources.
+vm_jumpbox_linux_size | `Standard_D2ls_v6` | The size of the Linux virtual machine (`jumplinux2`).
+vnet_address_space | 10.0.0.0/16 | The address space in CIDR notation for the virtual network. The minimum size is /24.
+vnet_name | devops | The suffix appended to the generated virtual network name.
+
+These variables are used only by the optional GitHub self-hosted runner and Sandbox deployment workflow. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration).
+
+Variable | Default | Description
+--- | --- | ---
 deployment_identity | `none` | The deployment identity to create for Azure Sandbox applies: `none`, `managed_identity` or `oidc`. `managed_identity` creates an identity attached to `jumplinux2`, with standing roles on the subscription (`auth_mode = "managed_identity"`). See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies). `oidc` creates an identity that GitHub Actions workflows sign in as, with time-bound roles the operator grants before each run (`auth_mode = "oidc"`). See [Optional: Deployment Identity for OIDC Workflow Applies](#optional-deployment-identity-for-oidc-workflow-applies).
 enable_github_runner | false | Set to true to install and register the GitHub Actions self-hosted runner agent on `jumplinux2`. See [vm-jumpbox-linux](./modules/vm-jumpbox-linux/README.md#optional-github-self-hosted-runner-configuration).
-entra_tenant_id | | The Microsoft Entra tenant id.
 github_oidc_environments | `["sandbox-deployment", "sandbox-release-gate"]` | The GitHub Actions environments whose jobs can sign in as the deployment identity. One federated identity credential is created per environment. Only used when `deployment_identity` is `oidc`.
 github_repository_id | | The numeric id of the GitHub repository, e.g. from `gh api repos/OWNER/NAME --jq .id`. Only used when `deployment_identity` is `oidc`. When empty, it is looked up from the repository in `github_runner_url`, which works only for public repositories.
 github_repository_owner_id | | The numeric id of the user or organization that owns the GitHub repository, e.g. from `gh api repos/OWNER/NAME --jq .owner.id`. Only used when `deployment_identity` is `oidc`. When empty, it is looked up from the repository in `github_runner_url`, which works only for public repositories.
@@ -953,21 +361,6 @@ github_runner_power_state_environment | `sandbox-runner-power-state` | The GitHu
 github_runner_token | | Ephemeral. The runner registration token used to register the self-hosted runner (expires after 1 hour), e.g. from `scripts/new-runner-registration-token.sh`. Set using the environment variable `TF_VAR_github_runner_token` for both `terraform plan` and `terraform apply`. Never stored in Terraform state or the saved plan. Required only when the runner is registered (on first deployment or when `github_runner_token_version` changes).
 github_runner_token_version | 1 | Increment to send a new `github_runner_token` to the VM and re-run runner registration, e.g. after a failed registration. Only used when `enable_github_runner` is true.
 github_runner_url | `https://github.com/Azure-Samples/azuresandbox` | The GitHub repository URL to register the self-hosted runner with. Defaults to the Azure Sandbox repository. Used when `enable_github_runner` is true, or when `deployment_identity` is `oidc` and the repository ids are not set.
-location | | The name of the Azure Region where resources will be provisioned.
-log_analytics_workspace_retention_days | 30 | The retention period in days for the Log Analytics workspace. Must be one of 30, 31, 60, 90, 120, 180, 270, 365, 550 or 730.
-storage_access_tier | Hot | The access tier for the new storage account.
-storage_replication_type | LRS | The type of replication for the new storage account.
-subnet_bastion_address_prefix | 10.0.0.0/26 | The address prefix for the `AzureBastionSubnet`. Must be /26 or larger.
-subnet_address_prefix | 10.0.1.0/24 | The address prefix for the devops subnet. The minimum size is /29.
-subnet_devops_name | snet-devops-01 | The name of the devops subnet, which hosts `jumplinux2`.
-subnet_privatelink_address_prefix | 10.0.2.0/24 | The address prefix for the private link subnet, which hosts the private endpoints.
-subnet_privatelink_name | snet-privatelink-03 | The name of the private link subnet.
-subscription_id | | The Azure subscription id used to provision resources.
-storage_container_name | tfstate | The name of the storage container for Terraform state.
-tags | | The tags in map format to be used when creating new resources.
-vm_jumpbox_linux_size | `Standard_D2ls_v6` | The size of the Linux virtual machine (`jumplinux2`).
-vnet_address_space | 10.0.0.0/16 | The address space in CIDR notation for the virtual network. The minimum size is /24.
-vnet_name | devops | The suffix appended to the generated virtual network name.
 
 ### Root Module Resources
 
@@ -1127,3 +520,503 @@ The following operating systems are used for the various virtual machines in the
 Virtual Machine | Role | Module | Operating System
 --- | --- | --- | ---
 jumplinux2 | Linux Jumpbox VM | vm-jumpbox-linux | Ubuntu Server LTS 24.04 (Nobel Numbat)
+
+### Authentication
+
+This section is the reference for how the Azure Sandbox configuration authenticates to Azure and Microsoft Entra ID. Most sandbox users deploy interactively with a service principal, as described in the Azure Sandbox README's [Service Principal](../../../README.md#service-principal) prerequisites. The managed identity and OIDC modes below support secretless deployments from this configuration's Linux virtual machine, from a terminal and from the Sandbox deployment workflow, respectively.
+
+This configuration itself does not use these modes. It always authenticates as the operator signed in to Azure CLI; see [Operator](#operator).
+
+#### Authentication Modes
+
+The Azure Sandbox configuration's `auth_mode` variable selects how Terraform authenticates the `azurerm`, `azapi` and `azuread` providers. Every provider uses the same settings, derived once in the `provider_auth` local in the Azure Sandbox [`locals.tf`](../../../locals.tf).
+
+`auth_mode` | Identity (`client_id`) | Credential | Typical use
+--- | --- | --- | ---
+`client_secret` (default) | Service principal `appId` | `client_secret`, supplied with the `TF_VAR_client_secret` environment variable | Interactive execution from any client. See [Service Principal](../../../README.md#service-principal) in the Azure Sandbox README.
+`managed_identity` | Client id of a user-assigned managed identity attached to the Terraform execution host | Managed identity endpoint of the host. No secret. | Secretless execution on the rg-devops-iac Linux virtual machine.
+`oidc` | Client id of an unattached user-assigned managed identity with GitHub Actions federated identity credentials | GitHub Actions OIDC token, requested by the providers from the job's `ACTIONS_ID_TOKEN_REQUEST_URL`. No secret. | The [Sandbox deployment workflow](../../../.github/workflows/sandbox-deployment.yml) on the self-hosted runner. Works only inside a GitHub Actions job with `id-token: write`.
+
+Variable | Description
+--- | ---
+`auth_mode` | `client_secret`, `managed_identity` or `oidc`. Defaults to `client_secret`.
+`client_id` | The client id of the identity Terraform authenticates as.
+`client_secret` | The service principal secret. Required only when `auth_mode` is `client_secret`. Set it with `TF_VAR_client_secret`; never store it in a file.
+`entra_tenant_id` | The Microsoft Entra tenant id.
+
+#### Deployment Identity Permissions
+
+The identity Terraform authenticates as needs the same permissions in every authentication mode. None of them is `Owner`. In `oidc` mode, the two Azure RBAC roles are time-bound grants the operator makes before each workflow run, on top of a standing `Reader` role. See [Optional: Deployment Identity for OIDC Workflow Applies](#optional-deployment-identity-for-oidc-workflow-applies).
+
+Permission | Scope | Why
+--- | --- | ---
+`Contributor` Azure RBAC role | Sandbox subscription | Creates and manages the sandbox resources.
+`Role Based Access Control Administrator` Azure RBAC role, with a condition | Sandbox subscription | Creates and removes the sandbox's role assignments. The condition allows only the roles listed in `ROLES` in the Azure Sandbox README's [Service Principal](../../../README.md#service-principal) commands, so the identity cannot grant `Owner`, `User Access Administrator` or `Role Based Access Control Administrator`.
+`Group.Create`, `GroupMember.Read.All`, `User.Read.All` and `Application.Read.All` Microsoft Graph application permissions | Microsoft Entra tenant | Creates the SQL administrators security group, with a user and a managed identity as members. The identity becomes the group's owner, which lets it manage and delete the group. Required only when the mssql module is enabled.
+
+When you add a module that assigns a new Azure RBAC role, add the role to the `ROLES` list in the Azure Sandbox README's [Service Principal](../../../README.md#service-principal) commands and to `deployment_identity_assignable_roles` in [`locals.tf`](./locals.tf). Then re-grant:
+
+* **Service principal:** remove the existing assignment, then re-run the `Role Based Access Control Administrator` commands in [Service Principal](../../../README.md#service-principal):
+
+  ```bash
+  az role assignment delete --assignee "$SPN_APP_ID" --role "Role Based Access Control Administrator" --scope "$SCOPE"
+  ```
+
+* **Managed identity:** re-apply this configuration.
+* **OIDC:** re-apply this configuration, then use the updated `jit_condition` from the `deployment_identity` output for the next grant.
+
+For `client_secret` mode, see [Service Principal](../../../README.md#service-principal) in the Azure Sandbox README. For `managed_identity` mode, set `deployment_identity = "managed_identity"` in this configuration. It creates the user-assigned managed identity, assigns both Azure RBAC roles on the subscription, and attaches the identity to its Linux virtual machine. Use `client_id` from the `deployment_identity` output as `client_id`, and grant the Microsoft Graph permissions with `scripts/grant-graph-permissions.sh`. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies). For `oidc` mode, set `deployment_identity = "oidc"`. See [Optional: Deployment Identity for OIDC Workflow Applies](#optional-deployment-identity-for-oidc-workflow-applies).
+
+#### Operator
+
+The operator is the signed-in user who provisions a configuration. It is separate from the deployment identity.
+
+* **This configuration:** Terraform authenticates as the operator signed in to Azure CLI (`use_cli = true` in [`providers.tf`](./providers.tf)), so the operator needs `Owner` on the subscription, or `Contributor` plus an unconditioned role-assignment role such as `User Access Administrator`, for the duration of the apply. The operator's identity is read from the Azure CLI sign-in and granted `Key Vault Secrets Officer` and `Storage Blob Data Contributor` on the resources this configuration creates, and `Virtual Machine Administrator Login` on `jumplinux2` for Microsoft Entra ID SSH sign-in.
+* **Azure Sandbox:** `operator_object_id` is the Microsoft Entra object id of the operator. The operator is granted data-plane role assignments, such as Key Vault and Storage roles, on the sandbox resources. The Azure Sandbox bootstrap scripts default it to the signed-in Azure CLI or Azure PowerShell user.
+
+##### Least-Privilege Operator Access with Privileged Identity Management
+
+Day-to-day use of `jumplinux2` doesn't need `Owner`. Connecting through Bastion needs only `Reader` on the virtual machine, its network interface and the Bastion host, plus the `Virtual Machine Administrator Login` role this configuration assigns. Use [Microsoft Entra Privileged Identity Management](https://learn.microsoft.com/entra/id-governance/privileged-identity-management/pim-configure) (PIM) so the operator holds `Owner` only while running `terraform plan` or `terraform apply`. The recommended end state is:
+
+Access | How it's granted
+--- | ---
+Azure RBAC `Reader` on the subscription | Standing (active, permanent)
+Azure RBAC `Owner` on the subscription | PIM eligible, activated just in time for `terraform plan` and `terraform apply`
+Microsoft Entra Privileged Role Administrator (only to grant Microsoft Graph permissions) | PIM eligible, activated just in time for `grant-graph-permissions.sh`
+Other Microsoft Entra directory roles, such as Global Administrator | PIM eligible, activated only when needed
+`User Access Administrator` at root scope (`/`) | Removed
+
+Apply it in the Azure portal in this order, so you don't lock yourself out:
+
+1. Confirm the prerequisites: Microsoft Entra ID P2, at least two multifactor authentication methods registered, and an [emergency access account](https://learn.microsoft.com/entra/identity/role-based-access-control/security-emergency-access) with permanent Global Administrator.
+1. Go to *PIM* > *Azure resources* > your subscription > *Settings* > *Owner*. Set the activation duration to 4-8 hours, require multifactor authentication and a justification, don't require approval, and allow permanent eligible assignments.
+1. Add an **eligible** `Owner` assignment for the operator on the subscription, and a standing `Reader` assignment.
+1. Test activation and deactivation **before** removing any standing access.
+1. Remove the operator's standing `Owner` assignment. Check inherited scopes too; it may be assigned on a management group such as the Tenant Root Group rather than on the subscription.
+1. Remove the standing root-scope `User Access Administrator`: activate Global Administrator, then go to *Microsoft Entra ID* > *Properties* > *Access management for Azure resources* and select *No*. This grant persists after Global Administrator is deactivated, so it's easy to leave in place by accident.
+1. Verify with read-only checks:
+
+   ```bash
+   OID=$(az ad signed-in-user show --query id -o tsv)
+   SUB=$(az account show --query id -o tsv)
+   az role assignment list --assignee "$OID" --scope "/subscriptions/$SUB" --include-inherited -o table
+   az rest --method get --url "https://management.azure.com/subscriptions/$SUB/providers/Microsoft.Authorization/permissions?api-version=2022-04-01"
+   ```
+
+   With `Owner` active, the permissions output includes an `"actions": ["*"]` entry. With only standing access, the only entry is `*/read`.
+
+Things to know:
+
+* Activate Azure resource roles, such as subscription `Owner`, in the Azure portal under *PIM* > *My roles* > *Azure resources*. The Microsoft Entra admin center's PIM pages show only Microsoft Entra roles and groups.
+* You don't need a new `az login` after activating an Azure RBAC role. Azure Resource Manager evaluates role assignments on each request, so allow about a minute for propagation. Microsoft Entra directory roles and PIM for Groups do need a new token.
+* PIM may not prompt for multifactor authentication on activation if the portal session already has a multifactor authentication claim. Use a Conditional Access authentication context to require it on every activation.
+* The *Check access* current view hides eligible assignments. Check the *Eligible assignments* tab.
+* Recovery path: activate Global Administrator, turn on *Access management for Azure resources*, grant `Owner`, then turn it back off. The emergency access account is the last resort.
+* Removing the operator's `Owner` assignment doesn't affect sandbox applies by a `managed_identity` deployment identity, which keeps standing `Contributor` plus the conditioned `Role Based Access Control Administrator` role. An `oidc` deployment identity has only standing `Reader`, so the operator activates `Owner` to grant its time-bound roles before each workflow run.
+* In managed tenants, provider automation may re-add standing assignments, so check again after a day.
+
+#### State Backend Authentication
+
+Provider authentication and state backend authentication are independent. Provider settings such as `auth_mode` affect only the providers. By default, Terraform state is stored locally. When an `azurerm` backend is configured in `backend.tf`, it authenticates with its own settings, for example the system-assigned managed identity of the rg-devops-iac Linux virtual machine (`use_msi = true` with `use_azuread_auth = true`).
+
+### Optional: GitHub Self-Hosted Runner Configuration
+
+#### Self-Hosted Runner and Managed Identity Prerequisites (Optional)
+
+These prerequisites apply only if you plan to use this configuration as a self-hosted runner that deploys Azure Sandbox with a deployment identity (`enable_github_runner = true` and `deployment_identity = "managed_identity"` or `"oidc"`). Arrange them **before** provisioning, because some of them need privileged roles that the person running the deployment may not hold.
+
+* **GitHub repository administrator.** Registering the runner needs a runner registration token, which only a repository administrator can create. The operator can create it with the GitHub CLI right before the apply, or a repository administrator can provide one. See [Optional: GitHub Actions Self-Hosted Runner](#optional-github-actions-self-hosted-runner).
+* **Microsoft Entra Privileged Role Administrator.** Required only if the sandbox will be deployed with the `mssql` module enabled. The user-assigned managed identity then needs the Microsoft Graph `Group.Create`, `GroupMember.Read.All`, `User.Read.All` and `Application.Read.All` application permissions. Privileged Role Administrator is the least privileged Entra role that can grant them (Global Administrator also works, but has far broader rights). An Owner on the subscription, Cloud Application Administrator and read-only Entra roles such as Global Reader cannot grant them. If your organization uses [Privileged Identity Management](https://learn.microsoft.com/entra/id-governance/privileged-identity-management/pim-configure), activate an eligible assignment for the grant, or arrange for an administrator to run it. The grant is a one-time step after the identity is created. See [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies).
+* **OIDC deployment identity only (`deployment_identity = "oidc"`).**
+  * Microsoft Entra ID P2 or Microsoft Entra ID Governance, for the time-bound role assignments the operator grants before each workflow run.
+  * A subscription `Owner` (for example, the operator with `Owner` activated through PIM) to grant those assignments.
+  * A GitHub repository administrator to set the repository's OIDC subject claim template once, unless the repository already uses the expected template (for example, from its organization).
+
+  See [Optional: Deployment Identity for OIDC Workflow Applies](#optional-deployment-identity-for-oidc-workflow-applies).
+
+#### **Optional: GitHub Actions Self-Hosted Runner**
+
+The Linux virtual machine can optionally be registered as a [GitHub Actions self-hosted runner](./modules/vm-jumpbox-linux/README.md#optional-github-self-hosted-runner-configuration) so it can run CI/CD workflows using the pre-installed IaC toolchain and the VM managed identity. This is **disabled by default**.
+
+To enable it:
+
+* Add the following to the `terraform.tfvars` file:
+
+  ```hcl
+  enable_github_runner = true
+  ```
+
+  The runner is pre-configured for the [Azure Sandbox](https://github.com/Azure-Samples/azuresandbox) repository:
+
+  * `github_runner_url` defaults to `https://github.com/Azure-Samples/azuresandbox`.
+  * `github_runner_labels` defaults to `["azuresandbox"]`, the label the [Sandbox deployment workflow](../../../.github/workflows/sandbox-deployment.yml) targets.
+  * Set either variable in `terraform.tfvars` only to override the default.
+
+* Right before [Step 4](#step-4-validate-and-apply-configuration), create a runner registration token with the helper script, in the shell that will run Terraform. The script sets the `TF_VAR_github_runner_token` environment variable without displaying the token. It must be sourced, and refuses to print the token to a terminal. It uses the [GitHub CLI](https://cli.github.com) (`gh`), signed in as a repository administrator. It reads `github_runner_url` from `terraform.tfvars`, falling back to the default Azure Sandbox repository URL:
+
+  ```bash
+  source ./scripts/new-runner-registration-token.sh
+  ```
+
+  A registration token expires after one hour and can only register runners. Keep the environment variable set for both `terraform plan` and `terraform apply`, and run them within the hour.
+
+`github_runner_token` is an ephemeral variable. Terraform passes it to a managed Run Command on the VM through a write-only argument, so it is never written to Terraform state, the saved plan, the VM custom data or Key Vault. When `enable_github_runner` is `false` no runner software is installed and the VM behaves exactly as it did before.
+
+The token is needed only when the runner is registered. `github_runner_token_version` (default `1`) controls when it is sent: Terraform can't store an ephemeral value to detect changes, so the token is sent only when the Run Command is created or this number changes.
+
+* **Later applies:** leave `github_runner_token_version` at `1` and don't set `TF_VAR_github_runner_token`. No token is sent, and the plan shows a `github_runner_token is empty` warning that can be ignored. If a change updates the Run Command's settings, such as the labels or the runner version, the script runs again without a token, finds the runner already registered and changes nothing. Changes to the runner's name or labels are therefore not applied to a registered runner; remove the runner and register it again to change them.
+* **VM or Run Command replaced:** if the plan shows `module.vm_jumpbox_linux.azapi_resource.github_runner[0]` being created or replaced, for example because `jumplinux2` is replaced, the runner is registered again and needs a new token. Run `source ./scripts/new-runner-registration-token.sh` before `terraform plan`. You don't need to change `github_runner_token_version`.
+* **Failed registration:** if registration fails, for example because the token expired before the Run Command ran, create a new token, increment `github_runner_token_version` and apply again. The VM is not replaced.
+
+**Upgrading from an earlier version:** the runner is registered with a runner registration token only, and the token is no longer stored in Key Vault. `github_runner_token_type` is removed, so personal access tokens are no longer supported. `github_runner_token_secret_version` is renamed to `github_runner_token_version`. `github_runner_url` must be a repository URL; organization runners are no longer supported. An existing runner-enabled `jumplinux2` is replaced once, because the runner is no longer part of its cloud-init configuration.
+
+The runner service account is granted command scoped passwordless `sudo` for the binaries used by the `vwan` point-to-site VPN integration tests; review [Elevated Permissions for Integration Tests](./modules/vm-jumpbox-linux/README.md#elevated-permissions-for-integration-tests). It is also granted passwordless `sudo` for a wrapper that installs a specific Terraform version; see [Terraform Version on the Runner](./modules/vm-jumpbox-linux/README.md#terraform-version-on-the-runner).
+
+##### Terraform State for CD Workflows
+
+Workflows running on this self-hosted runner should **always** use the `azurerm` backend hosted in the storage account provisioned by this configuration. A runner is disposable infrastructure, so a local state file on it is an anti-pattern:
+
+* **Locking.** The `azurerm` backend takes a blob lease, so concurrent workflow runs - or a workflow run and an interactive `terraform apply` on the same VM - cannot corrupt state. A local state file has no lock beyond a single Terraform invocation.
+* **Durability.** The VM is replaceable. Resizing, reimaging or recreating it destroys anything held only on the OS disk, including a local state file. Blob storage supports versioning and soft delete.
+* **Secrets at rest.** Terraform state contains sensitive values. In the backend it is encrypted, scoped by Azure RBAC and reachable only over the storage account private endpoint. On the VM it is a plain file readable by the runner service account and by anything that compromises a workflow job.
+* **Shared source of truth.** Interactive runs on the VM and CD runs operate on the same state instead of diverging.
+
+The VM managed identity is already granted `Storage Blob Data Contributor` on the storage account, so no secrets are required:
+
+```hcl
+# backend.tf
+terraform {
+  backend "azurerm" {
+    use_azuread_auth     = true
+    use_msi              = true
+    tenant_id            = "YOUR-ENTRA-TENANT-ID-HERE"
+    subscription_id      = "YOUR-AZURE-SUBSCRIPTION-ID-HERE"
+    storage_account_name = "YOUR-STORAGE-ACCOUNT-NAME-HERE"
+    container_name       = "tfstate"
+    key                  = "YOUR-STATE-FILE-NAME-HERE.tfstate"
+  }
+}
+```
+
+```yaml
+- uses: actions/checkout@v5
+
+- run: terraform init
+
+- run: terraform apply -auto-approve
+```
+
+Because the runner always uses a remote backend, the `vm-jumpbox-linux` module deliberately does **not** provision a persistent local state directory on the VM. Nothing a workflow writes to the runner work directory is guaranteed to survive the next job, since `actions/checkout` cleans the workspace by default.
+
+Local state is only used during the **bootstrap apply of this configuration**, which is a separate concern: that apply creates the storage account, so the backend does not exist yet and the state file has to live on the Terraform execution environment running the apply - a workstation or an existing Terraform execution environment, never this runner, which does not exist until that apply completes.
+
+##### Removing the Runner
+
+Deleting the virtual machine does not deregister the self-hosted runner from GitHub. Either remove the runner from the VM before deleting it:
+
+```bash
+# Run on jumplinux2
+sudo /opt/actions-runner/svc.sh stop
+sudo /opt/actions-runner/svc.sh uninstall
+sudo -u githubrunner /opt/actions-runner/config.sh remove --token YOUR-REMOVAL-TOKEN-HERE
+```
+
+...or delete the stale offline runner afterwards from GitHub > *Settings* > *Actions* > *Runners*.
+
+#### **Optional: Deployment Identity for Managed Identity Sandbox Applies**
+
+The Azure Sandbox configuration can authenticate with a managed identity instead of a service principal secret (`auth_mode = "managed_identity"`; see [Authentication](#authentication)), for example from a CD workflow running on the self-hosted runner. That mode requires a **user-assigned** managed identity attached to the Terraform execution environment. This configuration can create one for you. This is **disabled by default**.
+
+To enable it, add the following to the `terraform.tfvars` file:
+
+```hcl
+deployment_identity = "managed_identity"
+```
+
+When enabled, the identity is:
+
+* Created in the resource group provisioned by this configuration.
+* Assigned two roles at the subscription scope, as described in [Deployment Identity Permissions](#deployment-identity-permissions):
+  * `Contributor`, to create and manage sandbox resources.
+  * `Role Based Access Control Administrator`, with a condition that allows assigning and removing only the roles the sandbox assigns, listed in `local.deployment_identity_assignable_roles` in [`locals.tf`](./locals.tf). The identity cannot grant `Owner`, `User Access Administrator` or `Role Based Access Control Administrator`.
+
+  This is still a standing, privileged identity. Contributor on the subscription also includes this configuration's own resource group, so anything running on `jumplinux2` that uses this identity can modify or delete it. When that list changes, re-apply this configuration to update the condition.
+* Attached to `jumplinux2` **in addition to** the system-assigned identity. The system-assigned identity remains the VM's default identity, so cloud-init, `az login --identity` and the `azurerm` state backend (`ARM_USE_MSI`) keep using it. Use the user-assigned identity explicitly by its client id, e.g. `az login --identity --client-id <client-id>` or `Connect-AzAccount -Identity -AccountId <client-id>`.
+
+Enabling or disabling the identity on an existing deployment updates the VM in place. It does not replace the VM.
+
+After the apply, use `client_id` from the `deployment_identity` output as `client_id` in the Azure Sandbox `terraform.tfvars`, together with `auth_mode = "managed_identity"`.
+
+If the sandbox will be deployed with the `mssql` module enabled, the identity also needs the Microsoft Graph `Group.Create`, `GroupMember.Read.All`, `User.Read.All` and `Application.Read.All` application permissions, which this configuration cannot grant. A Privileged Role Administrator (the least privileged Entra role that can grant them; Global Administrator also works) must grant them once, after the identity is created. If your organization uses PIM, activate Privileged Role Administrator for the grant and deactivate it afterward:
+
+```bash
+# Run from this configuration's directory, signed in to Azure CLI as a Privileged Role Administrator
+./scripts/grant-graph-permissions.sh
+```
+
+The script reads the identity from `principal_id` in the `deployment_identity` output (which requires `jq`) (or takes a client id or object id as its first argument), and skips permissions that are already granted, so it is safe to re-run. It warns, and prints the removal command, if the identity still has `Group.ReadWrite.All` from an earlier setup. If you activated the Entra role just before running it, sign in again with `az login` so the new role is included in your token.
+
+Managed identities have no app registration, so the Entra admin center **API permissions** steps used for a service principal do not apply. Use the script above instead. The grant is removed automatically if the identity is deleted.
+
+#### **Optional: Deployment Identity for OIDC Workflow Applies**
+
+The [Sandbox deployment workflow](../../../.github/workflows/sandbox-deployment.yml) authenticates the Azure Sandbox providers with GitHub OIDC (`auth_mode = "oidc"`; see [Authentication](#authentication)). It federates to a user-assigned managed identity that is **not** attached to any virtual machine, so code on `jumplinux2` can't get tokens for it from the managed identity endpoint. Only an approved workflow run in an allowed environment can. The identity holds standing `Reader` only. Before each run, the operator grants it time-bound deployment roles. This is **disabled by default**.
+
+`deployment_identity` takes a single value, so this replaces the attached `managed_identity` identity. Switching an existing deployment from `managed_identity` to `oidc` keeps the same identity and client id, removes its standing deployment roles, and detaches it from `jumplinux2` in place.
+
+To enable it, add the following to the `terraform.tfvars` file:
+
+```hcl
+deployment_identity = "oidc"
+```
+
+The federated credentials trust workflows in the repository in `github_runner_url` (default: the Azure Sandbox repository) in the environments in `github_oidc_environments`. It defaults to the workflow's two environments, `sandbox-deployment` and `sandbox-release-gate`. The credentials identify the repository and its owner by numeric id, which doesn't change if either is renamed. Terraform looks the ids up from the GitHub API on each plan. The request is anonymous, because data source arguments are saved in state, so it works only for public repositories and is subject to GitHub's rate limit for unauthenticated requests. For a private repository, or to avoid the lookup, set both ids:
+
+```hcl
+github_repository_id       = "123456789" # gh api repos/OWNER/NAME --jq .id
+github_repository_owner_id = "987654321" # gh api repos/OWNER/NAME --jq .owner.id
+```
+
+See [Root Module Input Variables](#root-module-input-variables).
+
+When enabled, the identity is:
+
+* Created in the resource group provisioned by this configuration.
+* Assigned standing `Reader` at the subscription scope, so the workflow can sign in and check its own grant before it changes anything.
+* Given one federated identity credential per environment, with issuer `https://token.actions.githubusercontent.com` and audience `api://AzureADTokenExchange`. Each subject combines the repository owner id, the repository id and the environment, for example `repository_owner_id:987654321:repository_id:123456789:environment:sandbox-deployment`. `github_subjects` in the `deployment_identity` output lists them.
+* Not attached to `jumplinux2`. The state backend keeps using the virtual machine's system-assigned identity.
+
+After the apply, complete these one-time steps:
+
+1. If the sandbox will be deployed with the `mssql` module enabled, grant the Microsoft Graph application permissions with `./scripts/grant-graph-permissions.sh`, as described in [Optional: Deployment Identity for Managed Identity Sandbox Applies](#optional-deployment-identity-for-managed-identity-sandbox-applies). Microsoft Graph application permissions can't be time-bound, so they stay standing. Only approved workflow runs can use them.
+1. Check the repository's OIDC subject claim template. The subjects above need a template with `include_claim_keys` set to `["repository_owner_id","repository_id","context"]`, which uses immutable ids instead of names:
+
+   ```bash
+   gh api repos/OWNER/NAME/actions/oidc/customization/sub
+   ```
+
+   If the response shows `"use_default":false` and those keys, the repository already uses the template, often because its organization requires it. Don't change it. If it shows `"use_default":true`, a repository administrator sets it once. Do this **after** the federated credentials exist, because it changes the subject of every OIDC token the repository issues:
+
+   ```bash
+   gh api --method PUT repos/OWNER/NAME/actions/oidc/customization/sub --input - <<'EOF'
+   {"use_default":false,"include_claim_keys":["repository_owner_id","repository_id","context"]}
+   EOF
+   ```
+
+   If the repository uses a different template, follow your organization's policy rather than overriding it. Any other workflow that federates to Azure from this repository must use subjects in the same format. If a sign-in fails with `AADSTS70021`, the error shows the subject GitHub presented. Compare it with `github_subjects` in the `deployment_identity` output.
+1. In both the `sandbox-deployment` and `sandbox-release-gate` environments, update `SANDBOX_TFVARS_HCL` to set `auth_mode = "oidc"` and `client_id` to `client_id` from the `deployment_identity` output.
+1. Optionally, set the `SANDBOX_JIT_MIN_REMAINING_MINUTES` repository or environment variable (default `150`, range `0`-`1440`, where `0` skips the remaining-time check).
+
+Before approving each run, grant the identity its deployment roles just in time. Run `./scripts/grant-jit-roles.sh` as the operator, from any directory, with Azure CLI signed in:
+
+```bash
+./scripts/grant-jit-roles.sh             # grant both roles for 8 hours
+./scripts/grant-jit-roles.sh --hours 6   # grant a different window (1-24 hours)
+./scripts/grant-jit-roles.sh --force     # replace assignments that are already active
+./scripts/grant-jit-roles.sh --revoke    # remove both assignments after the run
+```
+
+The script:
+
+1. Reads the identity, subscription and condition from this configuration's terraform outputs.
+1. Activates your eligible subscription `Owner` assignment through PIM for 1 hour, unless `Owner` or `User Access Administrator` is already active. If PIM requires approval or multifactor authentication that Azure CLI can't satisfy, activate `Owner` in the portal and run the script again. See [Least-Privilege Operator Access with Privileged Identity Management](#least-privilege-operator-access-with-privileged-identity-management).
+1. Assigns `Contributor`, and `Role Based Access Control Administrator` constrained by `jit_condition` from the `deployment_identity` output, as time-bound active assignments on the subscription. Without the condition the identity could assign any role, including `Owner`. Assignments that are already active are kept unless you pass `--force`.
+1. Lists the assignments' end times, and warns if less than `SANDBOX_JIT_MIN_REMAINING_MINUTES` remains. For `Role Based Access Control Administrator`, it lists the actions the applied condition restricts and the roles the identity can assign and remove, and checks that the condition matches `jit_condition` from the `deployment_identity` output.
+
+To grant the roles in the portal instead, activate `Owner`, then go to the subscription > *Access control (IAM)* > *Add* > *Add role assignment*. Assign `Contributor` to *Managed identity* > *User-assigned managed identity* > the deployment identity, with *Assignment type* set to *Active* and *Time bound* for 8 hours starting now. Repeat for `Role Based Access Control Administrator`, and on the *Conditions* tab paste the output of `terraform output -json deployment_identity | jq -r .jit_condition` into the advanced condition editor's code view.
+
+Wait for the new assignments to appear in PIM's list of active assignments before you approve the run. This can take about 5 minutes after the grant, even though the assignments already show in the portal's *Access control (IAM)* blade. Preflight reads the end times from that list, and fails with "Could not find an active assignment" if the roles aren't listed yet. Check with the Azure CLI:
+
+```bash
+az rest --method get \
+  --url "https://management.azure.com/subscriptions/$(az account show --query id -o tsv)/providers/Microsoft.Authorization/roleAssignmentScheduleInstances?api-version=2020-10-01&\$filter=principalId+eq+'$(terraform output -json deployment_identity | jq -r .principal_id)'" \
+  --query "value[].properties.{role: expandedProperties.roleDefinition.displayName, end: endDateTime}" -o table
+```
+
+Approve when `Contributor` and `Role Based Access Control Administrator` are listed with end times. Preflight waits up to 5 minutes for the roles to take effect. It fails if either role isn't active, or if less than `SANDBOX_JIT_MIN_REMAINING_MINUTES` remains on either assignment. It accepts a permanent assignment with a warning. Apply and unit-test check that both roles are still active before they start. After the run, revoke the assignments or let them expire.
+
+The 8-hour grant and 2.5-hour minimum cover preflight, a full apply and unit testing, with time left for a manual teardown while the grant is active. The workflow never destroys a sandbox. Tear down manually, from a terminal with your own access or while a grant is active.
+
+Residual exposure:
+
+* The subjects don't name a workflow file. Any workflow in the repository that runs in an allowed environment can federate to the identity. Restrict each environment to the `main` branch and require reviewers, so only reviewed workflows on `main` that an owner approves can use it.
+* The identity's standing `Reader` role and Microsoft Graph permissions are usable by any approved run in the allowed environments.
+* The time-bound roles belong to the identity, not to a single run. Another approved run during the same window can use them. The workflow's concurrency group runs one deployment at a time.
+* During a run, the job's federated token is passed to Azure CLI on the runner's command line, where other processes on `jumplinux2` can see it.
+
+##### Runner power state identity
+
+With `deployment_identity = "oidc"`, this configuration also creates a second, separate user-assigned managed identity that starts `jumplinux2` before an approved workflow run and deallocates it afterwards, from jobs on GitHub-hosted runners. It is unrelated to the deployment identity and can't deploy anything. It is:
+
+* Not attached to any virtual machine.
+* Assigned the built-in `Desktop Virtualization Power On Off Contributor` role on `jumplinux2` only. Despite its name, it's the built-in role for starting and stopping virtual machines. Scoped to the virtual machine, it allows only reading it and changing its power state (start, deallocate, power off and restart). It can't run commands, change extensions or delete the virtual machine. `Virtual Machine Contributor` isn't used because it allows all of those.
+* Given one federated identity credential for the `github_runner_power_state_environment` environment (default `sandbox-runner-power-state`), with a subject in the same format as the deployment identity's. `power_state_identity_github_subject` in the `github_runner` output shows it. The environment must differ from those in `github_oidc_environments`, so a token issued to one identity's jobs is never accepted by the other identity.
+
+Create the `sandbox-runner-power-state` environment in the repository and restrict it to the `main` branch. Don't add required reviewers: the start job waits for the approval of the deployment environment before it starts the virtual machine, so a second approval isn't needed. The workflow uses this environment name, so keep `github_runner_power_state_environment` at its default unless you change the workflow too.
+
+Add these secrets to the environment. They're secrets rather than variables so they're masked in the public run logs:
+
+Secret | Value
+--- | ---
+`RUNNER_POWER_STATE_CLIENT_ID` | `terraform output -json github_runner \| jq -r .power_state_identity_client_id`
+`AZURE_TENANT_ID` | The Microsoft Entra tenant id
+`RUNNER_VM_ID` | `terraform output -json resource_ids \| jq -r .virtual_machine_jumplinux2`
+
+How the workflow uses it, from two jobs on GitHub-hosted runners that run the script `scripts/Invoke-RunnerPowerState.sh` from the trusted workflow commit, never from the deployed branch:
+
+* `start_runner` starts alongside the `sandbox` job and waits up to 60 minutes for its approval. If the deployment is rejected, it ends without starting the virtual machine. If no decision arrives in time, it cancels the run. Once the deployment is approved, it signs in as this identity and starts `jumplinux2` if it's deallocated or stopped. If it's already running, it's left alone and stays running after the run. It then waits up to 20 minutes for the runner to pick up the `sandbox` job, and cancels the run if that doesn't happen.
+* `stop_runner` runs after the `sandbox` job, however it ended, and deallocates `jumplinux2` only if `start_runner` started it.
+
+The jobs don't coordinate with other runs, because the deployment workflow doesn't support concurrent runs. Grant the deployment identity's time-bound roles before you approve, as usual. The window now also covers the virtual machine's boot and the runner reconnecting, which usually takes a few minutes.
+
+#### Sandbox Deployment Workflow
+
+The VM can serve as a GitHub Actions self-hosted runner for the
+[Sandbox deployment workflow](../../../.github/workflows/sandbox-deployment.yml),
+a manually triggered deployment with all base modules enabled and
+post-deployment unit/integration testing in three stages: `preflight`,
+`apply`, and `unit-test`. Each deployment uses its own state key, and runner
+logs stay private.
+The unit-test stage publishes default-sanitized JSON evidence as
+workflow artifacts on both test success and failure; raw logs and plans stay
+on the runner.
+
+After a successful apply, the helper reads `terraform output -json resource_names`
+and records its actual `resource_group` value for the stage-results summary.
+The exact resource group name is an operator-approved exception to public
+deployment-name sanitization; other resource names, IDs, and raw outputs remain
+private. The summary retains the name even if subsequent unit testing fails.
+Preflight-only runs and runs without a verified post-apply name explicitly report
+it as unavailable rather than guessing. Completed run summaries are not rewritten.
+
+The updated workflow restricts automation to **new Sandboxes only**:
+each workflow run derives a new ID/key, and every preflight attempt rejects an
+existing state blob. Automated updates and recovery of existing Sandboxes are
+not supported. Unit-test also finalizes evidence itself, leaving only Publish
+and Report afterward.
+
+The workflow also supports a release-PR entry path through
+`pull_request_target` for same-repository `vnext` PRs targeting `main`.
+The normal release flow is: open a draft `vnext` → `main` PR → mark it ready
+for review → static CI runs → the deployment is queued awaiting approval →
+the owner approves → deploy and unit/integration tests → if they pass, the PR
+can be merged. A GitHub-hosted job validates the event without checkout or
+environment secrets. Drafts and title/description-only edits run no static CI
+and do not deploy; opening or reopening a ready PR, marking it ready, updating
+its head, or retargeting it to `main` starts a fresh run.
+PR runs use the separate `sandbox-release-gate` environment and always run
+all stages with checkout pinned to the exact PR head SHA. Manual dispatch
+retains `sandbox-deployment` and its stage selector, and does not run or wait
+for static CI. Its `source_branch` input chooses which branch of this
+repository to deploy: `vnext` (the default, matching earlier runs) or `main`
+for released code. Both sources support every stage. The hosted selection job
+rejects any other value before checkout or environment-secret access, then
+checks out the branch tip as `refs/heads/<branch>`. The run name and summary
+show the selected source, and the stage results report the deployed commit.
+The input never affects release PR runs, and manual runs never publish or
+satisfy the release statuses.
+Both environments require `SANDBOX_BACKEND_HCL` and `SANDBOX_TFVARS_HCL`
+and owner approval. Keep their deployment branch restrictions on `main`,
+the trusted workflow context, and explicitly allow `pull_request_target`
+and `workflow_dispatch` in an Actions event policy scoped only to
+`.github/workflows/sandbox-deployment.yml`.
+
+The workflow authenticates the sandbox providers only with GitHub OIDC:
+`SANDBOX_TFVARS_HCL` must set `auth_mode = "oidc"` and `client_id` to the
+OIDC deployment identity's client id, and preflight rejects any other mode.
+Only the `sandbox` job can federate to the deployment identity. The jobs that
+start and deallocate the runner virtual machine use a separate identity and
+environment; see [Runner power state identity](#runner-power-state-identity).
+Before approving a run, the
+operator grants the identity time-bound roles in the Azure portal; preflight
+waits for them and refuses to start unless enough of the grant remains. The
+state backend still uses the virtual machine's system-assigned identity. See
+[Optional: Deployment Identity for OIDC Workflow Applies](#optional-deployment-identity-for-oidc-workflow-applies).
+
+Preflight also checks that the runner's Terraform CLI satisfies the
+`required_version` in the deployed branch's root `terraform.tf`, using
+Terraform's own constraint check. A compatible runner is used as-is, even if
+it is newer than the version static CI uses. Otherwise preflight installs the
+`X.Y.Z` version that `ci-terraform.yml` derives from the same constraint,
+through a root-owned wrapper the runner service account may run with `sudo`,
+and checks again before `terraform init`. The job summary records the
+constraint, the version used, and whether it was installed. Runners
+provisioned before the wrapper existed fail preflight with a request to
+re-provision rg-devops-iac. See
+[Terraform Version on the Runner](modules/vm-jumpbox-linux/README.md#terraform-version-on-the-runner).
+
+Before any approval request, a release PR run calls the six static CI
+workflows (`ci-bash`, `ci-powershell`, `ci-docs`, `ci-actions`, `ci-secrets`,
+and `ci-terraform`) as reusable workflows from the trusted `main` revision.
+Each checks out the exact PR head SHA read-only, with no secrets, write
+tokens, or caches, and applies its usual path filters to the **full release
+diff**: everything `vnext` adds since its merge base with `main`, not just the
+last commit. Each ends with a no-logic `release report` job that passes back
+its raw job results. The hosted `Release static CI` job applies one rule to all
+six: `pass` when every applicable check succeeded, or `not-applicable` when
+change detection succeeded, proved no relevant files changed, and the
+path-gated checks were skipped (`gitleaks` and both `terraform validate`
+contexts always run and must succeed). Anything else fails. It requires a
+`pass` or `not-applicable` verdict from every workflow, then rereads the live
+PR and requires it to be open, not a draft, and unchanged in head, base, and
+source. Only then does it
+publish `release-static-ci = success` and let the environment-protected
+deployment job request approval. A failed, cancelled, missing, or unexpected
+result publishes `release-static-ci = failure` and no deployment is requested.
+Static CI never depends on deployment-produced checks, and the organization's
+CLA check is not part of it. Results from earlier topic-PR, push, or manual
+CI runs are never reused.
+
+After approval, and after any wait for the serialized runner, the deployment
+job's first step rechecks the live PR and confirms this attempt still owns a
+passing `release-static-ci` status, before checking out candidate code or
+touching Azure. A PR that changed, closed, became a draft, or was superseded
+in the meantime stops there.
+
+Both entry paths share the existing concurrency group with active-run
+cancellation disabled. Advancing `vnext` does not change an already captured
+PR candidate or interrupt an active apply. The workflow does not implement
+cleanup/recovery. The existing run-ID state keys and unused-state requirement
+still apply. **Re-run failed jobs** is not supported for release PRs: a re-run
+attempt doesn't own the PR statuses, so it stops before static CI is accepted
+or any deployment starts. To retry after any failure, mark the PR as a draft
+and then ready again, or close and reopen it, to start a fresh run.
+
+Eligible PR runs publish `release-static-ci` and `sandbox-deployment-gate` as
+pending on the exact head SHA before static CI starts. A separate
+GitHub-hosted reporter publishes `sandbox-deployment-gate = success` only after
+Preflight, Apply, Unit-test, stage reporting, and JSON artifact upload all
+succeed. The validated JSON must also report native exit code zero,
+`result = "pass"`, positive passing counts, and no failed tests or failed
+suites. Native test-scope/optional-suite skip behavior is unchanged. Missing
+evidence, skipped required stages, failures, and cancellations cannot produce
+success. If cancellation or an API outage prevents final reporting, the status
+can remain pending rather than falsely passing.
+
+The deployment job waits for successful pending-status publication and static
+CI on PR runs; an API failure at either point does not schedule an Azure
+deployment. Manual runs explicitly skip the PR-only jobs without losing their
+deployment. Metadata-only validation does not share the status-writer lock, so
+it cannot displace a queued reporter.
+
+Status writers have a separate per-SHA lock and attempt-specific run links;
+an older attempt cannot overwrite the pending result of a newer attempt on
+the same SHA, or deploy on the strength of it. Only the hosted status jobs
+have status-write permission. Manual dispatch does not publish these PR
+statuses. Drafts and metadata-only edits do not overwrite them, and no
+workflow closes or merges a PR. Three rulesets on `main` require these checks,
+all from GitHub Actions: `main-release-source` requires
+`main-source-eligibility`, `main-release-static-ci` requires
+`release-static-ci`, and `main-release-deployment` requires
+`sandbox-deployment-gate` and the hosted `Publish release deployment status`
+check. Failed checks block ordinary release merges without closing the PR.
+Release deployments are approved by the `azuresandbox-owners` team. The
+owners' PR-only emergency bypass is described in
+[CONTRIBUTING.md](../../../CONTRIBUTING.md#emergency-merges); it never creates
+a passing result or approves a deployment.
+
+The deployment/monitor helpers replace the Python implementation
+with Bash entrypoints and PowerShell 7.3+ stage logic. The helper test sources
+and their `scripts/tests` directory are removed at the operator's request;
+existing Sandbox unit/integration tests remain unchanged. Validation uses
+existing CI gates and real executions.
