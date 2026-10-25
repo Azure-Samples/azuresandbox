@@ -24,31 +24,27 @@ This configuration provides a minimal set of resources to function as a Terrafor
   * Managed-identity access to a pre-configured Terraform state backend (Azure Blob Storage).
   * Pre-installed Azure CLI and PowerShell + Azure PowerShell for custom automation.
 * **Network isolation**
-  * Virtual network with subnets for the virtual machine, private endpoints and Azure Bastion.
+  * Virtual network and subnets and NSGs for bastion, VMs and private endpoints.
   * NAT gateway for outbound internet access.
-  * Network security groups that allow SSH only from Azure Bastion.
-  * Private endpoints and private DNS zones for the storage account, key vault and Azure Monitor. Public network access is disabled.
+  * Private endpoints and private DNS zones for blob storage, key vault and Azure Monitor. Public network access is disabled.
 * **Secure access**
   * Azure Bastion (Standard SKU) is the only inbound path to the virtual machine.
   * Microsoft Entra ID sign-in with Azure RBAC (passwordless).
   * Break-glass local admin credentials stored in Key Vault.
   * Role separation follows principle of least privilege for Azure RBAC role assignments.
 * **Observability**
-  * Log Analytics workspace reachable only through an Azure Monitor Private Link Scope (AMPLS).
-  * Azure Monitor Agent collecting syslog and performance counters from the virtual machine.
+  * Log Analytics workspace reachable only through AMPLS.
+  * AMA pre-configured on VM for logging syslog and performance counters.
   * Pre-configured diagnostic settings for security-sensitive resources (Bastion, Key Vault and Storage).
 * **Optional features** (disabled by default)
   * Deployment identity for sandbox applies, either attached to the virtual machine (`managed_identity`) or federated with GitHub Actions (`oidc`), with time-bound deployment roles granted before each apply.
   * See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration)
-
-**NOTE:** The Linux virtual machine is implemented as a module so it can be easily reused in other configurations. It is not intended to be used as a production jumpbox. It is intended to be used as a Terraform execution environment for DevOps / IaC projects.
 
 ## Prerequisites
 
 This section describes the prerequisites required in order to provision this configuration.
 
 * [Microsoft Entra ID Tenant and Azure Subscription](#microsoft-entra-id-tenant-and-azure-subscription)
-* [Self-Hosted Runner and Managed Identity Prerequisites (Optional)](#self-hosted-runner-and-managed-identity-prerequisites-optional)
 * [Other Prerequisites](#other-prerequisites)
 * [Terraform Execution Environment](#terraform-execution-environment)
 
@@ -96,7 +92,7 @@ A variety of Terraform execution environments can be used to provision this conf
 
 ## Getting Started
 
-This section covers the steps to get started with this configuration using an interactive Terraform execution environment. The steps include logging into Azure, cloning the repository, initializing Terraform, configuring variables, validating and applying the configuration, and smoke testing.
+This section covers the steps to get started with this configuration using an interactive Terraform execution environment.
 
 * [Step 0: Login](#step-0-login)
 * [Step 1: Clone the Repository](#step-1-clone-the-repository)
@@ -109,7 +105,7 @@ This section covers the steps to get started with this configuration using an in
 
 ### Step 0: Login
 
-Before you can provision this configuration interactively, you need to log in to your Azure account. Terraform authenticates as the user signed in to Azure CLI, so an Azure CLI login is always required. If you will use the PowerShell bootstrap script, also sign in with Azure PowerShell. Use the following steps to log in
+Before you can provision this configuration interactively, you need to log in to your Azure account.
 
 * Open a terminal window and run the following command to log in to Azure CLI:
 
@@ -162,8 +158,6 @@ git clone https://github.com/Azure-Samples/azuresandbox
 
 ### Step 2: Initialize Terraform
 
-**WARNING:** By default this configuration assumes you will be using a local Terraform state file which includes sensitive information. This is by design since it is actually creating the storage account where Terraform state files are to be stored for other configurations. This chicken-and-egg bootstrap is the only scenario in this project that legitimately uses local state, and it runs on an interactive Terraform execution environment such as a workstation or Azure Cloud Shell. Configurations applied *after* the bootstrap - including CI/CD workflows running on `jumplinux2` as a self-hosted runner - should use the `azurerm` backend hosted in the storage account this configuration creates.
-
 After cloning the repository, navigate to the `rg-devops-iac` directory and initialize Terraform. This step downloads the necessary provider plugins and modules.
 
 ```bash
@@ -171,22 +165,18 @@ cd azuresandbox/extras/configurations/rg-devops-iac
 terraform init
 ```
 
+**WARNING:** By default this configuration assumes you will be using a local Terraform state file which includes sensitive information. This is by design since the configuration creates the storage account to be used as a Terraform state backend for other configurations.
+
 ### Step 3: Configure Variables
-
-There many variables in this configuration. Defaults have been set for most of them so only a few need to be set in advance to provision this configuration. There are a few different ways to set variables in Terraform.
-
-* **Environment Variables**: Set environment variables for sensitive information such as passwords and secrets used in the root module.
-* **terraform.tfvars file**: Create a `terraform.tfvars` file in the root directory of the project to set variables for the root module.
-* **main.tf file**: Override module default values in the `main.tf` file by customizing the module blocks.
 
 Follow these steps to configure the variables for this configuration:
 
 * Create a `terraform.tfvars` file in the root directory of the project. This file should set the necessary variables for your deployment. Here is an example of what the `terraform.tfvars` file might look like:
 
   ```hcl
-  entra_tenant_id = "YOUR-ENTRA-TENANT-ID-HERE"
-  location        = "YOUR-AZURE-REGION-HERE"
-  subscription_id = "YOUR-AZURE-SUBSCRIPTION-ID-HERE"
+  entra_tenant_id = "<entra-tenant-id-here>"
+  location        = "<azure-region-here>"
+  subscription_id = "<subscription-id-here>"
 
   tags = {
     project     = "devops",
@@ -231,8 +221,6 @@ module "vm_jumpbox_linux" {
 
 ### Step 4: Validate and Apply Configuration
 
-Remember that Terraform will compare the state of existing resources in Azure with what it expects to be there when creating a plan. If the state of existing resources in Azure does not match what Terraform expects, the plan will modify existing resources to match the configuration. This can happen when resources are modified manually or via Policy outside of Terraform. This is known as "drift".
-
 Follow these steps to validate and apply the configuration:
 
 * First, validate that the configuration is syntactically correct:
@@ -246,8 +234,6 @@ Follow these steps to validate and apply the configuration:
   ```bash
   terraform plan
   ```
-
-  * **IMPORTANT:** If you are provisioning this configuration for the first time, you will see a lot of `+` signs in the output. This indicates that new resources will be created if this plan is applied. If you are updating this configuration after it has been provisioned, you may see `~` signs indicating that existing resources will be updated. If you see `-` signs, this indicates that existing resources will be deleted. Be careful with these operations as they may cause data loss.
 
 * Finally, apply the configuration to create the resources:
 
