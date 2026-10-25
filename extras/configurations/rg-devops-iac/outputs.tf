@@ -44,14 +44,13 @@ output "resource_names" {
 #   client_id:       Used as 'client_id' for Azure Sandbox applies with auth_mode = "managed_identity" or "oidc".
 #   github_subjects: The GitHub OIDC subjects accepted by its federated identity credentials, keyed by environment.
 #                    An empty map unless var.deployment_identity is oidc.
-#   jit_condition:   The condition (version 2.0) the operator applies to its time-bound 'Role Based Access Control Administrator' assignment before each workflow run.
-#                    Null unless var.deployment_identity is oidc.
+#   jit_condition:   The condition (version 2.0) the operator applies to its time-bound 'Role Based Access Control Administrator' assignment before each apply.
 #   principal_id:    The principal (object) id, used to grant Microsoft Graph application permissions.
 output "deployment_identity" {
   value = var.deployment_identity != "none" ? {
     client_id       = azurerm_user_assigned_identity.deployment[0].client_id
     github_subjects = local.github_oidc_subjects
-    jit_condition   = var.deployment_identity == "oidc" ? local.deployment_identity_rbac_condition : null
+    jit_condition   = local.deployment_identity_rbac_condition
     principal_id    = azurerm_user_assigned_identity.deployment[0].principal_id
   } : null
 }

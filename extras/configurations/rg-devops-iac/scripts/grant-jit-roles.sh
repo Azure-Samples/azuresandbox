@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Grants the OIDC deployment identity (deployment_identity = "oidc") its just-in-time deployment roles before an
-# operator approves a Sandbox deployment workflow run:
+# Grants the deployment identity (deployment_identity = "managed_identity" or "oidc") its just-in-time deployment roles
+# before an Azure Sandbox apply, either a Sandbox deployment workflow run or a manual apply on jumplinux2:
 #   * Contributor                               time-bound active assignment on the subscription.
 #   * Role Based Access Control Administrator   time-bound active assignment on the subscription, constrained by
 #                                               'jit_condition' in the 'deployment_identity' terraform output.
@@ -16,7 +16,7 @@
 #
 # Usage: ./scripts/grant-jit-roles.sh [options]
 #   -H, --hours N             Duration of the time-bound assignments in hours (default 8, range 1-24).
-#   -j, --justification TEXT  Justification recorded with PIM requests (default "Sandbox deployment workflow run").
+#   -j, --justification TEXT  Justification recorded with PIM requests (default "Azure Sandbox apply").
 #   -f, --force               Replace assignments that are already active instead of keeping them.
 #   -r, --revoke              Remove the identity's Contributor and Role Based Access Control Administrator
 #                             assignments instead of granting them.
@@ -44,7 +44,7 @@ GRANT_ROLE_IDS=("${CONTRIBUTOR_ROLE_ID}" "${RBAC_ADMIN_ROLE_ID}")
 MIN_REMAINING_MINUTES="${SANDBOX_JIT_MIN_REMAINING_MINUTES:-150}"
 
 HOURS=8
-JUSTIFICATION="Sandbox deployment workflow run"
+JUSTIFICATION="Azure Sandbox apply"
 FORCE=false
 REVOKE=false
 
@@ -105,7 +105,7 @@ RESOURCE_GROUP_ID=$(jq -r '.resource_ids.value.resource_group // empty' <<<"${OU
 
 if [[ -z "${PRINCIPAL_ID}" || -z "${CONDITION}" ]]; then
   echo "Error: 'principal_id' or 'jit_condition' in the 'deployment_identity' output is empty."
-  echo "Set deployment_identity = \"oidc\" and run 'terraform apply'."
+  echo "Set deployment_identity = \"managed_identity\" or \"oidc\" and run 'terraform apply'."
   exit 1
 fi
 
@@ -330,11 +330,11 @@ else
     jq -r --arg id "${allowed_id}" '"    - \(.[$id] // "<unknown role>") (\($id))"' <<<"${ROLE_DEFINITIONS}"
   done | sort
   if [[ "${APPLIED_CONDITION}" == "${CONDITION}" ]]; then
-    echo "  Matches the the 'deployment_identity' output's 'jit_condition' output."
+    echo "  Matches the 'deployment_identity' output's 'jit_condition' output."
   else
-    echo "  Warning: doesn't match the the 'deployment_identity' output's 'jit_condition' output. Run again with --force to replace it."
+    echo "  Warning: doesn't match the 'deployment_identity' output's 'jit_condition' output. Run again with --force to replace it."
   fi
 fi
 
-echo "Just-in-time role grant complete. Approve the workflow run once both roles are listed with end times."
+echo "Just-in-time role grant complete. Approve the workflow run or start the apply once both roles are listed with end times."
 #endregion

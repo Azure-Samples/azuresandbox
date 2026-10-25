@@ -200,9 +200,10 @@ resource "azurerm_monitor_diagnostic_setting" "data_collection_rule_linux" {
 # The VM's (jumplinux2) system-assigned managed identity, not the UAMI, is used for the Terraform state backend.
 # The UAMI and its roles depend on the deployment_identity setting:
 # - "none" (default): no deployment UAMI is created.
-# - "managed_identity": the deployment UAMI is attached to jumplinux2 and holds standing Contributor and Role Based Access Control Administrator, restricted by the allow-list ABAC condition.
+# - "managed_identity": the deployment UAMI is attached to jumplinux2 and used by Terraform running there, from a terminal or a GitHub Actions job on its self-hosted runner.
 # - "oidc": the deployment UAMI is NOT attached to jumplinux2. Instead, it is used by approved GitHub Actions jobs on jumplinux2's self-hosted runner through federated identity credentials.
-#   It holds only standing Reader; before approving each workflow run, the operator grants time-bound Contributor and Role Based Access Control Administrator, restricted by the allow-list ABAC condition.
+# In both modes it holds only standing Reader. Before each apply, the operator grants time-bound Contributor and Role Based Access Control Administrator,
+# restricted by the allow-list ABAC condition (scripts/grant-jit-roles.sh).
 resource "azurerm_user_assigned_identity" "deployment" {
   count = var.deployment_identity != "none" ? 1 : 0
 
@@ -212,29 +213,8 @@ resource "azurerm_user_assigned_identity" "deployment" {
   tags                = var.tags
 }
 
-resource "azurerm_role_assignment" "deployment_identity_contributor" {
-  count = var.deployment_identity == "managed_identity" ? 1 : 0
-
-  principal_id         = azurerm_user_assigned_identity.deployment[0].principal_id
-  principal_type       = "ServicePrincipal"
-  role_definition_name = "Contributor"
-  scope                = "/subscriptions/${var.subscription_id}"
-}
-
-# Allows the deployment identity to assign and remove only the roles in local.deployment_identity_assignable_roles.
-resource "azurerm_role_assignment" "deployment_identity_rbac_admin" {
-  count = var.deployment_identity == "managed_identity" ? 1 : 0
-
-  condition            = local.deployment_identity_rbac_condition
-  condition_version    = "2.0"
-  principal_id         = azurerm_user_assigned_identity.deployment[0].principal_id
-  principal_type       = "ServicePrincipal"
-  role_definition_name = "Role Based Access Control Administrator"
-  scope                = "/subscriptions/${var.subscription_id}"
-}
-
 resource "azurerm_role_assignment" "deployment_identity_reader" {
-  count = var.deployment_identity == "oidc" ? 1 : 0
+  count = var.deployment_identity != "none" ? 1 : 0
 
   principal_id         = azurerm_user_assigned_identity.deployment[0].principal_id
   principal_type       = "ServicePrincipal"

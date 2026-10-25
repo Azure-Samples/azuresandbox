@@ -9,6 +9,17 @@ variable "deployment_identity" {
   }
 }
 
+variable "deployment_identity_github_environments" {
+  type        = list(string)
+  description = "The GitHub Actions environments whose jobs can sign in as the deployment identity. One federated identity credential is created per environment. Only used when var.deployment_identity is oidc."
+  default     = ["sandbox-deployment", "sandbox-release-gate"]
+
+  validation {
+    condition     = length(var.deployment_identity_github_environments) > 0 && length(var.deployment_identity_github_environments) <= 20 && alltrue([for environment in var.deployment_identity_github_environments : can(regex("^[A-Za-z0-9._-]{1,255}$", environment))])
+    error_message = "Must contain 1-20 environment names made of alphanumeric characters, periods (.), underscores (_), or hyphens (-)."
+  }
+}
+
 variable "enable_github_runner" {
   type        = bool
   description = "Set to true to install and register the GitHub Actions self-hosted runner agent on the Linux virtual machine, false to skip it."
@@ -22,17 +33,6 @@ variable "entra_tenant_id" {
   validation {
     condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.entra_tenant_id))
     error_message = "Must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
-  }
-}
-
-variable "github_oidc_environments" {
-  type        = list(string)
-  description = "The GitHub Actions environments whose jobs can sign in as the deployment identity. One federated identity credential is created per environment. Only used when var.deployment_identity is oidc."
-  default     = ["sandbox-deployment", "sandbox-release-gate"]
-
-  validation {
-    condition     = length(var.github_oidc_environments) > 0 && length(var.github_oidc_environments) <= 20 && alltrue([for environment in var.github_oidc_environments : can(regex("^[A-Za-z0-9._-]{1,255}$", environment))])
-    error_message = "Must contain 1-20 environment names made of alphanumeric characters, periods (.), underscores (_), or hyphens (-)."
   }
 }
 
@@ -71,7 +71,7 @@ variable "github_runner_labels" {
 
 variable "github_runner_power_state_environment" {
   type        = string
-  description = "The GitHub Actions environment whose jobs can sign in as the runner power state identity, which starts and deallocates the Linux virtual machine for workflow runs. Must not be one of var.github_oidc_environments. Only used when var.deployment_identity is oidc."
+  description = "The GitHub Actions environment whose jobs can sign in as the runner power state identity, which starts and deallocates the Linux virtual machine for workflow runs. Must not be one of var.deployment_identity_github_environments. Only used when var.deployment_identity is oidc."
   default     = "sandbox-runner-power-state"
 
   validation {
@@ -80,8 +80,8 @@ variable "github_runner_power_state_environment" {
   }
 
   validation {
-    condition     = !contains([for environment in var.github_oidc_environments : lower(environment)], lower(var.github_runner_power_state_environment))
-    error_message = "Must not be one of github_oidc_environments, so the runner power state identity and the deployment identity never accept the same subject."
+    condition     = !contains([for environment in var.deployment_identity_github_environments : lower(environment)], lower(var.github_runner_power_state_environment))
+    error_message = "Must not be one of deployment_identity_github_environments, so the runner power state identity and the deployment identity never accept the same subject."
   }
 }
 

@@ -9,6 +9,9 @@
 #   wait-approval  Wait for the sandbox job's approval. Writes approved=true|false to
 #                  $GITHUB_OUTPUT. Cancels the run if no decision arrives in time.
 #   start          Start the VM unless it's already running. Writes started=true|false.
+#                  Skipped (started=false) when RUNNER_POWER_STATE_CLIENT_ID isn't set: the power state
+#                  identity exists only with deployment_identity = "oidc", so with "managed_identity"
+#                  the VM must already be running.
 #   wait-pickup    Wait for a runner to pick up the sandbox job; cancel the run on timeout.
 #   stop           Deallocate the VM.
 #
@@ -89,6 +92,12 @@ power_state() {
 
 start_vm() {
     require GITHUB_OUTPUT
+    if [[ -z "${RUNNER_POWER_STATE_CLIENT_ID:-}" ]]; then
+        echo "started=false" >> "$GITHUB_OUTPUT"
+        echo "RUNNER_POWER_STATE_CLIENT_ID isn't set, so this run won't start or deallocate the runner VM."
+        summary "Runner power state identity not configured; the runner VM must already be running."
+        return 0
+    fi
     azure_login
     local state deadline=$((SECONDS + 600))
     state="$(power_state)"

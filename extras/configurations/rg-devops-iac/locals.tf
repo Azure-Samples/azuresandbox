@@ -73,9 +73,9 @@ locals {
   # For a job in an environment, "context" is "environment:<name>", so each subject is this prefix followed by the environment name.
   github_oidc_subject_prefix = "repository_owner_id:${local.github_repository_owner_id}:repository_id:${local.github_repository_id}:environment:"
 
-  # The oidc deployment identity accepts one subject for each environment in var.github_oidc_environments.
+  # The oidc deployment identity accepts one subject for each environment in var.deployment_identity_github_environments.
   github_oidc_subjects = var.deployment_identity == "oidc" ? {
-    for environment in var.github_oidc_environments : environment => "${local.github_oidc_subject_prefix}${environment}"
+    for environment in var.deployment_identity_github_environments : environment => "${local.github_oidc_subject_prefix}${environment}"
   } : {}
 
   # The runner power state identity accepts one subject, for var.github_runner_power_state_environment.
