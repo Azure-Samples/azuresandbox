@@ -221,7 +221,7 @@ function ConvertTo-SandboxDateTimeOffset {
 
 function Confirm-SandboxJitGrant {
     # Confirms the deployment identity's time-bound Contributor and Role Based Access Control Administrator grants are
-    # active, waiting up to WaitSeconds for propagation, and that at least MinimumMinutes of the grants remain.
+    # active and listed, waiting up to WaitSeconds for propagation, and that at least MinimumMinutes of the grants remain.
     param([System.Collections.IDictionary]$DeploymentProfile, [int]$MinimumMinutes, [int]$WaitSeconds)
     $subscription = "/subscriptions/$($DeploymentProfile.subscription_id)"
     $timer = [System.Diagnostics.Stopwatch]::StartNew()
@@ -230,33 +230,42 @@ function Confirm-SandboxJitGrant {
             "https://management.azure.com$subscription/providers/Microsoft.Authorization/permissions?api-version=2022-04-01"
         ) 'jit-permissions.json' | ConvertFrom-Json -AsHashtable
         $actions = @($permissions['value'] | ForEach-Object { $_['actions'] })
-        if ($actions -ccontains '*' -and $actions -ccontains 'Microsoft.Authorization/roleAssignments/write') { break }
+        $effective = $actions -ccontains '*' -and $actions -ccontains 'Microsoft.Authorization/roleAssignments/write'
+        $missing = $null
+        if ($effective) {
+            if ($MinimumMinutes -le 0) { return }
+            # Schedule instances can be listed a few minutes after the roles take effect.
+            $instances = Get-SandboxOutput @('az', 'rest', '--method', 'get', '--output', 'json', '--url',
+                "https://management.azure.com$subscription/providers/Microsoft.Authorization/roleAssignmentScheduleInstances?api-version=2020-10-01&`$filter=asTarget()"
+            ) 'jit-instances.json' | ConvertFrom-Json -AsHashtable
+            $roleEnds = [ordered]@{}
+            foreach ($role in $script:jitRoles.GetEnumerator()) {
+                $roleEnds[$role.Key] = @(foreach ($instance in @($instances['value'])) {
+                        $properties = $instance['properties']
+                        $scope = [string]$properties['scope']
+                        if (([string]$properties['roleDefinitionId']).EndsWith("/$($role.Value)", [StringComparison]::OrdinalIgnoreCase) -and
+                            ($scope -ieq $subscription -or $scope -ceq '/' -or
+                                $scope.StartsWith('/providers/Microsoft.Management/managementGroups/', [StringComparison]::OrdinalIgnoreCase))) {
+                            if ($null -eq $properties['endDateTime']) { [DateTimeOffset]::MaxValue }
+                            else { ConvertTo-SandboxDateTimeOffset $properties['endDateTime'] }
+                        }
+                    })
+                if ($null -eq $missing -and $roleEnds[$role.Key].Count -eq 0) { $missing = $role.Key }
+            }
+            if ($null -eq $missing) { break }
+        }
         if ($timer.Elapsed.TotalSeconds -ge $WaitSeconds) {
-            Stop-SandboxStage 'The deployment identity has no active Contributor and Role Based Access Control Administrator grant on the subscription. Grant both time-bound roles before approving the run.'
+            if (-not $effective) {
+                Stop-SandboxStage 'The deployment identity has no active Contributor and Role Based Access Control Administrator grant on the subscription. Grant both time-bound roles before approving the run.'
+            }
+            Stop-SandboxStage "Could not find an active assignment of $missing for the deployment identity to check its remaining time."
         }
         Start-Sleep -Seconds 30
     }
-    if ($MinimumMinutes -le 0) { return }
-    $instances = Get-SandboxOutput @('az', 'rest', '--method', 'get', '--output', 'json', '--url',
-        "https://management.azure.com$subscription/providers/Microsoft.Authorization/roleAssignmentScheduleInstances?api-version=2020-10-01&`$filter=asTarget()"
-    ) 'jit-instances.json' | ConvertFrom-Json -AsHashtable
     $now = [DateTimeOffset]::UtcNow
     $remaining = [TimeSpan]::MaxValue
-    foreach ($role in $script:jitRoles.GetEnumerator()) {
-        $ends = @(foreach ($instance in @($instances['value'])) {
-                $properties = $instance['properties']
-                $scope = [string]$properties['scope']
-                if (([string]$properties['roleDefinitionId']).EndsWith("/$($role.Value)", [StringComparison]::OrdinalIgnoreCase) -and
-                    ($scope -ieq $subscription -or $scope -ceq '/' -or
-                        $scope.StartsWith('/providers/Microsoft.Management/managementGroups/', [StringComparison]::OrdinalIgnoreCase))) {
-                    if ($null -eq $properties['endDateTime']) { [DateTimeOffset]::MaxValue }
-                    else { ConvertTo-SandboxDateTimeOffset $properties['endDateTime'] }
-                }
-            })
-        if ($ends.Count -eq 0) {
-            Stop-SandboxStage "Could not find an active assignment of $($role.Key) for the deployment identity to check its remaining time."
-        }
-        $end = @($ends | Sort-Object -Descending)[0]
+    foreach ($role in $roleEnds.GetEnumerator()) {
+        $end = @($role.Value | Sort-Object -Descending)[0]
         if ($end -eq [DateTimeOffset]::MaxValue) {
             Write-SandboxSummary "Warning: the deployment identity has a permanent $($role.Key) assignment; just-in-time access isn't enforced.`n`n"
             continue
@@ -437,6 +446,9 @@ function Invoke-SandboxPreflight {
         @($deploymentProfile.base | Where-Object { $_ -isnot [bool] -or -not $_ }).Count -gt 0 -or
         @($deploymentProfile.extras | Where-Object { $_ -isnot [bool] -or $_ }).Count -gt 0) {
         Stop-SandboxStage 'Inputs do not match the approved authentication mode, backend, or module scope.'
+    }
+    if ($deploymentProfile.auth_mode -cne $env:SANDBOX_AUTH_MODE) {
+        Stop-SandboxStage "auth_mode in SANDBOX_TFVARS_HCL ($($deploymentProfile.auth_mode)) doesn't match the SANDBOX_AUTH_MODE repository variable ($env:SANDBOX_AUTH_MODE)."
     }
     Write-SandboxJson (Join-Path $script:directory 'profile.json') $deploymentProfile
     Connect-SandboxProvider $deploymentProfile

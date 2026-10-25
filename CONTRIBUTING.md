@@ -139,6 +139,7 @@ The [deployment workflow](.github/workflows/sandbox-deployment.yml) signs in to 
 | `sandbox-deployment`, `sandbox-release-gate` and `sandbox-runner-power-state` deployment branches | `main` only |
 | Required reviewers | Owners, in `sandbox-deployment` and `sandbox-release-gate`. None in `sandbox-runner-power-state` |
 | **Allow administrators to bypass configured protection rules** | Off in `sandbox-release-gate`, so admins can't skip release deployment approval. On in `sandbox-deployment`, so an admin can start a manual deployment without approval |
+| Repository variable | `SANDBOX_AUTH_MODE`: `managed_identity` or `oidc`, matching `auth_mode` in `SANDBOX_TFVARS_HCL`. Runs fail without it, and the runner power state jobs run only with `oidc` |
 | Environment secrets | `SANDBOX_BACKEND_HCL` and `SANDBOX_TFVARS_HCL`, with `auth_mode = "managed_identity"` or `"oidc"`, in `sandbox-deployment` and `sandbox-release-gate`. With `oidc` only: `RUNNER_POWER_STATE_CLIENT_ID`, `AZURE_TENANT_ID` and `RUNNER_VM_ID` in `sandbox-runner-power-state` |
 | OIDC subject claim template | `use_default: false` with `include_claim_keys` `repository_owner_id`, `repository_id` and `context` |
 

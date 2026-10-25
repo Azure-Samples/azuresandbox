@@ -659,7 +659,7 @@ When enabled, the identity is:
 
 Enabling or disabling the identity on an existing deployment updates the VM in place. It does not replace the VM.
 
-After the apply, use `client_id` from the `deployment_identity` output as `client_id` in the Azure Sandbox `terraform.tfvars`, together with `auth_mode = "managed_identity"`. For the Sandbox deployment workflow, set these in `SANDBOX_TFVARS_HCL` in both the `sandbox-deployment` and `sandbox-release-gate` environments.
+After the apply, use `client_id` from the `deployment_identity` output as `client_id` in the Azure Sandbox `terraform.tfvars`, together with `auth_mode = "managed_identity"`. For the Sandbox deployment workflow, set these in `SANDBOX_TFVARS_HCL` in both the `sandbox-deployment` and `sandbox-release-gate` environments, and set the `SANDBOX_AUTH_MODE` repository variable to `managed_identity`.
 
 If the sandbox will be deployed with the `mssql` module enabled, the identity also needs the Microsoft Graph `Group.Create`, `GroupMember.Read.All`, `User.Read.All` and `Application.Read.All` application permissions, which this configuration cannot grant. A Privileged Role Administrator (the least privileged Entra role that can grant them; Global Administrator also works) must grant them once, after the identity is created. If your organization uses PIM, activate Privileged Role Administrator for the grant and deactivate it afterward:
 
@@ -718,7 +718,7 @@ After the apply, complete these one-time steps:
    ```
 
    If the repository uses a different template, follow your organization's policy rather than overriding it. Any other workflow that federates to Azure from this repository must use subjects in the same format. If a sign-in fails with `AADSTS70021`, the error shows the subject GitHub presented. Compare it with `github_subjects` in the `deployment_identity` output.
-1. In both the `sandbox-deployment` and `sandbox-release-gate` environments, update `SANDBOX_TFVARS_HCL` to set `auth_mode = "oidc"` and `client_id` to `client_id` from the `deployment_identity` output.
+1. In both the `sandbox-deployment` and `sandbox-release-gate` environments, update `SANDBOX_TFVARS_HCL` to set `auth_mode = "oidc"` and `client_id` to `client_id` from the `deployment_identity` output. Set the `SANDBOX_AUTH_MODE` repository variable to `oidc`.
 1. Optionally, set the `SANDBOX_JIT_MIN_REMAINING_MINUTES` repository or environment variable (default `150`, range `0`-`1440`, where `0` skips the remaining-time check).
 
 ##### Just-in-time deployment roles
@@ -768,7 +768,7 @@ With `deployment_identity = "oidc"`, this configuration also creates a second, s
 * Assigned the built-in `Desktop Virtualization Power On Off Contributor` role on `jumplinux2` only. Despite its name, it's the built-in role for starting and stopping virtual machines. Scoped to the virtual machine, it allows only reading it and changing its power state (start, deallocate, power off and restart). It can't run commands, change extensions or delete the virtual machine. `Virtual Machine Contributor` isn't used because it allows all of those.
 * Given one federated identity credential for the `github_runner_power_state_environment` environment (default `sandbox-runner-power-state`), with a subject in the same format as the deployment identity's. `power_state_identity_github_subject` in the `github_runner` output shows it. The environment must differ from those in `deployment_identity_github_environments`, so a token issued to one identity's jobs is never accepted by the other identity.
 
-With `deployment_identity = "managed_identity"`, this identity isn't created. Don't create the environment or its secrets, and keep `jumplinux2` running: `start_runner` then skips the start and `stop_runner` doesn't run.
+With `deployment_identity = "managed_identity"`, this identity isn't created, and the workflow skips `start_runner` and `stop_runner` when the `SANDBOX_AUTH_MODE` repository variable is `managed_identity`. Keep `jumplinux2` running. The environment and its secrets aren't used, so they can stay in place for a later switch to `oidc`.
 
 Create the `sandbox-runner-power-state` environment in the repository and restrict it to the `main` branch. Don't add required reviewers: the start job waits for the approval of the deployment environment before it starts the virtual machine, so a second approval isn't needed. The workflow uses this environment name, so keep `github_runner_power_state_environment` at its default unless you change the workflow too.
 
@@ -842,12 +842,17 @@ and `workflow_dispatch` in an Actions event policy scoped only to
 The workflow authenticates the sandbox providers with the deployment identity:
 `SANDBOX_TFVARS_HCL` must set `auth_mode` to `managed_identity` or `oidc` and
 `client_id` to the deployment identity's client id, and preflight rejects any
-other mode. With `oidc`, only the `sandbox` job can federate to the deployment
+other mode. The `SANDBOX_AUTH_MODE` repository variable must name the same
+mode: the hosted selection job fails the run if it isn't `managed_identity` or
+`oidc`, uses it to decide whether to run the power state jobs, and preflight
+stops if it differs from `auth_mode`. A repository variable is used because
+job conditions can't read environment secrets or variables, and it keeps the
+mode visible in the repository settings. With `oidc`, only the `sandbox` job can federate to the deployment
 identity, and the jobs that start and deallocate the runner virtual machine use
 a separate identity and environment; see
 [Runner power state identity](#runner-power-state-identity). With
-`managed_identity`, there is no power state identity, so `jumplinux2` must be
-running before the run. Before approving a run, the operator grants the
+`managed_identity`, there is no power state identity, so the power state jobs
+are skipped and `jumplinux2` must be running before the run. Before approving a run, the operator grants the
 identity [time-bound deployment roles](#just-in-time-deployment-roles);
 preflight waits for them and refuses to start unless enough of the grant
 remains. The state backend still uses the virtual machine's system-assigned
