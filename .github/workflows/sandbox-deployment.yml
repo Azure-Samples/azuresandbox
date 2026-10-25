@@ -7,7 +7,9 @@
 # (default) or main branch, chosen by source_branch; no static CI dependency and
 # no release status publication.
 # Both paths: start_runner starts the self-hosted runner VM once the deployment is
-# approved, and stop_runner deallocates it afterwards if this run started it.
+# approved, and stop_runner deallocates it afterwards if this run started it. Both
+# are no-ops with deployment_identity = "managed_identity", where the VM must already
+# be running.
 name: Azure Sandbox deployment
 run-name: Sandbox sandbox-${{ github.run_id }} / ${{ github.event_name == 'pull_request_target' && 'unit-test' || format('{0} / {1}', inputs.run_through, inputs.source_branch) }}
 
@@ -348,10 +350,11 @@ jobs:
       name: ${{ needs.selection.outputs.environment }}
       url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     timeout-minutes: 180
-    # id-token: write lets this job, and only this job, exchange a GitHub OIDC token for the deployment identity
-    # (auth_mode = "oidc"). The identity's federated credentials accept only this workflow on main in the deployment
-    # environments, and it has no deployment rights until the operator grants its time-bound roles. (start_runner and
-    # stop_runner also request tokens, but in their own environment, which only the runner power state identity trusts.)
+    # The job signs in as the deployment identity: with auth_mode = "managed_identity", the identity attached to the
+    # runner VM; with auth_mode = "oidc", by exchanging a GitHub OIDC token (id-token: write). Its federated credentials
+    # accept only this workflow on main in the deployment environments. In both modes the identity has no deployment
+    # rights until the operator grants its time-bound roles. (start_runner and stop_runner also request tokens, but in
+    # their own environment, which only the runner power state identity trusts.)
     permissions:
       contents: read
       id-token: write
@@ -457,7 +460,8 @@ jobs:
   # it (sandbox must not need this job). It signs in as the runner power state identity,
   # which can only read, start and deallocate the runner VM, through the
   # sandbox-runner-power-state environment (main only, no reviewers). Its script comes
-  # from the trusted workflow commit, never from the deployment source.
+  # from the trusted workflow commit, never from the deployment source. Without the
+  # RUNNER_POWER_STATE_CLIENT_ID secret (managed_identity), it doesn't start the VM.
   start_runner:
     name: Start runner VM after approval
     needs: [selection, pending_status, static_ci]
