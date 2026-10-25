@@ -441,9 +441,15 @@ function Invoke-SandboxPreflight {
     $expression = 'jsonencode({auth_mode=var.auth_mode,client_id=var.client_id,entra_tenant_id=var.entra_tenant_id,subscription_id=var.subscription_id,base=[var.enable_module_vnet_app,var.enable_module_vm_jumpbox_linux,var.enable_module_vm_mssql_win,var.enable_module_mssql,var.enable_module_mysql,var.enable_module_vwan],extras=[var.enable_module_avd,var.enable_module_petstore,var.enable_module_vnet_onprem]})' + "`n"
     $console = Get-SandboxOutput -Arguments @('terraform', 'console', '-no-color') -Name 'console.txt' -InputText $expression
     $deploymentProfile = ConvertFrom-Json -AsHashtable -InputObject (ConvertFrom-Json -InputObject $console)
+    # Release runs deploy every base module. Manual runs may choose any base modules, but vnet_app (index 0) is required
+    # because the others depend on it.
+    $baseModules = @($deploymentProfile.base)
+    $baseInvalid = if ($env:GITHUB_EVENT_NAME -ceq 'workflow_dispatch') {
+        @($baseModules | Where-Object { $_ -isnot [bool] }).Count -gt 0 -or $baseModules.Count -eq 0 -or $baseModules[0] -ne $true
+    }
+    else { @($baseModules | Where-Object { $_ -isnot [bool] -or -not $_ }).Count -gt 0 }
     if ($deploymentProfile.auth_mode -cnotin @('managed_identity', 'oidc') -or $deploymentProfile.entra_tenant_id -cne $backend.tenant_id -or
-        $deploymentProfile.subscription_id -cne $backend.subscription_id -or -not $deploymentProfile.client_id -or
-        @($deploymentProfile.base | Where-Object { $_ -isnot [bool] -or -not $_ }).Count -gt 0 -or
+        $deploymentProfile.subscription_id -cne $backend.subscription_id -or -not $deploymentProfile.client_id -or $baseInvalid -or
         @($deploymentProfile.extras | Where-Object { $_ -isnot [bool] -or $_ }).Count -gt 0) {
         Stop-SandboxStage 'Inputs do not match the approved authentication mode, backend, or module scope.'
     }

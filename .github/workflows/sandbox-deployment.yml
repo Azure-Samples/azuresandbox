@@ -3,9 +3,9 @@
 # first runs the six static CI workflows (ci-*.yml, called below) against its
 # exact head SHA and full diff. Only after they pass and a live recheck of the PR
 # succeeds does the environment-protected deployment job request approval.
-# Manual path (workflow_dispatch): deploys the tip of this repository's vnext
-# (default) or main branch, chosen by source_branch; no static CI dependency and
-# no release status publication.
+# Manual path (workflow_dispatch): deploys the tip of this repository's main
+# (default) or vnext branch, chosen by source_branch, through apply by default;
+# no static CI dependency and no release status publication.
 # Both paths: the SANDBOX_AUTH_MODE repository variable (managed_identity or oidc)
 # must match auth_mode in SANDBOX_TFVARS_HCL. With oidc, start_runner starts the
 # self-hosted runner VM once the deployment is approved, and stop_runner deallocates
@@ -24,12 +24,12 @@ on:
         description: Run through this stage
         type: choice
         options: [preflight, apply, unit-test]
-        default: preflight
+        default: apply
       source_branch:
         description: Deploy source code from this branch
         type: choice
         options: [vnext, main]
-        default: vnext
+        default: main
 
 permissions:
   contents: read

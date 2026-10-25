@@ -46,6 +46,7 @@ with open(f"{work}/select.sh", "w", encoding="utf-8") as f:
 checkout = [s for s in doc["jobs"]["sandbox"]["steps"] if str(s.get("uses", "")).startswith("actions/checkout@")]
 facts = {
     "source_input": triggers["workflow_dispatch"]["inputs"].get("source_branch"),
+    "run_through_input": triggers["workflow_dispatch"]["inputs"].get("run_through"),
     "select_env": steps[0].get("env", {}),
     "checkout": [s.get("with", {}) for s in checkout],
     "job_if": {name: doc["jobs"][name].get("if", "") for name in ("pending_status", "static_ci", "deployment_status")},
@@ -280,11 +281,18 @@ auth_mode=oidc
 # --- Static wiring ------------------------------------------------------------
 facts="$work/facts.json"
 
-name="source_branch input is a vnext/main choice defaulting to vnext"
-if jq -e '.source_input | .type == "choice" and .options == ["vnext", "main"] and .default == "vnext"' "$facts" > /dev/null; then
+name="source_branch input is a vnext/main choice defaulting to main"
+if jq -e '.source_input | .type == "choice" and .options == ["vnext", "main"] and .default == "main"' "$facts" > /dev/null; then
     pass "$name"
 else
     fail "$name" "$(jq -c '.source_input' "$facts")"
+fi
+
+name="run_through input is a stage choice defaulting to apply"
+if jq -e '.run_through_input | .type == "choice" and .options == ["preflight", "apply", "unit-test"] and .default == "apply"' "$facts" > /dev/null; then
+    pass "$name"
+else
+    fail "$name" "$(jq -c '.run_through_input' "$facts")"
 fi
 
 name="selection step reads the manual input only through env"
