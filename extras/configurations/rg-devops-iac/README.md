@@ -791,9 +791,10 @@ The jobs don't coordinate with other runs, because the deployment workflow doesn
 
 The VM can serve as a GitHub Actions self-hosted runner for the
 [Sandbox deployment workflow](../../../.github/workflows/sandbox-deployment.yml),
-a manually triggered deployment with all base modules enabled and
-post-deployment unit/integration testing in three stages: `preflight`,
-`apply`, and `unit-test`. Each deployment uses its own state key, and runner
+a deployment with post-deployment unit/integration testing in three stages:
+`preflight`, `apply`, and `unit-test`. Release runs must enable every base
+module. Manual runs may enable any base modules, as long as `vnet_app` is
+enabled. Extra modules must stay disabled in both. Each deployment uses its own state key, and runner
 logs stay private.
 The unit-test stage publishes default-sanitized JSON evidence as
 workflow artifacts on both test success and failure; raw logs and plans stay
@@ -824,10 +825,10 @@ and do not deploy; opening or reopening a ready PR, marking it ready, updating
 its head, or retargeting it to `main` starts a fresh run.
 PR runs use the separate `sandbox-release-gate` environment and always run
 all stages with checkout pinned to the exact PR head SHA. Manual dispatch
-retains `sandbox-deployment` and its stage selector, and does not run or wait
-for static CI. Its `source_branch` input chooses which branch of this
-repository to deploy: `vnext` (the default, matching earlier runs) or `main`
-for released code. Both sources support every stage. The hosted selection job
+retains `sandbox-deployment` and its stage selector (`run_through`, default
+`apply`), and does not run or wait for static CI. Its `source_branch` input
+chooses which branch of this repository to deploy: `main` (the default) for
+released code or `vnext`. Both sources support every stage. The hosted selection job
 rejects any other value before checkout or environment-secret access, then
 checks out the branch tip as `refs/heads/<branch>`. The run name and summary
 show the selected source, and the stage results report the deployed commit.
