@@ -112,7 +112,23 @@ Only owners open and merge the `vnext` → `main` release PR:
 4. A fresh sandbox is deployed and the unit and integration tests run.
 5. If everything passes, merge with a **merge commit**.
 
-Every push, and every time the PR is marked ready again, starts a fresh run; results from an earlier commit are never reused. **Re-run failed jobs** isn't supported. To retry, convert the PR to a draft and mark it ready again, or close and reopen it. Status and evidence requirements are documented in the [rg-devops-iac deployment guide](extras/configurations/rg-devops-iac/README.md).
+Every push, and every time the PR is marked ready again, starts a fresh run; results from an earlier commit are never reused. **Re-run failed jobs** isn't supported. To retry, convert the PR to a draft and mark it ready again, or close and reopen it. The workflow's design and configuration are in the [rg-devops-iac deployment guide](extras/configurations/rg-devops-iac/README.md#github-actions-workflow-design).
+
+#### Release deployment gate
+
+The release PR's required statuses are all published by GitHub-hosted jobs in the [deployment workflow](.github/workflows/sandbox-deployment.yml) or the [source policy workflow](.github/workflows/main-source-policy.yml):
+
+| Status | Success when |
+| --- | --- |
+| `main-source-eligibility` | The PR's source is this repo's `vnext` branch. |
+| `release-static-ci` | Each of `ci-bash`, `ci-powershell`, `ci-docs`, `ci-actions`, `ci-secrets` and `ci-terraform` reports `pass` or `not-applicable`, and a live recheck finds the PR open, ready, and unchanged in head, base and source. |
+| `sandbox-deployment-gate` and `Publish release deployment status` | Preflight, apply, unit-test, stage reporting and evidence upload all succeed, and the JSON evidence reports exit code 0, `result = "pass"`, passing counts above zero, and no failed tests or suites. |
+
+- **Triggers.** Opening, reopening, marking ready, pushing to, or retargeting the PR to `main` starts a fresh run. Drafts and title or description edits run nothing and don't overwrite statuses.
+- **Static CI.** The six workflows run from the trusted `main` revision against the exact head SHA, read-only, with no secrets, write tokens or caches. Path filters apply to the full release diff from the merge base with `main`. `not-applicable` means change detection succeeded and found no relevant files; `gitleaks` and both `terraform validate` checks always run. Results from topic-PR, push or manual runs are never reused, and the CLA check isn't part of it.
+- **Pending first.** Both release statuses are published as pending on the head SHA before static CI starts. Missing evidence, skipped stages, failures and cancellations never produce success; an API outage can leave a status pending.
+- **Recheck after approval.** Before checkout or any Azure access, the deployment job confirms the PR is unchanged and this attempt owns a passing `release-static-ci`.
+- **No overwrites.** Status writers use a per-SHA lock and attempt-specific run links, so an older attempt can't overwrite a newer one. No workflow closes or merges a PR.
 
 ### Branch protection
 
@@ -139,13 +155,14 @@ The [deployment workflow](.github/workflows/sandbox-deployment.yml) signs in to 
 | `sandbox-deployment`, `sandbox-release-gate` and `sandbox-runner-power-state` deployment branches | `main` only |
 | Required reviewers | Owners, in `sandbox-deployment` and `sandbox-release-gate`. None in `sandbox-runner-power-state` |
 | **Allow administrators to bypass configured protection rules** | Off in `sandbox-release-gate`, so admins can't skip release deployment approval. On in `sandbox-deployment`, so an admin can start a manual deployment without approval |
+| Actions event policy | Allows `pull_request_target` and `workflow_dispatch`, scoped only to `.github/workflows/sandbox-deployment.yml` |
 | Repository variable | `SANDBOX_AUTH_MODE`: `managed_identity` or `oidc`, matching `auth_mode` in `SANDBOX_TFVARS_HCL`. Runs fail without it, and the runner power state jobs run only with `oidc` |
 | Environment secrets | `SANDBOX_BACKEND_HCL` and `SANDBOX_TFVARS_HCL`, with `auth_mode = "managed_identity"` or `"oidc"`, in `sandbox-deployment` and `sandbox-release-gate`. With `oidc` only: `RUNNER_POWER_STATE_CLIENT_ID`, `AZURE_TENANT_ID` and `RUNNER_VM_ID` in `sandbox-runner-power-state` |
 | OIDC subject claim template | `use_default: false` with `include_claim_keys` `repository_owner_id`, `repository_id` and `context` |
 
 `sandbox-runner-power-state` is used by the `start_runner` and `stop_runner` jobs, which start the self-hosted runner virtual machine after a deployment is approved and deallocate it afterwards. It has no reviewers because `start_runner` waits for the deployment's own approval before it starts anything, and its identity can only read, start and deallocate that one virtual machine. Don't add it to `deployment_identity_github_environments`, and don't use it for any other job. See [Runner power state identity](extras/configurations/rg-devops-iac/README.md#runner-power-state-identity).
 
-Don't change the OIDC subject claim template. It changes the subject of every OIDC token the repository issues, and the federated credentials only accept this format. Check it with `gh api repos/Azure-Samples/azuresandbox/actions/oidc/customization/sub`. A new environment can't federate to the deployment identity until its name is added to `deployment_identity_github_environments` in rg-devops-iac. See the [rg-devops-iac deployment guide](extras/configurations/rg-devops-iac/README.md#optional-deployment-identity-for-oidc-workflow-applies).
+Don't change the OIDC subject claim template. It changes the subject of every OIDC token the repository issues, and the federated credentials only accept this format. Check it with `gh api repos/Azure-Samples/azuresandbox/actions/oidc/customization/sub`. A new environment can't federate to the deployment identity until its name is added to `deployment_identity_github_environments` in rg-devops-iac. See the [rg-devops-iac deployment guide](extras/configurations/rg-devops-iac/README.md#deployment-identity).
 
 ### Emergency merges
 
