@@ -3,11 +3,14 @@
 # first runs the six static CI workflows (ci-*.yml, called below) against its
 # exact head SHA and full diff. Only after they pass and a live recheck of the PR
 # succeeds does the environment-protected deployment job request approval.
-# Manual path (workflow_dispatch): deploys the tip of this repository's vnext
-# (default) or main branch, chosen by source_branch; no static CI dependency and
-# no release status publication.
-# Both paths: start_runner starts the self-hosted runner VM once the deployment is
-# approved, and stop_runner deallocates it afterwards if this run started it.
+# Manual path (workflow_dispatch): deploys the tip of this repository's main
+# (default) or vnext branch, chosen by source_branch, through apply by default;
+# no static CI dependency and no release status publication.
+# Both paths: the SANDBOX_AUTH_MODE repository variable (managed_identity or oidc)
+# must match auth_mode in SANDBOX_TFVARS_HCL. With oidc, start_runner starts the
+# self-hosted runner VM once the deployment is approved, and stop_runner deallocates
+# it afterwards if this run started it. With managed_identity both are skipped, and
+# the runner VM must already be running.
 name: Azure Sandbox deployment
 run-name: Sandbox sandbox-${{ github.run_id }} / ${{ github.event_name == 'pull_request_target' && 'unit-test' || format('{0} / {1}', inputs.run_through, inputs.source_branch) }}
 
@@ -21,12 +24,12 @@ on:
         description: Run through this stage
         type: choice
         options: [preflight, apply, unit-test]
-        default: preflight
+        default: apply
       source_branch:
         description: Deploy source code from this branch
         type: choice
         options: [vnext, main]
-        default: vnext
+        default: main
 
 permissions:
   contents: read
@@ -46,6 +49,7 @@ jobs:
       base_sha: ${{ steps.select.outputs.base_sha }}
       run_through: ${{ steps.select.outputs.run_through }}
       environment: ${{ steps.select.outputs.environment }}
+      auth_mode: ${{ steps.select.outputs.auth_mode }}
     steps:
       # No checkout or environment secrets until the event is eligible.
       - name: Select trusted deployment path
@@ -53,12 +57,20 @@ jobs:
         env:
           MANUAL_RUN_THROUGH: ${{ inputs.run_through }}
           MANUAL_SOURCE_BRANCH: ${{ inputs.source_branch }}
+          SANDBOX_AUTH_MODE: ${{ vars.SANDBOX_AUTH_MODE }}
         run: |
           set -euo pipefail
           if [[ "$GITHUB_REF" != refs/heads/main ]]; then
             echo "::error::Run the registered workflow in the trusted main context."
             exit 1
           fi
+          # Checked only when deploying, so draft and metadata-only PR events don't fail.
+          require_auth_mode() {
+            case "${SANDBOX_AUTH_MODE:-}" in
+              managed_identity|oidc) ;;
+              *) echo "::error::Set the SANDBOX_AUTH_MODE repository variable to managed_identity or oidc."; exit 1 ;;
+            esac
+          }
           case "$GITHUB_EVENT_NAME" in
             workflow_dispatch)
               case "$MANUAL_RUN_THROUGH" in
@@ -70,14 +82,16 @@ jobs:
                 vnext|main) ;;
                 *) echo "::error::Invalid deployment source. Choose vnext or main."; exit 1 ;;
               esac
+              require_auth_mode
               {
                 echo "source_ref=refs/heads/$MANUAL_SOURCE_BRANCH"
                 echo "run_through=$MANUAL_RUN_THROUGH"
                 echo "environment=sandbox-deployment"
+                echo "auth_mode=$SANDBOX_AUTH_MODE"
                 echo "deploy=true"
               } >> "$GITHUB_OUTPUT"
-              printf "## Deployment source\n\nManual run: \`%s\` branch, through \`%s\`, environment \`sandbox-deployment\`.\n" \
-                "$MANUAL_SOURCE_BRANCH" "$MANUAL_RUN_THROUGH" >> "$GITHUB_STEP_SUMMARY"
+              printf "## Deployment source\n\nManual run: \`%s\` branch, through \`%s\`, environment \`sandbox-deployment\`, auth mode \`%s\`.\n" \
+                "$MANUAL_SOURCE_BRANCH" "$MANUAL_RUN_THROUGH" "$SANDBOX_AUTH_MODE" >> "$GITHUB_STEP_SUMMARY"
               ;;
             pull_request_target)
               if ! jq -e --arg repository "$GITHUB_REPOSITORY" '
@@ -105,11 +119,13 @@ jobs:
               fi
               head_sha="$(jq -er '.pull_request.head.sha' "$GITHUB_EVENT_PATH")"
               base_sha="$(jq -er '.pull_request.base.sha' "$GITHUB_EVENT_PATH")"
+              require_auth_mode
               {
                 printf 'source_ref=%s\n' "$head_sha"
                 printf 'base_sha=%s\n' "$base_sha"
                 echo "run_through=unit-test"
                 echo "environment=sandbox-release-gate"
+                echo "auth_mode=$SANDBOX_AUTH_MODE"
                 echo "deploy=true"
               } >> "$GITHUB_OUTPUT"
               ;;
@@ -348,16 +364,18 @@ jobs:
       name: ${{ needs.selection.outputs.environment }}
       url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     timeout-minutes: 180
-    # id-token: write lets this job, and only this job, exchange a GitHub OIDC token for the deployment identity
-    # (auth_mode = "oidc"). The identity's federated credentials accept only this workflow on main in the deployment
-    # environments, and it has no deployment rights until the operator grants its time-bound roles. (start_runner and
-    # stop_runner also request tokens, but in their own environment, which only the runner power state identity trusts.)
+    # The job signs in as the deployment identity: with auth_mode = "managed_identity", the identity attached to the
+    # runner VM; with auth_mode = "oidc", by exchanging a GitHub OIDC token (id-token: write). Its federated credentials
+    # accept only this workflow on main in the deployment environments. In both modes the identity has no deployment
+    # rights until the operator grants its time-bound roles. (start_runner and stop_runner also request tokens, but in
+    # their own environment, which only the runner power state identity trusts.)
     permissions:
       contents: read
       id-token: write
       pull-requests: read
       statuses: read
     env:
+      SANDBOX_AUTH_MODE: ${{ needs.selection.outputs.auth_mode }}
       SANDBOX_JIT_MIN_REMAINING_MINUTES: ${{ vars.SANDBOX_JIT_MIN_REMAINING_MINUTES }}
       SANDBOX_RUN_THROUGH: ${{ needs.selection.outputs.run_through }}
       SANDBOX_SOURCE_SHA: ${{ github.event_name == 'pull_request_target' && needs.selection.outputs.source_ref || '' }}
@@ -457,11 +475,13 @@ jobs:
   # it (sandbox must not need this job). It signs in as the runner power state identity,
   # which can only read, start and deallocate the runner VM, through the
   # sandbox-runner-power-state environment (main only, no reviewers). Its script comes
-  # from the trusted workflow commit, never from the deployment source.
+  # from the trusted workflow commit, never from the deployment source. Skipped, with
+  # stop_runner, when SANDBOX_AUTH_MODE is managed_identity: that mode has no power
+  # state identity, so the runner VM must already be running.
   start_runner:
     name: Start runner VM after approval
     needs: [selection, pending_status, static_ci]
-    if: ${{ !cancelled() && needs.selection.result == 'success' && needs.selection.outputs.deploy == 'true' && (github.event_name == 'workflow_dispatch' || (needs.pending_status.result == 'success' && needs.static_ci.result == 'success')) }}
+    if: ${{ !cancelled() && needs.selection.result == 'success' && needs.selection.outputs.deploy == 'true' && (github.event_name == 'workflow_dispatch' || (needs.pending_status.result == 'success' && needs.static_ci.result == 'success')) && needs.selection.outputs.auth_mode == 'oidc' }}
     runs-on: ubuntu-latest
     environment: sandbox-runner-power-state
     timeout-minutes: 100

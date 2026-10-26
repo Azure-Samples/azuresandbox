@@ -11,11 +11,12 @@
 # Works for any deployment identity: the service principal used with auth_mode = "client_secret", or the
 # user-assigned managed identity this configuration creates (deployment_identity = "managed_identity").
 #
-# Must be run with Azure CLI signed in as a Microsoft Entra Privileged Role Administrator or Global
-# Administrator. Azure RBAC roles, including subscription Owner, cannot grant application permissions.
+# Must be run with Azure CLI signed in as a Microsoft Entra Privileged Role Administrator, the least privileged
+# role that can grant Microsoft Graph application permissions (Global Administrator also works). Azure RBAC
+# roles, including subscription Owner, cannot grant application permissions.
 #
 # Usage: ./scripts/grant-graph-permissions.sh [client-id-or-object-id]
-# The identity defaults to the 'deployment_identity_principal_id' terraform output.
+# The identity defaults to 'principal_id' in the 'deployment_identity' terraform output, which requires jq.
 # The script is idempotent: permissions that are already granted are skipped.
 
 set -euo pipefail
@@ -29,10 +30,15 @@ GRAPH_PERMISSIONS=("Group.Create" "GroupMember.Read.All" "User.Read.All" "Applic
 if [[ $# -ge 1 ]]; then
   IDENTITY="$1"
 else
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "Error: jq is required to read the 'deployment_identity' terraform output. Install jq, or pass the identity."
+    echo "Usage: $0 [client-id-or-object-id]"
+    exit 1
+  fi
   echo "Retrieving deployment identity principal id from terraform output..."
-  IDENTITY=$(terraform -chdir="${TERRAFORM_DIR}" output -raw deployment_identity_principal_id 2>/dev/null) || IDENTITY=""
-  if [[ -z "${IDENTITY}" || "${IDENTITY}" == "null" ]]; then
-    echo "Error: 'deployment_identity_principal_id' terraform output is empty."
+  IDENTITY=$(terraform -chdir="${TERRAFORM_DIR}" output -json deployment_identity 2>/dev/null | jq -r '.principal_id // empty') || IDENTITY=""
+  if [[ -z "${IDENTITY}" ]]; then
+    echo "Error: 'principal_id' in the 'deployment_identity' terraform output is empty."
     echo "Set deployment_identity = \"managed_identity\" and run 'terraform apply', or pass the identity."
     echo "Usage: $0 [client-id-or-object-id]"
     exit 1

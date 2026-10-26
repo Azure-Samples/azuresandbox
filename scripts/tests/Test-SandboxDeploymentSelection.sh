@@ -8,7 +8,8 @@
 # test always exercises the exact code that ships. Also asserts the manual
 # source_branch input, the checkout/status wiring that depend on it, that only
 # the sandbox job and the runner power state jobs (start_runner, stop_runner) can
-# request a GitHub OIDC token (id-token: write), and the power state jobs' wiring.
+# request a GitHub OIDC token (id-token: write), the SANDBOX_AUTH_MODE repository
+# variable check, and the power state jobs' wiring (oidc only).
 #
 # Usage: ./scripts/tests/Test-SandboxDeploymentSelection.sh
 # Requires: bash, jq, python3 with PyYAML. Exit code 0 only if every case passes.
@@ -45,6 +46,7 @@ with open(f"{work}/select.sh", "w", encoding="utf-8") as f:
 checkout = [s for s in doc["jobs"]["sandbox"]["steps"] if str(s.get("uses", "")).startswith("actions/checkout@")]
 facts = {
     "source_input": triggers["workflow_dispatch"]["inputs"].get("source_branch"),
+    "run_through_input": triggers["workflow_dispatch"]["inputs"].get("run_through"),
     "select_env": steps[0].get("env", {}),
     "checkout": [s.get("with", {}) for s in checkout],
     "job_if": {name: doc["jobs"][name].get("if", "") for name in ("pending_status", "static_ci", "deployment_status")},
@@ -56,6 +58,7 @@ facts = {
     "sandbox_name": doc["jobs"]["sandbox"].get("name"),
     "sandbox_needs": doc["jobs"]["sandbox"].get("needs"),
     "sandbox_if": doc["jobs"]["sandbox"].get("if"),
+    "sandbox_auth_mode": doc["jobs"]["sandbox"].get("env", {}).get("SANDBOX_AUTH_MODE"),
     "power": {name: {
         "runs_on": doc["jobs"][name].get("runs-on"),
         "environment": doc["jobs"][name].get("environment"),
@@ -94,6 +97,8 @@ write_pr_event() {
 
 # run_select <case dir> <event name> <ref> <run_through> <source_branch> [event file]
 # Runs the step like GitHub's bash shell (bash -e -o pipefail) in a clean env.
+# SANDBOX_AUTH_MODE comes from $auth_mode (default oidc).
+auth_mode=oidc
 run_select() {
     local dir="$1"
     mkdir -p "$dir"
@@ -103,7 +108,7 @@ run_select() {
         GITHUB_EVENT_NAME="$2" GITHUB_REF="$3" GITHUB_REPOSITORY="$repository" \
         GITHUB_EVENT_PATH="${6:-/dev/null}" GITHUB_OUTPUT="$dir/output" \
         GITHUB_STEP_SUMMARY="$dir/summary" \
-        MANUAL_RUN_THROUGH="$4" MANUAL_SOURCE_BRANCH="$5" \
+        MANUAL_RUN_THROUGH="$4" MANUAL_SOURCE_BRANCH="$5" SANDBOX_AUTH_MODE="$auth_mode" \
         bash --noprofile --norc -e -o pipefail "$work/select.sh" > "$dir/log" 2>&1
 }
 
@@ -123,6 +128,7 @@ for source in vnext main; do
         elif ! output_is "$dir" "source_ref=refs/heads/$source
 run_through=$stage
 environment=sandbox-deployment
+auth_mode=oidc
 deploy=true"; then
             fail "$name" "unexpected outputs: $(tr '\n' ' ' < "$dir/output")"
         elif ! grep -q "\`$source\` branch" "$dir/summary"; then
@@ -178,6 +184,7 @@ for source in "" main; do
 base_sha=$base_sha
 run_through=unit-test
 environment=sandbox-release-gate
+auth_mode=oidc
 deploy=true"; then
         fail "$name" "unexpected outputs: $(tr '\n' ' ' < "$dir/output")"
     else
@@ -219,14 +226,73 @@ for filter in '.pull_request.head.repo.full_name = "someone/fork"' '.pull_reques
     fi
 done
 
+# --- SANDBOX_AUTH_MODE repository variable ------------------------------------
+auth_mode=managed_identity
+name="manual auth_mode=managed_identity"
+dir="$(next_dir)"
+if run_select "$dir" workflow_dispatch refs/heads/main apply main && grep -qx 'auth_mode=managed_identity' "$dir/output" &&
+    grep -q 'auth mode `managed_identity`' "$dir/summary"; then
+    pass "$name"
+else
+    fail "$name" "$(cat "$dir/log") $(tr '\n' ' ' < "$dir/output")"
+fi
+
+name="release PR auth_mode=managed_identity"
+dir="$(next_dir)"
+write_pr_event "$dir.json"
+if run_select "$dir" pull_request_target refs/heads/main "" "" "$dir.json" && grep -qx 'auth_mode=managed_identity' "$dir/output"; then
+    pass "$name"
+else
+    fail "$name" "$(cat "$dir/log") $(tr '\n' ' ' < "$dir/output")"
+fi
+
+for auth_mode in "" client_secret OIDC "oidc "; do
+    name="manual invalid SANDBOX_AUTH_MODE='$auth_mode'"
+    dir="$(next_dir)"
+    if run_select "$dir" workflow_dispatch refs/heads/main apply main || [[ -s "$dir/output" ]]; then
+        fail "$name" "was accepted or wrote outputs"
+    elif ! grep -q 'SANDBOX_AUTH_MODE repository variable' "$dir/log"; then
+        fail "$name" "missing explicit error: $(cat "$dir/log")"
+    else
+        pass "$name"
+    fi
+
+    name="release PR invalid SANDBOX_AUTH_MODE='$auth_mode'"
+    dir="$(next_dir)"
+    write_pr_event "$dir.json"
+    if run_select "$dir" pull_request_target refs/heads/main "" "" "$dir.json" || [[ -s "$dir/output" ]]; then
+        fail "$name" "was accepted or wrote outputs"
+    else
+        pass "$name"
+    fi
+done
+
+auth_mode=""
+name="release PR draft with SANDBOX_AUTH_MODE unset doesn't fail"
+dir="$(next_dir)"
+write_pr_event "$dir.json" '.pull_request.draft = true'
+if run_select "$dir" pull_request_target refs/heads/main "" "" "$dir.json" && output_is "$dir" "deploy=false"; then
+    pass "$name"
+else
+    fail "$name" "$(cat "$dir/log")"
+fi
+auth_mode=oidc
+
 # --- Static wiring ------------------------------------------------------------
 facts="$work/facts.json"
 
-name="source_branch input is a vnext/main choice defaulting to vnext"
-if jq -e '.source_input | .type == "choice" and .options == ["vnext", "main"] and .default == "vnext"' "$facts" > /dev/null; then
+name="source_branch input is a vnext/main choice defaulting to main"
+if jq -e '.source_input | .type == "choice" and .options == ["vnext", "main"] and .default == "main"' "$facts" > /dev/null; then
     pass "$name"
 else
     fail "$name" "$(jq -c '.source_input' "$facts")"
+fi
+
+name="run_through input is a stage choice defaulting to apply"
+if jq -e '.run_through_input | .type == "choice" and .options == ["preflight", "apply", "unit-test"] and .default == "apply"' "$facts" > /dev/null; then
+    pass "$name"
+else
+    fail "$name" "$(jq -c '.run_through_input' "$facts")"
 fi
 
 name="selection step reads the manual input only through env"
@@ -235,6 +301,15 @@ if jq -e '.select_env.MANUAL_SOURCE_BRANCH == "${{ inputs.source_branch }}"' "$f
     pass "$name"
 else
     fail "$name" "MANUAL_SOURCE_BRANCH env wiring missing or inputs interpolated into the script"
+fi
+
+name="selection step reads SANDBOX_AUTH_MODE only through env, and sandbox gets the validated value"
+if jq -e '.select_env.SANDBOX_AUTH_MODE == "${{ vars.SANDBOX_AUTH_MODE }}" and
+    .sandbox_auth_mode == "${{ needs.selection.outputs.auth_mode }}"' "$facts" > /dev/null &&
+    ! grep -q 'vars\.' "$work/select.sh"; then
+    pass "$name"
+else
+    fail "$name" "$(jq -c '{select_env, sandbox_auth_mode}' "$facts")"
 fi
 
 name="sandbox checkout uses the validated source_ref from this repository"
@@ -276,9 +351,10 @@ else
     fail "$name" "$(jq -c '.power | map_values(.checkout)' "$facts")"
 fi
 
-name="start_runner runs alongside sandbox and watches it by name"
+name="start_runner runs alongside sandbox, only for oidc, and watches it by name"
 if jq -e '(.sandbox_needs | index("start_runner") | not) and
-    .power.start_runner.needs == .sandbox_needs and .power.start_runner.if == .sandbox_if and
+    .power.start_runner.needs == .sandbox_needs and
+    .power.start_runner.if == (.sandbox_if | sub(" }}$"; " && needs.selection.outputs.auth_mode == '\''oidc'\'' }}")) and
     .power.start_runner.job_name_env == .sandbox_name' "$facts" > /dev/null; then
     pass "$name"
 else
