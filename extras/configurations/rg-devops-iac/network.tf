@@ -1,52 +1,24 @@
 #region vnets-and-subnets
 resource "azurerm_virtual_network" "this" {
-  name                = "${module.naming.virtual_network.name}-${var.vnet_name}"
+  name                = module.naming.virtual_network.name
   location            = var.location
   resource_group_name = azurerm_resource_group.this.name
   address_space       = [var.vnet_address_space]
   dns_servers         = ["168.63.129.16"]
 }
 
-resource "azurerm_monitor_diagnostic_setting" "virtual_network" {
-  name                       = "Diagnostic Logs"
-  target_resource_id         = azurerm_virtual_network.this.id
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
-
-  enabled_log {
-    category_group = "allLogs"
-  }
-
-  enabled_metric {
-    category = "AllMetrics"
-  }
-}
-
-resource "azurerm_subnet" "devops" {
-  name                            = var.subnet_name
-  resource_group_name             = azurerm_resource_group.this.name
-  virtual_network_name            = azurerm_virtual_network.this.name
-  address_prefixes                = [var.subnet_address_prefix]
-  default_outbound_access_enabled = false
+resource "azurerm_subnet" "subnets" {
+  for_each                          = local.subnets
+  name                              = each.key
+  resource_group_name               = azurerm_resource_group.this.name
+  virtual_network_name              = azurerm_virtual_network.this.name
+  address_prefixes                  = [each.value.address_prefix]
+  private_endpoint_network_policies = each.value.private_endpoint_network_policies
+  default_outbound_access_enabled   = false
 
   lifecycle {
     ignore_changes = [delegation]
   }
-}
-
-resource "azurerm_subnet" "privatelink" {
-  name                              = var.subnet_privatelink_name
-  resource_group_name               = azurerm_resource_group.this.name
-  virtual_network_name              = azurerm_virtual_network.this.name
-  address_prefixes                  = [var.subnet_privatelink_address_prefix]
-  default_outbound_access_enabled   = false
-  private_endpoint_network_policies = "Disabled"
-}
-
-resource "azurerm_subnet" "bastion" {
-  name                 = "AzureBastionSubnet" # Name is fixed by Azure
-  resource_group_name  = azurerm_resource_group.this.name
-  virtual_network_name = azurerm_virtual_network.this.name
-  address_prefixes     = [var.subnet_bastion_address_prefix]
 }
 #endregion
 
@@ -64,9 +36,11 @@ resource "azurerm_bastion_host" "this" {
   sku               = "Standard"
   tunneling_enabled = true
 
+  depends_on = [azurerm_subnet.subnets]
+
   ip_configuration {
     name                 = "Primary"
-    subnet_id            = azurerm_subnet.bastion.id
+    subnet_id            = azurerm_subnet.subnets["AzureBastionSubnet"].id
     public_ip_address_id = azurerm_public_ip.bastion.id
   }
 
@@ -109,100 +83,76 @@ resource "azurerm_public_ip" "bastion" {
     ignore_changes = [ip_tags]
   }
 }
-
-resource "azurerm_monitor_diagnostic_setting" "public_ip_bastion" {
-  name                       = "Diagnostic Logs"
-  target_resource_id         = azurerm_public_ip.bastion.id
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
-
-  enabled_log {
-    category_group = "allLogs"
-  }
-
-  enabled_metric {
-    category = "AllMetrics"
-  }
-}
 #endregion
 
 #region nsgs
-resource "azurerm_network_security_group" "devops" {
-  name                = "${module.naming.network_security_group.name}-${var.subnet_name}"
+resource "azurerm_network_security_group" "groups" {
+  for_each = { for k, v in local.subnets : k => v if length(v.nsg_rules) > 0 }
+
+  name                = "${module.naming.network_security_group.name}.${each.key}"
   location            = var.location
   resource_group_name = azurerm_resource_group.this.name
-
-  security_rule {
-    name                       = "Allow-SSH"
-    priority                   = 1000
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_ranges    = ["22"]
-    source_address_prefix      = var.subnet_bastion_address_prefix
-    destination_address_prefix = "*"
-  }
 }
 
-resource "azurerm_subnet_network_security_group_association" "devops" {
-  subnet_id                 = azurerm_subnet.devops.id
-  network_security_group_id = azurerm_network_security_group.devops.id
+# Associating an NSG with AzureBastionSubnet before the Bastion host exists causes the Bastion
+# deployment to fail, so every association waits for the Bastion host and the NSG rules.
+resource "azurerm_subnet_network_security_group_association" "associations" {
+  for_each = azurerm_network_security_group.groups
+
+  subnet_id                 = azurerm_subnet.subnets[each.key].id
+  network_security_group_id = azurerm_network_security_group.groups[each.key].id
+
+  depends_on = [
+    azurerm_network_security_rule.rules,
+    azurerm_bastion_host.this
+  ]
 }
 
-resource "azurerm_monitor_diagnostic_setting" "network_security_group_devops" {
-  name                       = "Diagnostic Logs"
-  target_resource_id         = azurerm_network_security_group.devops.id
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
+resource "azurerm_network_security_rule" "rules" {
+  for_each = { for network_security_group_rule in local.network_security_group_rules : "${network_security_group_rule.subnet_name}.${network_security_group_rule.nsg_rule_name}" => network_security_group_rule }
 
-  enabled_log {
-    category_group = "allLogs"
-  }
+  access                      = each.value.access
+  destination_address_prefix  = each.value.destination_address_prefix
+  destination_port_range      = length(each.value.destination_port_ranges) == 1 ? each.value.destination_port_ranges[0] : null
+  destination_port_ranges     = length(each.value.destination_port_ranges) > 1 ? each.value.destination_port_ranges : null
+  direction                   = each.value.direction
+  name                        = each.value.nsg_rule_name
+  network_security_group_name = "${module.naming.network_security_group.name}.${each.value.subnet_name}"
+  priority                    = each.value.priority
+  protocol                    = each.value.protocol
+  resource_group_name         = azurerm_resource_group.this.name
+  source_address_prefix       = each.value.source_address_prefix
+  source_port_range           = length(each.value.source_port_ranges) == 1 ? each.value.source_port_ranges[0] : null
+  source_port_ranges          = length(each.value.source_port_ranges) > 1 ? each.value.source_port_ranges : null
+
+  depends_on = [
+    azurerm_network_security_group.groups
+  ]
 }
 #endregion
 
 #region private-dns-zones
-resource "azurerm_private_dns_zone" "key_vault" {
-  name                = "privatelink.vaultcore.azure.net"
-  resource_group_name = azurerm_resource_group.this.name
-  tags                = var.tags
-}
-
-resource "azurerm_private_dns_zone" "storage_blob" {
-  name                = "privatelink.blob.core.windows.net"
-  resource_group_name = azurerm_resource_group.this.name
-  tags                = var.tags
-}
-
-resource "azurerm_private_dns_zone_virtual_network_link" "key_vault" {
-  name                = "link-${azurerm_private_dns_zone.key_vault.name}-${azurerm_virtual_network.this.name}"
-  private_dns_zone_id = azurerm_private_dns_zone.key_vault.id
-  virtual_network_id  = azurerm_virtual_network.this.id
-  resolution_policy   = "NxDomainRedirect"
-}
-
-
-resource "azurerm_private_dns_zone_virtual_network_link" "storage_blob" {
-  name                = "link-${azurerm_private_dns_zone.storage_blob.name}-${azurerm_virtual_network.this.name}"
-  private_dns_zone_id = azurerm_private_dns_zone.storage_blob.id
-  virtual_network_id  = azurerm_virtual_network.this.id
-  resolution_policy   = "NxDomainRedirect"
-}
-
-resource "azurerm_private_dns_zone" "ampls" {
-  for_each = toset(local.ampls_private_dns_zones)
+resource "azurerm_private_dns_zone" "zones" {
+  for_each = toset(local.private_dns_zones)
 
   name                = each.value
   resource_group_name = azurerm_resource_group.this.name
   tags                = var.tags
 }
 
-resource "azurerm_private_dns_zone_virtual_network_link" "ampls" {
-  for_each = azurerm_private_dns_zone.ampls
+resource "azurerm_private_dns_zone_virtual_network_link" "zones" {
+  for_each = azurerm_private_dns_zone.zones
 
   name                = "link-${each.value.name}-${azurerm_virtual_network.this.name}"
   private_dns_zone_id = each.value.id
   virtual_network_id  = azurerm_virtual_network.this.id
-  resolution_policy   = "NxDomainRedirect"
+  resolution_policy   = "NxDomainRedirect" # Enables fallback to internet when a zone has no record for a name.
+}
+
+# Dependency signal consumed by the private endpoints, so they are not created until every private DNS zone
+# virtual network link exists.
+resource "terraform_data" "private_dns_zone_links_complete" {
+  input = join(",", [for link in azurerm_private_dns_zone_virtual_network_link.zones : link.id])
 }
 #endregion
 
@@ -234,23 +184,11 @@ resource "azurerm_nat_gateway_public_ip_association" "this" {
   public_ip_address_id = azurerm_public_ip.this.id
 }
 
-resource "azurerm_monitor_diagnostic_setting" "public_ip_nat" {
-  name                       = "Diagnostic Logs"
-  target_resource_id         = azurerm_public_ip.this.id
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
-
-  enabled_log {
-    category_group = "allLogs"
-  }
-
-  enabled_metric {
-    category = "AllMetrics"
-  }
-}
-
 resource "azurerm_subnet_nat_gateway_association" "devops" {
-  subnet_id      = azurerm_subnet.devops.id
+  subnet_id      = azurerm_subnet.subnets[var.subnet_devops_name].id
   nat_gateway_id = azurerm_nat_gateway.this.id
+
+  depends_on = [azurerm_subnet_network_security_group_association.associations]
 }
 #endregion
 
@@ -259,7 +197,7 @@ resource "azurerm_private_endpoint" "key_vault" {
   name                = "${module.naming.private_endpoint.name}-key-vault"
   location            = var.location
   resource_group_name = azurerm_resource_group.this.name
-  subnet_id           = azurerm_subnet.privatelink.id
+  subnet_id           = azurerm_subnet.subnets[var.subnet_privatelink_name].id
   tags                = var.tags
 
   private_service_connection {
@@ -271,15 +209,17 @@ resource "azurerm_private_endpoint" "key_vault" {
 
   private_dns_zone_group {
     name                 = "default"
-    private_dns_zone_ids = [azurerm_private_dns_zone.key_vault.id]
+    private_dns_zone_ids = [azurerm_private_dns_zone.zones["privatelink.vaultcore.azure.net"].id]
   }
+
+  depends_on = [terraform_data.private_dns_zone_links_complete]
 }
 
 resource "azurerm_private_endpoint" "storage_blob" {
   name                = "${module.naming.private_endpoint.name}-storage-blob"
   location            = var.location
   resource_group_name = azurerm_resource_group.this.name
-  subnet_id           = azurerm_subnet.privatelink.id
+  subnet_id           = azurerm_subnet.subnets[var.subnet_privatelink_name].id
   tags                = var.tags
 
   private_service_connection {
@@ -291,15 +231,17 @@ resource "azurerm_private_endpoint" "storage_blob" {
 
   private_dns_zone_group {
     name                 = "default"
-    private_dns_zone_ids = [azurerm_private_dns_zone.storage_blob.id]
+    private_dns_zone_ids = [azurerm_private_dns_zone.zones["privatelink.blob.core.windows.net"].id]
   }
+
+  depends_on = [terraform_data.private_dns_zone_links_complete]
 }
 
 resource "azurerm_private_endpoint" "ampls" {
   name                = "${module.naming.private_endpoint.name}-ampls"
   location            = var.location
   resource_group_name = azurerm_resource_group.this.name
-  subnet_id           = azurerm_subnet.privatelink.id
+  subnet_id           = azurerm_subnet.subnets[var.subnet_privatelink_name].id
   tags                = var.tags
 
   private_service_connection {
@@ -311,7 +253,7 @@ resource "azurerm_private_endpoint" "ampls" {
 
   private_dns_zone_group {
     name                 = "default"
-    private_dns_zone_ids = [for zone in local.ampls_private_dns_zones : azurerm_private_dns_zone.ampls[zone].id]
+    private_dns_zone_ids = [for zone in local.ampls_private_dns_zones : azurerm_private_dns_zone.zones[zone].id]
   }
 
   # Creating the private endpoint updates the AMPLS. If the scoped services or the jumplinux2 data collection
@@ -320,8 +262,8 @@ resource "azurerm_private_endpoint" "ampls" {
   depends_on = [
     azurerm_monitor_private_link_scoped_service.dce,
     azurerm_monitor_private_link_scoped_service.log_analytics,
-    azurerm_private_dns_zone_virtual_network_link.ampls,
     module.vm_jumpbox_linux,
+    terraform_data.private_dns_zone_links_complete,
   ]
 }
 #endregion

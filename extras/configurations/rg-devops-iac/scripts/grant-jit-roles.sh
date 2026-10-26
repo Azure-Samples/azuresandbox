@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Grants the OIDC deployment identity (deployment_identity = "oidc") its just-in-time deployment roles before an
-# operator approves a Sandbox deployment workflow run:
+# Grants the deployment identity (deployment_identity = "managed_identity" or "oidc") its just-in-time deployment roles
+# before an Azure Sandbox apply, either a Sandbox deployment workflow run or a manual apply on jumplinux2:
 #   * Contributor                               time-bound active assignment on the subscription.
 #   * Role Based Access Control Administrator   time-bound active assignment on the subscription, constrained by
-#                                               the 'deployment_identity_jit_condition' terraform output.
+#                                               'jit_condition' in the 'deployment_identity' terraform output.
 #
 # Run as the operator with Azure CLI signed in. Creating role assignments requires an active subscription Owner
 # or User Access Administrator assignment. If neither is active, the script activates your eligible Owner
@@ -16,7 +16,7 @@
 #
 # Usage: ./scripts/grant-jit-roles.sh [options]
 #   -H, --hours N             Duration of the time-bound assignments in hours (default 8, range 1-24).
-#   -j, --justification TEXT  Justification recorded with PIM requests (default "Sandbox deployment workflow run").
+#   -j, --justification TEXT  Justification recorded with PIM requests (default "Azure Sandbox apply").
 #   -f, --force               Replace assignments that are already active instead of keeping them.
 #   -r, --revoke              Remove the identity's Contributor and Role Based Access Control Administrator
 #                             assignments instead of granting them.
@@ -44,7 +44,7 @@ GRANT_ROLE_IDS=("${CONTRIBUTOR_ROLE_ID}" "${RBAC_ADMIN_ROLE_ID}")
 MIN_REMAINING_MINUTES="${SANDBOX_JIT_MIN_REMAINING_MINUTES:-150}"
 
 HOURS=8
-JUSTIFICATION="Sandbox deployment workflow run"
+JUSTIFICATION="Azure Sandbox apply"
 FORCE=false
 REVOKE=false
 
@@ -98,14 +98,14 @@ OUTPUTS=$(terraform -chdir="${TERRAFORM_DIR}" output -json) || {
   exit 1
 }
 
-PRINCIPAL_ID=$(jq -r '.deployment_identity_principal_id.value // empty' <<<"${OUTPUTS}")
-CONDITION=$(jq -r '.deployment_identity_jit_condition.value // empty' <<<"${OUTPUTS}")
+PRINCIPAL_ID=$(jq -r '.deployment_identity.value.principal_id // empty' <<<"${OUTPUTS}")
+CONDITION=$(jq -r '.deployment_identity.value.jit_condition // empty' <<<"${OUTPUTS}")
 IDENTITY_NAME=$(jq -r '.resource_names.value.deployment_identity // empty' <<<"${OUTPUTS}")
 RESOURCE_GROUP_ID=$(jq -r '.resource_ids.value.resource_group // empty' <<<"${OUTPUTS}")
 
 if [[ -z "${PRINCIPAL_ID}" || -z "${CONDITION}" ]]; then
-  echo "Error: the 'deployment_identity_principal_id' or 'deployment_identity_jit_condition' output is empty."
-  echo "Set deployment_identity = \"oidc\" and run 'terraform apply'."
+  echo "Error: 'principal_id' or 'jit_condition' in the 'deployment_identity' output is empty."
+  echo "Set deployment_identity = \"managed_identity\" or \"oidc\" and run 'terraform apply'."
   exit 1
 fi
 
@@ -117,12 +117,11 @@ fi
 SCOPE="/subscriptions/${SUBSCRIPTION_ID}"
 ARM="https://management.azure.com${SCOPE}/providers/Microsoft.Authorization"
 
-if ! az account show --output none 2>/dev/null; then
+if ! ACCOUNT_TYPE=$(az account show --query user.type -o tsv 2>/dev/null); then
   echo "Error: Azure CLI isn't signed in. Run 'az login' as the operator."
   exit 1
 fi
-OPERATOR_ID=$(az ad signed-in-user show --query id -o tsv 2>/dev/null) || OPERATOR_ID=""
-if [[ -z "${OPERATOR_ID}" ]]; then
+if [[ "${ACCOUNT_TYPE}" != "user" ]]; then
   echo "Error: Azure CLI must be signed in as a user (the operator), not a service principal or managed identity."
   exit 1
 fi
@@ -192,6 +191,14 @@ else
     exit 1
   fi
 
+  # Only PIM self-activation needs the operator's object ID, which comes from Microsoft Graph.
+  if ! OPERATOR_ID=$(az ad signed-in-user show --query id -o tsv 2>&1) || [[ -z "${OPERATOR_ID}" ]]; then
+    echo "Error: couldn't look up your user object ID in Microsoft Graph:"
+    echo "${OPERATOR_ID}"
+    echo "If Azure CLI asks you to sign in again, run 'az login' and run this script again."
+    exit 1
+  fi
+
   echo "Operator access:     activating your eligible Owner assignment through PIM for 1 hour..."
   ACTIVATE_BODY=$(jq -n \
     --arg principal "${OPERATOR_ID}" \
@@ -245,7 +252,7 @@ for role_id in "${GRANT_ROLE_IDS[@]}"; do
         echo "  ${role_name}: already active until ${end} ($(minutes_until "${end}") minutes). Kept; use --force to replace it."
       fi
       if [[ "${role_id}" == "${RBAC_ADMIN_ROLE_ID}" ]] && [[ "$(jq -r '.condition // empty' <<<"${current}")" != "${CONDITION}" ]]; then
-        echo "  Warning: its condition doesn't match 'deployment_identity_jit_condition'. Run again with --force to replace it."
+        echo "  Warning: its condition doesn't match the 'deployment_identity' output's 'jit_condition'. Run again with --force to replace it."
       fi
       continue
     fi
@@ -323,11 +330,11 @@ else
     jq -r --arg id "${allowed_id}" '"    - \(.[$id] // "<unknown role>") (\($id))"' <<<"${ROLE_DEFINITIONS}"
   done | sort
   if [[ "${APPLIED_CONDITION}" == "${CONDITION}" ]]; then
-    echo "  Matches the 'deployment_identity_jit_condition' output."
+    echo "  Matches the 'deployment_identity' output's 'jit_condition' output."
   else
-    echo "  Warning: doesn't match the 'deployment_identity_jit_condition' output. Run again with --force to replace it."
+    echo "  Warning: doesn't match the 'deployment_identity' output's 'jit_condition' output. Run again with --force to replace it."
   fi
 fi
 
-echo "Just-in-time role grant complete. Approve the workflow run once both roles are listed with end times."
+echo "Just-in-time role grant complete. Approve the workflow run or start the apply once both roles are listed with end times."
 #endregion

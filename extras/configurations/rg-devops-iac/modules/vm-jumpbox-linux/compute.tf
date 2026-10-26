@@ -1,3 +1,26 @@
+#region data
+data "cloudinit_config" "vm_jumpbox_linux" {
+  gzip          = true
+  base64_encode = true
+
+  part {
+    content_type = "text/cloud-config"
+    content = templatefile(
+      "./${path.module}/scripts/configure-vm-jumpbox-linux.yaml", {
+        aad_tenant_id = data.azurerm_client_config.current.tenant_id
+      }
+    )
+    filename = "configure-vm-jumpbox-linux.yaml"
+  }
+
+  part {
+    content_type = "text/x-shellscript"
+    content      = file("./${path.module}/scripts/configure-powershell.ps1")
+    filename     = "configure-powershell.ps1"
+  }
+}
+#endregion
+
 #region resources
 resource "azurerm_linux_virtual_machine" "this" {
   name                       = var.vm_jumpbox_linux_name
@@ -32,9 +55,6 @@ resource "azurerm_linux_virtual_machine" "this" {
   }
 
   custom_data = data.cloudinit_config.vm_jumpbox_linux.rendered
-
-  # The runner registration secret must exist in key vault before cloud-init reads it on first boot.
-  depends_on = [azurerm_key_vault_secret.github_runner_token]
 }
 
 resource "azurerm_virtual_machine_run_command" "wait_for_cloud_init" {
@@ -58,12 +78,10 @@ resource "azurerm_role_assignment" "this" {
   role_definition_name = "Storage Blob Data Contributor"
   scope                = var.storage_account_id
 }
-#endregion
 
-#region entra-id-ssh
-# Enables Microsoft Entra ID sign-in over SSH using short-lived OpenSSH certificates, so operators sign in
-# as their own Entra identity through Azure Bastion instead of the local admin account. Installing the
-# extension uses apt, so it waits for cloud-init and the dpkg/apt locks to be released first.
+# Enables Microsoft Entra ID SSH sign-in through Azure Bastion with short-lived OpenSSH certificates.
+# Operators sign in as their own Entra identity instead of the local admin account.
+# The extension installs with apt, so it waits for cloud-init and the dpkg/apt locks.
 resource "azurerm_virtual_machine_extension" "aad_ssh_login" {
   name                       = "${module.naming.virtual_machine_extension.name}-${var.vm_jumpbox_linux_name}-AADSSHLoginForLinux"
   virtual_machine_id         = azurerm_linux_virtual_machine.this.id
@@ -81,9 +99,7 @@ resource "azurerm_role_assignment" "operator_vm_admin_login" {
   role_definition_name = "Virtual Machine Administrator Login"
   scope                = azurerm_linux_virtual_machine.this.id
 }
-#endregion
 
-#region azure-monitor
 # Installing the agent uses apt, so it waits for the Entra ID SSH extension (which waits for cloud-init)
 # to avoid contending for the dpkg/apt locks.
 resource "azurerm_virtual_machine_extension" "ama" {
@@ -111,5 +127,66 @@ resource "azurerm_monitor_data_collection_rule_association" "dce" {
   data_collection_endpoint_id = var.data_collection_endpoint_id
 
   depends_on = [azurerm_virtual_machine_extension.ama]
+}
+
+# Optional: installs and registers the GitHub Actions self-hosted runner.
+# Runs after cloud-init and the VM extensions, so the base VM is identical with or without the runner.
+# The token goes through write-only sensitive_body, so it never lands in state, the plan, custom data or Key Vault.
+# It is sent only on create or when var.github_runner_token_version changes.
+# Other updates re-run the script without it, and the script leaves a registered runner as-is.
+resource "azapi_resource" "github_runner" {
+  count = var.enable_github_runner ? 1 : 0
+
+  type      = "Microsoft.Compute/virtualMachines/runCommands@2025-04-01"
+  name      = "${module.naming.virtual_machine_extension.name}-${var.vm_jumpbox_linux_name}-ConfigureGitHubRunner"
+  parent_id = azurerm_linux_virtual_machine.this.id
+  location  = var.location
+
+  body = {
+    properties = {
+      source = {
+        script = file("${path.module}/scripts/configure-github-runner.sh")
+      }
+      parameters = [
+        { name = "RUNNER_URL", value = var.github_runner_url },
+        { name = "RUNNER_NAME", value = var.vm_jumpbox_linux_name },
+        { name = "RUNNER_LABELS", value = join(",", var.github_runner_labels) },
+        { name = "RUNNER_VERSION", value = var.github_runner_version },
+        { name = "RUNNER_HOME", value = local.github_runner_home },
+        { name = "AAD_TENANT_ID", value = data.azurerm_client_config.current.tenant_id }
+      ]
+      asyncExecution                  = false
+      treatFailureAsDeploymentFailure = true
+      timeoutInSeconds                = 3600
+    }
+  }
+
+  sensitive_body = {
+    properties = {
+      protectedParameters = [
+        { name = "RUNNER_TOKEN", value = var.github_runner_token }
+      ]
+    }
+  }
+
+  # Sends sensitive_body only on create or when var.github_runner_token_version changes. See that variable.
+  sensitive_body_version = {
+    "properties.protectedParameters" = tostring(var.github_runner_token_version)
+  }
+
+  timeouts {
+    create = "90m"
+    update = "90m"
+  }
+
+  # Installing the runner dependencies uses apt, so wait for the last apt-based extension to finish.
+  depends_on = [azurerm_virtual_machine_extension.ama]
+
+  lifecycle {
+    precondition {
+      condition     = var.github_runner_url != ""
+      error_message = "var.github_runner_url must be set when var.enable_github_runner is true."
+    }
+  }
 }
 #endregion

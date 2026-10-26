@@ -41,27 +41,9 @@ variable "enable_github_runner" {
   default     = false
 }
 
-variable "github_runner_enable_vwan_sudoers" {
-  type        = bool
-  description = "Set to true to grant the runner service account command-scoped NOPASSWD sudo for the binaries used by the vwan P2S VPN integration tests (openvpn, cat, tail, kill, pkill). Required for unattended vwan integration testing. Only used when var.enable_github_runner is true."
-  default     = true
-}
-
-variable "github_runner_group" {
-  type        = string
-  description = "The name of the GitHub Actions runner group to register the runner with. Only used when var.enable_github_runner is true."
-  default     = "Default"
-
-  validation {
-    condition     = can(regex("^[a-zA-Z0-9 ._-]{1,64}$", var.github_runner_group))
-    error_message = "Must be 1-64 characters long and consist of alphanumeric characters, periods (.), underscores (_), spaces, or hyphens (-)."
-  }
-}
-
 variable "github_runner_labels" {
   type        = list(string)
   description = "Additional labels to apply to the GitHub Actions self-hosted runner. Only used when var.enable_github_runner is true."
-  default     = ["azuresandbox"]
 
   validation {
     condition     = alltrue([for label in var.github_runner_labels : can(regex("^[a-zA-Z0-9._-]{1,64}$", label))])
@@ -69,71 +51,33 @@ variable "github_runner_labels" {
   }
 }
 
-variable "github_runner_name" {
-  type        = string
-  description = "The name to register the GitHub Actions self-hosted runner with. Defaults to the VM name when left empty. Only used when var.enable_github_runner is true."
-  default     = ""
-
-  validation {
-    condition     = var.github_runner_name == "" || can(regex("^[a-zA-Z0-9._-]{1,64}$", var.github_runner_name))
-    error_message = "Must be empty or 1-64 characters long and consist of alphanumeric characters, periods (.), underscores (_), or hyphens (-)."
-  }
-}
-
-variable "github_runner_service_account" {
-  type        = string
-  description = "The name of the non-root local service account the GitHub Actions self-hosted runner runs under. Only used when var.enable_github_runner is true."
-  default     = "githubrunner"
-
-  validation {
-    condition     = can(regex("^[a-z_][a-z0-9_-]{0,31}$", var.github_runner_service_account))
-    error_message = "Must conform to Linux user name requirements: it must start with a lowercase letter or underscore and can only contain lowercase letters, digits, underscores and hyphens, up to 32 characters long."
-  }
-}
-
 variable "github_runner_token" {
   type        = string
-  description = "A GitHub personal access token or runner registration token used to register the self-hosted runner. Set using an environment variable 'TF_VAR_github_runner_token'. Required when var.enable_github_runner is true."
+  description = "The GitHub runner registration token used to register the self-hosted runner (expires after 1 hour). Ephemeral: delivered to the VM through a write-only Run Command protected parameter and never stored in Terraform state or the saved plan. Required only when the runner is registered (when the Run Command is created or var.github_runner_token_version changes)."
   sensitive   = true
+  ephemeral   = true
   default     = ""
 }
 
-variable "github_runner_token_secret" {
-  type        = string
-  description = "The name of the key vault secret used to pass the GitHub registration token to the VM at provisioning time."
-  default     = "github-runner-token"
-
-  validation {
-    condition     = can(regex("^[a-zA-Z0-9-]{1,127}$", var.github_runner_token_secret))
-    error_message = "Must conform to Azure Key Vault secret naming requirements: it can only contain alphanumeric characters and hyphens (-), and must be between 1 and 127 characters long."
-  }
-}
-
-variable "github_runner_token_secret_version" {
+# Controls when the ephemeral github_runner_token is sent to the VM. Terraform can't store an ephemeral value
+# to detect changes, so the Run Command's write-only sensitive_body_version tracks this number instead: the
+# token is sent when the Run Command is created (including when the VM is replaced, which then needs a fresh
+# token) and whenever this value changes, and is omitted otherwise. Leave it at 1 in normal use. Increment it
+# only to retry a failed registration with a new token, e.g. after the token expired before the Run Command ran.
+variable "github_runner_token_version" {
   type        = number
-  description = "Increment to write a new value for the github_runner_token key vault secret."
+  description = "Increment to send a new var.github_runner_token to the VM and re-run runner registration, e.g. after a failed registration. The token is sent only when the Run Command is created or this value changes."
   default     = 1
-}
-
-variable "github_runner_token_type" {
-  type        = string
-  description = "The type of token supplied in var.github_runner_token. Use 'pat' for a personal access token, which is exchanged for a short lived registration token on the VM, or 'registration' for a registration token obtained from the GitHub API."
-  default     = "pat"
-
-  validation {
-    condition     = contains(["pat", "registration"], var.github_runner_token_type)
-    error_message = "Must be either 'pat' or 'registration'."
-  }
 }
 
 variable "github_runner_url" {
   type        = string
-  description = "The GitHub repository or organization URL to register the self-hosted runner with, e.g. 'https://github.com/myorg/myrepo'. Required when var.enable_github_runner is true."
+  description = "The GitHub repository URL to register the self-hosted runner with, e.g. 'https://github.com/myorg/myrepo'. Required when var.enable_github_runner is true."
   default     = ""
 
   validation {
-    condition     = var.github_runner_url == "" || can(regex("^https://github\\.com/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)?$", var.github_runner_url))
-    error_message = "Must be empty or a valid GitHub organization or repository URL, e.g. 'https://github.com/myorg' or 'https://github.com/myorg/myrepo'."
+    condition     = var.github_runner_url == "" || can(regex("^https://github\\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$", var.github_runner_url))
+    error_message = "Must be empty or a GitHub repository URL, e.g. 'https://github.com/myorg/myrepo'."
   }
 }
 
@@ -158,16 +102,6 @@ variable "key_vault_id" {
   }
 }
 
-variable "key_vault_name" {
-  type        = string
-  description = "The name of the existing key vault where secrets are stored."
-
-  validation {
-    condition     = can(regex("^[a-zA-Z0-9-]{3,24}$", var.key_vault_name))
-    error_message = "Must conform to Azure Key Vault naming requirements: it can only contain alphanumeric characters and hyphens (-), and must be between 3 and 24 characters long."
-  }
-}
-
 variable "location" {
   type        = string
   description = "The name of the Azure Region where resources will be provisioned."
@@ -175,16 +109,6 @@ variable "location" {
   validation {
     condition     = can(regex("^[a-z0-9-]+$", var.location))
     error_message = "Must be a valid Azure region name. It should only contain lowercase letters, numbers, and dashes."
-  }
-}
-
-variable "log_analytics_workspace_id" {
-  type        = string
-  description = "The ID of the Log Analytics workspace that receives the network interface metrics."
-
-  validation {
-    condition     = can(regex("^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[a-zA-Z0-9-_()]+/providers/Microsoft.OperationalInsights/workspaces/[a-zA-Z0-9-_()]+$", var.log_analytics_workspace_id))
-    error_message = "Must be a valid Azure Resource ID for a Log Analytics workspace. It should follow the format '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.OperationalInsights/workspaces/{workspaceName}'."
   }
 }
 

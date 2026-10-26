@@ -2,7 +2,7 @@
 
 # Deletes Terraform state blob(s) from the tfstate container in the
 # rg-devops-iac storage account, used as a remote state backend for other
-# Terraform configurations (e.g. the root azuresandbox module running from
+# Terraform configurations (e.g. the Azure Sandbox configuration running from
 # jumplinux2).
 #
 # This does NOT use 'terraform output' because the state being deleted here

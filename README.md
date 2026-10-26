@@ -105,46 +105,52 @@ Multiple SQL database options are provided to suit various use cases and require
 
 ### Secure by Default, Secure by Design
 
-Azure Sandbox is built with security as a core principle, ensuring that all resources are deployed with secure configurations by default. Key security features include:
+Azure Sandbox demonstrates layered security controls across identity, authorization, networking, secrets, data protection, and monitoring. Key security features include:
 
-* **Azure Key Vault Integration**:
-  * Securely stores sensitive information, such as:
-    * Service principal credentials
-    * Shared keys
-    * Administrator passwords
-  * Ensures secrets are encrypted at rest and accessed only by authorized users or services.
-  * Network isolated endpoints for secure access to secrets.
+* **Identity and Authentication**:
+  * Uses Microsoft Entra ID for Azure identities and authentication, including managed identities for supported workload access.
+  * Uses Microsoft Entra ID for service authentication where configured, such as Microsoft Entra-only authentication in the mssql module.
+  * Uses Active Directory Domain Services (AD DS) to domain-join Windows Servers and enable Windows integrated authentication to SQL Servers.
+  * Uses service-specific identities where Microsoft Entra ID integration is not configured, such as in the MySQL module.
+  * See [Authentication](#authentication) for more information.
 
-* **Role-Based Access Control (RBAC)**:
-  * Enforces least-privilege access by assigning roles to users, groups, and services based on their specific needs.
-  * Ensures that only authorized entities can access or manage Azure resources.
-  * Simplifies access management by leveraging Microsoft Entra ID for identity and access control.
-
-  **IMPORTANT**: The interactive user who provisions the sandbox must have an `Owner` role assignment scoped to the sandbox subscription. The deployment identity Terraform authenticates as does not need `Owner`: it has `Contributor` and a `Role Based Access Control Administrator` assignment with a condition that allows it to assign only the roles the sandbox uses. See [Service Principal](#service-principal). All other role assignments follow the principle of least privilege and leverage managed identities where applicable.
-
-* **Data Encryption**:
-  * All data stored in the sandbox environment is encrypted at rest using platform-managed keys.
-  * Supports end-to-end encryption for data in transit using TLS and host encryption for virtual machines.
-
-* **Compliance and Monitoring**:
-  * Integrates with Azure Policy to enforce compliance with organizational or regulatory standards.
-  * Configures diagnostic settings to log resource activity and monitor for potential security threats.
-  * Supports integration with Microsoft Defender for Cloud to provide advanced threat protection and security recommendations.
+* **Authorization**:
+  * Assigns Azure roles to users, groups, and service identities based on their operational responsibilities (Azure RBAC).
+  * Uses Azure role assignment conditions to restrict which roles the deployment identity can assign or remove (Azure ABAC).
+  * Uses operating-system and service-specific permissions to control access within workloads.
+  * See [Authorization](#authorization) for more information.
 
 * **Network Isolation**:
-  * All sandbox resources are deployed within separate virtual networks, ensuring that they are isolated from the public internet and other Azure resources.
+  * Uses network segmentation, private endpoints, and access controls to restrict public exposure and connectivity between workloads.
+  * Uses dependency barriers to keep public access available on selected shared services while Terraform completes required data-plane operations from outside the private network, then disables public access once those operations finish.
+
+* **Azure Key Vault Integration**:
+  * Centrally stores the shared administrator username and password, plus SSH and VPN client certificate private keys when their modules are enabled.
+  * Encrypts secrets at rest and controls access through Microsoft Entra ID and Azure RBAC.
+  * Assigns one-year expiration dates to secrets; automatic rotation is not configured.
+  * Provides private endpoint access with private DNS integration; public network access is disabled after provisioning completes.
+
+* **Data Encryption**:
+  * Uses platform-managed keys for encryption at rest in Azure storage services.
+  * Enables encryption at host for supported VM configurations.
+  * Configures TLS for supported service connections to protect data in transit.
+
+* **Compliance and Monitoring**:
+  * Supports deployment under existing Azure Policy controls, subject to configuration adjustments required by applicable policies.
+  * Configures diagnostic settings to log resource activity and monitor for potential security threats.
+  * Can be assessed through Microsoft Defender for Cloud for security recommendations; advanced threat protection requires separately enabled Defender plans.
 
 ### Documentation and Videos
 
 This project includes valuable resources to help you get started quickly and easily. The content is designed to be user-friendly and accessible, making it easy for users of all skill levels to understand and utilize the features of Azure Sandbox.
 
 * Comprehensive documentation for each module and configuration.
-* Prescriptive smoke testing procedures for validating deployments.
+* Interactive smoke testing procedures and comprehensive automated unit testing procedures for validating deployments.
 * Step-by-step video tutorials for setup, testing, and customization.
 
 ## Prerequisites
 
-This section describes the prerequisites required in order to provision an Azure Sandbox.
+This section describes the prerequisites required to allow a **sandbox user** to manually provision an Azure Sandbox using a service principal.
 
 * [Microsoft Entra ID Tenant and Azure Subscription](#microsoft-entra-id-tenant-and-azure-subscription)
 * [Azure RBAC Role Assignments](#azure-rbac-role-assignments)
@@ -156,15 +162,15 @@ This section describes the prerequisites required in order to provision an Azure
 
 * Identify the [Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/fundamentals/whatis) tenant to be used for identity and access management, or create a new tenant using [Quickstart: Set up a tenant](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-create-new-tenant).
 * Identify a single Azure [subscription](https://learn.microsoft.com/azure/cloud-adoption-framework/ready/considerations/fundamental-concepts#azure-terminology) or create a new Azure subscription. See [Azure Offer Details](https://azure.microsoft.com/support/legal/offer-details/) and [Associate or add an Azure subscription to your Microsoft Entra tenant](https://learn.microsoft.com/entra/fundamentals/how-subscriptions-associated-directory) for more information.
-* Identify the owner of the Azure subscription to be used to provision Azure Sandbox. This user should have an [Owner](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#owner) Azure RBAC role assignment on the subscription. See [Steps to assign an Azure role](https://learn.microsoft.com/azure/role-based-access-control/role-assignments-steps) for more information.
+* Identify the owner of the Azure subscription to be used to provision Azure Sandbox as the **sandbox administrator**. This user should have an [Owner](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#owner) Azure RBAC role assignment on the subscription. See [Steps to assign an Azure role](https://learn.microsoft.com/azure/role-based-access-control/role-assignments-steps) for more information.
 
 ### Azure RBAC Role Assignments
 
-* Ask the subscription owner to create an [Owner](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#owner) Azure RBAC role assignment for each sandbox user. See [Steps to assign an Azure role](https://learn.microsoft.com/azure/role-based-access-control/role-assignments-steps) for more information.
+* Ask the **sandbox administrator** to create a standing [Contributor](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#contributor) Azure RBAC role assignment for each **sandbox user** scoped to the sandbox subscription. See [Steps to assign an Azure role](https://learn.microsoft.com/azure/role-based-access-control/role-assignments-steps) for more information.
 
 ### Service Principal
 
-This section applies to the default `client_secret` authentication mode. See [Authentication](#authentication) for the other modes.
+The simplest way to let **sandbox users** deploy sandboxes is for the **sandbox administrator** to first create a service principal (SPN), which is then shared with each **sandbox user** who wants the ability to deploy one. Using this approach, **sandbox users** don't need all of the role assignments and permissions used by the **deployment identity** to deploy a sandbox. This is known as `client_secret` authentication mode in this configuration. In this mode, Terraform uses the service principal as the **deployment identity**. See [Authentication](#authentication) for the other modes.
 
 * Verify the subscription owner has privileges to create a service principal on the Microsoft Entra tenant. See [Permissions required for registering an app](https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal#permissions-required-for-registering-an-app) for more information.
 * Ask the subscription owner to [Create an Azure service principal](https://learn.microsoft.com/en-us/cli/azure/azure-cli-sp-tutorial-1?tabs=bash) (SPN) for sandbox users with [Azure Cloud Shell](https://learn.microsoft.com/azure/cloud-shell/quickstart). The following command creates the service principal with a `Contributor` role assignment on the sandbox subscription, which lets it create and manage sandbox resources:
@@ -241,17 +247,29 @@ This section applies to the default `client_secret` authentication mode. See [Au
     --condition "$CONDITION" --condition-version "2.0"
   ```
 
-* If you want to deploy the Azure SQL Database module, a Microsoft Entra Global Administrator or Privileged Role Administrator must grant the service principal the Microsoft Graph application permissions it needs to create the SQL administrators security group. Run these commands in Azure Cloud Shell:
+  Alternatively the subscription owner can perform these steps manually from the Azure portal:
+
+  1. Sign in to the [Azure portal](https://portal.azure.com) as the subscription owner.
+  2. Navigate to the sandbox subscription and select **Access control (IAM)** > **Add** > **Add role assignment**.
+  3. On the **Role** tab, select **Privileged administrator roles**, then select **Role Based Access Control Administrator**.
+  4. On the **Members** tab, choose **User, group, or service principal**, click **Select members**, and search for and select the service principal (e.g. `AzureSandboxSPN`).
+  5. On the **Conditions** tab, under **What user can do**, select **Allow user to only assign selected roles to selected principals (fewer privileges)**, then click **Select roles and principals**.
+  6. Select **Configure** on the **Constrain roles** template, add every role listed in `ROLES` above, and click **Save**. This template limits both adding and removing role assignments to the selected roles.
+  7. Click **Review + assign** to create the role assignment.
+
+  See [Delegate Azure role assignment management to others with conditions](https://learn.microsoft.com/azure/role-based-access-control/delegate-role-assignments-portal) for more information.
+
+* If you want to deploy the Azure SQL Database module, a Microsoft Entra Privileged Role Administrator (the least privileged role that can do this; Global Administrator also works) must grant the service principal the Microsoft Graph application permissions it needs to create the SQL administrators security group. Run these commands in Azure Cloud Shell:
 
   ```bash
   SPN_APP_ID="<service-principal-app-id-here>"
   GRAPH_APP_ID="00000003-0000-0000-c000-000000000000" # Microsoft Graph (the same in every tenant)
 
   # Microsoft Graph application permission (app role) ids
-  GROUP_CREATE_ID="bf7b1a76-6e77-406b-b258-bf5c7720e98f"         # Group.Create: create the group
+  GROUP_CREATE_ID="bf7b1a76-6e77-406b-b258-bf5c7720e98f"          # Group.Create: create the group
   GROUP_MEMBER_READ_ALL_ID="98830695-27a2-44f7-8c18-0c3ebc9698f6" # GroupMember.Read.All: read the group's owners and members
-  USER_READ_ALL_ID="df021288-bdef-4463-88db-98f22de89214"        # User.Read.All: add the operator (a user) as a member
-  APPLICATION_READ_ALL_ID="9a5d68dd-52b0-4cc2-bd40-abcf44ac3a30" # Application.Read.All: add a managed identity as a member
+  USER_READ_ALL_ID="df021288-bdef-4463-88db-98f22de89214"         # User.Read.All: add the operator (a user) as a member
+  APPLICATION_READ_ALL_ID="9a5d68dd-52b0-4cc2-bd40-abcf44ac3a30"  # Application.Read.All: add a managed identity as a member
 
   SPN_OBJECT_ID=$(az ad sp show --id "$SPN_APP_ID" --query id -o tsv)
   GRAPH_OBJECT_ID=$(az ad sp show --id "$GRAPH_APP_ID" --query id -o tsv)
@@ -266,8 +284,8 @@ This section applies to the default `client_secret` authentication mode. See [Au
 
   Alternatively you can perform these steps manually from the Entra portal:
 
-  1. Sign in to [Microsoft Entra admin center](https://entra.microsoft.com) as a Global
-    Administrator or Privileged Role Administrator.
+  1. Sign in to [Microsoft Entra admin center](https://entra.microsoft.com) as a Privileged
+    Role Administrator.
   2. Navigate to **Identity** > **Applications** > **App registrations**.
   3. Search for and select the service principal's app registration (matching `<service-principal-app-id-here>`).
   4. Select **API permissions** in the left menu.
@@ -326,21 +344,6 @@ A variety of Terraform execution environments can be used to provision Azure San
 * **Azure Cloud Shell**: Azure Cloud Shell is not recommended but can be used. Most of the software dependencies are pre-installed.
 
 * **GitHub Codespaces**: GitHub Codespaces has not been tested but should be okay. Most of the software dependencies should be pre-installed.
-
-#### Automated Execution
-
-Azure DevOps, GitHub Actions, or other CI/CD tools can be used to automate the deployment of Azure Sandbox. The following software should be installed in your Terraform execution environment:
-
-* git
-* PowerShell 7.x
-* Az PowerShell Module
-* Terraform
-
-## Authentication
-
-By default, Terraform authenticates as a service principal with a client secret (`auth_mode = "client_secret"`). Create the service principal and grant its permissions as described in [Service Principal](#service-principal), and supply its secret with the `TF_VAR_client_secret` environment variable. The bootstrap script writes the other values, `client_id`, `entra_tenant_id` and `operator_object_id`, to `terraform.tfvars`.
-
-For automated or secretless deployments, see [Deployment Identity and Authentication](./extras/configurations/rg-devops-iac/README.md#deployment-identity-and-authentication) in the rg-devops-iac configuration. It covers two more modes: `auth_mode = "managed_identity"`, for a terminal on the rg-devops-iac Linux virtual machine, and `auth_mode = "oidc"`, which the [Sandbox deployment workflow](./.github/workflows/sandbox-deployment.yml) uses to sign in with GitHub Actions OIDC to an identity whose deployment roles the operator grants for a limited time before each run.
 
 ## Getting Started (Interactive Execution)
 
@@ -622,6 +625,8 @@ This section provides documentation regarding the overall structure of the repos
 * [Root Module Resources](#root-module-resources)
 * [Root Module Output Variables](#root-module-output-variables)
 * [Child Modules](#child-modules)
+* [Authentication](#authentication)
+* [Authorization](#authorization)
 * [Virtual Network Design](#virtual-network-design)
 * [Dependencies](#dependencies)
 * [Unit Testing](#unit-testing)
@@ -740,6 +745,32 @@ Name | Required | Depends On | Description
 [vwan](./modules/vwan/) | No | vnet-app module | Creates a Point-to-Site VPN gateway to securely connect to your sandbox environment from your local machine.
 
 ---
+
+### Authentication
+
+Terraform authenticates the `azurerm`, `azapi` and `azuread` providers as the deployment identity, never as the sandbox user. The `auth_mode` variable selects how, and applies the same settings to all three providers:
+
+`auth_mode` | Use for | Deployment identity | Credential | Used from | More information
+--- | --- | --- | --- | --- | ---
+`client_secret` (default) | Manual deployments by sandbox users | Service principal | Service principal secret from the `TF_VAR_client_secret` environment variable, so it never lands in `terraform.tfvars` | Any Terraform execution environment | [Service Principal](#service-principal)
+`managed_identity` | Automated deployments | User-assigned managed identity | Host's managed identity (secretless) | An Azure VM with a managed identity, from a terminal or a GitHub Actions self-hosted runner | [rg-devops-iac](./extras/configurations/rg-devops-iac/)
+`oidc` | Automated deployments integrated with GitHub | User-assigned managed identity with a GitHub federated credential | GitHub Actions OIDC token (secretless) | A GitHub Actions workflow | [rg-devops-iac](./extras/configurations/rg-devops-iac/)
+
+In every mode, `client_id` identifies the deployment identity. The sandbox user is identified separately by `operator_object_id`, which the configuration uses to grant that user data-plane access to the sandbox. The Terraform state backend, when one is configured, authenticates independently of `auth_mode`.
+
+---
+
+### Authorization
+
+Azure Sandbox separates authorization into three roles, each designed with the principle of least privilege in mind. The **sandbox administrator** uses `Owner` to set up the subscription and the deployment identity. The Terraform **deployment identity** uses `Contributor` and `Role Based Access Administrator` (ABAC Limited \*) to apply sandbox configurations, and it has limited Microsoft Graph rights to create new groups. **Sandbox users** use `Contributor` to manage sandbox resources, but can't grant access to others, and depend on the **deployment identity** to create sandboxes and grant access to them.
+
+Role | Who | Privileges | Purpose
+--- | --- | --- | ---
+Sandbox administrator | Subscription owner | `Owner` on the subscription; Privileged Role Administrator in Microsoft Entra ID (only to grant Microsoft Graph permissions) | Assign roles to sandbox users and create the deployment identity
+Deployment identity | Service principal (`client_secret`), managed identity (`managed_identity`) or GitHub Actions OIDC identity (`oidc`) | `Contributor` and `Role Based Access Control Administrator` (ABAC limited\*) on the subscription, time-bound for `managed_identity` and `oidc`; Microsoft Graph `Group.Create`, `GroupMember.Read.All`, `User.Read.All` and `Application.Read.All` | Create sandbox resources and the role assignments they need
+Sandbox user (operator) | Each person who deploys and uses sandboxes | `Contributor` on the subscription; data-plane roles on their own sandbox's Key Vault and Storage Account, granted by the deployment | Run Terraform as the deployment identity, manage sandbox resources, read secrets and files
+
+\* On its own, `Role Based Access Control Administrator` can assign any role, including `Owner`. An [Azure attribute-based access control (ABAC)](https://learn.microsoft.com/azure/role-based-access-control/conditions-overview) condition limits the deployment identity to assigning and removing only the roles the sandbox uses, so it can't grant privileged roles like `Owner` to itself or anyone else.
 
 ### Virtual Network Design
 

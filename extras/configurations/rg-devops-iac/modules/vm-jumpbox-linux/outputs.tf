@@ -11,18 +11,11 @@ output "resource_names" {
 }
 
 output "key_vault_operations_complete" {
-  value = join(",", concat(
-    [azurerm_key_vault_secret.ssh_private_key.id],
-    azurerm_key_vault_secret.github_runner_token[*].id
-  ))
+  value       = azurerm_key_vault_secret.ssh_private_key.id
+  description = "Dependency signal: the SSH private key Key Vault secret write is complete. Consumed by the root key_vault_access_barrier."
 }
 
 output "log_analytics_operations_complete" {
   value       = terraform_data.log_analytics_operations_complete.id
-  description = "Dependency signal: the Azure Monitor Agent, the data collection rule and endpoint associations, and the network interface diagnostic setting are complete. Consumed by the root ampls_access_barrier."
-}
-
-output "github_runner_name" {
-  value       = var.enable_github_runner ? local.github_runner_name : null
-  description = "The name the GitHub Actions self-hosted runner is registered with, or null when the runner is disabled."
+  description = "Dependency signal: the Azure Monitor Agent and the data collection rule and endpoint associations are complete. Consumed by the root ampls_access_barrier."
 }
