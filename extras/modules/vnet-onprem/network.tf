@@ -1,6 +1,6 @@
 #region onprem vnets and subnets
 resource "azurerm_virtual_network" "this" {
-  name                = "${module.naming.virtual_network.name}-${var.vnet_name}"
+  name                = "${module.naming.names["virtual_network"].name}-${var.vnet_name}"
   location            = var.location
   resource_group_name = var.resource_group_name
   address_space       = [var.vnet_address_space]
@@ -19,7 +19,7 @@ resource "azurerm_subnet" "subnets" {
 
 #region onprem VPN Gateway
 resource "azurerm_virtual_network_gateway" "this" {
-  name                       = module.naming.virtual_network_gateway.name
+  name                       = module.naming.names["virtual_network_gateway"].name
   location                   = var.location
   resource_group_name        = var.resource_group_name
   type                       = "Vpn"
@@ -45,7 +45,7 @@ resource "azurerm_virtual_network_gateway" "this" {
 }
 
 resource "azurerm_public_ip" "vpn" {
-  name                = "${module.naming.public_ip.name}-vpn"
+  name                = "${module.naming.names["public_ip_address"].name}-vpn"
   location            = var.location
   resource_group_name = var.resource_group_name
   allocation_method   = "Static"
@@ -55,7 +55,7 @@ resource "azurerm_public_ip" "vpn" {
 }
 
 resource "azurerm_local_network_gateway" "this" {
-  name                = module.naming.local_network_gateway.name
+  name                = module.naming.names["local_network_gateway"].name
   resource_group_name = var.resource_group_name
   location            = var.location
   gateway_address     = tolist(azurerm_vpn_gateway.this.bgp_settings[0].instance_0_bgp_peering_address[0].tunnel_ips)[1]
@@ -69,7 +69,7 @@ resource "azurerm_local_network_gateway" "this" {
 }
 
 resource "azurerm_virtual_network_gateway_connection" "this" {
-  name                       = module.naming.virtual_network_gateway_connection.name
+  name                       = module.naming.names["connection"].name
   resource_group_name        = var.resource_group_name
   location                   = var.location
   virtual_network_gateway_id = azurerm_virtual_network_gateway.this.id
@@ -85,14 +85,14 @@ resource "azurerm_virtual_network_gateway_connection" "this" {
 
 #region onprem NAT gateway
 resource "azurerm_nat_gateway" "this" {
-  name                = module.naming.nat_gateway.name
+  name                = module.naming.names["nat_gateway"].name
   location            = var.location
   resource_group_name = var.resource_group_name
   sku_name            = "Standard"
 }
 
 resource "azurerm_public_ip" "nat" {
-  name                = "${module.naming.public_ip.name}-nat"
+  name                = "${module.naming.names["public_ip_address"].name}-nat"
   location            = var.location
   resource_group_name = var.resource_group_name
   allocation_method   = "Static"
@@ -118,7 +118,7 @@ resource "azurerm_subnet_nat_gateway_association" "associations" {
 
 #region onprem nics
 resource "azurerm_network_interface" "vm_adds" {
-  name                = "${module.naming.network_interface.name}-${var.vm_adds_name}"
+  name                = "${module.naming.names["network_interface"].name}-${var.vm_adds_name}"
   location            = var.location
   resource_group_name = var.resource_group_name
 
@@ -132,7 +132,7 @@ resource "azurerm_network_interface" "vm_adds" {
 }
 
 resource "azurerm_network_interface" "vm_jumpbox_win" {
-  name                = "${module.naming.network_interface.name}-${var.vm_jumpbox_win_name}"
+  name                = "${module.naming.names["network_interface"].name}-${var.vm_jumpbox_win_name}"
   location            = var.location
   resource_group_name = var.resource_group_name
 
@@ -148,14 +148,14 @@ resource "azurerm_network_interface" "vm_jumpbox_win" {
 
 #region cloud VPN Gateway
 resource "azurerm_vpn_gateway" "this" {
-  name                = "${module.naming.virtual_wan.name}-vpn"
+  name                = module.naming.names["vpn_gateway"].name
   resource_group_name = var.resource_group_name
   location            = var.location
   virtual_hub_id      = var.vwan_hub_id
 }
 
 resource "azurerm_vpn_site" "this" {
-  name                = "${module.naming.virtual_wan.name}-site"
+  name                = module.naming.names["vpn_site"].name
   resource_group_name = var.resource_group_name
   location            = var.location
   virtual_wan_id      = var.vwan_id
@@ -187,14 +187,14 @@ resource "azurerm_vpn_gateway_connection" "this" {
 
 #region cloud dns private resolver
 resource "azurerm_private_dns_resolver" "this" {
-  name                = "pdnsr-${var.tags["project"]}-${var.tags["environment"]}"
+  name                = module.naming.names["dns_resolver"].name
   resource_group_name = var.resource_group_name
   location            = var.location
   virtual_network_id  = var.virtual_networks_cloud["virtual_network_shared"].id
 }
 
 resource "azurerm_private_dns_resolver_inbound_endpoint" "this" {
-  name                    = "pdnsri-${var.tags["project"]}-${var.tags["environment"]}"
+  name                    = module.naming.names["dns_resolver_inbound_endpoint"].name
   private_dns_resolver_id = azurerm_private_dns_resolver.this.id
   location                = var.location
 
@@ -205,14 +205,14 @@ resource "azurerm_private_dns_resolver_inbound_endpoint" "this" {
 }
 
 resource "azurerm_private_dns_resolver_outbound_endpoint" "this" {
-  name                    = "pdnsro-${var.tags["project"]}-${var.tags["environment"]}"
+  name                    = module.naming.names["dns_resolver_outbound_endpoint"].name
   private_dns_resolver_id = azurerm_private_dns_resolver.this.id
   location                = var.location
   subnet_id               = var.subnets_cloud["snet-misc-02"].id
 }
 
 resource "azurerm_private_dns_resolver_dns_forwarding_ruleset" "this" {
-  name                                       = "rset-${var.tags["project"]}-${var.tags["environment"]}"
+  name                                       = module.naming.names["dns_forwarding_ruleset"].name
   resource_group_name                        = var.resource_group_name
   location                                   = var.location
   private_dns_resolver_outbound_endpoint_ids = [azurerm_private_dns_resolver_outbound_endpoint.this.id]

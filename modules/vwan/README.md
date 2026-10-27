@@ -73,7 +73,7 @@ The point-to-site VPN gateway uses a self-signed root certificate to authenticat
 The Azure VPN Client must be installed on the remote Windows client. It is used to establish a point-to-site VPN connection to the VPN gateway connected to your sandbox environment. Perform these steps from remote Windows client:
 
 * Download virtual hub user VPN profile
-  * Navigate to *portal.azure.com* > *Virtual WANs* > *vwan-sand-dev* > *Hubs* > *vwan-sand-dev-hub* > *User VPN (Point to site)*
+  * Navigate to *portal.azure.com* > *Virtual WANs* > *vwan-sand-dev* > *Hubs* > *vhubsanddev* > *User VPN (Point to site)*
   * Click *Download virtual hub user VPN profile*
     * Authentication type: *EAPTLS*
     * Click *Generate and download profile*
@@ -87,7 +87,7 @@ The Azure VPN Client must be installed on the remote Windows client. It is used 
 
     Section | Setting | Value
     --- | --- | ---
-    Top | Connection Name | vwan-sand-dev_vwan-sand-dev-hub
+    Top | Connection Name | vwan-sand-dev_vhubsanddev
     Top | VPN Server | hub0.xxxxxxxxxxxxxxxxxxxxxxxxx.vpn.azure.com
     Server Validation | Certificate Information | DigiCert Global Root B2
     Server Validation | Server Secret | Sensitive
@@ -96,12 +96,12 @@ The Azure VPN Client must be installed on the remote Windows client. It is used 
     Client Authentication | Secondary Profile | None
 
   * Click *Save*
-  * A new VPN connection named *vwan-sand-dev_vwan-sand-dev-hub* should now be visible in the Azure VPN Client. Select it, then click *Connect*.
+  * A new VPN connection named *vwan-sand-dev_vhubsanddev* should now be visible in the Azure VPN Client. Select it, then click *Connect*.
   * When the connection is established, review *Connection Properties*
 
     Name | Value
     --- | ---
-    Connection Name | vwan-sand-dev_vwan-sand-dev-hub
+    Connection Name | vwan-sand-dev_vhubsanddev
     VPN Server | hub0.xxxxxxxxxxxxxxxxxxxxxxxxx.vpn.azure.com
     Authentication Type | Certificate
     Connection Time | Timestamp
@@ -382,7 +382,7 @@ Address | Name | Notes
 module.vwan[0].azurerm_key_vault_secret.this | p2svpn&#8209;client&#8209;private&#8209;key&#8209;pem | Key vault secret used to secure the private key for the client certificate.
 module.vwan[0].azurerm_monitor_diagnostic_setting.this | Diagnostic Logs | The diagnostic setting that sends point-to-site VPN gateway *GatewayDiagnosticLog*, *IKEDiagnosticLog*, *P2SDiagnosticLog* logs and *AllMetrics* to the shared Log Analytics workspace.
 module.vwan[0].azurerm_point_to_site_vpn_gateway.this | vpngw&#8209;sand&#8209;dev | The Azure Virtual WAN point-to-site VPN gateway.
-module.vwan[0].azurerm_virtual_hub.this | vwan&#8209;sand&#8209;dev&#8209;hub | The Azure Virtual WAN hub.
+module.vwan[0].azurerm_virtual_hub.this | vhubsanddev | The Azure Virtual WAN hub.
 module.vwan[0].azurerm_virtual_hub_connection.connections[*] | | The Azure Virtual WAN hub connections to the virtual networks.
 module.vwan[0].azurerm_virtual_wan.this | vwan&#8209;sand&#8209;dev | The Azure Virtual WAN.
 module.vwan[0].azurerm_vpn_server_configuration.this | | The Azure Virtual WAN VPN server configuration.

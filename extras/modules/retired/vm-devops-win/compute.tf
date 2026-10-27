@@ -43,7 +43,7 @@ resource "azurerm_windows_virtual_machine" "virtual_machines" {
 #region disks
 resource "azurerm_managed_disk" "disks" {
   for_each             = local.vm_devops_win_data_disk_count == 1 ? azurerm_windows_virtual_machine.virtual_machines : {}
-  name                 = "${module.naming.managed_disk.name}-${each.value.name}"
+  name                 = "${module.naming.names["disk"].name}-${each.value.name}"
   location             = var.location
   resource_group_name  = var.resource_group_name
   storage_account_type = var.vm_devops_win_storage_account_type
@@ -63,7 +63,7 @@ resource "azurerm_virtual_machine_data_disk_attachment" "attachments" {
 #region extensions
 resource "azurerm_virtual_machine_extension" "extensions" {
   for_each                   = azurerm_windows_virtual_machine.virtual_machines
-  name                       = "${module.naming.virtual_machine_extension.name}-${each.value.name}"
+  name                       = "${module.naming.names["virtual_machine_extension"].name}-${each.value.name}"
   virtual_machine_id         = each.value.id
   publisher                  = "Microsoft.Compute"
   type                       = "CustomScriptExtension"

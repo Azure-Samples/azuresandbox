@@ -65,11 +65,11 @@ resource "azurerm_container_app" "this" {
 }
 
 resource "azurerm_container_app_environment" "this" {
-  name                               = module.naming.container_app_environment.name_unique
+  name                               = module.naming_unique.names["managed_environment"].name
   location                           = var.location
   resource_group_name                = var.resource_group_name
   infrastructure_subnet_id           = var.container_apps_subnet_id
-  infrastructure_resource_group_name = "ME_${module.naming.container_app_environment.name_unique}_${var.resource_group_name}_${var.location}"
+  infrastructure_resource_group_name = "ME_${module.naming_unique.names["managed_environment"].name}_${var.resource_group_name}_${var.location}"
   log_analytics_workspace_id         = var.log_analytics_workspace_id
   logs_destination                   = "log-analytics"
   internal_load_balancer_enabled     = true
@@ -133,9 +133,18 @@ resource "azurerm_virtual_machine_run_command" "build_image" {
 
 #region modules
 module "naming" {
-  source      = "Azure/naming/azurerm"
-  version     = "~> 0.4.3"
-  suffix      = [var.tags["project"], var.tags["environment"]]
-  unique-seed = var.unique_seed
+  source        = "Azure/avm-utl-naming/azure"
+  version       = "~> 0.3.0"
+  suffix        = [var.tags["project"], var.tags["environment"]]
+  unique_length = 0
+}
+
+# unique_seed comes from a resource in the root module, so it's unknown at plan time and can't be passed as the
+# naming module's unique_seed input. Adding it to the suffix keeps names consistent with the resource group.
+module "naming_unique" {
+  source        = "Azure/avm-utl-naming/azure"
+  version       = "~> 0.3.0"
+  suffix        = [var.tags["project"], var.tags["environment"], substr(var.unique_seed, 0, 4)]
+  unique_length = 0
 }
 #endregion

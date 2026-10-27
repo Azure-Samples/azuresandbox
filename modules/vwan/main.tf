@@ -66,8 +66,9 @@ resource "tls_locally_signed_cert" "client_cert" {
 
 #region modules
 module "naming" {
-  source  = "Azure/naming/azurerm"
-  version = "~> 0.4.3"
-  suffix  = [var.tags["project"], var.tags["environment"]]
+  source        = "Azure/avm-utl-naming/azure"
+  version       = "~> 0.3.0"
+  suffix        = [var.tags["project"], var.tags["environment"]]
+  unique_length = 0
 }
 #endregion

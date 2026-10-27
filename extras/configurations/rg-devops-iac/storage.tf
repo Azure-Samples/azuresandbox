@@ -1,6 +1,6 @@
 #region resources
 resource "azurerm_storage_account" "this" {
-  name                      = module.naming.storage_account.name_unique
+  name                      = module.naming.names["storage_account"].name_unique
   resource_group_name       = azurerm_resource_group.this.name
   location                  = var.location
   account_kind              = "StorageV2"

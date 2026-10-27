@@ -1,6 +1,6 @@
 #region storage-account
 resource "azurerm_storage_account" "this" {
-  name                            = module.naming.storage_account.name_unique
+  name                            = module.naming_unique.names["storage_account"].name
   resource_group_name             = var.resource_group_name
   location                        = var.location
   account_kind                    = "StorageV2"

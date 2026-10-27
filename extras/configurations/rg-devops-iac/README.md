@@ -337,11 +337,11 @@ azapi_update_resource.ampls_disable_public_access | | Sets the AMPLS ingestion a
 azapi_update_resource.key_vault_disable_public_access | | Disables key vault public network access after the key vault barrier.
 azapi_update_resource.log_analytics_disable_public_access | | Disables public ingestion and query on the Log Analytics workspace after the AMPLS barrier.
 azapi_update_resource.storage_disable_public_access | | Disables storage account public network access after the storage barrier.
-azurerm_bastion_host.this | snap-devops-dev | Bastion host for secure remote access to `jumplinux2`.
+azurerm_bastion_host.this | bas-devops-dev | Bastion host for secure remote access to `jumplinux2`.
 azurerm_key_vault.this | kv-devops-dev-xxx | Key vault for secure secret storage.
 azurerm_log_analytics_workspace.this | log-devops-dev-xxx | Azure Monitor LAW workspace for observability (diagnostic logs and metrics).
-azurerm_monitor_data_collection_endpoint.this | dce-devops-dev-xxx | Data collection endpoint used by the Azure Monitor Agent on `jumplinux2`.
-azurerm_monitor_data_collection_rule.linux | dcr-devops-dev-linux | Linux data collection rule: syslog (`auth` and `authpriv` at `Info` and above, other facilities at `Warning` and above) and performance counters.
+azurerm_monitor_data_collection_endpoint.this | dcedevopsdevxxx | Data collection endpoint used by the Azure Monitor Agent on `jumplinux2`.
+azurerm_monitor_data_collection_rule.linux | dcrdevopsdev-linux | Linux data collection rule: syslog (`auth` and `authpriv` at `Info` and above, other facilities at `Warning` and above) and performance counters.
 azurerm_monitor_diagnostic_setting.bastion | Diagnostic Logs | Sends `BastionAuditLogs` and metrics for the Bastion host to the workspace.
 azurerm_monitor_diagnostic_setting.data_collection_rule_linux | Diagnostic Logs | Sends data collection errors (`allLogs`) and metrics for the Linux data collection rule to the workspace.
 azurerm_monitor_diagnostic_setting.key_vault | Audit Logs | Sends key vault `audit` logs (including secret reads) and metrics to the workspace.
@@ -350,15 +350,15 @@ azurerm_monitor_diagnostic_setting.storage_blob | Diagnostic Logs | Sends blob s
 azurerm_monitor_private_link_scope.this | ampls-devops-dev | Azure Monitor Private Link Scope. Starts in `Open` mode and is set to `PrivateOnly` by the AMPLS barrier.
 azurerm_monitor_private_link_scoped_service.dce | ampls-scope-dce | Adds the data collection endpoint to the AMPLS.
 azurerm_monitor_private_link_scoped_service.log_analytics | ampls-scope-log-analytics | Adds the Log Analytics workspace to the AMPLS.
-azurerm_nat_gateway.this | ng-devops-dev | NAT gateway for outbound internet connectivity.
+azurerm_nat_gateway.this | ngdevopsdev | NAT gateway for outbound internet connectivity.
 azurerm_nat_gateway_public_ip_association.this | | Associates the NAT gateway with the public IP address.
 azurerm_network_security_group.groups[*] | | One NSG for each subnet in `local.subnets` that has NSG rules. The private link subnet has no NSG.
 azurerm_network_security_rule.rules[*] | | NSG rules from `local.nsg_rules`. See [Virtual Network Design](#virtual-network-design).
 azurerm_private_dns_zone.zones[*] | | Private DNS zones from `local.private_dns_zones`. See [Virtual Network Design](#virtual-network-design).
 azurerm_private_dns_zone_virtual_network_link.zones[*] | | Links each private DNS zone to the virtual network. See [Virtual Network Design](#virtual-network-design).
-azurerm_private_endpoint.ampls | pe-devops-dev-ampls | Private endpoint for the AMPLS (`azuremonitor` subresource)
-azurerm_private_endpoint.key_vault | pe-devops-dev-key-vault | Private endpoint for Azure key vault
-azurerm_private_endpoint.storage_blob | pe-devops-dev-storage-blob | Private endpoint for Azure blob storage
+azurerm_private_endpoint.ampls | pep-devops-dev-ampls | Private endpoint for the AMPLS (`azuremonitor` subresource)
+azurerm_private_endpoint.key_vault | pep-devops-dev-key-vault | Private endpoint for Azure key vault
+azurerm_private_endpoint.storage_blob | pep-devops-dev-storage-blob | Private endpoint for Azure blob storage
 azurerm_public_ip.bastion | pip-devops-dev-bastion | Public IP address for the Bastion host.
 azurerm_public_ip.this | pip-devops-dev-nat | Public IP address for the NAT gateway.
 azurerm_resource_group.this | rg-devops-dev-xxx | Resource group for all resources in this configuration.
@@ -446,7 +446,7 @@ This project is built built using Terraform, a cross platform, open-source Infra
   * **time**: Used to implement wait cycles and other time based operations.
   * **tls**: Used to generate the break-glass SSH key pair for the Linux virtual machine's local admin account.
 * **Modules**: The following Terraform modules are used in this project:
-  * **Azure/naming**: A module for generating consistent and compliant Azure resource names.
+  * **Azure/avm-utl-naming**: The Azure Verified Module naming utility, used to generate consistent and compliant Azure resource names from its `names` output (replaces the archived `Azure/naming/azurerm` module).
 
 #### **Scripting Technologies**
 
@@ -524,8 +524,8 @@ azurerm_federated_identity_credential.runner_power_state_github[0] | github-sand
 azurerm_role_assignment.deployment_identity_rbac_admin[0] | | Assigns `Role Based Access Control Administrator` at the subscription scope to the deployment identity, with a condition that allows only the roles in `local.deployment_identity_assignable_roles`. Created only when `deployment_identity` is `managed_identity`.
 azurerm_role_assignment.deployment_identity_reader[0] | | Assigns standing `Reader` at the subscription scope to the deployment identity.
 azurerm_role_assignment.runner_power_state[0] | | Assigns `Desktop Virtualization Power On Off Contributor` on `jumplinux2` to the runner power state identity. Created only when `deployment_identity` is `oidc`.
-azurerm_user_assigned_identity.deployment[0] | uai-devops-dev-deployment | Deployment identity for Azure Sandbox applies. Attached to `jumplinux2` when `deployment_identity` is `managed_identity`; unattached and federated with GitHub Actions when it is `oidc`. Not created when `deployment_identity` is `none`.
-azurerm_user_assigned_identity.runner_power_state[0] | uai-devops-dev-runner | Runner power state identity that starts and deallocates `jumplinux2` for workflow runs. Unattached and federated with GitHub Actions. Created only when `deployment_identity` is `oidc`.
+azurerm_user_assigned_identity.deployment[0] | id-devops-dev-deployment | Deployment identity for Azure Sandbox applies. Attached to `jumplinux2` when `deployment_identity` is `managed_identity`; unattached and federated with GitHub Actions when it is `oidc`. Not created when `deployment_identity` is `none`.
+azurerm_user_assigned_identity.runner_power_state[0] | id-devops-dev-runner | Runner power state identity that starts and deallocates `jumplinux2` for workflow runs. Unattached and federated with GitHub Actions. Created only when `deployment_identity` is `oidc`.
 
 #### Root Module Output Variables (Optional)
 

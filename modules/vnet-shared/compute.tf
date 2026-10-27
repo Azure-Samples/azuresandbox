@@ -107,7 +107,7 @@ resource "azurerm_virtual_machine_extension" "ama" {
 }
 
 resource "azurerm_monitor_data_collection_rule_association" "adds1_dcr" {
-  name                    = "${module.naming.monitor_data_collection_rule.name}-${var.vm_adds_name}-association"
+  name                    = "${module.naming.names["data_collection_rule_association"].name}-${var.vm_adds_name}"
   target_resource_id      = azurerm_windows_virtual_machine.this.id
   data_collection_rule_id = azurerm_monitor_data_collection_rule.windows.id
 

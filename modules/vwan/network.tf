@@ -1,11 +1,11 @@
 resource "azurerm_virtual_wan" "this" {
-  name                = module.naming.virtual_wan.name
+  name                = module.naming.names["virtual_wan"].name
   resource_group_name = var.resource_group_name
   location            = var.location
 }
 
 resource "azurerm_virtual_hub" "this" {
-  name                = "${module.naming.virtual_wan.name}-hub"
+  name                = module.naming.names["virtual_hub_virtual_wan_hub"].name
   resource_group_name = var.resource_group_name
   location            = var.location
   virtual_wan_id      = azurerm_virtual_wan.this.id
@@ -21,7 +21,7 @@ resource "azurerm_virtual_hub_connection" "connections" {
 }
 
 resource "azurerm_point_to_site_vpn_gateway" "this" {
-  name                        = module.naming.point_to_site_vpn_gateway.name
+  name                        = module.naming.names["point_to_site_vpn_gateway"].name
   resource_group_name         = var.resource_group_name
   location                    = var.location
   virtual_hub_id              = azurerm_virtual_hub.this.id
@@ -64,7 +64,7 @@ resource "azurerm_monitor_diagnostic_setting" "this" {
 }
 
 resource "azurerm_vpn_server_configuration" "this" {
-  name                     = "${module.naming.point_to_site_vpn_gateway.name}-server-config"
+  name                     = "${module.naming.names["point_to_site_vpn_gateway"].name}-server-config"
   resource_group_name      = var.resource_group_name
   location                 = var.location
   vpn_authentication_types = ["Certificate"]

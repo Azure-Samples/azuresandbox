@@ -111,8 +111,8 @@ unique_seed |  | Unique seed appended to generated names (via Azure naming modul
 Address | Name | Notes
 --- | --- | ---
 azurerm_container_app.this | petstore | Runs the instrumented petstore image; has a system-assigned identity for Entra ID telemetry auth.
-azurerm_container_app_environment.this | cae-sand-dev-xxx | Managed Container Apps Environment.
-azurerm_private_endpoint.this | pe-sand-dev-cae | Private endpoint for the Container Apps Environment.
+azurerm_container_app_environment.this | caesanddevxxx | Managed Container Apps Environment.
+azurerm_private_endpoint.this | pep-sand-dev-cae | Private endpoint for the Container Apps Environment.
 azurerm_role_assignment.acr_pull | | Grants the environment managed identity AcrPull on the shared registry.
 azurerm_role_assignment.acr_push | | Grants the jumplinux1 managed identity AcrPush on the shared registry.
 azurerm_role_assignment.app_insights_publisher | | Grants the container app identity Monitoring Metrics Publisher on Application Insights.

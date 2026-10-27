@@ -1,6 +1,6 @@
 #region virtual-network
 resource "azurerm_virtual_network" "this" {
-  name                = "${module.naming.virtual_network.name}-${var.vnet_name}"
+  name                = "${module.naming.names["virtual_network"].name}-${var.vnet_name}"
   location            = var.location
   resource_group_name = var.resource_group_name
   address_space       = [var.vnet_address_space]
@@ -39,7 +39,7 @@ resource "azurerm_subnet" "subnets" {
 resource "azurerm_network_security_group" "groups" {
   for_each = { for k, v in local.subnets : k => v if length(v.nsg_rules) > 0 }
 
-  name                = "${module.naming.network_security_group.name}.${each.key}"
+  name                = "${module.naming.names["network_security_group"].name}.${each.key}"
   location            = var.location
   resource_group_name = var.resource_group_name
 }
@@ -53,7 +53,7 @@ resource "azurerm_network_security_rule" "rules" {
   destination_port_ranges     = length(each.value.destination_port_ranges) > 1 ? each.value.destination_port_ranges : null
   direction                   = each.value.direction
   name                        = each.value.nsg_rule_name
-  network_security_group_name = "${module.naming.network_security_group.name}.${each.value.subnet_name}"
+  network_security_group_name = "${module.naming.names["network_security_group"].name}.${each.value.subnet_name}"
   priority                    = each.value.priority
   protocol                    = each.value.protocol
   resource_group_name         = var.resource_group_name
@@ -79,7 +79,7 @@ resource "azurerm_subnet_network_security_group_association" "associations" {
 
 # Peering with shared services virtual network
 resource "azurerm_virtual_network_peering" "shared_to_app" {
-  name                         = "${module.naming.virtual_network_peering.name}-shared-to-app"
+  name                         = "${module.naming.names["virtual_network_virtual_network_peering"].name}-shared-to-app"
   resource_group_name          = var.resource_group_name
   virtual_network_name         = var.virtual_network_shared_name
   remote_virtual_network_id    = azurerm_virtual_network.this.id
@@ -94,7 +94,7 @@ resource "azurerm_virtual_network_peering" "shared_to_app" {
 }
 
 resource "azurerm_virtual_network_peering" "app_to_shared" {
-  name                         = "${module.naming.virtual_network_peering.name}-app-to-shared"
+  name                         = "${module.naming.names["virtual_network_virtual_network_peering"].name}-app-to-shared"
   resource_group_name          = var.resource_group_name
   virtual_network_name         = azurerm_virtual_network.this.name
   remote_virtual_network_id    = var.virtual_network_shared_id
@@ -116,13 +116,13 @@ resource "azurerm_subnet_route_table_association" "associations" {
 
 #region private-endpoints
 resource "azurerm_private_endpoint" "container_registry" {
-  name                = "${module.naming.private_endpoint.name}-cr"
+  name                = "${module.naming.names["private_endpoint"].name}-cr"
   location            = var.location
   resource_group_name = var.resource_group_name
   subnet_id           = var.private_endpoint_subnet_id
 
   private_service_connection {
-    name                           = "${module.naming.container_registry.name_unique}-psc"
+    name                           = "${module.naming_unique.names["registry"].name}-psc"
     private_connection_resource_id = azurerm_container_registry.this.id
     is_manual_connection           = false
     subresource_names              = ["registry"]
@@ -142,7 +142,7 @@ resource "azurerm_private_endpoint" "container_registry" {
 }
 
 resource "azurerm_private_endpoint" "storage_blob" {
-  name                = "${module.naming.private_endpoint.name}-storage-blob"
+  name                = "${module.naming.names["private_endpoint"].name}-storage-blob"
   resource_group_name = var.resource_group_name
   location            = var.location
   subnet_id           = var.private_endpoint_subnet_id
@@ -167,7 +167,7 @@ resource "azurerm_private_endpoint" "storage_blob" {
 }
 
 resource "azurerm_private_endpoint" "storage_file" {
-  name                = "${module.naming.private_endpoint.name}-storage-file"
+  name                = "${module.naming.names["private_endpoint"].name}-storage-file"
   resource_group_name = var.resource_group_name
   location            = var.location
   subnet_id           = var.private_endpoint_subnet_id
@@ -194,7 +194,7 @@ resource "azurerm_private_endpoint" "storage_file" {
 
 #region network-interfaces
 resource "azurerm_network_interface" "this" {
-  name                = "${module.naming.network_interface.name}-${var.vm_jumpbox_win_name}"
+  name                = "${module.naming.names["network_interface"].name}-${var.vm_jumpbox_win_name}"
   location            = var.location
   resource_group_name = var.resource_group_name
 

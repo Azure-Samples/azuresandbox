@@ -23,7 +23,7 @@ resource "terraform_data" "storage_operations_complete" {
 
 #region resources
 resource "azurerm_container_registry" "this" {
-  name                          = module.naming.container_registry.name_unique
+  name                          = module.naming_unique.names["registry"].name
   resource_group_name           = var.resource_group_name
   location                      = var.location
   sku                           = var.container_registry_sku
@@ -61,7 +61,7 @@ resource "azurerm_monitor_diagnostic_setting" "container_registry" {
 # start enabled and are flipped to Disabled by the root azapi_update_resource after the
 # AMPLS access barrier signals end-to-end wiring is complete (see root main.tf).
 resource "azurerm_application_insights" "this" {
-  name                         = module.naming.application_insights.name_unique
+  name                         = module.naming_unique.names["component"].name
   location                     = var.location
   resource_group_name          = var.resource_group_name
   application_type             = "web"
@@ -101,11 +101,18 @@ resource "azurerm_monitor_private_link_scoped_service" "app_insights" {
 
 #region modules
 module "naming" {
-  source                 = "Azure/naming/azurerm"
-  version                = "~> 0.4.3"
-  suffix                 = [var.tags["project"], var.tags["environment"]]
-  unique-seed            = var.unique_seed
-  unique-include-numbers = true
-  unique-length          = 8
+  source        = "Azure/avm-utl-naming/azure"
+  version       = "~> 0.3.0"
+  suffix        = [var.tags["project"], var.tags["environment"]]
+  unique_length = 0
+}
+
+# unique_seed comes from a resource in the root module, so it's unknown at plan time and can't be passed as the
+# naming module's unique_seed input. Adding it to the suffix keeps names consistent with the resource group.
+module "naming_unique" {
+  source        = "Azure/avm-utl-naming/azure"
+  version       = "~> 0.3.0"
+  suffix        = [var.tags["project"], var.tags["environment"], substr(var.unique_seed, 0, 8)]
+  unique_length = 0
 }
 #endregion
