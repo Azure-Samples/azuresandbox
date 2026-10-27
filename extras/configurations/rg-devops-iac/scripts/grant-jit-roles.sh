@@ -6,10 +6,10 @@
 #   * Role Based Access Control Administrator   time-bound active assignment on the subscription, constrained by
 #                                               'jit_condition' in the 'deployment_identity' terraform output.
 #
-# Run as the operator with Azure CLI signed in. Creating role assignments requires an active subscription Owner
-# or User Access Administrator assignment. If neither is active, the script activates your eligible Owner
-# assignment through Privileged Identity Management (PIM). If PIM requires approval or multifactor
-# authentication that Azure CLI can't satisfy, activate Owner in the portal and run the script again.
+# Run as the operator with Azure CLI signed in. If your subscription Role Based Access Control Administrator
+# assignment isn't active, the script activates your eligible assignment through Privileged Identity Management
+# (PIM). If PIM requires approval or multifactor authentication that Azure CLI can't satisfy, activate the role in
+# the portal and run the script again.
 #
 # The identity, subscription and condition come from this configuration's terraform outputs, so run it after
 # 'terraform apply'. It works from any directory.
@@ -31,9 +31,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TERRAFORM_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 API_VERSION="2020-10-01"
-OWNER_ROLE_ID="8e3af657-a8ff-443c-a75c-2fe8c4bcb635"
 # Built-in Azure role definition IDs are public, not secrets.
-USER_ACCESS_ADMIN_ROLE_ID="18d7d88d-d35e-4fb5-a5c3-7773c20a72d9" # gitleaks:allow
 CONTRIBUTOR_ROLE_ID="b24988ac-6180-42a0-ab88-20f7382dd24c"
 RBAC_ADMIN_ROLE_ID="f58310d9-a9f6-439a-9e8d-f62e7b41a168"
 declare -A ROLE_NAMES=(
@@ -177,17 +175,17 @@ remove_assignment() {
 
 #region operator-access
 CALLER_ROLES=$(active_assignments "asTarget()" | jq -r '.roleId')
-if grep -qx -e "${OWNER_ROLE_ID}" -e "${USER_ACCESS_ADMIN_ROLE_ID}" <<<"${CALLER_ROLES}"; then
-  echo "Operator access:     Owner or User Access Administrator is active."
+if grep -qx "${RBAC_ADMIN_ROLE_ID}" <<<"${CALLER_ROLES}"; then
+  echo "Operator access:     Role Based Access Control Administrator is active."
 else
   ELIGIBILITY_ID=$(az rest --method GET \
     --url "${ARM}/roleEligibilityScheduleInstances?api-version=${API_VERSION}&\$filter=asTarget()" -o json |
-    jq -r --arg scope "${SCOPE}" --arg role "${OWNER_ROLE_ID}" '[.value[].properties
+    jq -r --arg scope "${SCOPE}" --arg role "${RBAC_ADMIN_ROLE_ID}" '[.value[].properties
       | select((.scope | ascii_downcase) == ($scope | ascii_downcase))
       | select((.roleDefinitionId | split("/") | last | ascii_downcase) == $role)
       | .roleEligibilityScheduleId][0] // empty')
   if [[ -z "${ELIGIBILITY_ID}" ]]; then
-    echo "Error: you have no active or eligible Owner assignment on the subscription."
+    echo "Error: you have no eligible Role Based Access Control Administrator assignment on the subscription."
     exit 1
   fi
 
@@ -199,10 +197,10 @@ else
     exit 1
   fi
 
-  echo "Operator access:     activating your eligible Owner assignment through PIM for 1 hour..."
+  echo "Operator access:     activating your eligible Role Based Access Control Administrator assignment through PIM for 1 hour..."
   ACTIVATE_BODY=$(jq -n \
     --arg principal "${OPERATOR_ID}" \
-    --arg role "${SCOPE}/providers/Microsoft.Authorization/roleDefinitions/${OWNER_ROLE_ID}" \
+    --arg role "${SCOPE}/providers/Microsoft.Authorization/roleDefinitions/${RBAC_ADMIN_ROLE_ID}" \
     --arg eligibility "${ELIGIBILITY_ID}" \
     --arg justification "${JUSTIFICATION}" \
     --arg start "$(utc_now)" \
@@ -210,14 +208,14 @@ else
       linkedRoleEligibilityScheduleId: $eligibility, justification: $justification,
       scheduleInfo: {startDateTime: $start, expiration: {type: "AfterDuration", duration: "PT1H"}}}}')
   if ! STATUS=$(submit_request "${ACTIVATE_BODY}"); then
-    echo "Error: PIM activation failed. Activate Owner in the portal, then run this script again."
+    echo "Error: PIM activation failed. Activate Role Based Access Control Administrator in the portal, then run this script again."
     exit 1
   fi
   if [[ "${STATUS}" != "Provisioned" ]]; then
     echo "Error: PIM activation status is '${STATUS}'. If it needs approval, wait for it, then run this script again."
     exit 1
   fi
-  echo "Operator access:     Owner activated."
+  echo "Operator access:     Role Based Access Control Administrator activated."
 fi
 #endregion
 

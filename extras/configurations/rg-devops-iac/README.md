@@ -657,7 +657,8 @@ GitHub repository administrator | Runner registration token; environments, secre
 GitHub repository administrator | OIDC subject claim template, unless the repository already uses it | `oidc` | Once, after the federated credentials exist
 Microsoft Entra Privileged Role Administrator | Microsoft Graph permissions. The least privileged role that can grant them; Global Administrator also works. `Owner`, Cloud Application Administrator and Global Reader can't. | Both, `mssql` only | Once, after the identity is created
 Microsoft Entra ID P2 or Microsoft Entra ID Governance | Time-bound role assignments | Both | Before the first run
-Subscription `Owner`, ideally PIM eligible | Applying this configuration and granting the time-bound roles | Both | Each apply and each run
+Subscription `Owner`, ideally PIM eligible | Applying this configuration | Both | Each apply
+Subscription `Role Based Access Control Administrator`, ideally PIM eligible | Granting the time-bound roles | Both | Each run
 
 ##### Workflow Configuration
 
@@ -718,7 +719,7 @@ Step | Task | Who | Modes | Details
 4 | Check or set the OIDC subject claim template | Repository administrator | `oidc` | Below
 5 | Add the power state secrets to `sandbox-runner-power-state` | Repository administrator | `oidc` | [Runner Power State Identity](#runner-power-state-identity)
 6 | Set `SANDBOX_BACKEND_HCL`, `SANDBOX_TFVARS_HCL` and `SANDBOX_AUTH_MODE` | Repository administrator | Both | [Workflow Configuration](#workflow-configuration)
-7 | Before each run, grant the time-bound roles | Operator, with `Owner` | Both | [Just-in-Time Deployment Roles](#just-in-time-deployment-roles)
+7 | Before each run, grant the time-bound roles | Operator, with `Role Based Access Control Administrator` | Both | [Just-in-Time Deployment Roles](#just-in-time-deployment-roles)
 8 | Start a manual run or mark a release PR ready, then approve | Owner | Both | [Sandbox Deployment Workflow](#sandbox-deployment-workflow)
 
 Grant the Microsoft Graph permissions from this configuration's directory, signed in to Azure CLI as a Privileged Role Administrator. If you activated the role just before, sign in again with `az login` so your token includes it:
@@ -783,7 +784,7 @@ sequenceDiagram
     participant Op as Operator
     participant Az as Azure
     participant Wf as Workflow preflight
-    Op->>Az: grant-jit-roles.sh (activates Owner through PIM if needed)
+    Op->>Az: grant-jit-roles.sh (activates RBAC Administrator through PIM if needed)
     Az-->>Op: Contributor + conditioned RBAC Administrator, time-bound
     Op->>Az: Wait until both roles are listed in PIM (about 5 minutes)
     Op->>Wf: Approve the run
@@ -795,7 +796,7 @@ sequenceDiagram
 The script:
 
 1. Reads the identity, subscription and `jit_condition` from this configuration's outputs. Run it as the operator, from any directory, with Azure CLI signed in.
-1. Activates your eligible subscription `Owner` through PIM for 1 hour, unless `Owner` or `User Access Administrator` is already active. If PIM requires approval or multifactor authentication that Azure CLI can't satisfy, activate `Owner` in the portal and run it again.
+1. Activates your eligible subscription `Role Based Access Control Administrator` through PIM for 1 hour, unless it's already active. If PIM requires approval or multifactor authentication that Azure CLI can't satisfy, activate the role in the portal and run it again.
 1. Assigns `Contributor`, and `Role Based Access Control Administrator` constrained by `jit_condition`, as time-bound active assignments. Existing active assignments are kept unless you pass `--force`.
 1. Lists the end times, warns if less than `SANDBOX_JIT_MIN_REMAINING_MINUTES` remains, and checks that the applied condition matches `jit_condition`.
 
@@ -811,7 +812,7 @@ Things to know:
 
 * Preflight accepts a permanent assignment with a warning.
 * The 8-hour grant and 150-minute minimum cover preflight, a full apply and unit testing, with time left for a manual teardown. With `oidc`, the window also covers `jumplinux2` booting.
-* To grant in the portal instead, activate `Owner`, then use the subscription's *Access control (IAM)* > *Add role assignment* with *Assignment type* *Active* and *Time bound*. For `Role Based Access Control Administrator`, paste `terraform output -json deployment_identity | jq -r .jit_condition` into the condition editor's code view.
+* To grant in the portal instead, activate `Role Based Access Control Administrator`, then use the subscription's *Access control (IAM)* > *Add role assignment* with *Assignment type* *Active* and *Time bound*. For `Role Based Access Control Administrator`, paste `terraform output -json deployment_identity | jq -r .jit_condition` into the condition editor's code view.
 * After the run, revoke the assignments with `--revoke` or let them expire.
 
 ##### Runner Power State Identity
@@ -926,7 +927,8 @@ Day-to-day use of `jumplinux2` needs only `Reader` on the VM, its network interf
 Access | How it's granted
 --- | ---
 Azure RBAC `Reader` on the subscription | Standing
-Azure RBAC `Owner` on the subscription | PIM eligible, activated for `terraform plan`, `terraform apply` and `grant-jit-roles.sh`
+Azure RBAC `Owner` on the subscription | PIM eligible, activated for `terraform plan` and `terraform apply`
+Azure RBAC `Role Based Access Control Administrator` on the subscription | PIM eligible, activated for `grant-jit-roles.sh`. Narrower than `Owner`: it can manage role assignments but not resources.
 Microsoft Entra Privileged Role Administrator | PIM eligible, activated for `grant-graph-permissions.sh`
 Other Microsoft Entra directory roles, such as Global Administrator | PIM eligible, activated only when needed
 `User Access Administrator` at root scope (`/`) | Removed
@@ -935,7 +937,7 @@ Apply it in the Azure portal in this order, so you don't lock yourself out:
 
 1. Confirm the prerequisites: Microsoft Entra ID P2, at least two multifactor authentication methods, and an [emergency access account](https://learn.microsoft.com/entra/identity/role-based-access-control/security-emergency-access) with permanent Global Administrator.
 1. Go to *PIM* > *Azure resources* > your subscription > *Settings* > *Owner*. Set the activation duration to 4-8 hours, require multifactor authentication and a justification, don't require approval, and allow permanent eligible assignments.
-1. Add an **eligible** `Owner` assignment for the operator on the subscription, and a standing `Reader` assignment.
+1. Add **eligible** `Owner` and `Role Based Access Control Administrator` assignments for the operator on the subscription, and a standing `Reader` assignment. Configure the `Role Based Access Control Administrator` role settings the same way as `Owner`.
 1. Test activation and deactivation **before** removing any standing access.
 1. Remove the operator's standing `Owner` assignment, including any inherited from a management group such as the Tenant Root Group.
 1. Remove the standing root-scope `User Access Administrator`: activate Global Administrator, then go to *Microsoft Entra ID* > *Properties* > *Access management for Azure resources* and select *No*. This grant persists after Global Administrator is deactivated.
