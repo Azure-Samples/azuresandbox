@@ -124,7 +124,7 @@ github_runner_labels | | Additional labels to apply to the self-hosted runner.
 github_runner_token | | Ephemeral. The runner registration token used to register the runner (expires after 1 hour). Passed to the Run Command through a write-only protected parameter, so it never lands in Terraform state or the saved plan. Required only when the runner is registered (when the Run Command is created or `github_runner_token_version` changes).
 github_runner_token_version | 1 | Increment to send a new `github_runner_token` to the VM and re-run runner registration, for example after a failed registration.
 github_runner_url | | The GitHub repository URL to register the runner with, e.g. `https://github.com/myorg/myrepo`. Required when `enable_github_runner` is true.
-github_runner_version | `2.338.0` | The version of the GitHub Actions runner agent to install, without the leading `v`.
+github_runner_version | `2.338.2` | The version of the GitHub Actions runner agent to install, without the leading `v`.
 
 ### Module Resources
 
