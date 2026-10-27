@@ -19,16 +19,20 @@
 # Available checks (map 1:1 to a CI workflow):
 #   bash        ShellCheck                  (ci-bash.yml)        pin 0.11.0
 #   powershell  PSScriptAnalyzer            (ci-powershell.yml)  pin 1.25.0
-#   markdown    markdownlint-cli2           (ci-docs.yml)        pin 0.23.3, requires Node.js 20 (ci-docs.yml actions/setup-node)
+#   markdown    markdownlint-cli2           (ci-docs.yml)        pin 0.24.0, requires Node.js 20 (ci-docs.yml actions/setup-node)
 #   links       lychee (offline/internal)   (ci-docs.yml)
 #   actions     actionlint                  (ci-actions.yml)     pin 1.7.12
 #               + sandbox-deployment selection test (scripts/tests/Test-SandboxDeploymentSelection.sh)
 #   secrets     gitleaks                    (ci-secrets.yml)     pin 8.30.1
-#   terraform   terraform fmt + tflint      (ci-terraform.yml)   tflint pin v0.64.0
+#   terraform   terraform fmt + tflint      (ci-terraform.yml)   tflint pin v0.65.0
 #
 # A missing tool is reported as SKIPPED (with an install hint) and does not fail
 # the run, but the final summary flags it so you know the gate was not verified.
 # Exit code: 0 when nothing FAILED, non-zero otherwise (CI-friendly).
+#
+# CI runs on a clean checkout, so git-ignored files (terraform.tfvars, *.tfstate,
+# *.tfplan, .terraform/) are excluded from every check here too, except tflint,
+# which still auto-loads a module directory's terraform.tfvars when evaluating.
 #
 # The tool version pins above are mirrored from the CI workflows and are NOT
 # tracked by Dependabot. The scheduled ci-tool-versions.yml workflow (and its
@@ -52,6 +56,30 @@ skipped=()
 passed=()
 
 have() { command -v "$1" > /dev/null 2>&1; }
+
+# CI runs on a clean checkout, so it never sees git-ignored files such as
+# terraform.tfvars, *.tfstate, *.tfplan, or .terraform/. Checks that would
+# otherwise walk the working tree are fed this list instead: tracked plus
+# untracked-but-not-ignored files that still exist on disk, NUL-delimited.
+# Optional arguments are git pathspecs (e.g. '*.tf').
+ci_files() {
+    local f
+    while IFS= read -r -d '' f; do
+        if [ -f "$f" ]; then printf '%s\0' "$f"; fi
+    done < <(git ls-files -z --cached --others --exclude-standard -- "$@")
+}
+
+# gitleaks has no option to honor .gitignore when scanning a directory, so copy
+# the CI-visible files into a scratch directory and scan that instead.
+scan_secrets() {
+    local stage rc
+    stage="$(mktemp -d)"
+    ci_files | xargs -0 -r cp --parents -t "$stage" --
+    (cd "$stage" && gitleaks dir . --redact --verbose --no-banner)
+    rc=$?
+    rm -rf "$stage"
+    return "$rc"
+}
 
 run_check() {
     local name="$1"
@@ -106,12 +134,17 @@ check_markdown() {
     if [ -n "$node_major" ] && [ "$node_major" != "20" ]; then
         printf '\n=== markdown ===\nWARNING: Node.js v%s detected; ci-docs.yml pins Node 20 (actions/setup-node@v7). Install Node 20.x for full CI parity.\n' "$node_major"
     fi
-    run_check markdown npx --yes markdownlint-cli2@0.23.3
+    run_check markdown npx --yes markdownlint-cli2@0.24.0
 }
 
 check_links() {
     have lychee || { skip links "install lychee (https://github.com/lycheeverse/lychee)"; return; }
-    run_check links lychee --offline --no-progress './**/*.md'
+    # ci-docs.yml passes the glob './**/*.md', which lychee expands without
+    # honoring .gitignore; pass the CI-visible Markdown files explicitly instead.
+    # The glob also skips hidden directories (e.g. .github/), so exclude those too.
+    local md_files=()
+    mapfile -d '' -t md_files < <(ci_files '*.md' ':(exclude,glob)**/.*/**')
+    run_check links lychee --offline --no-progress "${md_files[@]}"
 }
 
 check_actions() {
@@ -122,13 +155,17 @@ check_actions() {
 
 check_secrets() {
     have gitleaks || { skip secrets "install gitleaks 8.30.1 (https://github.com/gitleaks/gitleaks)"; return; }
-    run_check secrets gitleaks dir . --redact --verbose --no-banner
+    run_check secrets scan_secrets
 }
 
 check_terraform() {
     have terraform || { skip "terraform fmt" "install terraform"; }
     if have terraform; then
-        run_check "terraform fmt" terraform fmt -check -recursive -diff
+        # ci-terraform.yml runs `terraform fmt -check -recursive`; pass the same
+        # file types explicitly so git-ignored files (terraform.tfvars) are skipped.
+        local tf_files=()
+        mapfile -d '' -t tf_files < <(ci_files '*.tf' '*.tfvars' '*.tftest.hcl')
+        run_check "terraform fmt" terraform fmt -check -diff "${tf_files[@]}"
     fi
     if have tflint; then
         # tflint --init only initializes the current directory, so initialize
@@ -138,7 +175,7 @@ check_terraform() {
         done < <(find . -name .tflint.hcl -printf '%h\n' | sort -u)
         run_check tflint tflint --recursive
     else
-        skip tflint "install tflint v0.64.0 (https://github.com/terraform-linters/tflint)"
+        skip tflint "install tflint v0.65.0 (https://github.com/terraform-linters/tflint)"
     fi
 }
 

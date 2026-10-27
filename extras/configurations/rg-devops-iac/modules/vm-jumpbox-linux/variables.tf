@@ -84,7 +84,7 @@ variable "github_runner_url" {
 variable "github_runner_version" {
   type        = string
   description = "The version of the GitHub Actions runner agent to install, without the leading 'v'. Only used when var.enable_github_runner is true."
-  default     = "2.338.0"
+  default     = "2.338.2"
 
   validation {
     condition     = can(regex("^[0-9]+\\.[0-9]+\\.[0-9]+$", var.github_runner_version))
