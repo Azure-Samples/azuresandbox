@@ -49,7 +49,7 @@ resource "azurerm_role_assignment" "assignments_vm_win" {
 
 #region vm-configuration
 resource "azurerm_virtual_machine_run_command" "install_windows_features" {
-  name               = "${module.naming.virtual_machine_extension.name}-${var.vm_jumpbox_win_name}-InstallWindowsFeatures"
+  name               = "${module.naming.names["virtual_machine_extension"].name}-${var.vm_jumpbox_win_name}-InstallWindowsFeatures"
   location           = var.location
   virtual_machine_id = azurerm_windows_virtual_machine.this.id
 
@@ -59,7 +59,7 @@ resource "azurerm_virtual_machine_run_command" "install_windows_features" {
 }
 
 resource "azurerm_virtual_machine_extension" "join_domain" {
-  name                       = "${module.naming.virtual_machine_extension.name}-${var.vm_jumpbox_win_name}-JsonADDomainExtension"
+  name                       = "${module.naming.names["virtual_machine_extension"].name}-${var.vm_jumpbox_win_name}-JsonADDomainExtension"
   virtual_machine_id         = azurerm_windows_virtual_machine.this.id
   publisher                  = "Microsoft.Compute"
   type                       = "JsonADDomainExtension"
@@ -80,7 +80,7 @@ resource "azurerm_virtual_machine_extension" "join_domain" {
 }
 
 resource "azurerm_virtual_machine_run_command" "install_software" {
-  name               = "${module.naming.virtual_machine_extension.name}-${var.vm_jumpbox_win_name}-InstallSoftware"
+  name               = "${module.naming.names["virtual_machine_extension"].name}-${var.vm_jumpbox_win_name}-InstallSoftware"
   location           = var.location
   virtual_machine_id = azurerm_windows_virtual_machine.this.id
   depends_on         = [azurerm_virtual_machine_extension.configure_azure_files]
@@ -111,7 +111,7 @@ resource "azurerm_virtual_machine_run_command" "install_software" {
 
 #region azure-files-configuration
 resource "azurerm_virtual_machine_extension" "configure_azure_files" {
-  name                       = "${module.naming.virtual_machine_extension.name}-${var.vm_jumpbox_win_name}-ConfigureAzureFiles"
+  name                       = "${module.naming.names["virtual_machine_extension"].name}-${var.vm_jumpbox_win_name}-ConfigureAzureFiles"
   virtual_machine_id         = azurerm_windows_virtual_machine.this.id
   publisher                  = "Microsoft.Compute"
   type                       = "CustomScriptExtension"
@@ -153,7 +153,7 @@ resource "azurerm_virtual_machine_extension" "ama" {
 }
 
 resource "azurerm_monitor_data_collection_rule_association" "jumpwin1_dcr" {
-  name                    = "${module.naming.monitor_data_collection_rule.name}-${var.vm_jumpbox_win_name}-association"
+  name                    = "${module.naming.names["data_collection_rule_association"].name}-${var.vm_jumpbox_win_name}"
   target_resource_id      = azurerm_windows_virtual_machine.this.id
   data_collection_rule_id = var.data_collection_rule_windows_id
 

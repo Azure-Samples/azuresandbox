@@ -4,7 +4,7 @@ data "azurerm_client_config" "current" {}
 
 #region key-vault
 resource "azurerm_key_vault" "this" {
-  name                          = module.naming.key_vault.name_unique
+  name                          = module.naming_unique.names["key_vault_vault"].name
   location                      = var.location
   resource_group_name           = var.resource_group_name
   tenant_id                     = data.azurerm_client_config.current.tenant_id
@@ -64,7 +64,7 @@ resource "azurerm_monitor_diagnostic_setting" "this" {
 
 #region azure-monitor
 resource "azurerm_log_analytics_workspace" "this" {
-  name                           = module.naming.log_analytics_workspace.name_unique
+  name                           = module.naming_unique.names["operational_insights_workspace"].name
   location                       = var.location
   resource_group_name            = var.resource_group_name
   sku                            = "PerGB2018"
@@ -103,14 +103,14 @@ resource "azurerm_monitor_private_link_scoped_service" "dce" {
 }
 
 resource "azurerm_monitor_data_collection_endpoint" "this" {
-  name                = module.naming.monitor_data_collection_endpoint.name_unique
+  name                = module.naming_unique.names["data_collection_endpoint"].name
   location            = var.location
   resource_group_name = var.resource_group_name
   kind                = "Windows" # Kind is informational on DCE; DCRs carry the actual platform binding.
 }
 
 resource "azurerm_monitor_data_collection_rule" "windows" {
-  name                        = "${module.naming.monitor_data_collection_rule.name}-windows"
+  name                        = "${module.naming.names["data_collection_rule"].name}-windows"
   location                    = var.location
   resource_group_name         = var.resource_group_name
   data_collection_endpoint_id = azurerm_monitor_data_collection_endpoint.this.id
@@ -154,7 +154,7 @@ resource "azurerm_monitor_data_collection_rule" "windows" {
 }
 
 resource "azurerm_monitor_data_collection_rule" "linux" {
-  name                        = "${module.naming.monitor_data_collection_rule.name}-linux"
+  name                        = "${module.naming.names["data_collection_rule"].name}-linux"
   location                    = var.location
   resource_group_name         = var.resource_group_name
   data_collection_endpoint_id = azurerm_monitor_data_collection_endpoint.this.id
@@ -252,9 +252,18 @@ resource "time_sleep" "wait_for_roles" {
 
 #region modules
 module "naming" {
-  source      = "Azure/naming/azurerm"
-  version     = "~> 0.4.3"
-  suffix      = [var.tags["project"], var.tags["environment"]]
-  unique-seed = var.unique_seed
+  source        = "Azure/avm-utl-naming/azure"
+  version       = "~> 0.3.0"
+  suffix        = [var.tags["project"], var.tags["environment"]]
+  unique_length = 0
+}
+
+# unique_seed comes from a resource in the root module, so it's unknown at plan time and can't be passed as the
+# naming module's unique_seed input. Adding it to the suffix keeps names consistent with the resource group.
+module "naming_unique" {
+  source        = "Azure/avm-utl-naming/azure"
+  version       = "~> 0.3.0"
+  suffix        = [var.tags["project"], var.tags["environment"], substr(var.unique_seed, 0, 4)]
+  unique_length = 0
 }
 #endregion

@@ -1,6 +1,6 @@
 #region vnets-and-subnets
 resource "azurerm_virtual_network" "this" {
-  name                = module.naming.virtual_network.name
+  name                = module.naming.names["virtual_network"].name
   location            = var.location
   resource_group_name = azurerm_resource_group.this.name
   address_space       = [var.vnet_address_space]
@@ -24,7 +24,7 @@ resource "azurerm_subnet" "subnets" {
 
 #region bastion
 resource "azurerm_bastion_host" "this" {
-  name                = module.naming.bastion_host.name
+  name                = module.naming.names["bastion_host"].name
   location            = var.location
   resource_group_name = azurerm_resource_group.this.name
   tags                = var.tags
@@ -72,7 +72,7 @@ resource "azurerm_monitor_diagnostic_setting" "bastion" {
 }
 
 resource "azurerm_public_ip" "bastion" {
-  name                = "${module.naming.public_ip.name}-bastion"
+  name                = "${module.naming.names["public_ip_address"].name}-bastion"
   location            = var.location
   resource_group_name = azurerm_resource_group.this.name
   allocation_method   = "Static"
@@ -89,7 +89,7 @@ resource "azurerm_public_ip" "bastion" {
 resource "azurerm_network_security_group" "groups" {
   for_each = { for k, v in local.subnets : k => v if length(v.nsg_rules) > 0 }
 
-  name                = "${module.naming.network_security_group.name}.${each.key}"
+  name                = "${module.naming.names["network_security_group"].name}.${each.key}"
   location            = var.location
   resource_group_name = azurerm_resource_group.this.name
 }
@@ -117,7 +117,7 @@ resource "azurerm_network_security_rule" "rules" {
   destination_port_ranges     = length(each.value.destination_port_ranges) > 1 ? each.value.destination_port_ranges : null
   direction                   = each.value.direction
   name                        = each.value.nsg_rule_name
-  network_security_group_name = "${module.naming.network_security_group.name}.${each.value.subnet_name}"
+  network_security_group_name = "${module.naming.names["network_security_group"].name}.${each.value.subnet_name}"
   priority                    = each.value.priority
   protocol                    = each.value.protocol
   resource_group_name         = azurerm_resource_group.this.name
@@ -158,14 +158,14 @@ resource "terraform_data" "private_dns_zone_links_complete" {
 
 #region nat-gateway
 resource "azurerm_nat_gateway" "this" {
-  name                = module.naming.nat_gateway.name
+  name                = module.naming.names["nat_gateway"].name
   location            = var.location
   resource_group_name = azurerm_resource_group.this.name
   sku_name            = "Standard"
 }
 
 resource "azurerm_public_ip" "this" {
-  name                = "${module.naming.public_ip.name}-nat"
+  name                = "${module.naming.names["public_ip_address"].name}-nat"
   location            = var.location
   resource_group_name = azurerm_resource_group.this.name
   allocation_method   = "Static"
@@ -194,7 +194,7 @@ resource "azurerm_subnet_nat_gateway_association" "devops" {
 
 #region private-endpoints
 resource "azurerm_private_endpoint" "key_vault" {
-  name                = "${module.naming.private_endpoint.name}-key-vault"
+  name                = "${module.naming.names["private_endpoint"].name}-key-vault"
   location            = var.location
   resource_group_name = azurerm_resource_group.this.name
   subnet_id           = azurerm_subnet.subnets[var.subnet_privatelink_name].id
@@ -216,7 +216,7 @@ resource "azurerm_private_endpoint" "key_vault" {
 }
 
 resource "azurerm_private_endpoint" "storage_blob" {
-  name                = "${module.naming.private_endpoint.name}-storage-blob"
+  name                = "${module.naming.names["private_endpoint"].name}-storage-blob"
   location            = var.location
   resource_group_name = azurerm_resource_group.this.name
   subnet_id           = azurerm_subnet.subnets[var.subnet_privatelink_name].id
@@ -238,7 +238,7 @@ resource "azurerm_private_endpoint" "storage_blob" {
 }
 
 resource "azurerm_private_endpoint" "ampls" {
-  name                = "${module.naming.private_endpoint.name}-ampls"
+  name                = "${module.naming.names["private_endpoint"].name}-ampls"
   location            = var.location
   resource_group_name = azurerm_resource_group.this.name
   subnet_id           = azurerm_subnet.subnets[var.subnet_privatelink_name].id

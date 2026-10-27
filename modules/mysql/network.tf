@@ -1,5 +1,5 @@
 resource "azurerm_private_endpoint" "this" {
-  name                = "${module.naming.private_endpoint.name}-mysql-server"
+  name                = "${module.naming.names["private_endpoint"].name}-mysql-server"
   resource_group_name = var.resource_group_name
   location            = var.location
   subnet_id           = var.subnet_id

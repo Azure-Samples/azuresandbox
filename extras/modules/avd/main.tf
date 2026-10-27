@@ -4,7 +4,7 @@ data "azurerm_client_config" "current" {}
 
 #region common
 resource "azurerm_virtual_desktop_workspace" "this" {
-  name                = module.naming.virtual_desktop_workspace.name_unique
+  name                = module.naming_unique.names["desktop_virtualization_workspace"].name
   location            = var.location
   resource_group_name = var.resource_group_name
   friendly_name       = "AVD Quickstart Workspace"
@@ -29,7 +29,7 @@ resource "azurerm_role_assignment" "session_host_roles" {
 
 #region personal
 resource "azurerm_virtual_desktop_application_group" "personal" {
-  name                = "${module.naming.virtual_desktop_application_group.name_unique}-personal"
+  name                = "${module.naming_unique.names["application_group"].name}-personal"
   location            = var.location
   resource_group_name = var.resource_group_name
   type                = "Desktop"
@@ -51,7 +51,7 @@ resource "azurerm_role_assignment" "personal" {
 }
 
 resource "azurerm_virtual_desktop_host_pool" "personal" {
-  name                     = "${module.naming.virtual_desktop_host_pool.name_unique}-personal"
+  name                     = "${module.naming_unique.names["host_pool"].name}-personal"
   location                 = var.location
   resource_group_name      = var.resource_group_name
   type                     = "Pooled"
@@ -71,7 +71,7 @@ resource "azurerm_virtual_desktop_host_pool_registration_info" "personal" {
 
 #region remoteapp
 resource "azurerm_virtual_desktop_application_group" "remoteapp" {
-  name                = "${module.naming.virtual_desktop_application_group.name_unique}-remoteapp"
+  name                = "${module.naming_unique.names["application_group"].name}-remoteapp"
   location            = var.location
   resource_group_name = var.resource_group_name
   type                = "RemoteApp"
@@ -93,7 +93,7 @@ resource "azurerm_role_assignment" "remoteapp" {
 }
 
 resource "azurerm_virtual_desktop_host_pool" "remoteapp" {
-  name                     = "${module.naming.virtual_desktop_host_pool.name_unique}-remoteapp"
+  name                     = "${module.naming_unique.names["host_pool"].name}-remoteapp"
   location                 = var.location
   resource_group_name      = var.resource_group_name
   type                     = "Pooled"
@@ -131,9 +131,18 @@ resource "time_offset" "this" {
 
 #region modules
 module "naming" {
-  source      = "Azure/naming/azurerm"
-  version     = "~> 0.4.3"
-  suffix      = [var.tags["project"], var.tags["environment"]]
-  unique-seed = var.unique_seed
+  source        = "Azure/avm-utl-naming/azure"
+  version       = "~> 0.3.0"
+  suffix        = [var.tags["project"], var.tags["environment"]]
+  unique_length = 0
+}
+
+# unique_seed comes from a resource in the root module, so it's unknown at plan time and can't be passed as the
+# naming module's unique_seed input. Adding it to the suffix keeps names consistent with the resource group.
+module "naming_unique" {
+  source        = "Azure/avm-utl-naming/azure"
+  version       = "~> 0.3.0"
+  suffix        = [var.tags["project"], var.tags["environment"], substr(var.unique_seed, 0, 4)]
+  unique_length = 0
 }
 #endregion

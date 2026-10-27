@@ -1,6 +1,6 @@
 #region virtual-network
 resource "azurerm_virtual_network" "this" {
-  name                = "${module.naming.virtual_network.name}-${var.vnet_name}"
+  name                = "${module.naming.names["virtual_network"].name}-${var.vnet_name}"
   location            = var.location
   resource_group_name = var.resource_group_name
   address_space       = [var.vnet_address_space]
@@ -24,7 +24,7 @@ resource "azurerm_subnet" "subnets" {
 resource "azurerm_network_security_group" "groups" {
   for_each = { for k, v in local.subnets : k => v if length(v.nsg_rules) > 0 }
 
-  name                = "${module.naming.network_security_group.name}.${each.key}"
+  name                = "${module.naming.names["network_security_group"].name}.${each.key}"
   location            = var.location
   resource_group_name = var.resource_group_name
 }
@@ -50,7 +50,7 @@ resource "azurerm_network_security_rule" "rules" {
   destination_port_ranges     = length(each.value.destination_port_ranges) > 1 ? each.value.destination_port_ranges : null
   direction                   = each.value.direction
   name                        = each.value.nsg_rule_name
-  network_security_group_name = "${module.naming.network_security_group.name}.${each.value.subnet_name}"
+  network_security_group_name = "${module.naming.names["network_security_group"].name}.${each.value.subnet_name}"
   priority                    = each.value.priority
   protocol                    = each.value.protocol
   resource_group_name         = var.resource_group_name
@@ -66,7 +66,7 @@ resource "azurerm_network_security_rule" "rules" {
 
 #region bastion
 resource "azurerm_bastion_host" "this" {
-  name                = module.naming.bastion_host.name
+  name                = module.naming.names["bastion_host"].name
   location            = var.location
   resource_group_name = var.resource_group_name
 
@@ -122,7 +122,7 @@ resource "azurerm_monitor_diagnostic_setting" "bastion" {
 }
 
 resource "azurerm_public_ip" "bastion" {
-  name                = "${module.naming.public_ip.name}-bastion"
+  name                = "${module.naming.names["public_ip_address"].name}-bastion"
   location            = var.location
   resource_group_name = var.resource_group_name
   allocation_method   = "Static"
@@ -136,7 +136,7 @@ resource "azurerm_public_ip" "bastion" {
 
 #region firewall
 resource "azurerm_firewall" "this" {
-  name                = module.naming.firewall.name
+  name                = module.naming.names["azure_firewall"].name
   resource_group_name = var.resource_group_name
   location            = var.location
   sku_name            = "AZFW_VNet"
@@ -151,7 +151,7 @@ resource "azurerm_firewall" "this" {
 }
 
 resource "azurerm_firewall_policy" "this" {
-  name                     = module.naming.firewall_policy.name
+  name                     = module.naming.names["firewall_policy"].name
   resource_group_name      = var.resource_group_name
   location                 = var.location
   sku                      = "Standard"
@@ -159,7 +159,7 @@ resource "azurerm_firewall_policy" "this" {
 }
 
 resource "azurerm_firewall_policy_rule_collection_group" "this" {
-  name               = module.naming.firewall_policy_rule_collection_group.name
+  name               = module.naming.names["firewall_policy_rule_collection_group"].name
   firewall_policy_id = azurerm_firewall_policy.this.id
   priority           = 500
   network_rule_collection {
@@ -226,7 +226,7 @@ resource "azurerm_monitor_diagnostic_setting" "firewall" {
 }
 
 resource "azurerm_route_table" "this" {
-  name                = module.naming.route_table.name
+  name                = module.naming.names["route_table"].name
   resource_group_name = var.resource_group_name
   location            = var.location
 
@@ -250,7 +250,7 @@ resource "azurerm_subnet_route_table_association" "associations" {
 }
 
 resource "azurerm_public_ip" "firewall" {
-  name                = "${module.naming.public_ip.name}-firewall"
+  name                = "${module.naming.names["public_ip_address"].name}-firewall"
   location            = var.location
   resource_group_name = var.resource_group_name
   allocation_method   = "Static"
@@ -289,7 +289,7 @@ resource "terraform_data" "private_dns_zone_links_complete" {
 
 #region private-endpoints
 resource "azurerm_private_endpoint" "key_vault" {
-  name                = "${module.naming.private_endpoint.name}-key-vault"
+  name                = "${module.naming.names["private_endpoint"].name}-key-vault"
   resource_group_name = var.resource_group_name
   location            = var.location
   subnet_id           = azurerm_subnet.subnets["snet-privatelink-01"].id
@@ -310,7 +310,7 @@ resource "azurerm_private_endpoint" "key_vault" {
 }
 
 resource "azurerm_private_endpoint" "ampls" {
-  name                = "${module.naming.private_endpoint.name}-ampls"
+  name                = "${module.naming.names["private_endpoint"].name}-ampls"
   resource_group_name = var.resource_group_name
   location            = var.location
   subnet_id           = azurerm_subnet.subnets["snet-privatelink-01"].id
@@ -344,7 +344,7 @@ resource "azurerm_private_endpoint" "ampls" {
 
 #region network-interfaces
 resource "azurerm_network_interface" "this" {
-  name                = "${module.naming.network_interface.name}-${var.vm_adds_name}"
+  name                = "${module.naming.names["network_interface"].name}-${var.vm_adds_name}"
   location            = var.location
   resource_group_name = var.resource_group_name
   depends_on          = [azurerm_subnet_route_table_association.associations]

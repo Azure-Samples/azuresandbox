@@ -7,14 +7,14 @@ resource "azuread_group" "sql_admins" {
 }
 
 resource "azurerm_resource_group" "this" {
-  name     = module.naming.resource_group.name_unique
+  name     = module.naming.names["resource_group"].name_unique
   location = var.location
   tags     = local.tags
 }
 
 resource "azurerm_virtual_machine_run_command" "create_mssql_db_user" {
   count              = var.enable_module_mssql ? 1 : 0
-  name               = "${module.naming.virtual_machine_extension.name}-${module.vnet_app[0].resource_names.virtual_machine_jumpwin1}-CreateMssqlDbUser"
+  name               = "${module.naming.names["virtual_machine_extension"].name}-${module.vnet_app[0].resource_names.virtual_machine_jumpwin1}-CreateMssqlDbUser"
   location           = azurerm_resource_group.this.location
   virtual_machine_id = module.vnet_app[0].resource_ids.virtual_machine_jumpwin1
 
@@ -58,7 +58,7 @@ resource "azurerm_virtual_machine_run_command" "create_mssql_db_user" {
 # new identity with no cached tokens carrying a stale groups claim (#772).
 resource "azurerm_user_assigned_identity" "sql_admin" {
   count               = var.enable_module_mssql ? 1 : 0
-  name                = "${module.naming.user_assigned_identity.name}-sqladmin"
+  name                = "${module.naming.names["user_assigned_identity"].name}-sqladmin"
   resource_group_name = azurerm_resource_group.this.name
   location            = azurerm_resource_group.this.location
   tags                = local.tags
@@ -194,11 +194,11 @@ resource "azapi_update_resource" "app_insights_disable_public_access" {
 
 #region required-modules
 module "naming" {
-  source                 = "Azure/naming/azurerm"
-  version                = "~> 0.4.3"
+  source                 = "Azure/avm-utl-naming/azure"
+  version                = "~> 0.3.0"
   suffix                 = [var.tags["project"], var.tags["environment"]]
-  unique-include-numbers = true
-  unique-length          = 8
+  unique_include_numbers = true
+  unique_length          = 8
 }
 
 module "vnet_shared" {
@@ -207,7 +207,7 @@ module "vnet_shared" {
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
   tags                = local.tags
-  unique_seed         = module.naming.unique-seed
+  unique_seed         = module.naming.names["resource_group"].unique_seed
   operator_object_id  = var.operator_object_id
   vm_adds_size        = var.vm_jumpbox_size
 }
@@ -242,7 +242,7 @@ module "vnet_app" {
   resource_group_name             = azurerm_resource_group.this.name
   sql_admin_uami_id               = var.enable_module_mssql ? azurerm_user_assigned_identity.sql_admin[0].id : null
   tags                            = local.tags
-  unique_seed                     = module.naming.unique-seed
+  unique_seed                     = module.naming.names["resource_group"].unique_seed
   operator_object_id              = var.operator_object_id
   virtual_network_shared_id       = module.vnet_shared.resource_ids["virtual_network_shared"]
   virtual_network_shared_name     = module.vnet_shared.resource_names["virtual_network_shared"]
@@ -315,7 +315,7 @@ module "mssql" {
   sql_admin_object_id        = azuread_group.sql_admins[0].object_id
   subnet_id                  = module.vnet_shared.resource_ids["subnet_privatelink"]
   tags                       = local.tags
-  unique_seed                = module.naming.unique-seed
+  unique_seed                = module.naming.names["resource_group"].unique_seed
 
   depends_on = [module.vnet_app[0].configure_azure_files_id] # Ensures that Azure Files is configured
 }
@@ -333,7 +333,7 @@ module "mysql" {
   resource_group_name        = azurerm_resource_group.this.name
   subnet_id                  = module.vnet_shared.resource_ids["subnet_privatelink"]
   tags                       = local.tags
-  unique_seed                = module.naming.unique-seed
+  unique_seed                = module.naming.names["resource_group"].unique_seed
 
   depends_on = [module.vnet_app[0].configure_azure_files_id] # Ensures that Azure Files is configured
 }
@@ -377,7 +377,7 @@ module "petstore" {
   private_endpoint_subnet_id     = module.vnet_shared.resource_ids["subnet_privatelink"]
   resource_group_name            = azurerm_resource_group.this.name
   tags                           = local.tags
-  unique_seed                    = module.naming.unique-seed
+  unique_seed                    = module.naming.names["resource_group"].unique_seed
 
   depends_on = [module.vnet_app[0].azure_files_config_vm_extension_id] # Ensure that Azure Files is configured
 }
@@ -396,7 +396,7 @@ module "avd" {
   security_principal_object_ids = [var.operator_object_id]
   subnet_id                     = module.vnet_app[0].subnets["snet-app-01"].id
   tags                          = local.tags
-  unique_seed                   = module.naming.unique-seed
+  unique_seed                   = module.naming.names["resource_group"].unique_seed
   vm_avd_size                   = var.vm_avd_size
 
   depends_on = [module.vnet_app[0].azure_files_config_vm_extension_id] # Ensure that Azure Files is configured

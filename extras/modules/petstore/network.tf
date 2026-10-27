@@ -1,11 +1,11 @@
 resource "azurerm_private_endpoint" "this" {
-  name                = "${module.naming.private_endpoint.name}-cae"
+  name                = "${module.naming.names["private_endpoint"].name}-cae"
   location            = var.location
   resource_group_name = var.resource_group_name
   subnet_id           = var.private_endpoint_subnet_id
 
   private_service_connection {
-    name                           = "${module.naming.container_app_environment.name_unique}-psc"
+    name                           = "${module.naming_unique.names["managed_environment"].name}-psc"
     private_connection_resource_id = azurerm_container_app_environment.this.id
     is_manual_connection           = false
     subresource_names              = ["managedEnvironments"]

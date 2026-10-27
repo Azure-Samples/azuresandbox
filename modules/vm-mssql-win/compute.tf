@@ -36,7 +36,7 @@ resource "azurerm_managed_disk" "disks" {
   for_each = local.disks
 
   resource_group_name = var.resource_group_name
-  name                = "${module.naming.managed_disk.name}-${each.value.name}"
+  name                = "${module.naming.names["disk"].name}-${each.value.name}"
   location            = var.location
   zone                = var.vm_mssql_win_zone
 
@@ -68,7 +68,7 @@ resource "azurerm_role_assignment" "assignments" {
 
 #region sql-vm-configuration
 resource "azurerm_virtual_machine_extension" "join_domain" {
-  name                       = "${module.naming.virtual_machine_extension.name}-${var.vm_mssql_win_name}-JsonADDomainExtension"
+  name                       = "${module.naming.names["virtual_machine_extension"].name}-${var.vm_mssql_win_name}-JsonADDomainExtension"
   virtual_machine_id         = azurerm_windows_virtual_machine.this.id
   publisher                  = "Microsoft.Compute"
   type                       = "JsonADDomainExtension"
@@ -117,7 +117,7 @@ resource "azurerm_virtual_machine_run_command" "configure_sql_login" {
 #endregion
 
 resource "azurerm_virtual_machine_extension" "configure_sql_server" {
-  name                       = "${module.naming.virtual_machine_extension.name}-${var.vm_mssql_win_name}-ConfigureSqlServer"
+  name                       = "${module.naming.names["virtual_machine_extension"].name}-${var.vm_mssql_win_name}-ConfigureSqlServer"
   virtual_machine_id         = azurerm_windows_virtual_machine.this.id
   publisher                  = "Microsoft.Compute"
   type                       = "CustomScriptExtension"
@@ -160,7 +160,7 @@ resource "azurerm_virtual_machine_extension" "ama" {
 }
 
 resource "azurerm_monitor_data_collection_rule_association" "mssqlwin1_dcr" {
-  name                    = "${module.naming.monitor_data_collection_rule.name}-${var.vm_mssql_win_name}-association"
+  name                    = "${module.naming.names["data_collection_rule_association"].name}-${var.vm_mssql_win_name}"
   target_resource_id      = azurerm_windows_virtual_machine.this.id
   data_collection_rule_id = var.data_collection_rule_windows_id
 

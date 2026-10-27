@@ -1,7 +1,7 @@
 #region resources
 resource "azurerm_network_interface" "nics" {
   for_each            = toset(local.vm_devops_win_names)
-  name                = "${module.naming.network_interface.name}-${each.key}"
+  name                = "${module.naming.names["network_interface"].name}-${each.key}"
   location            = var.location
   resource_group_name = var.resource_group_name
   tags                = var.tags

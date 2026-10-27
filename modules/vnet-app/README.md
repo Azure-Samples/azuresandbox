@@ -182,8 +182,8 @@ This section lists the resources included in this configuration.
 
 Address | Name | Notes
 --- | --- | ---
-module.vnet_app[0].azurerm_application_insights.this | appi-sand-dev-xxx | Workspace-based Application Insights linked to the shared Log Analytics workspace.
-module.vnet_app[0].azurerm_container_registry.this | crsandboxdevxxxxxxxx | Shared container registry.
+module.vnet_app[0].azurerm_application_insights.this | appisanddevxxx | Workspace-based Application Insights linked to the shared Log Analytics workspace.
+module.vnet_app[0].azurerm_container_registry.this | crsanddevxxxxxxxx | Shared container registry.
 module.vnet_app[0].azurerm_monitor_data_collection_rule_association.jumpwin1_dce | | Data collection endpoint association for jumpwin1.
 module.vnet_app[0].azurerm_monitor_data_collection_rule_association.jumpwin1_dcr | | Data collection rule association for jumpwin1.
 module.vnet_app[0].azurerm_monitor_diagnostic_setting.container_registry | | Diagnostic settings for container registry.
@@ -193,9 +193,9 @@ module.vnet_app[0].azurerm_monitor_private_link_scoped_service.app_insights | | 
 module.vnet_app[0].azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;jumpwin1 | Network interface for the VM.
 module.vnet_app[0].azurerm_network_security_group.groups[*] | | NSGs for each subnet.
 module.vnet_app[0].azurerm_network_security_rule.rules[*] | | NSG rules for each NSG. See *locals.tf* for rule definitions.
-module.vnet_app[0].azurerm_private_endpoint.container_registry | pe&#8209;sand&#8209;dev&#8209;cr | Private endpoint for the container registry. Provisioned in the centralized private endpoint subnet in *vnet-shared*.
-module.vnet_app[0].azurerm_private_endpoint.storage_blob | pe&#8209;sand&#8209;dev&#8209;storage&#8209;blob | Private endpoint for the blob storage endpoint. Provisioned in the centralized private endpoint subnet in *vnet-shared*.
-module.vnet_app[0].azurerm_private_endpoint.storage_file | pe&#8209;sand&#8209;dev&#8209;storage&#8209;file | Private endpoint for the file storage endpoint. Provisioned in the centralized private endpoint subnet in *vnet-shared*.
+module.vnet_app[0].azurerm_private_endpoint.container_registry | pep&#8209;sand&#8209;dev&#8209;cr | Private endpoint for the container registry. Provisioned in the centralized private endpoint subnet in *vnet-shared*.
+module.vnet_app[0].azurerm_private_endpoint.storage_blob | pep&#8209;sand&#8209;dev&#8209;storage&#8209;blob | Private endpoint for the blob storage endpoint. Provisioned in the centralized private endpoint subnet in *vnet-shared*.
+module.vnet_app[0].azurerm_private_endpoint.storage_file | pep&#8209;sand&#8209;dev&#8209;storage&#8209;file | Private endpoint for the file storage endpoint. Provisioned in the centralized private endpoint subnet in *vnet-shared*.
 module.vnet_app[0].azurerm_role_assignment.assignments_storage[*] | | Role assignments for the storage account as defined in *locals.tf*.
 module.vnet_app[0].azurerm_role_assignment.assignments_vm_win[*] | | Role assignments for the VM as defined in *locals.tf*.
 module.vnet_app[0].azurerm_storage_account.this | stsanddevxxxxxxxx | Storage account for the blob and file storage.
