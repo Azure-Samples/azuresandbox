@@ -10,7 +10,11 @@ Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'SandboxProgress.ps1')
 . (Join-Path $PSScriptRoot 'SandboxOidc.ps1')
+. (Join-Path $PSScriptRoot 'SandboxRedaction.ps1')
+. (Join-Path $PSScriptRoot 'SandboxTerraformError.ps1')
 $script:utf8 = [System.Text.UTF8Encoding]::new($false)
+$script:directory = $null
+$script:redaction = $null
 
 function Stop-SandboxStage {
     param([string]$Message, [int]$Code = 1)
@@ -24,9 +28,30 @@ function Write-SandboxLog {
     [System.IO.File]::AppendAllText($script:logPath, $Text, $script:utf8)
 }
 
+function Get-SandboxRedaction {
+    # The run's ids and tags are known once preflight has copied backend.tf and terraform.tfvars; until then, GUIDs and
+    # tag-shaped text are still redacted.
+    if (-not $script:redaction -and $script:directory -and [System.IO.File]::Exists((Join-Path $script:directory 'backend.tf'))) {
+        $script:redaction = Get-SandboxRedactionContext $script:directory
+    }
+    if ($script:redaction) { $script:redaction } else { @{ KnownIds = @{}; Tags = @{} } }
+}
+
+function Protect-SandboxText {
+    # Applies SandboxRedaction.ps1 to anything published.
+    param([AllowEmptyString()][string]$Text)
+    $context = Get-SandboxRedaction
+    ConvertTo-SandboxRedactedText -Text $Text -KnownIds $context.KnownIds -Tags $context.Tags
+}
+
+function Write-SandboxStatus {
+    param([AllowEmptyString()][string]$Text)
+    Write-Host (Protect-SandboxText $Text)
+}
+
 function Write-SandboxSummary {
     param([string]$Text)
-    [System.IO.File]::AppendAllText($env:GITHUB_STEP_SUMMARY, $Text, $script:utf8)
+    [System.IO.File]::AppendAllText($env:GITHUB_STEP_SUMMARY, (Protect-SandboxText $Text), $script:utf8)
 }
 
 function Write-SandboxJson {
@@ -119,22 +144,22 @@ function Invoke-SandboxCommand {
         while (-not $process.WaitForExit(120000)) {
             $size = ([System.IO.FileInfo]::new($script:logPath)).Length
             $health = if ($size -gt $lastSize) { 'log advancing' } else { 'no new log output; review if persistent' }
-            Write-Host "${Stage}: $([int][Math]::Floor($timer.Elapsed.TotalMinutes)) min elapsed; $health."
+            Write-SandboxStatus "${Stage}: $([int][Math]::Floor($timer.Elapsed.TotalMinutes)) min elapsed; $health."
             if ($Stage -in @('apply', 'unit-test') -and $size -gt $lastSize) {
                 try {
                     foreach ($line in @(Read-SandboxProgress -Path $script:logPath -Start $lastSize -Stage $Stage)) {
-                        Write-Host "  $line"
+                        Write-SandboxStatus "  $line"
                     }
                 }
                 catch [System.IO.IOException] {
                     Write-SandboxLog "$($_ | Out-String)`n"
                     $size = ([System.IO.FileInfo]::new($script:logPath)).Length
-                    Write-Host "${Stage}: sanitized progress preview unavailable; see private diagnostics."
+                    Write-SandboxStatus "${Stage}: sanitized progress preview unavailable; see private diagnostics."
                 }
                 catch [System.UnauthorizedAccessException] {
                     Write-SandboxLog "$($_ | Out-String)`n"
                     $size = ([System.IO.FileInfo]::new($script:logPath)).Length
-                    Write-Host "${Stage}: sanitized progress preview unavailable; see private diagnostics."
+                    Write-SandboxStatus "${Stage}: sanitized progress preview unavailable; see private diagnostics."
                 }
             }
             $lastSize = $size
@@ -351,7 +376,7 @@ function Confirm-SandboxTerraformVersion {
     if ($constraint -cnotmatch '^[0-9A-Za-z.,~<>=! -]+$') { Stop-SandboxStage 'The deployed required_version is not a valid version constraint.' }
     $installed = Get-SandboxTerraformVersion
     if (Test-SandboxTerraformConstraint $constraint) {
-        Write-Host "preflight: Terraform $installed satisfies required_version `"$constraint`"; nothing to install."
+        Write-SandboxStatus "preflight: Terraform $installed satisfies required_version `"$constraint`"; nothing to install."
         Write-SandboxSummary "## Terraform`n`nrequired_version: ``$constraint``; runner Terraform ``$installed`` is compatible, nothing installed.`n`n"
         return
     }
@@ -362,7 +387,7 @@ function Confirm-SandboxTerraformVersion {
     if (-not [System.IO.File]::Exists($installer)) {
         Stop-SandboxStage "Runner Terraform $installed doesn't satisfy required_version `"$constraint`", and $installer is missing. Re-provision rg-devops-iac to install it, or install Terraform $version on the runner."
     }
-    Write-Host "preflight: Terraform $installed doesn't satisfy required_version `"$constraint`"; installing $version."
+    Write-SandboxStatus "preflight: Terraform $installed doesn't satisfy required_version `"$constraint`"; installing $version."
     Invoke-SandboxCommand @('sudo', '-n', $installer, $version)
     $current = Get-SandboxTerraformVersion
     if ($current -cne $version -or -not (Test-SandboxTerraformConstraint $constraint)) {
@@ -593,9 +618,40 @@ function Export-SandboxEvidence {
     $null = [System.IO.Directory]::CreateDirectory($staging)
     [System.IO.File]::SetUnixFileMode($staging, [System.IO.UnixFileMode]448)
     $jsonPath = Join-Path $staging $name
-    [System.IO.File]::Copy($path, $jsonPath, $false)
+    # The private file has full detail (-VerboseResults); the published copy gets the same redaction as the job log.
+    $context = Get-SandboxRedaction
+    Write-SandboxJson $jsonPath (ConvertTo-SandboxRedactedValue -Value $record -KnownIds $context.KnownIds -Tags $context.Tags)
     [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT,
         "json_path=$jsonPath`nname=unit-test-evidence-$script:deploymentId-$script:runId-$script:attempt`nready=true`ntests_passed=$testsPassed`n", $script:utf8)
+}
+
+function Publish-SandboxTerraformError {
+    # After a failed preflight or apply, shows the Terraform Error blocks in the job log (red), as an error annotation,
+    # and saves them for the step summary. Shows nothing extra when the failure wasn't a Terraform error.
+    try {
+        $blocks = @(Get-SandboxTerraformError -Lines ([System.IO.File]::ReadAllLines($script:logPath, $script:utf8)))
+    }
+    catch [System.IO.IOException] {
+        Write-SandboxLog "$($_ | Out-String)`n"
+        Write-SandboxStatus "${Stage}: Terraform error details unavailable; see private diagnostics."
+        return
+    }
+    catch [System.UnauthorizedAccessException] {
+        Write-SandboxLog "$($_ | Out-String)`n"
+        Write-SandboxStatus "${Stage}: Terraform error details unavailable; see private diagnostics."
+        return
+    }
+    if ($blocks.Count -eq 0) { return }
+    $context = Get-SandboxRedaction
+    $report = ConvertTo-SandboxTerraformErrorReport -Blocks $blocks -KnownIds $context.KnownIds -Tags $context.Tags
+    [System.IO.File]::WriteAllText((Join-Path $script:directory "$Stage-error.txt"), $report, $script:utf8)
+    Write-SandboxStatus "${Stage}: Terraform reported $($blocks.Count) error block(s):"
+    # Keeps a line of Terraform output from being run as a workflow command.
+    $token = [guid]::NewGuid().ToString('N')
+    Write-SandboxStatus "::stop-commands::$token"
+    foreach ($line in @($report -split '\n')) { Write-SandboxStatus "`e[31m$line`e[0m" }
+    Write-SandboxStatus "::${token}::"
+    Write-SandboxStatus "::error title=Terraform $Stage failed::$(ConvertTo-SandboxAnnotationData $report)"
 }
 
 function Write-SandboxReport {
@@ -620,6 +676,10 @@ function Write-SandboxReport {
         if ([System.IO.File]::Exists($statusPath)) {
             $status = Read-SandboxJson $statusPath
             Write-SandboxSummary "`n${name}: exit ``$($status.exit_code)``, start ``$($status.started_at)``, end ``$($status.finished_at)``.`n`nPrivate log: ``~/.local/state/azuresandbox/deployments/$script:deploymentId/runs/$script:runId-$script:attempt/$name.log```n`n"
+            $errorPath = Join-Path $script:directory "$name-error.txt"
+            if ([System.IO.File]::Exists($errorPath)) {
+                Write-SandboxSummary (ConvertTo-SandboxErrorMarkdown $name ([System.IO.File]::ReadAllText($errorPath)))
+            }
         }
         elseif ([Environment]::GetEnvironmentVariable($stages[$name]) -notin @($null, '', 'skipped')) {
             Write-SandboxSummary "`n${name}: no final exit record; execution or result logging is incomplete.`n`n"
@@ -656,7 +716,7 @@ Preflight PASS is not proof that infrastructure was applied or tests passed.
         Write-SandboxSummary "`nUnit-test counts: passed=$($totals.passed), failed=$($totals.failed), skipped suites=$($totals.suitesSkipped).`n"
     }
     if ($env:UNIT_TEST_ARTIFACT_OUTCOME -eq 'success' -and $env:UNIT_TEST_ARTIFACT_URL) {
-        Write-SandboxSummary "`n[Download sanitized unit-test evidence (JSON)]($env:UNIT_TEST_ARTIFACT_URL)`n"
+        Write-SandboxSummary "`n[Download redacted unit-test evidence (JSON)]($env:UNIT_TEST_ARTIFACT_URL)`n"
     }
     elseif ($env:UNIT_TEST_ARTIFACT_OUTCOME -eq 'failure') {
         Write-SandboxSummary "`nUnit-test evidence upload failed; structured results remain on the runner.`n"
@@ -735,6 +795,13 @@ try {
         $azureConfig = $script:childEnvironment['AZURE_CONFIG_DIR']
         if ([System.IO.Directory]::Exists($azureConfig)) { [System.IO.Directory]::Delete($azureConfig, $true) }
     }
+    if ($code -ne 0 -and $Stage -in @('preflight', 'apply')) {
+        try { Publish-SandboxTerraformError }
+        catch {
+            Write-SandboxLog "$($_ | Out-String)`n$($_.ScriptStackTrace)`n"
+            Write-SandboxStatus "${Stage}: Terraform error details unavailable; see private diagnostics."
+        }
+    }
     if ($Stage -eq 'unit-test') {
         try { Export-SandboxEvidence }
         catch {
@@ -748,8 +815,8 @@ try {
     Write-SandboxJson (Join-Path $script:directory "$Stage-status.json") @{
         started_at = $started; finished_at = $finished; exit_code = $code
     }
-    if ($code -ne 0) { Write-Host "::error::$Stage failed (exit $code); review its private runner log." }
-    else { Write-Host "${Stage}: PASS. Raw output retained privately on the runner." }
+    if ($code -ne 0) { Write-SandboxStatus "::error::$Stage failed (exit $code); review its private runner log." }
+    else { Write-SandboxStatus "${Stage}: PASS. Raw output retained privately on the runner." }
     exit $code
 }
 catch {

@@ -493,7 +493,9 @@ jumplinux2 | Jumpbox / DevOps agent | `vm-jumpbox-linux` | Ubuntu Server LTS 24.
     ├── Invoke-SandboxDeployment.sh       # Workflow: Bash entry point for Invoke-SandboxDeployment.ps1
     ├── new-runner-registration-token.sh  # Bash (sourced): sets TF_VAR_github_runner_token to a new runner registration token
     ├── SandboxOidc.ps1                   # Workflow: shared GitHub Actions OIDC sign-in helpers
-    └── SandboxProgress.ps1               # Workflow: shared apply and unit test progress parsing helpers
+    ├── SandboxProgress.ps1               # Workflow: shared apply and unit test progress parsing helpers
+    ├── SandboxRedaction.ps1              # Workflow: redacts ids and tags from everything published to the job log and summary
+    └── SandboxTerraformError.ps1         # Workflow: extracts Terraform errors from a failed preflight or apply for the job log and summary
 ```
 
 #### Root Module Input Variables (Optional)
@@ -869,13 +871,13 @@ Stage | What it does
 --- | ---
 `preflight` | Confirms the trusted `main` workflow context and `jumplinux2`. Checks the backend and tfvars secrets, that `auth_mode` matches `SANDBOX_AUTH_MODE`, the module scope, and that the run's state key is unused. Installs a Terraform version that satisfies the deployed `required_version` if the runner's doesn't. Signs in as the deployment identity and waits for the time-bound roles.
 `apply` | Rechecks the roles, then applies the saved plan from preflight.
-`unit-test` | Rechecks the roles, starts every sandbox VM, runs the unit and integration tests, and publishes sanitized JSON results as a workflow artifact, pass or fail.
+`unit-test` | Rechecks the roles, starts every sandbox VM, runs the unit and integration tests, and publishes the full JSON results, redacted the same way as the job log, as a workflow artifact, pass or fail.
 
 Things to know:
 
 * **New sandboxes only.** Each run uses its own state key, `sandboxes/<deployment id>/terraform.tfstate`. The workflow never updates, recovers or destroys a sandbox. Tear down manually.
 * **One run at a time.** Runs share a concurrency group, and an active apply isn't cancelled.
-* **Private logs.** Raw logs and plans stay on the runner. The job summary shows the stage results, the deployed commit and the sandbox resource group name after a successful apply.
+* **Private logs.** Raw logs and plans stay on the runner. The job summary shows the stage results, the deployed commit and the sandbox resource group name after a successful apply. When `preflight` or `apply` fails with a Terraform error, each `Error:` block is also shown in full, in red in the job log, as an error annotation and in a caution alert in the job summary. Everything the runner publishes (status messages, progress, errors, annotations, the job summary and the unit-test evidence artifact) is redacted the same way: Microsoft Entra ID ids (tenant, client and object ids) and subscription ids are redacted, along with any other GUID. All tag values are redacted, and so are tag names other than the `project`, `costcenter` and `environment` names in the root `tags` design. Resource names and other details are kept for troubleshooting.
 * **Retry.** **Re-run failed jobs** isn't supported for release PRs. Start a new manual run, or mark the release PR as a draft and ready again.
 
 ##### Terraform State

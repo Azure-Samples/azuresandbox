@@ -56,8 +56,6 @@ CI runs on ready (non-draft) PRs to `vnext` and on every push to `vnext`. It's s
 | [`ci-actions`](.github/workflows/ci-actions.yml) | `actionlint` | [`.github/actionlint.yaml`](.github/actionlint.yaml) | `actions` |
 | [`ci-secrets`](.github/workflows/ci-secrets.yml) | `gitleaks` | — | `secrets` |
 
-The `actionlint` job also runs [`scripts/tests/Test-SandboxDeploymentSelection.sh`](scripts/tests/Test-SandboxDeploymentSelection.sh), which tests the [deployment workflow](.github/workflows/sandbox-deployment.yml)'s entry selection against sample events without GitHub or Azure access, and checks that only its `sandbox` job can request an OIDC token (`id-token: write`). It needs `jq` and Python 3 with PyYAML.
-
 [`scripts/Invoke-CIChecks.sh`](scripts/Invoke-CIChecks.sh) runs the same tools at the same pinned versions with the same config files. Its header lists the versions and install hints. A tool that isn't installed is reported as `SKIPPED`, which means only CI will verify that check. Rule exclusions are explained inline in each config file.
 
 For PRs from external contributors (for example, from forks), a maintainer must approve the workflow runs before CI starts.
