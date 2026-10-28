@@ -50,7 +50,8 @@ catch {
 }
 
 if ($RunTests) {
-    $testArguments = @{ ResultsJsonPath = $ResultsJsonPath }
+    # Full detail stays in the private results file; Invoke-SandboxDeployment.ps1 redacts the published copy.
+    $testArguments = @{ ResultsJsonPath = $ResultsJsonPath; VerboseResults = $true }
     if ($deploymentProfile.auth_mode -ceq 'oidc') {
         # Federated sessions can't refresh their tokens, so Invoke-UnitTests.ps1 calls this before each test suite.
         # Invoke-UnitTests.ps1 runs in a child scope of this script, so the block resolves these names when it runs.

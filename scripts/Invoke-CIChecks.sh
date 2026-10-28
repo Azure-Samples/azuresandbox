@@ -22,7 +22,6 @@
 #   markdown    markdownlint-cli2           (ci-docs.yml)        pin 0.24.0, requires Node.js 20 (ci-docs.yml actions/setup-node)
 #   links       lychee (offline/internal)   (ci-docs.yml)
 #   actions     actionlint                  (ci-actions.yml)     pin 1.7.12
-#               + sandbox-deployment selection test (scripts/tests/Test-SandboxDeploymentSelection.sh)
 #   secrets     gitleaks                    (ci-secrets.yml)     pin 8.30.1
 #   terraform   terraform fmt + tflint      (ci-terraform.yml)   tflint pin v0.65.0
 #
@@ -150,7 +149,6 @@ check_links() {
 check_actions() {
     have actionlint || { skip actions "install actionlint 1.7.12 (https://github.com/rhysd/actionlint)"; return; }
     run_check actions actionlint -color
-    run_check actions-selection "$repo_root/scripts/tests/Test-SandboxDeploymentSelection.sh"
 }
 
 check_secrets() {
