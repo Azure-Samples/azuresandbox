@@ -445,7 +445,7 @@ jobs:
         if: ${{ success() && env.SANDBOX_RUN_THROUGH == 'unit-test' }}
         run: bash extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.sh unit-test
 
-      - name: Publish sanitized unit-test evidence
+      - name: Publish redacted unit-test evidence
         id: upload_evidence
         if: ${{ always() && steps.unit_test.outputs.ready == 'true' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
