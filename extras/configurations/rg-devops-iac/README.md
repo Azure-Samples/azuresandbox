@@ -521,8 +521,6 @@ Address | Name | Notes
 --- | --- | ---
 azurerm_federated_identity_credential.deployment_identity_github[*] | github-sandbox-deployment, github-sandbox-release-gate | Trusts GitHub Actions OIDC tokens for the deployment identity, one per environment in `deployment_identity_github_environments`. Created only when `deployment_identity` is `oidc`.
 azurerm_federated_identity_credential.runner_power_state_github[0] | github-sandbox-runner-power-state | Trusts GitHub Actions OIDC tokens for the runner power state identity from the `github_runner_power_state_environment` environment. Created only when `deployment_identity` is `oidc`.
-azurerm_role_assignment.deployment_identity_rbac_admin[0] | | Assigns `Role Based Access Control Administrator` at the subscription scope to the deployment identity, with a condition that allows only the roles in `local.deployment_identity_assignable_roles`. Created only when `deployment_identity` is `managed_identity`.
-azurerm_role_assignment.deployment_identity_reader[0] | | Assigns standing `Reader` at the subscription scope to the deployment identity.
 azurerm_role_assignment.runner_power_state[0] | | Assigns `Desktop Virtualization Power On Off Contributor` on `jumplinux2` to the runner power state identity. Created only when `deployment_identity` is `oidc`.
 azurerm_user_assigned_identity.deployment[0] | id-devops-dev-deployment | Deployment identity for Azure Sandbox applies. Attached to `jumplinux2` when `deployment_identity` is `managed_identity`; unattached and federated with GitHub Actions when it is `oidc`. Not created when `deployment_identity` is `none`.
 azurerm_user_assigned_identity.runner_power_state[0] | id-devops-dev-runner | Runner power state identity that starts and deallocates `jumplinux2` for workflow runs. Unattached and federated with GitHub Actions. Created only when `deployment_identity` is `oidc`.
@@ -560,7 +558,7 @@ This section describes the [Sandbox deployment workflow](../../../.github/workfl
 flowchart LR
     subgraph rgdevops["rg-devops-iac"]
         vm["jumplinux2<br/>self-hosted runner"]
-        did["Deployment identity<br/>standing Reader"]
+        did["Deployment identity<br/>no standing roles"]
         pid["Runner power state identity<br/>oidc only"]
         st["Storage account<br/>tfstate container"]
     end
@@ -582,7 +580,7 @@ flowchart LR
 Component | Provided by | Purpose
 --- | --- | ---
 `jumplinux2` runner | rg-devops-iac (`enable_github_runner = true`) | Runs the `sandbox` job with the pre-installed IaC toolchain, inside the private network.
-Deployment identity | rg-devops-iac (`deployment_identity`) | The identity the Azure Sandbox providers authenticate as. Standing `Reader`, plus time-bound deployment roles granted per run.
+Deployment identity | rg-devops-iac (`deployment_identity`) | The identity the Azure Sandbox providers authenticate as. No standing Azure RBAC roles, only time-bound deployment roles granted per run.
 Runner power state identity | rg-devops-iac, `oidc` only | Starts and deallocates `jumplinux2` around a run, from GitHub-hosted jobs.
 Storage account | rg-devops-iac | Holds each sandbox's Terraform state, reached with `jumplinux2`'s system-assigned identity.
 Environments, secrets and variables | GitHub repository settings | Supply the sandbox's `backend.tf` and `terraform.tfvars`, require owner approval, and select the authentication mode.
@@ -618,7 +616,7 @@ Who can use it while a grant is active | Anything on `jumplinux2`: any job on th
 Terminal applies on `jumplinux2` | Supported | Not supported
 Runner VM power state | `jumplinux2` must be running before the run | Started after approval and deallocated afterwards by the [runner power state identity](#runner-power-state-identity)
 Extra GitHub setup | None | OIDC subject claim template, `sandbox-runner-power-state` environment and its secrets
-Standing roles | `Reader` on the subscription | `Reader` on the subscription
+Standing roles | None | None
 Per-run roles | [Time-bound deployment roles](#just-in-time-deployment-roles) | [Time-bound deployment roles](#just-in-time-deployment-roles)
 
 Things to know:
@@ -635,7 +633,6 @@ The identity Terraform authenticates as needs the same permissions in every auth
 
 Permission | Scope | `client_secret` | `managed_identity` / `oidc` | Why
 --- | --- | --- | --- | ---
-`Reader` | Subscription | Not needed | Standing | Lets the identity sign in and check its own grant.
 `Contributor` | Subscription | Standing | [Time-bound](#just-in-time-deployment-roles) | Creates and manages the sandbox resources.
 `Role Based Access Control Administrator`, with a condition | Subscription | Standing | [Time-bound](#just-in-time-deployment-roles) | Creates and removes the sandbox's role assignments. The condition allows only the sandbox's roles, so the identity can't grant `Owner`, `User Access Administrator` or `Role Based Access Control Administrator`.
 `Group.Create`, `GroupMember.Read.All`, `User.Read.All`, `Application.Read.All` (Microsoft Graph application permissions) | Tenant | Standing | Standing | Creates the SQL administrators group. Required only with the `mssql` module. Graph permissions can't be time-bound.
@@ -966,7 +963,7 @@ Risk | Applies to | Mitigation
 While a grant is active, anything on `jumplinux2` can use the deployment identity, including against this configuration's resource group | `managed_identity` | Keep grants short and revoke them after the run. Prefer `oidc`.
 The federated subjects don't name a workflow file, so any workflow in an allowed environment can federate | `oidc` | Restrict the environments to `main` and require owner approval. See [CONTRIBUTING.md](../../../CONTRIBUTING.md#deployment-environments-and-identities).
 The time-bound roles belong to the identity, not a run, so another approved run in the same window can use them | Both | The concurrency group runs one deployment at a time.
-Standing `Reader` and Microsoft Graph permissions are usable by any approved run, or anything on `jumplinux2` with `managed_identity` | Both | Grant Graph permissions only when `mssql` is used.
+Microsoft Graph permissions are standing and usable by any approved run, or anything on `jumplinux2` with `managed_identity` | Both | Grant Graph permissions only when `mssql` is used.
 The job's federated token is passed to Azure CLI on the command line, where other processes on `jumplinux2` can see it | `oidc` | Sign-in to `jumplinux2` requires Microsoft Entra ID through Bastion. Limit who has `Virtual Machine Administrator Login` or `Virtual Machine User Login`.
 
 ##### Removing the Runner
