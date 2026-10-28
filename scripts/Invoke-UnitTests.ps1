@@ -44,10 +44,6 @@
 #   Results are sanitized by default. Add -VerboseResults for the original
 #   environment-specific check text and diagnostics (private use only).
 #
-#   Optional (automation only): -SessionRefresh <scriptblock> runs before each test suite to
-#   re-authenticate sessions that can't refresh their own tokens (GitHub OIDC federated sign-ins
-#   on the Sandbox deployment runner). Not needed for interactive use.
-#
 # Exit codes: 0 = all tests passed, 1 = one or more tests failed, 2 = harness error (bad
 #   parameters, missing Azure auth / terraform state, etc. - no or partial tests ran).
 #
@@ -89,10 +85,7 @@ param(
     [string]$ResultsJsonPath,
 
     [Parameter(Mandatory = $false)]
-    [switch]$VerboseResults,
-
-    [Parameter(Mandatory = $false)]
-    [scriptblock]$SessionRefresh
+    [switch]$VerboseResults
 )
 
 #region functions
@@ -101,15 +94,6 @@ function Write-Log {
     $entry = "$(Get-Date -Format FileDateTimeUniversal) : $msg"
     $entry | Out-File -FilePath $script:logPath -Append -Force
     Write-Host $entry
-}
-
-function Update-AzureSandboxSession {
-    # Callers whose Azure sessions can't refresh their own tokens, such as GitHub OIDC sign-ins on the Sandbox deployment
-    # runner, pass -SessionRefresh to sign in again before each test suite.
-    if ($SessionRefresh) {
-        try { & $SessionRefresh }
-        catch { Exit-WithError "Azure session refresh failed: $($_.Exception.Message)" }
-    }
 }
 
 function Exit-WithError {
@@ -858,7 +842,6 @@ $moduleResults = @()
 # Module unit tests
 foreach ($configKey in $testConfigs.Keys) {
     $config = $testConfigs[$configKey]
-    Update-AzureSandboxSession
 
     if ($config.RunLocal) {
         # Client-side test (e.g. mssql PaaS module)
@@ -1073,7 +1056,6 @@ if ($runIntegration) {
 
     foreach ($test in $integrationTests) {
         $suiteName = "integration: $($test.Name)"
-        Update-AzureSandboxSession
         $suiteTarget = if ($test.RunLocal) { 'local' } else { $test.RunOnVM -replace '^virtual_machine_', '' }
 
         # Check all required VMs are deployed
