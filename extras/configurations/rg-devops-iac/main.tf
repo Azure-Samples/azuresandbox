@@ -202,7 +202,7 @@ resource "azurerm_monitor_diagnostic_setting" "data_collection_rule_linux" {
 # - "none" (default): no deployment UAMI is created.
 # - "managed_identity": the deployment UAMI is attached to jumplinux2 and used by Terraform running there, from a terminal or a GitHub Actions job on its self-hosted runner.
 # - "oidc": the deployment UAMI is NOT attached to jumplinux2. Instead, it is used by approved GitHub Actions jobs on jumplinux2's self-hosted runner through federated identity credentials.
-# In both modes it holds only standing Reader. Before each apply, the operator grants time-bound Contributor and Role Based Access Control Administrator,
+# In both modes it holds no standing Azure RBAC role. Before each apply, the operator grants time-bound Contributor and Role Based Access Control Administrator,
 # restricted by the allow-list ABAC condition (scripts/grant-jit-roles.sh).
 resource "azurerm_user_assigned_identity" "deployment" {
   count = var.deployment_identity != "none" ? 1 : 0
@@ -211,15 +211,6 @@ resource "azurerm_user_assigned_identity" "deployment" {
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
   tags                = var.tags
-}
-
-resource "azurerm_role_assignment" "deployment_identity_reader" {
-  count = var.deployment_identity != "none" ? 1 : 0
-
-  principal_id         = azurerm_user_assigned_identity.deployment[0].principal_id
-  principal_type       = "ServicePrincipal"
-  role_definition_name = "Reader"
-  scope                = "/subscriptions/${var.subscription_id}"
 }
 
 # Trusts GitHub Actions OIDC tokens for the oidc deployment identity, one credential per subject in local.github_oidc_subjects.

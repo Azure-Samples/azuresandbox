@@ -1,6 +1,6 @@
 variable "deployment_identity" {
   type        = string
-  description = "The deployment identity to create for Azure Sandbox applies. Use none for no identity; managed_identity for an identity attached to the Linux virtual machine, with standing roles on the subscription (auth_mode = \"managed_identity\"); or oidc for an identity that GitHub Actions workflows sign in as, with time-bound roles the operator grants before each run (auth_mode = \"oidc\")."
+  description = "The deployment identity to create for Azure Sandbox applies. Use none for no identity; managed_identity for an identity attached to the Linux virtual machine, with time-bound roles the operator grants before each apply (auth_mode = \"managed_identity\"); or oidc for an identity that GitHub Actions workflows sign in as, with time-bound roles the operator grants before each run (auth_mode = \"oidc\")."
   default     = "none"
 
   validation {

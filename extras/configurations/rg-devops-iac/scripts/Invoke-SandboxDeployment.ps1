@@ -192,9 +192,8 @@ function Confirm-SandboxReceipt {
     return $record
 }
 
-function Connect-SandboxProvider {
+function Connect-SandboxAzureCli {
     param([System.Collections.IDictionary]$DeploymentProfile)
-    $script:childEnvironment['ARM_TENANT_ID'] = $DeploymentProfile.entra_tenant_id
     if ($DeploymentProfile.auth_mode -ceq 'managed_identity') {
         # The client id is required: jumplinux2 also has a system-assigned identity, used for the state backend.
         Invoke-SandboxCommand @('az', 'login', '--identity', '--client-id', $DeploymentProfile.client_id,
@@ -205,7 +204,27 @@ function Connect-SandboxProvider {
             '--tenant', $DeploymentProfile.entra_tenant_id, '--allow-no-subscriptions', '--output', 'none', '--federated-token')
         Invoke-SandboxCommand -Arguments ($login + @(Get-SandboxGitHubIdToken)) -LogArguments ($login + @('<redacted>'))
     }
-    Invoke-SandboxCommand @('az', 'account', 'set', '--subscription', $DeploymentProfile.subscription_id)
+}
+
+function Connect-SandboxProvider {
+    # The deployment identity has no standing role, so the subscription is visible only while its time-bound grants are
+    # active. Sign in without a subscription, confirm the grants, then sign in again: Azure CLI lists subscriptions only
+    # at sign-in.
+    param([System.Collections.IDictionary]$DeploymentProfile, [int]$MinimumMinutes, [int]$WaitSeconds)
+    $script:childEnvironment['ARM_TENANT_ID'] = $DeploymentProfile.entra_tenant_id
+    Connect-SandboxAzureCli $DeploymentProfile
+    Confirm-SandboxJitGrant $DeploymentProfile $MinimumMinutes $WaitSeconds
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($true) {
+        Connect-SandboxAzureCli $DeploymentProfile
+        $code = Invoke-SandboxCommand -Arguments @('az', 'account', 'set', '--subscription', $DeploymentProfile.subscription_id) -AllowFailure
+        if ($code -eq 0) { break }
+        # The subscription can be listed shortly after the grants take effect.
+        if ($timer.Elapsed.TotalSeconds -ge 120) {
+            Stop-SandboxStage 'The deployment identity has active grants but Azure CLI could not select the approved subscription; see the private stage log.'
+        }
+        Start-Sleep -Seconds 30
+    }
     $account = Get-SandboxOutput @('az', 'account', 'show', '--output', 'json') 'account.json' | ConvertFrom-Json -AsHashtable
     if ($account.id -cne $DeploymentProfile.subscription_id -or $account.tenantId -cne $DeploymentProfile.entra_tenant_id) {
         Stop-SandboxStage 'Azure CLI context does not match the approved deployment.'
@@ -225,11 +244,17 @@ function Confirm-SandboxJitGrant {
     param([System.Collections.IDictionary]$DeploymentProfile, [int]$MinimumMinutes, [int]$WaitSeconds)
     $subscription = "/subscriptions/$($DeploymentProfile.subscription_id)"
     $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    $permissionsPath = Join-Path $script:directory 'jit-permissions.json'
     while ($true) {
-        $permissions = Get-SandboxOutput @('az', 'rest', '--method', 'get', '--output', 'json', '--url',
+        # Without an active grant the identity has no role on the subscription, so this call can fail; treat that as no grant.
+        $code = Invoke-SandboxCommand -Arguments @('az', 'rest', '--method', 'get', '--output', 'json', '--url',
             "https://management.azure.com$subscription/providers/Microsoft.Authorization/permissions?api-version=2022-04-01"
-        ) 'jit-permissions.json' | ConvertFrom-Json -AsHashtable
-        $actions = @($permissions['value'] | ForEach-Object { $_['actions'] })
+        ) -OutputPath $permissionsPath -AllowFailure
+        $actions = @()
+        if ($code -eq 0) {
+            $permissions = [System.IO.File]::ReadAllText($permissionsPath) | ConvertFrom-Json -AsHashtable
+            $actions = @($permissions['value'] | ForEach-Object { $_['actions'] })
+        }
         $effective = $actions -ccontains '*' -and $actions -ccontains 'Microsoft.Authorization/roleAssignments/write'
         $missing = $null
         if ($effective) {
@@ -457,8 +482,7 @@ function Invoke-SandboxPreflight {
         Stop-SandboxStage "auth_mode in SANDBOX_TFVARS_HCL ($($deploymentProfile.auth_mode)) doesn't match the SANDBOX_AUTH_MODE repository variable ($env:SANDBOX_AUTH_MODE)."
     }
     Write-SandboxJson (Join-Path $script:directory 'profile.json') $deploymentProfile
-    Connect-SandboxProvider $deploymentProfile
-    Confirm-SandboxJitGrant $deploymentProfile ([int]$jitMinimum) 300
+    Connect-SandboxProvider $deploymentProfile ([int]$jitMinimum) 300
     Invoke-SandboxCommand @('pwsh', '-NoLogo', '-NoProfile', '-File',
         'extras/configurations/rg-devops-iac/scripts/Connect-SandboxRunner.ps1',
         '-ProfilePath', (Join-Path $script:directory 'profile.json'))
@@ -491,8 +515,7 @@ function Invoke-SandboxApply {
     $record = Confirm-SandboxReceipt
     Write-SandboxLog "Verified plan SHA-256: $($record.plan_sha256)`n"
     $deploymentProfile = Read-SandboxJson (Join-Path $script:directory 'profile.json')
-    Connect-SandboxProvider $deploymentProfile
-    Confirm-SandboxJitGrant $deploymentProfile 0 0
+    Connect-SandboxProvider $deploymentProfile 0 0
     Invoke-SandboxCommand @('terraform', 'apply', '-input=false', '-no-color', $script:plan)
     $names = Get-SandboxOutput @('terraform', 'output', '-json', 'resource_names') 'resource-names.json' | ConvertFrom-Json -AsHashtable
     Write-SandboxJson (Join-Path $script:directory 'resource-group.json') @{
@@ -507,8 +530,7 @@ function Invoke-SandboxUnitTest {
     }
     $null = Confirm-SandboxReceipt
     $deploymentProfile = Read-SandboxJson (Join-Path $script:directory 'profile.json')
-    Connect-SandboxProvider $deploymentProfile
-    Confirm-SandboxJitGrant $deploymentProfile 0 0
+    Connect-SandboxProvider $deploymentProfile 0 0
     Invoke-SandboxCommand @('bash', 'scripts/manage-vms.sh', 'start')
     $names = Get-SandboxOutput @('terraform', 'output', '-json', 'resource_names') 'resource-names.json' | ConvertFrom-Json -AsHashtable
     $resourceGroup = Get-SandboxResourceGroupName $names
