@@ -207,15 +207,21 @@ else
     '{properties: {principalId: $principal, roleDefinitionId: $role, requestType: "SelfActivate",
       linkedRoleEligibilityScheduleId: $eligibility, justification: $justification,
       scheduleInfo: {startDateTime: $start, expiration: {type: "AfterDuration", duration: "PT1H"}}}}')
-  if ! STATUS=$(submit_request "${ACTIVATE_BODY}"); then
-    echo "Error: PIM activation failed. Activate Role Based Access Control Administrator in the portal, then run this script again."
-    exit 1
-  fi
-  if [[ "${STATUS}" != "Provisioned" ]]; then
+  if ! STATUS=$(submit_request "${ACTIVATE_BODY}" 2>&1); then
+    # A fresh activation (e.g. from the portal) can take a few minutes to appear in asTarget() above.
+    if grep -q "RoleAssignmentExists" <<<"${STATUS}"; then
+      echo "Operator access:     Role Based Access Control Administrator is already active."
+    else
+      echo "${STATUS}"
+      echo "Error: PIM activation failed. Activate Role Based Access Control Administrator in the portal, then run this script again."
+      exit 1
+    fi
+  elif [[ "${STATUS}" != "Provisioned" ]]; then
     echo "Error: PIM activation status is '${STATUS}'. If it needs approval, wait for it, then run this script again."
     exit 1
+  else
+    echo "Operator access:     Role Based Access Control Administrator activated."
   fi
-  echo "Operator access:     Role Based Access Control Administrator activated."
 fi
 #endregion
 
