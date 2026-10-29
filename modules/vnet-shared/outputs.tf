@@ -87,3 +87,8 @@ output "log_analytics_operations_complete" {
 output "configure_adds_dns_id" {
   value = azurerm_virtual_machine_run_command.configure_adds_dns.id
 }
+
+output "patch_install_result" {
+  value       = azapi_resource_action.install_patches.output
+  description = "Result of the patch-first installPatches operation on adds1 (status, rebootStatus, patch counts). Informational only; a failed patch install does not fail the apply."
+}

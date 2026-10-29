@@ -57,13 +57,28 @@
 #     integration, startedAt/finishedAt (UTC ISO 8601), durationSeconds, totals, and suites[]
 #     (one per module test config or integration test; name, type 'module'|'integration',
 #     module, target, status 'passed'|'failed'|'skipped', passed, failed, skipped, skipReason,
-#     startedAt, durationSeconds, checks[] of { name, status, message }). Suite and overall
+#     attempts, retryReason, startedAt, durationSeconds, checks[] of { name, status, message }).
+#     attempts is 1 for a suite that ran once, 2 when it was re-run after a VM reboot (see
+#     below), and 0 for a skipped suite; retryReason is null or a static reason string. Suite and overall
 #     passed/failed counts mirror the log's [SUMMARY] counts (the exit-code source of truth).
 #     If a test script reports more failures than [FAIL] lines, an 'Unattributed failures'
 #     check is added; if a script cannot be run or parsed, a 'Test harness' check is added.
 #   Default JSON preserves counts/statuses and static child check descriptions,
 #   excluding runtime values and exception text. -VerboseResults restores full detail
 #   in JSON. General console/log diagnostics remain private.
+#
+# VM readiness and reboot-aware retry:
+#   - mssqlwin1 is stopped/deallocated/started before its suite to exercise its startup task.
+#     It counts as ready only when SQL Server is running, the Set-MssqlStartupConfiguration task
+#     ran after the last boot and succeeded, and the boot time is unchanged across two probes
+#     (the task itself may reboot the VM). A pending-reboot flag is logged as a warning.
+#   - Any VM can reboot unexpectedly (automatic patching, Azure Policy, Defender for Servers), which
+#     kills an in-flight run command. When a VM-based module or integration suite fails, the boot
+#     time of each watched VM (the VM the suite runs on plus its RequiredVMs) is checked. If one
+#     rebooted during the suite, the harness waits for it to settle and re-runs the suite once;
+#     only the retry's results count, and the suite is annotated (attempts / retryReason). If the
+#     retry is also interrupted by a reboot, the suite fails with a 'VM rebooted during test
+#     execution' harness error. Passing suites incur no extra probes. Local suites are not retried.
 #
 # Prerequisites:
 #   - PowerShell 7.x (pwsh) with Az.Accounts, Az.Compute, Az.Resources, Az.Sql, Az.Network,
@@ -217,7 +232,9 @@ function Add-SuiteResult {
     foreach ($c in @($TestResult.Checks)) { if ($c) { $checks.Add($c) } }
 
     if ($TestResult.HarnessError) {
-        $detail = if ($VerboseResults) { Remove-AnsiEscape $TestResult.HarnessError } else { 'Child test execution or summary parsing failed. Use -VerboseResults for private diagnostics.' }
+        $detail = if ($VerboseResults) { Remove-AnsiEscape $TestResult.HarnessError }
+        elseif ($TestResult.PublicHarnessError) { $TestResult.PublicHarnessError }
+        else { 'Child test execution or summary parsing failed. Use -VerboseResults for private diagnostics.' }
         $checks.Add([ordered]@{ name = 'Test harness'; status = 'failed'; message = $detail })
     }
     else {
@@ -241,6 +258,8 @@ function Add-SuiteResult {
             failed          = [int]$TestResult.Failed
             skipped         = @($checks | Where-Object { $_.status -eq 'skipped' }).Count
             skipReason      = $null
+            attempts        = if ($TestResult.Attempts) { [int]$TestResult.Attempts } else { 1 }
+            retryReason     = if ($TestResult.RetryReason) { $TestResult.RetryReason } else { $null }
             startedAt       = Get-UtcTimestamp $StartedAt
             durationSeconds = [math]::Round($Stopwatch.Elapsed.TotalSeconds, 3)
             checks          = $checks.ToArray()
@@ -266,6 +285,8 @@ function Add-SkippedSuite {
             failed          = 0
             skipped         = 0
             skipReason      = $Reason
+            attempts        = 0
+            retryReason     = $null
             startedAt       = Get-UtcTimestamp
             durationSeconds = 0
             checks          = @()
@@ -469,6 +490,206 @@ function Invoke-LocalTest {
     return $testResult
 }
 
+function Get-RunCommandStdOut {
+    # Windows (RunPowerShellScript) returns ComponentStatus/StdOut; Linux (RunShellScript) returns a
+    # single ProvisioningState/succeeded value with combined output.
+    param($Result)
+    $value = $Result.Value | Where-Object { $_.Code -like '*StdOut*' } | Select-Object -First 1
+    if (-not $value) { $value = $Result.Value | Where-Object { $_.Code -like '*succeeded*' } | Select-Object -First 1 }
+    return "$($value.Message)"
+}
+
+function Invoke-VMProbeScript {
+    # Runs a short probe script on a VM via run command and returns its stdout.
+    param(
+        [string]$ResourceGroupName,
+        [string]$VMName,
+        [string]$CommandId,
+        [string]$ScriptText
+    )
+
+    $extension = if ($CommandId -eq 'RunShellScript') { '.sh' } else { '.ps1' }
+    $probePath = Join-Path ([System.IO.Path]::GetTempPath()) ("probe-$([guid]::NewGuid().ToString('N'))$extension")
+    try {
+        Set-Content -Path $probePath -Value $ScriptText
+        $result = Invoke-AzVMRunCommand -ResourceGroupName $ResourceGroupName -VMName $VMName -CommandId $CommandId -ScriptPath $probePath -ErrorAction Stop
+        return Get-RunCommandStdOut $result
+    }
+    finally {
+        Remove-Item $probePath -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function ConvertFrom-ProbeTimestamp {
+    # Accepts an ISO 8601 string or a DateTime (ConvertFrom-Json converts ISO strings to DateTime).
+    param([object]$Value)
+    if (-not $Value) { return $null }
+    if ($Value -is [datetime]) {
+        if ($Value.Kind -eq [System.DateTimeKind]::Unspecified) { return [datetime]::SpecifyKind($Value, [System.DateTimeKind]::Utc) }
+        return $Value.ToUniversalTime()
+    }
+    $parsed = [datetimeoffset]::MinValue
+    if ([datetimeoffset]::TryParse([string]$Value, [cultureinfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::AssumeUniversal, [ref]$parsed)) {
+        return $parsed.UtcDateTime
+    }
+    return $null
+}
+
+function Get-VMOsType {
+    param(
+        [string]$ResourceGroupName,
+        [string]$VMName
+    )
+    if (-not $script:vmOsTypes.ContainsKey($VMName)) {
+        $vm = Get-AzVM -ResourceGroupName $ResourceGroupName -Name $VMName -ErrorAction Stop
+        $script:vmOsTypes[$VMName] = [string]$vm.StorageProfile.OsDisk.OsType
+    }
+    return $script:vmOsTypes[$VMName]
+}
+
+function Get-VMLastBootTime {
+    # Returns the VM's last OS boot time (UTC), or $null if it cannot be determined.
+    param(
+        [string]$ResourceGroupName,
+        [string]$VMName
+    )
+
+    try {
+        if ((Get-VMOsType -ResourceGroupName $ResourceGroupName -VMName $VMName) -eq 'Linux') {
+            $stdout = Invoke-VMProbeScript -ResourceGroupName $ResourceGroupName -VMName $VMName -CommandId 'RunShellScript' -ScriptText "awk '/^btime/ { print `"BOOT_EPOCH=`" `$2 }' /proc/stat"
+            if ($stdout -match 'BOOT_EPOCH=(\d+)') {
+                return [datetimeoffset]::FromUnixTimeSeconds([long]$Matches[1]).UtcDateTime
+            }
+        }
+        else {
+            $stdout = Invoke-VMProbeScript -ResourceGroupName $ResourceGroupName -VMName $VMName -CommandId 'RunPowerShellScript' -ScriptText "'BOOT=' + (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime.ToUniversalTime().ToString('o')"
+            if ($stdout -match 'BOOT=(\S+)') {
+                return ConvertFrom-ProbeTimestamp $Matches[1]
+            }
+        }
+        Write-Log "[WARNING] Could not parse the last boot time of VM '$VMName'."
+    }
+    catch {
+        Write-Log "[WARNING] Could not read the last boot time of VM '$VMName': $_"
+    }
+    return $null
+}
+
+function Get-RebootedVM {
+    # Returns the VMs (from -VMNames) whose last boot time is later than -SinceUtc.
+    param(
+        [string]$ResourceGroupName,
+        [string[]]$VMNames,
+        [datetime]$SinceUtc
+    )
+
+    $rebooted = [System.Collections.Generic.List[string]]::new()
+    foreach ($name in $VMNames) {
+        $boot = Get-VMLastBootTime -ResourceGroupName $ResourceGroupName -VMName $name
+        if ($boot -and $boot -gt $SinceUtc) {
+            Write-Log "VM '$name' last booted at $(Get-UtcTimestamp $boot), after the suite started at $(Get-UtcTimestamp $SinceUtc)."
+            $rebooted.Add($name)
+        }
+    }
+    return , $rebooted.ToArray()
+}
+
+function Wait-MssqlReady {
+    # Waits until the SQL Server VM has finished its startup configuration on a stable boot:
+    #   - MSSQLSERVER is Running
+    #   - the Set-MssqlStartupConfiguration task is not running, ran after the last boot, and succeeded
+    #   - the last boot time is unchanged across two consecutive probes
+    # The startup task can restart the VM (e.g. after rebuilding the temp disk following a deallocate),
+    # so a Running service alone is not proof the VM has settled. A pending reboot flag (e.g. Windows
+    # Update) is logged as a warning; the reboot-aware retry covers a reboot during the tests.
+    param(
+        [string]$ResourceGroupName,
+        [string]$VMName
+    )
+
+    Write-Log "Waiting for VM '$VMName' to complete startup configuration..."
+    $probeScript = @'
+$ErrorActionPreference = 'SilentlyContinue'
+$info = Get-ScheduledTaskInfo -TaskName 'Set-MssqlStartupConfiguration'
+$task = Get-ScheduledTask -TaskName 'Set-MssqlStartupConfiguration'
+$cbs = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending'
+$wu = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired'
+'READY_PROBE=' + ([ordered]@{
+    Service       = [string](Get-Service -Name MSSQLSERVER).Status
+    BootUtc       = (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime.ToUniversalTime().ToString('o')
+    TaskState     = [string]$task.State
+    TaskLastRun   = if ($info.LastRunTime) { $info.LastRunTime.ToUniversalTime().ToString('o') } else { $null }
+    TaskResult    = $info.LastTaskResult
+    RebootPending = (Test-Path $cbs) -or (Test-Path $wu)
+} | ConvertTo-Json -Compress)
+'@
+
+    $previousBoot = $null
+    for ($attempt = 1; $attempt -le $script:readinessMaxAttempts; $attempt++) {
+        Start-Sleep -Seconds $script:readinessIntervalSeconds
+
+        try {
+            $stdout = Invoke-VMProbeScript -ResourceGroupName $ResourceGroupName -VMName $VMName -CommandId 'RunPowerShellScript' -ScriptText $probeScript
+            if ($stdout -notmatch 'READY_PROBE=(\{.*\})') { throw 'Probe returned no readiness data.' }
+            $state = $Matches[1] | ConvertFrom-Json
+            $boot = ConvertFrom-ProbeTimestamp $state.BootUtc
+            $lastRun = ConvertFrom-ProbeTimestamp $state.TaskLastRun
+            $taskDone = $state.TaskState -ne 'Running' -and $lastRun -and $boot -and $lastRun -gt $boot -and $state.TaskResult -eq 0
+            $stableBoot = $boot -and $previousBoot -and $boot -eq $previousBoot
+
+            if ($state.Service -eq 'Running' -and $taskDone -and $stableBoot) {
+                if ($state.RebootPending) {
+                    Write-Log "[WARNING] VM '$VMName' reports a pending reboot (e.g. Windows Update). Proceeding; a reboot during the tests triggers one retry."
+                }
+                Write-Log "VM '$VMName' is ready - startup configuration completed and SQL Server service is running."
+                return $true
+            }
+
+            Write-Log "VM '$VMName' probe attempt $attempt/$($script:readinessMaxAttempts) - SQL Server: $($state.Service), startup task: $($state.TaskState) (result: $($state.TaskResult), ran this boot: $([bool]($lastRun -and $boot -and $lastRun -gt $boot))), boot stable: $([bool]$stableBoot)"
+            $previousBoot = $boot
+        }
+        catch {
+            Write-Log "VM '$VMName' probe attempt $attempt/$($script:readinessMaxAttempts) - VM agent not ready yet."
+            $previousBoot = $null
+        }
+    }
+
+    Write-Log "[WARNING] VM '$VMName' may not be fully ready after $($script:readinessMaxAttempts) probe attempts. Proceeding with tests."
+    return $false
+}
+
+function Wait-VMSettled {
+    # Waits for a VM that rebooted to settle: its boot time is readable and unchanged across two
+    # consecutive probes and it has been up for at least the minimum settle time. The SQL Server VM
+    # uses its stricter startup-configuration readiness check instead.
+    param(
+        [string]$ResourceGroupName,
+        [string]$VMName
+    )
+
+    if ($script:mssqlVmName -and $VMName -eq $script:mssqlVmName) {
+        return Wait-MssqlReady -ResourceGroupName $ResourceGroupName -VMName $VMName
+    }
+
+    Write-Log "Waiting for VM '$VMName' to settle after a reboot..."
+    $previousBoot = $null
+    for ($attempt = 1; $attempt -le $script:readinessMaxAttempts; $attempt++) {
+        Start-Sleep -Seconds $script:readinessIntervalSeconds
+        $boot = Get-VMLastBootTime -ResourceGroupName $ResourceGroupName -VMName $VMName
+        $uptimeSeconds = if ($boot) { [math]::Round(((Get-Date).ToUniversalTime() - $boot).TotalSeconds) } else { 0 }
+        $stableBoot = $boot -and $previousBoot -and [math]::Abs(($boot - $previousBoot).TotalSeconds) -le 5
+        if ($stableBoot -and $uptimeSeconds -ge $script:minSettledUptimeSeconds) {
+            Write-Log "VM '$VMName' has settled (up for $uptimeSeconds s)."
+            return $true
+        }
+        Write-Log "VM '$VMName' settle probe $attempt/$($script:readinessMaxAttempts) - boot stable: $([bool]$stableBoot), uptime: $uptimeSeconds s"
+        $previousBoot = $boot
+    }
+
+    Write-Log "[WARNING] VM '$VMName' may not have settled after $($script:readinessMaxAttempts) probe attempts. Proceeding."
+    return $false
+}
+
 function Invoke-VMStopDeallocateStart {
     param(
         [string]$ResourceGroupName,
@@ -481,43 +702,70 @@ function Invoke-VMStopDeallocateStart {
     Write-Log "Starting VM '$VMName'..."
     Start-AzVM -ResourceGroupName $ResourceGroupName -Name $VMName -ErrorAction Stop | Out-Null
 
-    # The startup scheduled task (Set-MssqlStartupConfiguration.ps1) runs at boot.
-    # After a deallocate the temp disk is wiped, so the task will reformat it,
-    # reconfigure the pagefile and restart the VM once more before starting SQL Server.
-    # Poll until the SQL Server service is running to confirm the full cycle completed.
-    Write-Log "Waiting for VM '$VMName' to complete startup configuration..."
+    # The startup scheduled task (Set-MssqlStartupConfiguration.ps1) runs at boot. After a deallocate
+    # the temp disk is wiped, so the task rebuilds it, reconfigures the pagefile and restarts the VM
+    # once more; SQL Server is started on the following boot.
+    $null = Wait-MssqlReady -ResourceGroupName $ResourceGroupName -VMName $VMName
+}
 
-    $probeScriptPath = Join-Path ([System.IO.Path]::GetTempPath()) 'probe-mssql-ready.ps1'
-    Set-Content -Path $probeScriptPath -Value "(Get-Service -Name MSSQLSERVER -ErrorAction SilentlyContinue).Status"
+function Test-SuiteFailed {
+    param([hashtable]$TestResult)
+    return [bool]($TestResult.HarnessError -or $TestResult.Failed -gt 0)
+}
 
-    $ready = $false
-    $maxAttempts = 10
+function Invoke-VMTestWithRebootRetry {
+    # Runs a VM-based suite. If it fails and any watched VM (the VM the suite runs on, plus any VMs it
+    # depends on) rebooted while it ran, waits for the rebooted VMs to settle and re-runs the suite
+    # once. Only the final attempt's results are reported. Boot times are probed only after a
+    # failure, so passing suites cost nothing extra.
+    param(
+        [string]$ResourceGroupName,
+        [string]$VMName,
+        [string]$CommandId,
+        [string]$ScriptPath,
+        [hashtable]$Parameters,
+        [string]$Label,
+        [string[]]$WatchedVMs
+    )
 
-    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
-        Start-Sleep -Seconds 30
+    $watched = @($WatchedVMs | Where-Object { $_ } | Select-Object -Unique)
+    $attemptStartUtc = (Get-Date).ToUniversalTime()
+    $testResult = Invoke-VMTest -ResourceGroupName $ResourceGroupName -VMName $VMName -CommandId $CommandId -ScriptPath $ScriptPath -Parameters $Parameters -Label $Label
+    $testResult.Attempts = 1
+    $testResult.RetryReason = $null
 
-        try {
-            $probe = Invoke-AzVMRunCommand -ResourceGroupName $ResourceGroupName -VMName $VMName -CommandId 'RunPowerShellScript' -ScriptPath $probeScriptPath -ErrorAction Stop
-            $stdout = ($probe.Value | Where-Object { $_.Code -like '*StdOut*' } | Select-Object -First 1).Message
+    if (-not (Test-SuiteFailed $testResult) -or $watched.Count -eq 0) { return $testResult }
 
-            if ($stdout -match 'Running') {
-                Write-Log "VM '$VMName' is ready - SQL Server service is running."
-                $ready = $true
-                break
-            }
+    $rebooted = Get-RebootedVM -ResourceGroupName $ResourceGroupName -VMNames $watched -SinceUtc $attemptStartUtc
+    if ($rebooted.Count -eq 0) { return $testResult }
 
-            Write-Log "VM '$VMName' probe attempt $attempt/$maxAttempts - SQL Server status: $($stdout.Trim())"
-        }
-        catch {
-            Write-Log "VM '$VMName' probe attempt $attempt/$maxAttempts - VM agent not ready yet."
-        }
+    Write-Log "[WARNING] [$Label] VM(s) '$($rebooted -join "', '")' rebooted during test execution. Waiting for them to settle and retrying the suite once."
+    foreach ($name in $rebooted) {
+        $null = Wait-VMSettled -ResourceGroupName $ResourceGroupName -VMName $name
     }
 
-    Remove-Item $probeScriptPath -Force -ErrorAction SilentlyContinue
+    $attemptStartUtc = (Get-Date).ToUniversalTime()
+    $retryResult = Invoke-VMTest -ResourceGroupName $ResourceGroupName -VMName $VMName -CommandId $CommandId -ScriptPath $ScriptPath -Parameters $Parameters -Label $Label
+    $retryResult.Attempts = 2
+    $retryResult.RetryReason = $script:rebootRetryReason
 
-    if (-not $ready) {
-        Write-Log "[WARNING] VM '$VMName' may not be fully ready after $maxAttempts probe attempts. Proceeding with tests."
+    if (Test-SuiteFailed $retryResult) {
+        $reboundAgain = Get-RebootedVM -ResourceGroupName $ResourceGroupName -VMNames $watched -SinceUtc $attemptStartUtc
+        if ($reboundAgain.Count -gt 0) {
+            Write-Log "[$Label] [FAIL] VM(s) '$($reboundAgain -join "', '")' rebooted again during the retry."
+            $retryResult.HarnessError = "VM(s) '$($reboundAgain -join "', '")' rebooted during test execution; the retry was also interrupted."
+            $retryResult.PublicHarnessError = 'VM rebooted during test execution; the retry was also interrupted.'
+            if ($retryResult.Failed -lt 1) { $retryResult.Failed = 1 }
+        }
+        else {
+            Write-Log "[$Label] Retry after VM reboot also failed."
+        }
     }
+    else {
+        Write-Log "[$Label] Retry after VM reboot passed."
+    }
+
+    return $retryResult
 }
 #endregion
 
@@ -527,6 +775,13 @@ $repoRoot = Split-Path $PSScriptRoot -Parent
 $script:runStartedAt = Get-Date
 $script:suiteResults = [System.Collections.Generic.List[object]]::new()
 $script:resultsJsonFullPath = if ($ResultsJsonPath) { $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($ResultsJsonPath) } else { $null }
+# VM readiness / reboot-aware retry settings
+$script:readinessMaxAttempts = 20
+$script:readinessIntervalSeconds = 30
+$script:minSettledUptimeSeconds = 120
+$script:rebootRetryReason = 'VM rebooted during test execution'
+$script:vmOsTypes = @{}
+$script:mssqlVmName = $null
 
 # Clear previous log
 if (Test-Path $script:logPath) { Remove-Item $script:logPath -Force }
@@ -606,6 +861,7 @@ if (-not $resourceGroupName) {
 }
 
 Write-Log "Resource group: $resourceGroupName"
+$script:mssqlVmName = $resourceNames['virtual_machine_mssqlwin1']
 
 # Validate Azure credentials are live by querying the target resource group
 try {
@@ -903,11 +1159,11 @@ foreach ($configKey in $testConfigs.Keys) {
             }
         }
 
-        $testResult = Invoke-VMTest -ResourceGroupName $resourceGroupName -VMName $vmName -CommandId $config.CommandId -ScriptPath $config.ScriptPath -Parameters $config.Parameters -Label "MODULE:$($config.Module)"
+        $testResult = Invoke-VMTestWithRebootRetry -ResourceGroupName $resourceGroupName -VMName $vmName -CommandId $config.CommandId -ScriptPath $config.ScriptPath -Parameters $config.Parameters -Label "MODULE:$($config.Module)" -WatchedVMs @($vmName)
     }
     $overallPassed += $testResult.Passed
     $overallFailed += $testResult.Failed
-    $moduleResults += @{ Module = $config.Module; Passed = $testResult.Passed; Failed = $testResult.Failed }
+    $moduleResults += @{ Module = $config.Module; Passed = $testResult.Passed; Failed = $testResult.Failed; RetryReason = $testResult.RetryReason }
     Add-SuiteResult -Name "$($config.Module) ($suiteTarget)" -Type 'module' -ModuleName $config.ModuleName -Target $suiteTarget -TestResult $testResult -StartedAt $suiteStartedAt -Stopwatch $suiteStopwatch
 }
 
@@ -1126,11 +1382,13 @@ if ($runIntegration) {
             Write-Log "Integration: $($test.Name) | VM: $vmName"
             Write-Log "========================================"
 
-            $testResult = Invoke-VMTest -ResourceGroupName $resourceGroupName -VMName $vmName -CommandId $test.CommandId -ScriptPath $test.ScriptPath -Parameters $test.Parameters -Label "INTEGRATION:$($test.Name)"
+            # Watch the VM the test runs on and every VM it depends on (e.g. the SQL Server VM).
+            $watchedVMs = @(@($test.RunOnVM) + @($test.RequiredVMs) | ForEach-Object { $resourceNames[$_] } | Where-Object { $_ } | Select-Object -Unique)
+            $testResult = Invoke-VMTestWithRebootRetry -ResourceGroupName $resourceGroupName -VMName $vmName -CommandId $test.CommandId -ScriptPath $test.ScriptPath -Parameters $test.Parameters -Label "INTEGRATION:$($test.Name)" -WatchedVMs $watchedVMs
         }
         $overallPassed += $testResult.Passed
         $overallFailed += $testResult.Failed
-        $moduleResults += @{ Module = "integration: $($test.Name)"; Passed = $testResult.Passed; Failed = $testResult.Failed }
+        $moduleResults += @{ Module = "integration: $($test.Name)"; Passed = $testResult.Passed; Failed = $testResult.Failed; RetryReason = $testResult.RetryReason }
         Add-SuiteResult -Name $suiteName -Type 'integration' -ModuleName $null -Target $suiteTarget -TestResult $testResult -StartedAt $suiteStartedAt -Stopwatch $suiteStopwatch
     }
 }
@@ -1141,7 +1399,8 @@ Write-Log "UNIT TEST RESULTS SUMMARY"
 Write-Log "========================================"
 foreach ($mr in $moduleResults) {
     $status = if ($mr.Failed -gt 0) { 'FAIL' } else { 'PASS' }
-    Write-Log "  [$status] $($mr.Module): Passed=$($mr.Passed) Failed=$($mr.Failed)"
+    $retryNote = if ($mr.RetryReason) { " (retried once: $($mr.RetryReason))" } else { '' }
+    Write-Log "  [$status] $($mr.Module): Passed=$($mr.Passed) Failed=$($mr.Failed)$retryNote"
 }
 $overallTotal = $overallPassed + $overallFailed
 Write-Log "Overall: Passed=$overallPassed Failed=$overallFailed Total=$overallTotal"

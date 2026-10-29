@@ -67,6 +67,32 @@ resource "azurerm_role_assignment" "assignments" {
 #endregion
 
 #region sql-vm-configuration
+# Patch first: install pending Critical/Security updates (and reboot if required) before any run
+# command or extension runs, so update-driven reboots don't interrupt guest configuration.
+# Runs after the data disk attachments so the two VM operations don't conflict.
+# Best-effort: only an API/operation error fails the apply; the patch result is exported.
+resource "azapi_resource_action" "install_patches" {
+  type        = "Microsoft.Compute/virtualMachines@2025-04-01"
+  resource_id = azurerm_windows_virtual_machine.this.id
+  action      = "installPatches"
+  method      = "POST"
+  depends_on  = [azurerm_virtual_machine_data_disk_attachment.attachments]
+
+  body = {
+    maximumDuration = "PT1H"
+    rebootSetting   = "IfRequired"
+    windowsParameters = {
+      classificationsToInclude = ["Critical", "Security"]
+    }
+  }
+
+  response_export_values = ["status", "rebootStatus", "installedPatchCount", "failedPatchCount", "pendingPatchCount", "maintenanceWindowExceeded"]
+
+  timeouts {
+    create = "75m"
+  }
+}
+
 resource "azurerm_virtual_machine_extension" "join_domain" {
   name                       = "${module.naming.names["virtual_machine_extension"].name}-${var.vm_mssql_win_name}-JsonADDomainExtension"
   virtual_machine_id         = azurerm_windows_virtual_machine.this.id
@@ -74,7 +100,7 @@ resource "azurerm_virtual_machine_extension" "join_domain" {
   type                       = "JsonADDomainExtension"
   type_handler_version       = "1.3"
   auto_upgrade_minor_version = true
-  depends_on                 = [azurerm_virtual_machine_data_disk_attachment.attachments]
+  depends_on                 = [azapi_resource_action.install_patches]
 
   settings = jsonencode({
     Name    = var.adds_domain_name

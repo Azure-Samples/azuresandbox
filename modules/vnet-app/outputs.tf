@@ -70,3 +70,8 @@ output "virtual_machine_jumpwin1_identity" {
     principal_id = azurerm_windows_virtual_machine.this.identity[0].principal_id
   }
 }
+
+output "patch_install_result" {
+  value       = azapi_resource_action.install_patches.output
+  description = "Result of the patch-first installPatches operation on jumpwin1 (status, rebootStatus, patch counts). Informational only; a failed patch install does not fail the apply."
+}

@@ -33,6 +33,8 @@ This configuration implements a virtual network for applications including:
 
 The estimated provisioning time for this module is 15 minutes.
 
+Before any run command or VM extension touches *jumpwin1*, Terraform installs pending Critical and Security Windows updates on it using the platform [installPatches](https://learn.microsoft.com/en-us/rest/api/compute/virtual-machines/install-patches) action and reboots it if required (patch → reboot → configure). This keeps an update-driven reboot from interrupting later configuration steps. Patching is best-effort: only an API error fails the apply, and the result is surfaced in the `patch_install_result` output. Automatic patching stays enabled. Patching adds time to provisioning that varies with the number of pending updates. Adding this step to an existing sandbox patches and may reboot *jumpwin1* on the next apply.
+
 > [!IMPORTANT]
 > **OS disk type change (Standard HDD retirement).** The default for `vm_jumpbox_win_storage_account_type` is now `StandardSSD_LRS` and Standard HDD (`Standard_LRS`) is no longer permitted, because [Azure is retiring Standard HDD OS disks on September 8, 2028](https://learn.microsoft.com/en-us/azure/virtual-machines/disks-hdd-os-retirement). Fresh deployments are unaffected. For an **existing** deployment created with `Standard_LRS`, changing `os_disk.storage_account_type` forces Terraform to **replace the VM** (destroy and recreate), which causes downtime; the Windows jumpbox is domain-joined and re-provisioned by its run-command configuration, so the recommended path is to let Terraform recreate it during a maintenance window. To avoid replacement, deallocate the VM and change its OS disk SKU in place (Azure portal/CLI) *before* applying, then set the variable to the new SKU so Terraform detects no change.
 
@@ -182,6 +184,7 @@ This section lists the resources included in this configuration.
 
 Address | Name | Notes
 --- | --- | ---
+module.vnet_app[0].azapi_resource_action.install_patches | | Installs Critical and Security updates on *jumpwin1* (rebooting if required) before any run command or extension runs on it.
 module.vnet_app[0].azurerm_application_insights.this | appisanddevxxx | Workspace-based Application Insights linked to the shared Log Analytics workspace.
 module.vnet_app[0].azurerm_container_registry.this | crsanddevxxxxxxxx | Shared container registry.
 module.vnet_app[0].azurerm_monitor_data_collection_rule_association.jumpwin1_dce | | Data collection endpoint association for jumpwin1.
@@ -223,6 +226,7 @@ Name | Comments
 --- | --- | ---
 app_insights_connection_string | | Application Insights connection string. Use this in application code instead of the legacy instrumentation key.
 fqdns | | A map of fqdns for resources provisioned in the module.
+patch_install_result | | The result of the *jumpwin1* patch installation (status, rebootStatus, installed/failed/pending patch counts, maintenanceWindowExceeded).
 resource_ids | | A map of resource IDs for key resources in the module.
 resource_names | | A map of resource names for key resources in the module.
 storage_container_name | scripts | The name of the storage container used to store scripts.

@@ -24,6 +24,8 @@ This module implements a virtual network with shared services used by all the co
 
 The estimated provisioning time for this module is 23 minutes.
 
+Before any run command or VM extension touches *adds1*, Terraform installs pending Critical and Security Windows updates on it using the platform [installPatches](https://learn.microsoft.com/en-us/rest/api/compute/virtual-machines/install-patches) action and reboots it if required (patch → reboot → configure). This keeps an update-driven reboot from interrupting later configuration steps. Patching is best-effort: only an API error fails the apply, and the result is surfaced in the `patch_install_result` output. Automatic patching stays enabled. Patching adds time to provisioning that varies with the number of pending updates. Adding this step to an existing sandbox patches and may reboot *adds1* on the next apply.
+
 > [!IMPORTANT]
 > **OS disk type change (Standard HDD retirement).** The default for `vm_adds_storage_account_type` is now `StandardSSD_LRS` and Standard HDD (`Standard_LRS`) is no longer permitted, because [Azure is retiring Standard HDD OS disks on September 8, 2028](https://learn.microsoft.com/en-us/azure/virtual-machines/disks-hdd-os-retirement). Fresh deployments are unaffected. For an **existing** deployment created with `Standard_LRS`, changing `os_disk.storage_account_type` forces Terraform to **replace the VM** (destroy and recreate). This VM is the Active Directory domain controller and DNS server that other modules depend on, so its replacement causes an AD/DNS outage that will disrupt domain-joined VMs and dependent modules until it re-provisions. To avoid replacement and downtime, deallocate the VM and change its OS disk SKU in place (Azure portal/CLI) *before* applying, then set the variable to the new SKU so Terraform detects no change. If you allow a replacement instead, schedule a maintenance window and expect dependent VMs to require domain re-join/re-provisioning.
 
@@ -114,6 +116,7 @@ vnet_name | shared | The name of the new virtual network.
 
 Address | Name | Notes
 --- | --- | ---
+module.vnet_shared.azapi_resource_action.install_patches | | Installs Critical and Security updates on *adds1* (rebooting if required) before any run command or extension runs on it.
 module.vnet_shared.azurerm_bastion_host.this | bas&#8209;sand&#8209;dev | The Azure Bastion used for secure RDP/SSH access to sandbox VMs. Uses the `Standard` SKU, which is required to emit `BastionAuditLogs` via a diagnostic setting.
 module.vnet_shared.azurerm_firewall.this | afw&#8209;sand&#8209;dev | The Azure Firewall used for network security.
 module.vnet_shared.azurerm_firewall_policy.this | awfp&#8209;sand&#8209;dev | The firewall policy. Threat intelligence mode is set to `Deny`.
@@ -178,6 +181,7 @@ admin_username | bootstrapadmin | The user name for provisioning administrator a
 admin_username_secret | adminuser | The name of the key vault secret containing the admin username.
 dns_server | 10.1.1.4 | The primary DNS server IP address for the virtual network.
 fqdns | | A map of fqdns for resources provisioned in the module.
+patch_install_result | | The result of the *adds1* patch installation (status, rebootStatus, installed/failed/pending patch counts, maintenanceWindowExceeded).
 private_dns_zone_links_complete | | A dependency signal indicating all private DNS zone virtual network links have been created. Consumed by modules that provision private endpoints.
 private_dns_zones | | A map of all private DNS zones used by the sandbox environment, keyed by zone name. Consumed by modules that provision private endpoints.
 resource_ids | | A map of resource IDs for key resources in the module.
