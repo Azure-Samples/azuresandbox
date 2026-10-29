@@ -3,7 +3,11 @@
 param(
     [Parameter(Mandatory)]
     [ValidateSet('preflight', 'apply', 'unit-test', 'summary')]
-    [string]$Stage
+    [string]$Stage,
+
+    # Internal: set only when this script starts one sandbox of a multi-sandbox run (SANDBOX_COUNT above 1).
+    [ValidateRange(0, 20)]
+    [int]$Instance = 0
 )
 
 Set-StrictMode -Version 2.0
@@ -15,6 +19,8 @@ $ErrorActionPreference = 'Stop'
 $script:utf8 = [System.Text.UTF8Encoding]::new($false)
 $script:directory = $null
 $script:redaction = $null
+$script:count = 1
+$script:fanOut = $false
 
 function Stop-SandboxStage {
     param([string]$Message, [int]$Code = 1)
@@ -33,6 +39,16 @@ function Get-SandboxRedaction {
     # tag-shaped text are still redacted.
     if (-not $script:redaction -and $script:directory -and [System.IO.File]::Exists((Join-Path $script:directory 'backend.tf'))) {
         $script:redaction = Get-SandboxRedactionContext $script:directory
+    }
+    # A multi-sandbox parent has no backend.tf of its own; every sandbox in the run uses the same secrets.
+    if (-not $script:redaction -and $script:fanOut) {
+        foreach ($number in 1..$script:count) {
+            $instanceDirectory = (Get-SandboxInstance $number).Directory
+            if ([System.IO.File]::Exists((Join-Path $instanceDirectory 'backend.tf'))) {
+                $script:redaction = Get-SandboxRedactionContext $instanceDirectory
+                break
+            }
+        }
     }
     if ($script:redaction) { $script:redaction } else { @{ KnownIds = @{}; Tags = @{} } }
 }
@@ -438,6 +454,9 @@ function Confirm-SandboxInvocation {
 function Invoke-SandboxPreflight {
     Confirm-SandboxInvocation
     if ($env:RUNNER_NAME -cne 'jumplinux2') { Stop-SandboxStage 'Job did not run on the approved runner.' }
+    if ($Instance -and -not [System.IO.Directory]::Exists($script:root)) {
+        Stop-SandboxStage 'The sandbox source tree is missing.'
+    }
     $jitMinimum = if ($env:SANDBOX_JIT_MIN_REMAINING_MINUTES) { $env:SANDBOX_JIT_MIN_REMAINING_MINUTES } else { '150' }
     if ($jitMinimum -cnotmatch '^[0-9]{1,4}$' -or [int]$jitMinimum -gt 1440) {
         Stop-SandboxStage 'SANDBOX_JIT_MIN_REMAINING_MINUTES must be a whole number of minutes from 0 to 1440.'
@@ -470,7 +489,8 @@ function Invoke-SandboxPreflight {
     $script:childEnvironment['ARM_TENANT_ID'] = $backend.tenant_id
     Write-SandboxSummary "## Sandbox target`n`nDeployment: ``$script:deploymentId```n`nState key: ``$script:key```n`n[Originating run]($script:runBase$script:runId) / [Current run]($script:runBase$script:runId)`n`n"
     Invoke-SandboxCommand @('git', '--version')
-    Confirm-SandboxTerraformVersion
+    # In a multi-sandbox run the parent checks the shared Terraform CLI once, before starting the sandboxes.
+    if (-not $Instance) { Confirm-SandboxTerraformVersion }
     Invoke-SandboxCommand @('az', 'version')
     Invoke-SandboxCommand @('az', 'login', '--identity', '--allow-no-subscriptions', '--output', 'none')
     $exists = Get-SandboxOutput @(
@@ -723,6 +743,224 @@ Preflight PASS is not proof that infrastructure was applied or tests passed.
     }
 }
 
+function Get-SandboxInstance {
+    # Id and private paths of sandbox Number in a multi-sandbox run. The parent and the sandbox's own process both use it.
+    param([int]$Number)
+    $id = "sandbox-$script:runId-$Number"
+    $deployment = Join-Path $HOME ".local/state/azuresandbox/deployments/$id"
+    [pscustomobject]@{
+        Number     = $Number
+        Id         = $id
+        Deployment = $deployment
+        Directory  = Join-Path $deployment "runs/$script:runId-$script:attempt"
+        Source     = Join-Path $deployment "source/$script:runId-$script:attempt"
+    }
+}
+
+function Receive-SandboxInstanceOutput {
+    # Relays a sandbox process's new complete lines, prefixed with its id so they can't run as workflow commands.
+    param($Child, [switch]$Final)
+    if (-not [System.IO.File]::Exists($Child.Console)) { return }
+    $stream = [System.IO.File]::Open($Child.Console, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read,
+        [System.IO.FileShare]::ReadWrite)
+    try {
+        $length = $stream.Length - $Child.Offset
+        if ($length -le 0) { return }
+        $buffer = [byte[]]::new($length)
+        $stream.Position = $Child.Offset
+        $read = 0
+        while ($read -lt $length) {
+            $chunk = $stream.Read($buffer, $read, $length - $read)
+            if ($chunk -le 0) { break }
+            $read += $chunk
+        }
+    }
+    finally { $stream.Dispose() }
+    # A newline byte is never part of a multi-byte UTF-8 character, so splitting there is safe.
+    $end = if ($Final) { $read } else { [Array]::LastIndexOf($buffer, [byte]10, $read - 1) + 1 }
+    if ($end -le 0) { return }
+    $Child.Offset += $end
+    foreach ($line in ($script:utf8.GetString($buffer, 0, $end).TrimEnd("`n") -split '\n')) {
+        # Sandbox output can include Terraform and Azure error text; also neutralize the legacy ##[command] syntax.
+        Write-SandboxStatus "[$($Child.Id)] $($line.TrimEnd("`r").Replace('##[', '## ['))"
+    }
+}
+
+function Invoke-SandboxFanOut {
+    # Runs this stage for every sandbox of a multi-sandbox run, each in its own process with its own source tree, state
+    # key and private records. A failed sandbox doesn't stop the others; the stage fails if any sandbox fails.
+    $ready = @(1..$script:count)
+    if ($Stage -eq 'preflight') {
+        Confirm-SandboxInvocation
+        if ($env:RUNNER_NAME -cne 'jumplinux2') { Stop-SandboxStage 'Job did not run on the approved runner.' }
+        Invoke-SandboxCommand @('git', '--version')
+        # Installing Terraform uses sudo and replaces the shared CLI, so it runs once, before any sandbox starts.
+        Confirm-SandboxTerraformVersion
+        # Each sandbox links providers from this cache instead of downloading about 730 MB. Only this init writes to it.
+        $null = [System.IO.Directory]::CreateDirectory($script:childEnvironment['TF_PLUGIN_CACHE_DIR'])
+        Invoke-SandboxCommand @('terraform', 'init', '-backend=false', '-input=false', '-no-color')
+        foreach ($number in $ready) {
+            $instance = Get-SandboxInstance $number
+            $null = [System.IO.Directory]::CreateDirectory($instance.Deployment)
+            [System.IO.File]::SetUnixFileMode($instance.Deployment, [System.IO.UnixFileMode]448)
+            if ([System.IO.Directory]::Exists($instance.Source)) { Stop-SandboxStage 'This run attempt already has sandbox source trees.' }
+            $null = [System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($instance.Source))
+            # backend.tf and terraform.tfvars are written into the source tree, so each sandbox needs its own.
+            Invoke-SandboxCommand @('git', 'worktree', 'add', '--detach', $instance.Source, 'HEAD')
+        }
+    }
+    else {
+        # All or nothing: apply starts only when every sandbox passed preflight.
+        foreach ($number in $ready) {
+            $statusPath = Join-Path (Get-SandboxInstance $number).Directory 'preflight-status.json'
+            $status = if ([System.IO.File]::Exists($statusPath)) { Read-SandboxJson $statusPath } else { @{} }
+            if ($status.exit_code -isnot [long] -or $status.exit_code -ne 0) {
+                Stop-SandboxStage 'Apply requires a successful preflight for every sandbox.'
+            }
+        }
+    }
+    Write-SandboxStatus "${Stage}: starting $($ready.Count) of $script:count sandboxes in parallel."
+    $pending = [System.Collections.Generic.Queue[int]]::new([int[]]$ready)
+    $children = [System.Collections.Generic.List[object]]::new()
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    $nextHeartbeat = 120
+    $failures = [System.Collections.Generic.List[string]]::new()
+    # Relayed sandbox output must never run as a workflow command, so command processing stays off until all of it is out.
+    $token = [guid]::NewGuid().ToString('N')
+    Write-SandboxStatus "::stop-commands::$token"
+    try {
+        while ($true) {
+            # Starts are staggered so sign-ins and Azure Resource Manager writes don't all begin at once.
+            if ($pending.Count -gt 0) {
+                $number = $pending.Dequeue()
+                $console = Join-Path $script:directory "sandbox-$number-$Stage.txt"
+                $info = [System.Diagnostics.ProcessStartInfo]::new()
+                $info.FileName = 'bash'
+                $info.UseShellExecute = $false
+                $info.WorkingDirectory = $script:root
+                # The sandbox process inherits this process's environment, including the HCL secrets and the OIDC
+                # token request variables that its own stage needs.
+                foreach ($argument in @('-c', 'exec "$@" >"$0" 2>&1', $console, 'pwsh', '-NoLogo', '-NoProfile',
+                        '-File', $PSCommandPath, '-Stage', $Stage, '-Instance', "$number")) {
+                    $info.ArgumentList.Add($argument)
+                }
+                $process = [System.Diagnostics.Process]::Start($info)
+                $children.Add([pscustomobject]@{
+                        Number = $number; Id = "sandbox-$script:runId-$number"; Process = $process; Console = $console; Offset = 0L
+                    })
+            }
+            foreach ($child in $children) { Receive-SandboxInstanceOutput $child }
+            $running = @($children | Where-Object { -not $_.Process.HasExited }).Count
+            if ($pending.Count -eq 0 -and $running -eq 0) { break }
+            if ($timer.Elapsed.TotalSeconds -ge $nextHeartbeat) {
+                $exited = @($children | Where-Object { $_.Process.HasExited })
+                $passed = @($exited | Where-Object { $_.Process.ExitCode -eq 0 }).Count
+                Write-SandboxStatus ("${Stage}: $([int][Math]::Floor($timer.Elapsed.TotalMinutes)) min elapsed; " +
+                    "sandboxes running=$running, passed=$passed, failed=$($exited.Count - $passed), not started=$($pending.Count).")
+                $nextHeartbeat += 120
+            }
+            Start-Sleep -Seconds 10
+        }
+        foreach ($child in $children) { $child.Process.WaitForExit(); Receive-SandboxInstanceOutput $child -Final }
+        foreach ($child in $children) {
+            $directory = (Get-SandboxInstance $child.Number).Directory
+            $statusPath = Join-Path $directory "$Stage-status.json"
+            $status = if ([System.IO.File]::Exists($statusPath)) { Read-SandboxJson $statusPath } else { @{} }
+            if ($child.Process.ExitCode -eq 0 -and $status.exit_code -is [long] -and $status.exit_code -eq 0) { continue }
+            $errorPath = Join-Path $directory "$Stage-error.txt"
+            $message = if ([System.IO.File]::Exists($errorPath)) { [System.IO.File]::ReadAllText($errorPath) }
+            else { "$Stage failed (exit $($child.Process.ExitCode)); review its private runner log." }
+            $failures.Add("::error title=$($child.Id) $Stage failed::$(ConvertTo-SandboxAnnotationData $message)")
+        }
+    }
+    finally {
+        foreach ($child in $children) { $child.Process.Dispose() }
+        Write-SandboxStatus "::${token}::"
+    }
+    foreach ($annotation in $failures) { Write-SandboxStatus $annotation }
+    $failed = $failures.Count
+    $succeeded = $children.Count - $failed
+    Write-SandboxStatus "${Stage}: $succeeded of $($children.Count) sandboxes passed."
+    if ($failed -gt 0) { Stop-SandboxStage "$failed of $($children.Count) sandboxes failed $Stage." }
+}
+
+function Get-SandboxStageResult {
+    param([string]$Directory, [string]$Name)
+    $statusPath = Join-Path $Directory "$Name-status.json"
+    if (-not [System.IO.File]::Exists($statusPath)) { return 'NOT RUN' }
+    $status = Read-SandboxJson $statusPath
+    if ($status.exit_code -is [long] -and $status.exit_code -eq 0) { 'PASS' } else { 'FAIL' }
+}
+
+function Write-SandboxFleetReport {
+    # Job summary for a multi-sandbox run, from each sandbox's private status files.
+    $stages = @('preflight', 'apply')
+    $succeeded = 0
+    Write-SandboxSummary "## Sandbox results`n`n| Sandbox | Resource group | preflight | apply |`n|---|---|---|---|`n"
+    foreach ($number in 1..$script:count) {
+        $instance = Get-SandboxInstance $number
+        $results = @{}
+        foreach ($name in $stages) { $results[$name] = Get-SandboxStageResult $instance.Directory $name }
+        if ($env:SANDBOX_RUN_THROUGH -ceq 'preflight' -and $results.apply -eq 'NOT RUN') { $results.apply = 'N/A' }
+        if ($results[$env:SANDBOX_RUN_THROUGH] -eq 'PASS') { $succeeded++ }
+        $resourceGroup = 'unavailable'
+        $resourceGroupPath = Join-Path $instance.Directory 'resource-group.json'
+        if ([System.IO.File]::Exists($resourceGroupPath)) {
+            try { $resourceGroup = "``$(Get-SandboxResourceGroupName (Read-SandboxJson $resourceGroupPath))``" }
+            catch { $resourceGroup = 'unavailable' }
+        }
+        Write-SandboxSummary "| ``$($instance.Id)`` | $resourceGroup | $($results.preflight) | $($results.apply) |`n"
+    }
+    Write-SandboxSummary "`nSucceeded through ``$env:SANDBOX_RUN_THROUGH``: $succeeded of $script:count. Failed or not run: $($script:count - $succeeded).`n`n"
+    Write-SandboxSummary "[Originating run]($script:runBase$script:runId)`n`n"
+    foreach ($name in $stages) {
+        $statusPath = Join-Path $script:directory "$name-status.json"
+        if ([System.IO.File]::Exists($statusPath)) {
+            $status = Read-SandboxJson $statusPath
+            Write-SandboxSummary "Run-wide ${name}: exit ``$($status.exit_code)``, start ``$($status.started_at)``, end ``$($status.finished_at)``. Private log: ``~/.local/state/azuresandbox/deployments/$script:deploymentId/runs/$script:runId-$script:attempt/$name.log```n`n"
+        }
+    }
+    foreach ($number in 1..$script:count) {
+        $instance = Get-SandboxInstance $number
+        $runPath = "~/.local/state/azuresandbox/deployments/$($instance.Id)/runs/$script:runId-$script:attempt"
+        Write-SandboxSummary "<details><summary>$($instance.Id)</summary>`n`nState key: ``sandboxes/$($instance.Id)/terraform.tfstate```n`n"
+        $receiptPath = Join-Path $instance.Directory 'plan-receipt.json'
+        if ([System.IO.File]::Exists($receiptPath)) {
+            $record = Read-SandboxJson $receiptPath
+            Write-SandboxSummary ("Source commit: ``$($record.source_sha)``; plan SHA-256: ``$($record.plan_sha256)``; " +
+                "changes: create=$($record.changes.create), update=$($record.changes.update), delete=$($record.changes.delete).`n`n")
+        }
+        foreach ($name in $stages) {
+            $statusPath = Join-Path $instance.Directory "$name-status.json"
+            if (-not [System.IO.File]::Exists($statusPath)) { continue }
+            $status = Read-SandboxJson $statusPath
+            Write-SandboxSummary "${name}: exit ``$($status.exit_code)``, start ``$($status.started_at)``, end ``$($status.finished_at)``. Private log: ``$runPath/$name.log```n`n"
+            $errorPath = Join-Path $instance.Directory "$name-error.txt"
+            if ([System.IO.File]::Exists($errorPath)) {
+                Write-SandboxSummary (ConvertTo-SandboxErrorMarkdown $name ([System.IO.File]::ReadAllText($errorPath)))
+            }
+        }
+        Write-SandboxSummary "</details>`n`n"
+    }
+    Write-SandboxSummary "Preflight PASS is not proof that infrastructure was applied. Tear down each sandbox manually.`n"
+}
+
+function Remove-SandboxFleetSource {
+    # The source trees and provider cache are needed only by this run's stages. Plans and logs stay private on the runner.
+    if (-not [System.IO.Directory]::Exists($script:directory)) { return }
+    $script:logPath = Join-Path $script:directory 'summary.log'
+    foreach ($number in 1..$script:count) {
+        $source = (Get-SandboxInstance $number).Source
+        if (-not [System.IO.Directory]::Exists($source)) { continue }
+        if ((Invoke-SandboxCommand @('git', 'worktree', 'remove', '--force', $source) -AllowFailure) -ne 0) {
+            Write-SandboxStatus "summary: could not remove the source tree of sandbox-$script:runId-$number; see the private summary log."
+        }
+    }
+    $null = Invoke-SandboxCommand @('git', 'worktree', 'prune') -AllowFailure
+    $cache = $script:childEnvironment['TF_PLUGIN_CACHE_DIR']
+    if ([System.IO.Directory]::Exists($cache)) { [System.IO.Directory]::Delete($cache, $true) }
+}
+
 try {
     if (-not $IsLinux) { Stop-SandboxStage 'This runner helper requires Linux.' }
     foreach ($name in @('GITHUB_WORKSPACE', 'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT', 'GITHUB_SERVER_URL',
@@ -739,10 +977,27 @@ try {
     $script:root = $env:GITHUB_WORKSPACE
     $script:runId = $env:GITHUB_RUN_ID
     $script:attempt = $env:GITHUB_RUN_ATTEMPT
-    $script:deploymentId = "sandbox-$script:runId"
+    # SANDBOX_COUNT sandboxes (1-20) deploy in parallel. More than one runs a parent process that starts one process per
+    # sandbox (-Instance); tests share host-wide state on the runner, so they run only for a single sandbox.
+    $countText = if ($env:SANDBOX_COUNT) { $env:SANDBOX_COUNT } else { '1' }
+    if ($countText -cnotmatch '^([1-9]|1[0-9]|20)$') { Stop-SandboxStage 'Invalid sandbox count.' }
+    $script:count = [int]$countText
+    if ($script:count -ne 1 -and ($env:GITHUB_EVENT_NAME -cne 'workflow_dispatch' -or $env:SANDBOX_RUN_THROUGH -ceq 'unit-test')) {
+        Stop-SandboxStage 'More than one sandbox is supported only for manual runs through preflight or apply.'
+    }
+    if ($Instance -gt $script:count -or ($Instance -and ($script:count -eq 1 -or $Stage -cnotin @('preflight', 'apply')))) {
+        Stop-SandboxStage 'Invalid sandbox instance.'
+    }
+    $script:fanOut = $script:count -gt 1 -and -not $Instance
+    $script:deploymentId = if ($Instance) { "sandbox-$script:runId-$Instance" } else { "sandbox-$script:runId" }
     $script:key = "sandboxes/$script:deploymentId/terraform.tfstate"
     $script:deploymentDirectory = Join-Path $HOME ".local/state/azuresandbox/deployments/$script:deploymentId"
     $script:directory = Join-Path $script:deploymentDirectory "runs/$script:runId-$script:attempt"
+    if ($Instance) {
+        $script:root = (Get-SandboxInstance $Instance).Source
+        # Sandbox processes keep their summary private; the parent reports every sandbox.
+        $env:GITHUB_STEP_SUMMARY = Join-Path $script:directory "$Stage-summary.md"
+    }
     $script:plan = Join-Path $script:directory 'sandbox.tfplan'
     $script:receipt = Join-Path $script:directory 'plan-receipt.json'
     $script:runBase = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/"
@@ -763,8 +1018,16 @@ try {
     $script:childEnvironment['AZURE_CONFIG_DIR'] = Join-Path $script:directory 'azure-cli'
     $script:childEnvironment['ARM_USE_MSI'] = 'true'
     $script:childEnvironment['TF_WORKSPACE'] = 'default'
+    if ($script:count -gt 1) {
+        $script:childEnvironment['TF_PLUGIN_CACHE_DIR'] = Join-Path $HOME (
+            ".local/state/azuresandbox/deployments/sandbox-$script:runId/runs/$script:runId-$script:attempt/plugin-cache")
+    }
     if ($Stage -eq 'summary') {
-        Write-SandboxReport
+        if ($script:fanOut) {
+            Write-SandboxFleetReport
+            Remove-SandboxFleetSource
+        }
+        else { Write-SandboxReport }
         exit 0
     }
     if ($Stage -eq 'preflight') {
@@ -781,8 +1044,8 @@ try {
     Write-SandboxLog "Stage: $Stage`nStarted: $started`n"
     try {
         switch ($Stage) {
-            preflight { Invoke-SandboxPreflight }
-            apply { Invoke-SandboxApply }
+            preflight { if ($script:fanOut) { Invoke-SandboxFanOut } else { Invoke-SandboxPreflight } }
+            apply { if ($script:fanOut) { Invoke-SandboxFanOut } else { Invoke-SandboxApply } }
             unit-test { Invoke-SandboxUnitTest }
         }
     }
