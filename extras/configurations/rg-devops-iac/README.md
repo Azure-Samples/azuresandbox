@@ -897,11 +897,20 @@ Plan capacity before the event. Figures are per sandbox with all base modules; f
 
 Resource | Per sandbox | Notes
 --- | --- | ---
-Runner memory | About 1.5 GB during plan and apply | The default `vm_jumpbox_linux_size`, `Standard_D2ls_v6` (4 GiB), suits 2 sandboxes. Before the event, set a larger size, for example 16 GiB for up to 8 sandboxes or 32 GiB for 20, and apply this configuration. Size it back down afterwards.
-Runner disk | Under 100 MB, plus a shared provider cache of about 730 MB per run | The default OS disk is enough.
+Runner memory | Up to 1.5 GB during plan and apply | The runner itself uses about 1 GB. A measured run with `vnet_app` and `mssql` used about 0.9 GB per sandbox, rising slowly during apply.
+Runner CPU | About 1 vCPU during preflight | `terraform init` and `plan` keep the CPU busy for about 5 minutes. Apply mostly waits on Azure and uses under 10%. Fewer vCPUs than sandboxes only slows preflight.
+Runner disk | About 40 MB kept per sandbox, plus a provider cache of about 730 MB removed at the end of the run | The default 30 GB Standard SSD is enough. Its bandwidth peaks briefly while the cache fills, which only slows preflight.
 Regional vCPUs | 10: 2 each for `adds1`, `jumpwin1` and `jumplinux1`, and 4 for `mssqlwin1` | 200 for 20 sandboxes. Check *Total Regional vCPUs* and the VM family quotas under the subscription's *Usage + quotas*, and request an increase if needed.
 Public IP addresses | 2 Standard | For Azure Firewall and Bastion.
 Cost | Dominated by Azure Firewall, the Virtual WAN hub and point-to-site gateway, and Bastion | Billed hourly whether or not the sandbox is used. Disable modules the event doesn't need, such as `vwan`, and tear down promptly.
+
+Size the runner with `vm_jumpbox_linux_size` before the event, apply this configuration, and size it back down afterwards:
+
+Sandboxes | Runner size
+--- | ---
+Up to 2 | `Standard_D2ls_v6` (2 vCPUs, 4 GiB), the default
+Up to 8 | `Standard_D4s_v6` (4 vCPUs, 16 GiB)
+Up to 20 | `Standard_D8s_v6` (8 vCPUs, 32 GiB)
 
 The sandbox VMs keep running after the run, unless an Azure Policy in the subscription shuts them down.
 
