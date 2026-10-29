@@ -48,10 +48,35 @@ resource "azurerm_role_assignment" "assignments_vm_win" {
 #endregion
 
 #region vm-configuration
+# Patch first: install pending Critical/Security updates (and reboot if required) before any run
+# command or extension runs, so update-driven reboots don't interrupt guest configuration.
+# Best-effort: only an API/operation error fails the apply; the patch result is exported.
+resource "azapi_resource_action" "install_patches" {
+  type        = "Microsoft.Compute/virtualMachines@2025-04-01"
+  resource_id = azurerm_windows_virtual_machine.this.id
+  action      = "installPatches"
+  method      = "POST"
+
+  body = {
+    maximumDuration = "PT1H"
+    rebootSetting   = "IfRequired"
+    windowsParameters = {
+      classificationsToInclude = ["Critical", "Security"]
+    }
+  }
+
+  response_export_values = ["status", "rebootStatus", "installedPatchCount", "failedPatchCount", "pendingPatchCount", "maintenanceWindowExceeded"]
+
+  timeouts {
+    create = "75m"
+  }
+}
+
 resource "azurerm_virtual_machine_run_command" "install_windows_features" {
   name               = "${module.naming.names["virtual_machine_extension"].name}-${var.vm_jumpbox_win_name}-InstallWindowsFeatures"
   location           = var.location
   virtual_machine_id = azurerm_windows_virtual_machine.this.id
+  depends_on         = [azapi_resource_action.install_patches]
 
   source {
     script = file("${path.module}/scripts/Install-WindowsFeatures.ps1")

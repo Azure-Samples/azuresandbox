@@ -26,6 +26,10 @@ Enabling this module also causes the *vnet-app* module to install SQL Server Man
 
 The estimated provisioning time for this module is 10 minutes.
 
+Before any run command or VM extension touches *mssqlwin1*, Terraform installs pending Critical and Security Windows updates on it using the platform [installPatches](https://learn.microsoft.com/en-us/rest/api/compute/virtual-machines/install-patches) action and reboots it if required (patch → reboot → configure). This keeps an update-driven reboot from interrupting later configuration steps. Patching is best-effort: only an API error fails the apply, and the result is surfaced in the `patch_install_result` output. Automatic patching stays enabled. Patching adds time to provisioning that varies with the number of pending updates. Adding this step to an existing sandbox patches and may reboot *mssqlwin1* on the next apply.
+
+After a stop/deallocate, the `Set-MssqlStartupConfiguration` startup task rebuilds the temp disk volume, and if that requires a restart it restarts the VM and exits without starting SQL Server. SQL Server is started by the task on the following boot.
+
 ## Smoke testing
 
 This section describes how to test the module after deployment.
@@ -82,7 +86,7 @@ The module is organized as follows:
 |   ├── Configure-SqlLogin.ps1            # Creates SQL Server login for domain admin and adds it to sysadmin server role
 |   ├── Invoke-MssqlConfiguration.ps1     # Runs Set-MssqlConfiguration.ps1 as domain admin, then reboots the VM via a one-time task run as NT AUTHORITY\SYSTEM
 |   ├── Set-MssqlConfiguration.ps1        # Prepares data and log disks and configures SQL Server instance (runs as domain admin); registers the AtStartup task below to run as NT AUTHORITY\SYSTEM
-|   ├── Set-MssqlStartupConfiguration.ps1 # Re-configures the SQL Server tempdb folder after a VM stop/deallocate event; runs as NT AUTHORITY\SYSTEM (local-only work, reliable at boot)
+|   ├── Set-MssqlStartupConfiguration.ps1 # Re-configures the SQL Server tempdb folder after a VM stop/deallocate event and starts SQL Server (exits early if it restarts the VM); runs as NT AUTHORITY\SYSTEM (local-only work, reliable at boot)
 |   └── Test-VmMssqlWin.ps1               # Unit test script
 ├── compute.tf                            # Compute resource configurations
 ├── locals.tf                             # Local variables
@@ -133,6 +137,7 @@ This section lists the resources included in this module.
 
 Address | Name | Notes
 --- | --- | ---
+module.vm_mssql_win[0].azapi_resource_action.install_patches | | Installs Critical and Security updates on *mssqlwin1* (rebooting if required) after the data disks are attached and before any run command or extension runs on it.
 module.vm_mssql_win[0].azurerm_managed_disk.disks["sqldata"] | disk&#8209;sand&#8209;dev&#8209;vol_sqldata_M | The managed disk for SQL Server data. The format of the *vol_* portion is used by automation to locate SQL Server data files vs. log files and set the drive letter mapping.
 module.vm_mssql_win[0].azurerm_managed_disk.disks["sqllog"] | disk&#8209;sand&#8209;dev&#8209;vol_sqllog_L | The managed disk for SQL Server logs. The format of the *vol_* portion is used by automation to locate SQL Server data files vs. log files and set the drive letter mapping.
 module.vm_mssql_win[0].azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;mssqlwin1 | The network interface associated with the SQL Server VM. Configured with accelerated networking enabled for improved performance.
@@ -149,5 +154,6 @@ This section includes a list of output variables returned by the module.
 
 Name | Description
 --- | ---
+patch_install_result | The result of the *mssqlwin1* patch installation (status, rebootStatus, installed/failed/pending patch counts, maintenanceWindowExceeded).
 resource_ids | A map of resource IDs for key resources in the module.
 resource_names | A map of resource names for key resources in the module.
