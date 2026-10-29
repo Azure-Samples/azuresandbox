@@ -863,6 +863,7 @@ Trigger | `workflow_dispatch` | `pull_request_target` for a ready, same-reposito
 Environment | `sandbox-deployment` | `sandbox-release-gate`
 Source | Tip of `source_branch`: `main` (default) or `vnext` | Exact PR head SHA
 Stages | `run_through`: `preflight`, `apply` (default) or `unit-test` | All three
+Sandboxes | `sandbox_count`: 1 (default) to 20, deployed in parallel; above 1, `preflight` or `apply` only. See [Deploying Several Sandboxes](#deploying-several-sandboxes) | 1
 Base modules | Any, with `vnet_app` enabled | All six
 Static CI | Not run | Six static CI workflows must pass before approval is requested
 PR statuses | Not published | `release-static-ci` and `sandbox-deployment-gate`; see [Releasing to `main`](../../../CONTRIBUTING.md#releasing-to-main)
@@ -879,6 +880,41 @@ Things to know:
 * **One run at a time.** Runs share a concurrency group, and an active apply isn't cancelled.
 * **Private logs.** Raw logs and plans stay on the runner. The job summary shows the stage results, the deployed commit and the sandbox resource group name after a successful apply. When `preflight` or `apply` fails with a Terraform error, each `Error:` block is also shown in full, in red in the job log, as an error annotation and in a caution alert in the job summary. Everything the runner publishes (status messages, progress, errors, annotations, the job summary and the unit-test evidence artifact) is redacted the same way: Microsoft Entra ID ids (tenant, client and object ids) and subscription ids are redacted, along with any other GUID. All tag values are redacted, and so are tag names other than the `project`, `costcenter` and `environment` names in the root `tags` design. Resource names and other details are kept for troubleshooting.
 * **Retry.** **Re-run failed jobs** isn't supported for release PRs. Start a new manual run, or mark the release PR as a draft and ready again.
+
+###### Deploying Several Sandboxes
+
+For a class or hackathon, set `sandbox_count` on a manual run to deploy up to 20 identical sandboxes in parallel, with one approval. Each sandbox is independent, with its own deployment id `sandbox-<run id>-<n>`, state key `sandboxes/sandbox-<run id>-<n>/terraform.tfstate`, resource group and private records on the runner. All of them use the same `SANDBOX_TFVARS_HCL`. With a count of 1 the run works as described above, with deployment id `sandbox-<run id>`.
+
+How it works:
+
+* **Preflight or apply only.** The tests use host-wide network state on the runner, such as the Virtual WAN point-to-site test's VPN tunnel and routes, so `unit-test` needs a count of 1. Release PRs always deploy one sandbox.
+* **Parallel processes in one job.** The `preflight` step checks the Terraform version and downloads the providers once, into a cache shared by the run. It then runs each sandbox's preflight in its own process, from its own copy of the source (a git worktree), starting one every 10 seconds. The `apply` step then applies every sandbox. The `Report stage results` step removes the source copies and the provider cache.
+* **Failures.** If any sandbox fails preflight, no sandbox is applied. During apply, a failed sandbox doesn't stop the others, but the job fails. Each failed sandbox gets an error annotation.
+* **Reporting.** The job log shows each sandbox's status lines prefixed with its deployment id, and a run-wide heartbeat every 2 minutes. The job summary has a table of every sandbox's resource group and stage results, with a details section per sandbox, including any Terraform errors.
+* **Shared limits.** All sandboxes share the job's 180-minute timeout, the just-in-time grant and the deployment identity's [Azure Resource Manager request limits](https://learn.microsoft.com/azure/azure-resource-manager/management/request-limits-and-throttling). Throttled requests are retried, so a larger run takes longer than a single sandbox.
+
+Plan capacity before the event. Figures are per sandbox with all base modules; fewer modules need less.
+
+Resource | Per sandbox | Notes
+--- | --- | ---
+Runner memory | About 1.5 GB during plan and apply | The default `vm_jumpbox_linux_size`, `Standard_D2ls_v6` (4 GiB), suits 2 sandboxes. Before the event, set a larger size, for example 16 GiB for up to 8 sandboxes or 32 GiB for 20, and apply this configuration. Size it back down afterwards.
+Runner disk | Under 100 MB, plus a shared provider cache of about 730 MB per run | The default OS disk is enough.
+Regional vCPUs | 10: 2 each for `adds1`, `jumpwin1` and `jumplinux1`, and 4 for `mssqlwin1` | 200 for 20 sandboxes. Check *Total Regional vCPUs* and the VM family quotas under the subscription's *Usage + quotas*, and request an increase if needed.
+Public IP addresses | 2 Standard | For Azure Firewall and Bastion.
+Cost | Dominated by Azure Firewall, the Virtual WAN hub and point-to-site gateway, and Bastion | Billed hourly whether or not the sandbox is used. Disable modules the event doesn't need, such as `vwan`, and tear down promptly.
+
+The sandbox VMs keep running after the run, unless an Azure Policy in the subscription shuts them down.
+
+To tear down, delete each sandbox's resource group, listed in the job summary, and its state blob. Run this on `jumplinux2`, from this directory, signed in to Azure CLI with access to both:
+
+```bash
+RUN_ID=YOUR-RUN-ID-HERE
+COUNT=YOUR-SANDBOX-COUNT-HERE
+for rg in YOUR-RESOURCE-GROUP-NAMES-HERE; do az group delete --name "$rg" --yes --no-wait; done
+for n in $(seq 1 "$COUNT"); do ./scripts/delete-tfstate.sh --yes "sandboxes/sandbox-$RUN_ID-$n/terraform.tfstate"; done
+```
+
+With `mssql` enabled, also delete each sandbox's `grp-sql-admins-*` Microsoft Entra group. The group name ends with the same suffix as the sandbox's resource group.
 
 ##### Terraform State
 
