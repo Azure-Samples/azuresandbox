@@ -71,6 +71,43 @@ function Write-TestResult {
     Write-Log ("[MODULE:$module] [$status] $msg")
 }
 
+# In the Sandbox workflow's OIDC mode, Connect-SandboxRunner.ps1 defines Update-SandboxOidcSession. The GitHub ID
+# token it signed in with expires after 5 minutes, so a token request for a new audience can fail later. Sign in
+# again at most once per run. Elsewhere the function doesn't exist and failures are returned unchanged.
+function Request-OidcRenewal {
+    param([string]$Message)
+    if ($script:oidcRenewed -or $Message -notmatch 'ClientAssertionCredential|AADSTS700024|client assertion' -or
+        -not (Get-Command Update-SandboxOidcSession -ErrorAction Ignore)) {
+        return $false
+    }
+    $script:oidcRenewed = $true
+    Write-Host "$(Get-Date -Format FileDateTimeUniversal) : OIDC client assertion expired. Signing in again with a new GitHub ID token and retrying once."
+    Update-SandboxOidcSession | Out-Null
+    return $true
+}
+
+function Invoke-WithOidcRenewal {
+    param([Parameter(Mandatory = $true)][scriptblock]$Operation)
+    try { & $Operation }
+    catch {
+        if (-not (Request-OidcRenewal "$_")) { throw }
+        & $Operation
+    }
+}
+
+# Runs Azure CLI and returns its exit code, standard output and standard error, so callers can check the result.
+function Invoke-AzCli {
+    param([Parameter(Mandatory = $true)][string[]]$Arguments)
+    while ($true) {
+        $errorLines = [System.Collections.Generic.List[string]]::new()
+        $outputLines = az @Arguments 2>&1 | ForEach-Object {
+            if ($_ -is [System.Management.Automation.ErrorRecord]) { $errorLines.Add("$_") } else { "$_" }
+        }
+        $result = [pscustomobject]@{ ExitCode = $LASTEXITCODE; Output = ($outputLines -join "`n"); Error = ($errorLines -join "`n") }
+        if ($result.ExitCode -eq 0 -or -not (Request-OidcRenewal $result.Error)) { return $result }
+    }
+}
+
 function Test-TcpPort {
     param(
         [string]$HostName,
@@ -233,6 +270,7 @@ $ovpnLogPath = Join-Path $tempDir 'openvpn.log'
 $ovpnPidPath = Join-Path $tempDir 'openvpn.pid'
 
 $vpnStarted = $false
+$oidcRenewed = $false
 
 try {
     # ========================================
@@ -273,12 +311,30 @@ try {
     # by an org-level (management group) modify-effect Azure Policy, so it is not solely under this
     # repo's control — read and restore the pre-existing values instead of assuming/hardcoding
     # 'Disabled'/'Deny', in case the policy (or another actor) has since changed the baseline.
-    $originalKeyVaultAccess = az keyvault show --name $KeyVaultName --resource-group $ResourceGroupName --query "{publicNetworkAccess: properties.publicNetworkAccess, defaultAction: properties.networkAcls.defaultAction}" --only-show-errors -o json | ConvertFrom-Json
+    $keyVaultArguments = @('--name', $KeyVaultName, '--resource-group', $ResourceGroupName, '--only-show-errors')
+    $keyVaultShow = Invoke-AzCli (@('keyvault', 'show') + $keyVaultArguments + @('--query', '{publicNetworkAccess: properties.publicNetworkAccess, defaultAction: properties.networkAcls.defaultAction}', '-o', 'json'))
+    $originalKeyVaultAccess = $null
+    if ($keyVaultShow.ExitCode -eq 0 -and $keyVaultShow.Output) {
+        try { $originalKeyVaultAccess = $keyVaultShow.Output | ConvertFrom-Json } catch { $originalKeyVaultAccess = $null }
+    }
+    # Without the prior values the vault can't be restored, so don't change it.
+    if (-not $originalKeyVaultAccess.publicNetworkAccess -or -not $originalKeyVaultAccess.defaultAction) {
+        Write-TestResult $moduleName 'FAIL' "P2S VPN: Failed to read Key Vault network access: $($keyVaultShow.Error)" -SanitizedMessage 'P2S VPN: Failed to read Key Vault network access: <value>'
+        $failed++
+        throw 'Key Vault network access could not be read'
+    }
     Write-Log "Key Vault '$KeyVaultName' current network access before change: publicNetworkAccess='$($originalKeyVaultAccess.publicNetworkAccess)', networkAcls.defaultAction='$($originalKeyVaultAccess.defaultAction)'"
 
     Write-Log "Enabling public network access on Key Vault '$KeyVaultName'..."
-    az keyvault update --name $KeyVaultName --resource-group $ResourceGroupName --public-network-access Enabled --default-action Allow --only-show-errors | Out-Null
     try {
+        # Restore even if this fails, because the update may have been partly applied.
+        $keyVaultEnable = Invoke-AzCli (@('keyvault', 'update') + $keyVaultArguments + @('--public-network-access', 'Enabled', '--default-action', 'Allow'))
+        if ($keyVaultEnable.ExitCode -ne 0) {
+            Write-TestResult $moduleName 'FAIL' "P2S VPN: Failed to enable Key Vault public network access: $($keyVaultEnable.Error)" -SanitizedMessage 'P2S VPN: Failed to enable Key Vault public network access: <value>'
+            $failed++
+            throw 'Key Vault network access could not be enabled'
+        }
+
         # A short retry/backoff is still kept as a safety net for any residual ARM-to-data-plane
         # propagation lag, but the primary fix is the --default-action Allow above.
         $maxAttempts = 5
@@ -286,7 +342,7 @@ try {
         $clientKeyPem = $null
         for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
             try {
-                $clientKeyPem = (Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name 'p2svpn-client-private-key-pem' -AsPlainText -ErrorAction Stop)
+                $clientKeyPem = Invoke-WithOidcRenewal { Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name 'p2svpn-client-private-key-pem' -AsPlainText -ErrorAction Stop }
                 break
             }
             catch {
@@ -300,7 +356,20 @@ try {
     }
     finally {
         Write-Log "Restoring Key Vault '$KeyVaultName' network access to its prior state: publicNetworkAccess='$($originalKeyVaultAccess.publicNetworkAccess)', networkAcls.defaultAction='$($originalKeyVaultAccess.defaultAction)'..."
-        az keyvault update --name $KeyVaultName --resource-group $ResourceGroupName --public-network-access $originalKeyVaultAccess.publicNetworkAccess --default-action $originalKeyVaultAccess.defaultAction --only-show-errors | Out-Null
+        $restoreArguments = @('keyvault', 'update') + $keyVaultArguments + @('--public-network-access', $originalKeyVaultAccess.publicNetworkAccess, '--default-action', $originalKeyVaultAccess.defaultAction)
+        $restoreAttempts = 3
+        for ($attempt = 1; $attempt -le $restoreAttempts; $attempt++) {
+            # Don't let an exception here hide the original error or skip the failed check below.
+            try { $keyVaultRestore = Invoke-AzCli $restoreArguments }
+            catch { $keyVaultRestore = [pscustomobject]@{ ExitCode = 1; Output = ''; Error = "$_" } }
+            if ($keyVaultRestore.ExitCode -eq 0) { break }
+            Write-Log "Attempt $attempt/$restoreAttempts to restore Key Vault network access failed: $($keyVaultRestore.Error)"
+            if ($attempt -lt $restoreAttempts) { Start-Sleep -Seconds 10 }
+        }
+        if ($keyVaultRestore.ExitCode -ne 0) {
+            Write-TestResult $moduleName 'FAIL' "P2S VPN: Failed to restore Key Vault network access; public access may still be enabled: $($keyVaultRestore.Error)" -SanitizedMessage 'P2S VPN: Failed to restore Key Vault network access; public access may still be enabled'
+            $failed++
+        }
     }
 
     # Write cert files (join array output with newlines — PowerShell captures multi-line output as string arrays)
@@ -835,7 +904,7 @@ key $clientKeyPath
     }
 }
 catch {
-    if ($_.Exception.Message -notmatch 'VPN tunnel establishment timed out|Terraform output|P2S VPN gateway not found|VPN profile generation failed|VPN config not found') {
+    if ($_.Exception.Message -notmatch 'VPN tunnel establishment timed out|Terraform output|P2S VPN gateway not found|VPN profile generation failed|VPN config not found|Key Vault network access could not be') {
         Write-TestResult $moduleName 'FAIL' "P2S VPN: Unexpected exception: $_" -SanitizedMessage 'P2S VPN: Unexpected exception: <value>'
         $failed++
     }
