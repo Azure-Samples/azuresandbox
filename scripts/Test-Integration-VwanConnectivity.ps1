@@ -307,23 +307,26 @@ try {
     # networkAcls.defaultAction independently controls whether traffic is allowed, and it stays
     # 'Deny' (blocking all non-Azure-service callers) unless explicitly set to 'Allow'. Both must
     # be flipped together, otherwise every secret read fails with 'Forbidden' regardless of how
-    # long you wait for propagation. In this environment, defaultAction is enforced back to 'Deny'
-    # by an org-level (management group) modify-effect Azure Policy, so it is not solely under this
-    # repo's control — read and restore the pre-existing values instead of assuming/hardcoding
-    # 'Disabled'/'Deny', in case the policy (or another actor) has since changed the baseline.
+    # long you wait for propagation. The sandbox doesn't set network rules on the vault, but an
+    # org-level modify-effect Azure Policy can set defaultAction to 'Deny', so read and restore the
+    # pre-existing values instead of assuming/hardcoding them. A vault with no network rules
+    # returns networkAcls = null: Azure reports defaultAction 'Allow' with no rules as null, so a
+    # null defaultAction is restored as 'Allow', which reads back as null again.
     $keyVaultArguments = @('--name', $KeyVaultName, '--resource-group', $ResourceGroupName, '--only-show-errors')
     $keyVaultShow = Invoke-AzCli (@('keyvault', 'show') + $keyVaultArguments + @('--query', '{publicNetworkAccess: properties.publicNetworkAccess, defaultAction: properties.networkAcls.defaultAction}', '-o', 'json'))
     $originalKeyVaultAccess = $null
     if ($keyVaultShow.ExitCode -eq 0 -and $keyVaultShow.Output) {
         try { $originalKeyVaultAccess = $keyVaultShow.Output | ConvertFrom-Json } catch { $originalKeyVaultAccess = $null }
     }
-    # Without the prior values the vault can't be restored, so don't change it.
-    if (-not $originalKeyVaultAccess.publicNetworkAccess -or -not $originalKeyVaultAccess.defaultAction) {
-        Write-TestResult $moduleName 'FAIL' "P2S VPN: Failed to read Key Vault network access: $($keyVaultShow.Error)" -SanitizedMessage 'P2S VPN: Failed to read Key Vault network access: <value>'
+    # Without the prior publicNetworkAccess value the vault can't be restored, so don't change it.
+    if (-not $originalKeyVaultAccess.publicNetworkAccess) {
+        $keyVaultShowDetail = if ($keyVaultShow.Error) { $keyVaultShow.Error } else { "exit code $($keyVaultShow.ExitCode), output: $($keyVaultShow.Output)" }
+        Write-TestResult $moduleName 'FAIL' "P2S VPN: Failed to read Key Vault network access: $keyVaultShowDetail" -SanitizedMessage 'P2S VPN: Failed to read Key Vault network access: <value>'
         $failed++
         throw 'Key Vault network access could not be read'
     }
-    Write-Log "Key Vault '$KeyVaultName' current network access before change: publicNetworkAccess='$($originalKeyVaultAccess.publicNetworkAccess)', networkAcls.defaultAction='$($originalKeyVaultAccess.defaultAction)'"
+    $originalDefaultAction = if ($originalKeyVaultAccess.defaultAction) { $originalKeyVaultAccess.defaultAction } else { 'Allow' }
+    Write-Log "Key Vault '$KeyVaultName' current network access before change: publicNetworkAccess='$($originalKeyVaultAccess.publicNetworkAccess)', networkAcls.defaultAction='$($originalKeyVaultAccess.defaultAction)' (restore as '$originalDefaultAction')"
 
     Write-Log "Enabling public network access on Key Vault '$KeyVaultName'..."
     try {
@@ -355,8 +358,8 @@ try {
         }
     }
     finally {
-        Write-Log "Restoring Key Vault '$KeyVaultName' network access to its prior state: publicNetworkAccess='$($originalKeyVaultAccess.publicNetworkAccess)', networkAcls.defaultAction='$($originalKeyVaultAccess.defaultAction)'..."
-        $restoreArguments = @('keyvault', 'update') + $keyVaultArguments + @('--public-network-access', $originalKeyVaultAccess.publicNetworkAccess, '--default-action', $originalKeyVaultAccess.defaultAction)
+        Write-Log "Restoring Key Vault '$KeyVaultName' network access to its prior state: publicNetworkAccess='$($originalKeyVaultAccess.publicNetworkAccess)', networkAcls.defaultAction='$originalDefaultAction'..."
+        $restoreArguments = @('keyvault', 'update') + $keyVaultArguments + @('--public-network-access', $originalKeyVaultAccess.publicNetworkAccess, '--default-action', $originalDefaultAction)
         $restoreAttempts = 3
         for ($attempt = 1; $attempt -le $restoreAttempts; $attempt++) {
             # Don't let an exception here hide the original error or skip the failed check below.
