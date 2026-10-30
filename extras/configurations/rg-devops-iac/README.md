@@ -549,6 +549,7 @@ This section describes the [Sandbox deployment workflow](../../../.github/workfl
 * [Just-in-Time Deployment Roles](#just-in-time-deployment-roles)
 * [Runner Power State Identity](#runner-power-state-identity)
 * [Sandbox Deployment Workflow](#sandbox-deployment-workflow)
+* [Runner Records](#runner-records)
 * [Terraform State](#terraform-state)
 * [Operator Access](#operator-access)
 * [Security Considerations](#security-considerations)
@@ -679,6 +680,7 @@ Setting | Type | Value | Modes
 --- | --- | --- | ---
 `SANDBOX_AUTH_MODE` | Repository variable | `managed_identity` or `oidc`. Must match `auth_mode` in `SANDBOX_TFVARS_HCL`. Runs fail without it. | Both
 `SANDBOX_JIT_MIN_REMAINING_MINUTES` | Repository or environment variable, optional | Minutes that must remain on the grant at preflight. Default `150`, range `0`-`1440`; `0` skips the check. | Both
+`SANDBOX_RETAINED_DEPLOYMENTS` | Repository or environment variable, optional | Previous runs whose private records stay on the runner, besides the current run. Default `3`, range `1`-`10`. Preflight purges older runs' records and state blobs; see [Runner Records](#runner-records). | Both
 `SANDBOX_BACKEND_HCL` | Secret in `sandbox-deployment` and `sandbox-release-gate` | Azure Sandbox `backend.tf`, as below | Both
 `SANDBOX_TFVARS_HCL` | Secret in `sandbox-deployment` and `sandbox-release-gate` | Azure Sandbox `terraform.tfvars`, as below | Both
 `RUNNER_POWER_STATE_CLIENT_ID`, `AZURE_TENANT_ID`, `RUNNER_VM_ID` | Secrets in `sandbox-runner-power-state` | See [Runner Power State Identity](#runner-power-state-identity) | `oidc`
@@ -871,7 +873,7 @@ PR statuses | Not published | `release-static-ci` and `sandbox-deployment-gate`;
 
 Stage | What it does
 --- | ---
-`preflight` | Confirms the trusted `main` workflow context and `jumplinux2`. Checks the backend and tfvars secrets, that `auth_mode` matches `SANDBOX_AUTH_MODE`, the module scope, and that the run's state key is unused. Installs a Terraform version that satisfies the deployed `required_version` if the runner's doesn't. Signs in as the deployment identity and waits for the time-bound roles.
+`preflight` | Confirms the trusted `main` workflow context and `jumplinux2`. Checks the backend and tfvars secrets, that `auth_mode` matches `SANDBOX_AUTH_MODE`, the module scope, and that the run's state key is unused. Installs a Terraform version that satisfies the deployed `required_version` if the runner's doesn't. Purges runs older than `SANDBOX_RETAINED_DEPLOYMENTS` from the runner and the state backend. Signs in as the deployment identity and waits for the time-bound roles.
 `apply` | Rechecks the roles, then applies the saved plan from preflight.
 `unit-test` | Rechecks the roles, starts every sandbox VM, runs the unit and integration tests, and publishes the full JSON results, redacted the same way as the job log, as a workflow artifact, pass or fail.
 
@@ -880,6 +882,7 @@ Things to know:
 * **New sandboxes only.** Each run uses its own state key, `sandboxes/<deployment id>/terraform.tfstate`. The workflow never updates, recovers or destroys a sandbox. Tear down manually.
 * **One run at a time.** Runs share a concurrency group, and an active apply isn't cancelled.
 * **Private logs.** Raw logs and plans stay on the runner. The job summary shows the stage results, the deployed commit and the sandbox resource group name after a successful apply. When `preflight` or `apply` fails with a Terraform error, each `Error:` block is also shown in full, in red in the job log, as an error annotation and in a caution alert in the job summary. Everything the runner publishes (status messages, progress, errors, annotations, the job summary and the unit-test evidence artifact) is redacted the same way: Microsoft Entra ID ids (tenant, client and object ids) and subscription ids are redacted, along with any other GUID. All tag values are redacted, and so are tag names other than the `project`, `costcenter` and `environment` names in the root `tags` design. Resource names and other details are kept for troubleshooting.
+* **Runner records.** Older runs are purged at preflight; see [Runner Records](#runner-records).
 * **Retry.** **Re-run failed jobs** isn't supported for release PRs. Start a new manual run, or mark the release PR as a draft and ready again.
 
 ###### Deploying Several Sandboxes
@@ -889,7 +892,7 @@ For a class or hackathon, set `sandbox_count` on a manual run to deploy up to 20
 How it works:
 
 * **Preflight or apply only.** The tests use host-wide network state on the runner, such as the Virtual WAN point-to-site test's VPN tunnel and routes, so `unit-test` needs a count of 1. Release PRs always deploy one sandbox.
-* **Parallel processes in one job.** The `preflight` step checks the Terraform version and downloads the providers once, into a cache shared by the run. It then runs each sandbox's preflight in its own process, from its own copy of the source (a git worktree), starting one every 10 seconds. The `apply` step then applies every sandbox. The `Report stage results` step removes the source copies and the provider cache.
+* **Parallel processes in one job.** The `preflight` step checks the Terraform version and downloads the providers once, into a cache shared by the run. It then runs each sandbox's preflight in its own process, from its own copy of the source (a git worktree), starting one every 10 seconds. The `apply` step then applies every sandbox. The `Report stage results` step removes the source copies and the provider cache. A single-sandbox run uses the same kind of provider cache.
 * **Failures.** If any sandbox fails preflight, no sandbox is applied. During apply, a failed sandbox doesn't stop the others, but the job fails. Each failed sandbox gets an error annotation.
 * **Reporting.** The job log shows each sandbox's status lines prefixed with its deployment id, and a run-wide heartbeat every 2 minutes. The job summary has a table of every sandbox's resource group and stage results, with a details section per sandbox, including any Terraform errors.
 * **Shared limits.** All sandboxes share the job's 180-minute timeout, the just-in-time grant and the deployment identity's [Azure Resource Manager request limits](https://learn.microsoft.com/azure/azure-resource-manager/management/request-limits-and-throttling). Throttled requests are retried, so a larger run takes longer than a single sandbox.
@@ -900,7 +903,7 @@ Resource | Per sandbox | Notes
 --- | --- | ---
 Runner memory | Up to 1.5 GB during plan and apply | The runner itself uses about 1 GB. A measured run with `vnet_app` and `mssql` used about 0.9 GB per sandbox, rising slowly during apply.
 Runner CPU | About 1 vCPU during preflight | `terraform init` and `plan` keep the CPU busy for about 5 minutes. Apply mostly waits on Azure and uses under 10%. Fewer vCPUs than sandboxes only slows preflight.
-Runner disk | About 40 MB kept per sandbox, plus a provider cache of about 730 MB removed at the end of the run | The default 30 GB Standard SSD is enough. Its bandwidth peaks briefly while the cache fills, which only slows preflight.
+Runner disk | About 40 MB kept per sandbox, plus a provider cache of about 730 MB removed at the end of the run. Records of runs older than `SANDBOX_RETAINED_DEPLOYMENTS` are purged at preflight | The default 30 GB Standard SSD is enough. Its bandwidth peaks briefly while the cache fills, which only slows preflight.
 Regional vCPUs | 10: 2 each for `adds1`, `jumpwin1` and `jumplinux1`, and 4 for `mssqlwin1` | 200 for 20 sandboxes. Check *Total Regional vCPUs* and the VM family quotas under the subscription's *Usage + quotas*, and request an increase if needed.
 Public IP addresses | 2 Standard | For Azure Firewall and Bastion.
 Cost | Dominated by Azure Firewall, the Virtual WAN hub and point-to-site gateway, and Bastion | Billed hourly whether or not the sandbox is used. Disable modules the event doesn't need, such as `vwan`, and tear down promptly.
@@ -915,7 +918,7 @@ Up to 20 | `Standard_D8s_v6` (8 vCPUs, 32 GiB)
 
 The sandbox VMs keep running after the run, unless an Azure Policy in the subscription shuts them down.
 
-To tear down, delete each sandbox's resource group, listed in the job summary, and its state blob. Run this on `jumplinux2`, from this directory, signed in to Azure CLI with access to both:
+To tear down, delete each sandbox's resource group, listed in the job summary, and its state blob. Once the run is older than `SANDBOX_RETAINED_DEPLOYMENTS` allows, preflight has already deleted its state blobs; only the resource groups remain. Run this on `jumplinux2`, from this directory, signed in to Azure CLI with access to both:
 
 ```bash
 RUN_ID=YOUR-RUN-ID-HERE
@@ -925,6 +928,25 @@ for n in $(seq 1 "$COUNT"); do ./scripts/delete-tfstate.sh --yes "sandboxes/sand
 ```
 
 With `mssql` enabled, also delete each sandbox's `grp-sql-admins-*` Microsoft Entra group. The group name ends with the same suffix as the sandbox's resource group.
+
+##### Runner Records
+
+Each deployment's private records (logs, plan, receipts and Terraform data) stay on `jumplinux2` in `~/.local/state/azuresandbox/deployments/<deployment id>/`. Terraform data links each provider to a per-run cache of about 730 MB, which the `Report stage results` step removes, so a deployment keeps about 40 MB. A run cancelled before that step leaves its cache behind until the run is purged.
+
+At preflight, the runner keeps the current run plus the `SANDBOX_RETAINED_DEPLOYMENTS` most recent previous runs (default `3`, range `1`-`10`), ordered by run id, and purges every older run:
+
+* A run is purged as a whole, including every sandbox of a multi-sandbox run.
+* Each purged deployment's state blob, `sandboxes/<deployment id>/terraform.tfstate`, is deleted from the backend first, breaking any leftover state lock. Only then are its records deleted, so a failure leaves them to retry on the next run. The `tfstate` container has no versioning or soft delete, so this is permanent.
+* Purging doesn't touch Azure resources. A sandbox that wasn't torn down keeps running; delete its resource group as described in [Deploying Several Sandboxes](#deploying-several-sandboxes).
+* Deployments recorded against another storage account or container are purged from the runner only, and reported, so their state blobs can be deleted manually with `delete-tfstate.sh`.
+* Entries in the folder that aren't deployment records are left in place, and reported.
+* Any error fails preflight.
+
+Preflight reports the result in the job log and the job summary, for example:
+
+```text
+preflight: runner records: kept the current run and 3 previous runs (SANDBOX_RETAINED_DEPLOYMENTS = 3); purged 2 runs: 3 deployments, 2 state blobs deleted, 2.3 GB freed.
+```
 
 ##### Terraform State
 

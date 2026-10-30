@@ -412,6 +412,138 @@ function Confirm-SandboxTerraformVersion {
     Write-SandboxSummary "## Terraform`n`nrequired_version: ``$constraint``; runner Terraform ``$installed`` was incompatible, installed ``$current``.`n`n"
 }
 
+function Get-SandboxBackend {
+    # Parses and checks SANDBOX_BACKEND_HCL. Each run sets its own state key, so the secret must not set one.
+    $backendText = $env:SANDBOX_BACKEND_HCL
+    if ([string]::IsNullOrWhiteSpace($backendText)) { Stop-SandboxStage 'Both environment HCL secrets are required.' }
+    $backend = @{}
+    foreach ($name in @('tenant_id', 'subscription_id', 'storage_account_name', 'container_name')) {
+        $backendMatches = [regex]::Matches($backendText, "(?m)^\s*$name\s*=\s*`"([^`"\n]+)`"\s*(?:#.*)?$")
+        if ($backendMatches.Count -ne 1) { Stop-SandboxStage "Backend requires exactly one literal $name." }
+        $backend[$name] = $backendMatches[0].Groups[1].Value
+    }
+    foreach ($name in @('use_msi', 'use_azuread_auth')) {
+        if (-not [regex]::IsMatch($backendText, "(?m)^\s*$name\s*=\s*true\s*(?:#.*)?$")) {
+            Stop-SandboxStage "Backend requires $name = true."
+        }
+    }
+    if ([regex]::IsMatch($backendText, '(?m)^\s*(key|client_id|access_key|sas_token|client_secret)\s*=')) {
+        Stop-SandboxStage 'Backend must omit fixed keys and authentication credentials.'
+    }
+    $backend
+}
+
+function Get-SandboxDirectorySize {
+    # Doesn't follow symbolic links, such as provider links into a run's shared cache.
+    param([string]$Path)
+    $options = [System.IO.EnumerationOptions]::new()
+    $options.RecurseSubdirectories = $true
+    $options.IgnoreInaccessible = $true
+    $options.AttributesToSkip = [System.IO.FileAttributes]::ReparsePoint
+    $size = 0L
+    foreach ($file in [System.IO.DirectoryInfo]::new($Path).EnumerateFiles('*', $options)) { $size += $file.Length }
+    $size
+}
+
+function Format-SandboxSize {
+    param([long]$Bytes)
+    if ($Bytes -ge 1GB) { return '{0:0.0} GB' -f ($Bytes / 1GB) }
+    '{0:0} MB' -f ($Bytes / 1MB)
+}
+
+# Keeps the private records of the current run and of the SANDBOX_RETAINED_DEPLOYMENTS most recent previous runs on
+# the runner, and purges older runs: first each deployment's state blob, then its records. A run is a unit: the
+# records of every sandbox of a multi-sandbox run are kept or purged together. Runs share one concurrency group, so no
+# other run is using the records or state. Requires the Azure CLI to be signed in as the runner's identity.
+function Invoke-SandboxGarbageCollection {
+    param([System.Collections.IDictionary]$Backend)
+    $retainText = if ($env:SANDBOX_RETAINED_DEPLOYMENTS) { $env:SANDBOX_RETAINED_DEPLOYMENTS } else { '3' }
+    if ($retainText -cnotmatch '^([1-9]|10)$') {
+        Stop-SandboxStage 'SANDBOX_RETAINED_DEPLOYMENTS must be a whole number of previous runs from 1 to 10.'
+    }
+    $retain = [int]$retainText
+    $root = Join-Path $HOME '.local/state/azuresandbox/deployments'
+    $runs = @{}
+    $unrecognized = 0
+    foreach ($entry in [System.IO.DirectoryInfo]::new($root).EnumerateFileSystemInfos()) {
+        $match = [regex]::Match($entry.Name, '^sandbox-([1-9][0-9]{0,18})(?:-([1-9]|1[0-9]|20))?$')
+        if (-not $match.Success -or $entry -isnot [System.IO.DirectoryInfo] -or $entry.LinkTarget) { $unrecognized++; continue }
+        $runId = [long]$match.Groups[1].Value
+        if ($runId -eq [long]$script:runId) { continue }
+        if (-not $runs.ContainsKey($runId)) { $runs[$runId] = [System.Collections.Generic.List[string]]::new() }
+        $runs[$runId].Add($entry.FullName)
+    }
+    $previous = @($runs.Keys | Sort-Object -Descending)
+    $kept = [Math]::Min($retain, $previous.Count)
+    $purge = @($previous | Select-Object -Skip $retain)
+    $result = [ordered]@{ Deployments = 0; Blobs = 0; Leases = 0; OtherBackend = 0; Bytes = 0L }
+    if ($purge.Count -gt 0) {
+        # One listing finds every deployment's state blob and lease.
+        $listing = Get-SandboxOutput -Name 'state-blobs.json' -Arguments @(
+            'az', 'storage', 'blob', 'list', '--auth-mode', 'login',
+            '--account-name', $Backend.storage_account_name, '--container-name', $Backend.container_name,
+            '--prefix', 'sandboxes/sandbox-', '--num-results', '*',
+            '--query', '[].{name:name, lease:properties.lease.status}', '--output', 'json'
+        ) | ConvertFrom-Json -AsHashtable -NoEnumerate
+        if ($listing -isnot [System.Collections.IList]) { Stop-SandboxStage 'Storage did not return a valid state-blob listing.' }
+        $blobs = @{}
+        foreach ($blob in $listing) { $blobs[[string]$blob['name']] = [string]$blob['lease'] }
+    }
+    try {
+        foreach ($path in @($purge | ForEach-Object { $runs[$_] })) {
+            $id = [System.IO.Path]::GetFileName($path)
+            $key = "sandboxes/$id/terraform.tfstate"
+            # The manifest records the backend when preflight gets far enough to use the state key; without it, no
+            # state blob was created.
+            $manifestPath = Join-Path $path 'deployment.json'
+            if ([System.IO.File]::Exists($manifestPath)) {
+                $manifest = Read-SandboxJson $manifestPath
+                $recorded = $manifest['backend']
+                if ($recorded -isnot [System.Collections.IDictionary] -or
+                    $recorded['storage_account_name'] -cne $Backend.storage_account_name -or
+                    $recorded['container_name'] -cne $Backend.container_name) {
+                    $result.OtherBackend++
+                }
+                elseif ($blobs.ContainsKey($key)) {
+                    $target = @('--account-name', $Backend.storage_account_name, '--container-name', $Backend.container_name)
+                    # An interrupted run can leave Terraform's state lock (a blob lease) held, which blocks the delete.
+                    if ($blobs[$key] -ceq 'locked') {
+                        Invoke-SandboxCommand (@('az', 'storage', 'blob', 'lease', 'break', '--auth-mode', 'login') + $target +
+                            @('--blob-name', $key, '--lease-break-period', '0', '--output', 'none'))
+                        $result.Leases++
+                    }
+                    Invoke-SandboxCommand (@('az', 'storage', 'blob', 'delete', '--auth-mode', 'login') + $target +
+                        @('--name', $key, '--delete-snapshots', 'include', '--output', 'none'))
+                    $result.Blobs++
+                }
+            }
+            # Records go after the state blob, so a failed delete leaves them to retry on the next run.
+            $result.Bytes += Get-SandboxDirectorySize $path
+            Write-SandboxLog "`nPurging runner records: $path`n"
+            [System.IO.Directory]::Delete($path, $true)
+            $result.Deployments++
+        }
+    }
+    catch {
+        Write-SandboxLog "$($_ | Out-String)`n$($_.ScriptStackTrace)`n"
+        Write-SandboxStatus "preflight: runner records: cleanup failed after purging $($result.Deployments) deployment(s); see the private stage log."
+        Stop-SandboxStage 'Could not purge the records or state blob of an old run; see the private stage log.'
+    }
+    # Drops the worktree metadata of purged multi-sandbox source trees.
+    if ($purge.Count -gt 0) { $null = Invoke-SandboxCommand @('git', 'worktree', 'prune') -AllowFailure }
+    $keptText = "the current run and $kept previous run$(if ($kept -ne 1) { 's' }) (SANDBOX_RETAINED_DEPLOYMENTS = $retain)"
+    $purged = if ($purge.Count -eq 0) { 'nothing to purge' } else {
+        "purged $($purge.Count) run$(if ($purge.Count -ne 1) { 's' }): $($result.Deployments) deployment$(if ($result.Deployments -ne 1) { 's' }), " +
+        "$($result.Blobs) state blob$(if ($result.Blobs -ne 1) { 's' }) deleted$(if ($result.Leases) { " ($($result.Leases) lease$(if ($result.Leases -ne 1) { 's' }) broken)" }), " +
+        "$(Format-SandboxSize $result.Bytes) freed"
+    }
+    $notes = ''
+    if ($result.OtherBackend) { $notes += " $($result.OtherBackend) purged deployment(s) used another state backend; delete those state blobs manually." }
+    if ($unrecognized) { $notes += " $unrecognized unrecognized entr$(if ($unrecognized -ne 1) { 'ies' } else { 'y' }) left in place." }
+    Write-SandboxStatus "preflight: runner records: kept $keptText; $purged.$notes"
+    Write-SandboxSummary "## Runner records`n`nKept $keptText; $purged.$notes`n`n"
+}
+
 function Confirm-SandboxInvocation {
     if ($env:GITHUB_REF -cne 'refs/heads/main') { Stop-SandboxStage 'Run the registered workflow in the trusted main context.' }
     if ($env:GITHUB_EVENT_NAME -ceq 'workflow_dispatch') { return }
@@ -464,35 +596,23 @@ function Invoke-SandboxPreflight {
     if ([string]::IsNullOrWhiteSpace($env:SANDBOX_BACKEND_HCL) -or [string]::IsNullOrWhiteSpace($env:SANDBOX_TFVARS_HCL)) {
         Stop-SandboxStage 'Both environment HCL secrets are required.'
     }
-    $backendText = $env:SANDBOX_BACKEND_HCL
     foreach ($name in @('backend.tf', 'terraform.tfvars')) {
-        $text = if ($name -eq 'backend.tf') { $backendText } else { $env:SANDBOX_TFVARS_HCL }
+        $text = if ($name -eq 'backend.tf') { $env:SANDBOX_BACKEND_HCL } else { $env:SANDBOX_TFVARS_HCL }
         $path = Join-Path $script:root $name
         [System.IO.File]::WriteAllText($path, $text, $script:utf8)
         [System.IO.File]::SetUnixFileMode($path, [System.IO.UnixFileMode]384)
         [System.IO.File]::Copy($path, (Join-Path $script:directory $name), $false)
     }
-    $backend = @{}
-    foreach ($name in @('tenant_id', 'subscription_id', 'storage_account_name', 'container_name')) {
-        $backendMatches = [regex]::Matches($backendText, "(?m)^\s*$name\s*=\s*`"([^`"\n]+)`"\s*(?:#.*)?$")
-        if ($backendMatches.Count -ne 1) { Stop-SandboxStage "Backend requires exactly one literal $name." }
-        $backend[$name] = $backendMatches[0].Groups[1].Value
-    }
-    foreach ($name in @('use_msi', 'use_azuread_auth')) {
-        if (-not [regex]::IsMatch($backendText, "(?m)^\s*$name\s*=\s*true\s*(?:#.*)?$")) {
-            Stop-SandboxStage "Backend requires $name = true."
-        }
-    }
-    if ([regex]::IsMatch($backendText, '(?m)^\s*(key|client_id|access_key|sas_token|client_secret)\s*=')) {
-        Stop-SandboxStage 'Backend must omit fixed keys and authentication credentials.'
-    }
+    $backend = Get-SandboxBackend
     $script:childEnvironment['ARM_TENANT_ID'] = $backend.tenant_id
     Write-SandboxSummary "## Sandbox target`n`nDeployment: ``$script:deploymentId```n`nState key: ``$script:key```n`n[Originating run]($script:runBase$script:runId) / [Current run]($script:runBase$script:runId)`n`n"
     Invoke-SandboxCommand @('git', '--version')
-    # In a multi-sandbox run the parent checks the shared Terraform CLI once, before starting the sandboxes.
+    # In a multi-sandbox run the parent checks the shared Terraform CLI and cleans up old runs once, before starting
+    # the sandboxes.
     if (-not $Instance) { Confirm-SandboxTerraformVersion }
     Invoke-SandboxCommand @('az', 'version')
     Invoke-SandboxCommand @('az', 'login', '--identity', '--allow-no-subscriptions', '--output', 'none')
+    if (-not $Instance) { Invoke-SandboxGarbageCollection $backend }
     $exists = Get-SandboxOutput @(
         'az', 'storage', 'blob', 'exists', '--auth-mode', 'login',
         '--account-name', $backend.storage_account_name, '--container-name', $backend.container_name,
@@ -506,6 +626,8 @@ function Invoke-SandboxPreflight {
         Stop-SandboxStage 'Deployment receipt does not match the selected backend.'
     }
     Write-SandboxJson $manifestPath $manifest
+    # A multi-sandbox parent creates the run's provider cache before starting the sandboxes.
+    if (-not $Instance) { $null = [System.IO.Directory]::CreateDirectory($script:childEnvironment['TF_PLUGIN_CACHE_DIR']) }
     Invoke-SandboxCommand @('terraform', 'init', '-input=false', "-backend-config=key=$script:key")
     Invoke-SandboxCommand @('terraform', 'validate', '-no-color')
     $expression = 'jsonencode({auth_mode=var.auth_mode,client_id=var.client_id,entra_tenant_id=var.entra_tenant_id,subscription_id=var.subscription_id,base=[var.enable_module_vnet_app,var.enable_module_vm_jumpbox_linux,var.enable_module_vm_mssql_win,var.enable_module_mssql,var.enable_module_mysql,var.enable_module_vwan],extras=[var.enable_module_avd,var.enable_module_petstore,var.enable_module_vnet_onprem]})' + "`n"
@@ -796,6 +918,10 @@ function Invoke-SandboxFanOut {
         Invoke-SandboxCommand @('git', '--version')
         # Installing Terraform uses sudo and replaces the shared CLI, so it runs once, before any sandbox starts.
         Confirm-SandboxTerraformVersion
+        $backend = Get-SandboxBackend
+        Invoke-SandboxCommand @('az', 'version')
+        Invoke-SandboxCommand @('az', 'login', '--identity', '--allow-no-subscriptions', '--output', 'none')
+        Invoke-SandboxGarbageCollection $backend
         # Each sandbox links providers from this cache instead of downloading about 730 MB. Only this init writes to it.
         $null = [System.IO.Directory]::CreateDirectory($script:childEnvironment['TF_PLUGIN_CACHE_DIR'])
         Invoke-SandboxCommand @('terraform', 'init', '-backend=false', '-input=false', '-no-color')
@@ -945,6 +1071,12 @@ function Write-SandboxFleetReport {
     Write-SandboxSummary "Preflight PASS is not proof that infrastructure was applied. Tear down each sandbox manually.`n"
 }
 
+function Remove-SandboxProviderCache {
+    # Terraform links each provider in TF_DATA_DIR to this cache, so it's needed until the run's last stage.
+    $cache = $script:childEnvironment['TF_PLUGIN_CACHE_DIR']
+    if ([System.IO.Directory]::Exists($cache)) { [System.IO.Directory]::Delete($cache, $true) }
+}
+
 function Remove-SandboxFleetSource {
     # The source trees and provider cache are needed only by this run's stages. Plans and logs stay private on the runner.
     if (-not [System.IO.Directory]::Exists($script:directory)) { return }
@@ -957,8 +1089,7 @@ function Remove-SandboxFleetSource {
         }
     }
     $null = Invoke-SandboxCommand @('git', 'worktree', 'prune') -AllowFailure
-    $cache = $script:childEnvironment['TF_PLUGIN_CACHE_DIR']
-    if ([System.IO.Directory]::Exists($cache)) { [System.IO.Directory]::Delete($cache, $true) }
+    Remove-SandboxProviderCache
 }
 
 try {
@@ -1018,16 +1149,18 @@ try {
     $script:childEnvironment['AZURE_CONFIG_DIR'] = Join-Path $script:directory 'azure-cli'
     $script:childEnvironment['ARM_USE_MSI'] = 'true'
     $script:childEnvironment['TF_WORKSPACE'] = 'default'
-    if ($script:count -gt 1) {
-        $script:childEnvironment['TF_PLUGIN_CACHE_DIR'] = Join-Path $HOME (
-            ".local/state/azuresandbox/deployments/sandbox-$script:runId/runs/$script:runId-$script:attempt/plugin-cache")
-    }
+    # Providers are downloaded once per run into this cache, and TF_DATA_DIR links to them; the summary stage removes it.
+    $script:childEnvironment['TF_PLUGIN_CACHE_DIR'] = Join-Path $HOME (
+        ".local/state/azuresandbox/deployments/sandbox-$script:runId/runs/$script:runId-$script:attempt/plugin-cache")
     if ($Stage -eq 'summary') {
         if ($script:fanOut) {
             Write-SandboxFleetReport
             Remove-SandboxFleetSource
         }
-        else { Write-SandboxReport }
+        else {
+            try { Write-SandboxReport }
+            finally { Remove-SandboxProviderCache }
+        }
         exit 0
     }
     if ($Stage -eq 'preflight') {
