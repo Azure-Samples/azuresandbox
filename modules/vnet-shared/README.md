@@ -22,6 +22,8 @@ This module implements a virtual network with shared services used by all the co
 * A Log Analytics workspace for collecting logs and metrics from Azure resources.
 * A Windows virtual machine configured as an Active Directory Domain Services domain controller and DNS server.
 
+Private DNS zones for the sandbox's Private Link services are linked to the shared virtual network with `NxDomainRedirect`. When a name is missing from a private zone, Azure DNS falls back to public DNS instead of returning `NXDOMAIN`.
+
 The estimated provisioning time for this module is 23 minutes.
 
 Before any run command or VM extension touches *adds1*, Terraform installs pending Critical and Security Windows updates on it using the platform [installPatches](https://learn.microsoft.com/en-us/rest/api/compute/virtual-machines/install-patches) action and reboots it if required (patch → reboot → configure). This keeps an update-driven reboot from interrupting later configuration steps. Patching runs for up to 2 hours. If the patch run reports a status of `Failed` (a patch failed to install, or the window ran out with patches outstanding), the apply fails instead of configuring a partially patched VM. The patch result is also surfaced in the `patch_install_result` output. Because the failed result stays in Terraform state, later plans fail too until you re-run patching with `terraform apply -replace='module.vnet_shared.azapi_resource_action.install_patches'`. Automatic patching stays enabled. Patching adds time to provisioning that varies with the number of pending updates. Adding this step to an existing sandbox patches and may reboot *adds1* on the next apply.
@@ -150,7 +152,7 @@ module.vnet_shared.azurerm_private_dns_zone.zones["privatelink.ods.opinsights.az
 module.vnet_shared.azurerm_private_dns_zone.zones["privatelink.oms.opinsights.azure.com"] | | Private DNS zone for Log Analytics agent onboarding.
 module.vnet_shared.azurerm_private_dns_zone.zones["privatelink.vaultcore.azure.net"] | | Private DNS zone for the key vault.
 module.vnet_shared.azurerm_private_dns_zone.zones["privatelink.&lt;location&gt;.azurecontainerapps.io"] | | Private DNS zone for Azure Container Apps, consumed by the *petstore* configuration.
-module.vnet_shared.azurerm_private_dns_zone_virtual_network_link.zones[*] | | Links each private DNS zone to *vnet-sand-dev-shared*. Zones are linked to the shared services virtual network only; see the root README section on Private Endpoints and Private DNS.
+module.vnet_shared.azurerm_private_dns_zone_virtual_network_link.zones[*] | | Links each private DNS zone to *vnet-sand-dev-shared* with `NxDomainRedirect` internet fallback. Zones are linked to the shared services virtual network only; see the root README section on Private Endpoints and Private DNS.
 module.vnet_shared.azurerm_private_endpoint.ampls | pep&#8209;sand&#8209;dev&#8209;ampls | The private endpoint for Azure Monitor.
 module.vnet_shared.azurerm_private_endpoint.key_vault | pep&#8209;sand&#8209;dev&#8209;key&#8209;vault | The private endpoint for the key vault.
 module.vnet_shared.azurerm_public_ip.bastion | pip&#8209;sand&#8209;dev&#8209;bastion | Public IP for Azure Bastion.
