@@ -2,6 +2,7 @@
 # Designed to run as a scheduled task with an 'AtStartup' trigger.
 # This script must be run after a VM stop/deallocate to prevent SQL Server service start failures when tempdb has been moved to the temp drive
 # The script is idempotent and at a minimum it will ensure that the SQL Server and SQL Agent services are started.
+# If a restart is required, it requests the restart and exits without starting SQL Server; the services are started on the next boot.
 
 # This script has only been tested under the following conditions:
 # - Windows Server 2025 using PowerShell 5.x for Windows
@@ -212,8 +213,13 @@ try {
     }
 
     if ($restartRequired) {
-        Write-ScriptLog "Restarting computer..."
+        # Restart-Computer is non-blocking. Exit now rather than starting SQL Server on a VM that is
+        # about to reboot; the instance is Manual-start, so it stays stopped until the post-reboot pass.
+        Write-ScriptLog "Restarting computer. SQL Server services will be started after the restart..."
         Restart-Computer -Force
+        Write-ScriptLog "'$PSCommandPath' exiting normally (restart pending)..."
+        Write-ScriptLog "$('=' * 80)"
+        Exit 0
     }
 
     # Start MSSQLSERVER and SQLSERVERAGENT services if not already running

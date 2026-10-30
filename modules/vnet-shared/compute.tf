@@ -29,10 +29,44 @@ resource "azurerm_windows_virtual_machine" "this" {
 }
 
 #region vm-configuration
+# Patch first: install pending Critical/Security updates (and reboot if required) before any run
+# command or extension runs, so update-driven reboots don't interrupt guest configuration.
+# The apply fails if the patch run reports status "Failed" (e.g. a patch failed to install or the
+# maximumDuration window ran out with patches outstanding), so configuration never runs on a
+# partially patched VM. The patch result is also exported.
+resource "azapi_resource_action" "install_patches" {
+  type        = "Microsoft.Compute/virtualMachines@2025-04-01"
+  resource_id = azurerm_windows_virtual_machine.this.id
+  action      = "installPatches"
+  method      = "POST"
+
+  body = {
+    maximumDuration = "PT2H"
+    rebootSetting   = "IfRequired"
+    windowsParameters = {
+      classificationsToInclude = ["Critical", "Security"]
+    }
+  }
+
+  response_export_values = ["status", "rebootStatus", "installedPatchCount", "failedPatchCount", "pendingPatchCount", "maintenanceWindowExceeded"]
+
+  timeouts {
+    create = "135m"
+  }
+
+  lifecycle {
+    postcondition {
+      condition     = try(self.output.status, "") != "Failed"
+      error_message = "Patch installation on ${azurerm_windows_virtual_machine.this.name} reported status Failed (maintenanceWindowExceeded=${try(self.output.maintenanceWindowExceeded, "unknown")}, installed=${try(self.output.installedPatchCount, "unknown")}, failed=${try(self.output.failedPatchCount, "unknown")}, pending=${try(self.output.pendingPatchCount, "unknown")}, rebootStatus=${try(self.output.rebootStatus, "unknown")})."
+    }
+  }
+}
+
 resource "azurerm_virtual_machine_run_command" "configure_adds" {
   name               = "ConfigureAdds"
   location           = var.location
   virtual_machine_id = azurerm_windows_virtual_machine.this.id
+  depends_on         = [azapi_resource_action.install_patches]
 
   source {
     script = file("${path.module}/scripts/Configure-Adds.ps1")
@@ -107,7 +141,7 @@ resource "azurerm_virtual_machine_extension" "ama" {
 }
 
 resource "azurerm_monitor_data_collection_rule_association" "adds1_dcr" {
-  name                    = "${module.naming.monitor_data_collection_rule.name}-${var.vm_adds_name}-association"
+  name                    = "${module.naming.names["data_collection_rule_association"].name}-${var.vm_adds_name}"
   target_resource_id      = azurerm_windows_virtual_machine.this.id
   data_collection_rule_id = azurerm_monitor_data_collection_rule.windows.id
 

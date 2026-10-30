@@ -4,6 +4,8 @@
 // Docs: https://github.com/DavidAnson/markdownlint-cli2
 {
   "globs": ["**/*.md"],
+  // Skip git-ignored files so local runs match CI's clean checkout.
+  "gitignore": true,
   "ignores": [
     "node_modules",
     // Downloaded provider/module cache (git-ignored); not present in CI's fresh checkout.

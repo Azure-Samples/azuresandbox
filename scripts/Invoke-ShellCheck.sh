@@ -30,11 +30,17 @@ fi
 
 printf "Running ShellCheck (%s)...\n" "$(shellcheck --version | awk '/version:/ {print $2}')"
 
-# Discover every tracked shell script (excluding the .git directory) so newly
-# added scripts are covered automatically. The warning+error gate is set via the
-# --severity flag (ShellCheck ignores a severity directive in .shellcheckrc);
-# other shared config (external-sources, per-rule excludes) comes from .shellcheckrc.
-if find "$repo_root" -name '*.sh' -not -path '*/.git/*' -print0 \
+# Discover every shell script CI would see (tracked plus untracked files that
+# aren't git-ignored, e.g. not under .terraform/) so newly added scripts are
+# covered automatically. CI's clean checkout has no ignored files, so this
+# matches its `find`. The warning+error gate is set via the --severity flag
+# (ShellCheck ignores a severity directive in .shellcheckrc); other shared
+# config (external-sources, per-rule excludes) comes from .shellcheckrc.
+cd "$repo_root"
+if git ls-files -z --cached --others --exclude-standard -- '*.sh' \
+    | while IFS= read -r -d '' f; do
+        if [ -f "$f" ]; then printf '%s\0' "$f"; fi
+    done \
     | xargs -0 -r shellcheck --severity=warning; then
     printf "ShellCheck: no warning/error findings.\n"
 else

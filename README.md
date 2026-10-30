@@ -545,7 +545,7 @@ module "vnet_shared" {
   operator_object_id  = var.operator_object_id
   resource_group_name = azurerm_resource_group.this.name
   tags                = var.tags
-  unique_seed         = module.naming.unique-seed
+  unique_seed         = module.naming.names["resource_group"].unique_seed
 
   # Override default values here
   vm_adds_name = "mydc1" # default was "adds1"
@@ -710,7 +710,7 @@ Address | Name | Notes
 --- | --- | ---
 azuread_group.sql_admins[0] | grp&#8209;sql&#8209;admins&#8209;sand&#8209;dev&#8209;xxxxxxxx | Entra ID group for Azure Sql Db admin authorization. Members are the user and the SQL admin user-assigned identity.
 azurerm_resource_group.this | rg&#8209;sand&#8209;dev&#8209;xxxxxxxx | Resource group for the sandbox environment.
-azurerm_user_assigned_identity.sql_admin[0] | uai&#8209;sand&#8209;dev&#8209;sqladmin | SQL admin user-assigned identity, attached to jumpwin1 and used by the CreateMssqlDbUser run command. Recreated whenever the mssql module is re-enabled.
+azurerm_user_assigned_identity.sql_admin[0] | id&#8209;sand&#8209;dev&#8209;sqladmin | SQL admin user-assigned identity, attached to jumpwin1 and used by the CreateMssqlDbUser run command. Recreated whenever the mssql module is re-enabled.
 azurerm_virtual_machine_run_command.create_mssql_db_user[0] | vmx&#8209;sand&#8209;dev&#8209;jumpwin1&#8209;CreateMssqlDbUser | Signs in to Azure SQL Db as the SQL admin user-assigned identity and adds jumpwin1's system-assigned identity as db_datareader on testdb
 
 ---
@@ -904,7 +904,7 @@ Sandbox environments are built using Terraform, a cross platform, open-source In
   * **time**: Used to implement wait cycles and other time based operations.
   * **tls**: Used to generate certificates.
 * **Modules**: The following Terraform modules are used in this project:
-  * **Azure/naming**: A module for generating consistent and compliant Azure resource names.
+  * **Azure/avm-utl-naming**: The Azure Verified Module naming utility, used to generate consistent and compliant Azure resource names from its `names` output (replaces the archived `Azure/naming/azurerm` module).
 
 #### **Scripting Technologies**
 
@@ -941,7 +941,7 @@ Fully automated unit test scripts are provided for each module and are orchestra
 * Module unit tests: These tests focus on functionality in a single module.
 * Integration tests: These tests focus on functionality that spans multiple modules.
 
-The orchestration script returns 0 if all tests completed successfully, 1 if any tests failed, or 2 if the test harness itself failed (for example, missing Azure authentication or Terraform state). The orchestration script can be incorporated in a CI/CD pipeline. For CI/CD consumption, supply `-ResultsJsonPath` to also write machine-readable JSON results with a per-check breakdown, e.g. `pwsh -File ./scripts/Invoke-UnitTests.ps1 -ResultsJsonPath ./test-results.json`. This output is optional and does not change the exit codes, log file, or console output. See the header comments in [Invoke-UnitTests.ps1](./scripts/Invoke-UnitTests.ps1) for the output schema.
+The orchestration script returns 0 if all tests completed successfully, 1 if any tests failed, or 2 if the test harness itself failed (for example, missing Azure authentication or Terraform state). The orchestration script can be incorporated in a CI/CD pipeline. For CI/CD consumption, supply `-ResultsJsonPath` to also write machine-readable JSON results with a per-check breakdown, e.g. `pwsh -File ./scripts/Invoke-UnitTests.ps1 -ResultsJsonPath ./test-results.json`. This output is optional and does not change the exit codes, log file, or console output. If a VM-based suite fails because a VM it uses rebooted mid-run (for example, due to automatic patching), the orchestrator waits for the VM to settle and re-runs that suite once; retried suites are annotated in the log and JSON results. See the header comments in [Invoke-UnitTests.ps1](./scripts/Invoke-UnitTests.ps1) for the output schema.
 
 ### Additional Resources
 

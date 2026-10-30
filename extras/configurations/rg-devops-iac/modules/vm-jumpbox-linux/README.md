@@ -124,7 +124,7 @@ github_runner_labels | | Additional labels to apply to the self-hosted runner.
 github_runner_token | | Ephemeral. The runner registration token used to register the runner (expires after 1 hour). Passed to the Run Command through a write-only protected parameter, so it never lands in Terraform state or the saved plan. Required only when the runner is registered (when the Run Command is created or `github_runner_token_version` changes).
 github_runner_token_version | 1 | Increment to send a new `github_runner_token` to the VM and re-run runner registration, for example after a failed registration.
 github_runner_url | | The GitHub repository URL to register the runner with, e.g. `https://github.com/myorg/myrepo`. Required when `enable_github_runner` is true.
-github_runner_version | `2.338.0` | The version of the GitHub Actions runner agent to install, without the leading `v`.
+github_runner_version | `2.338.2` | The version of the GitHub Actions runner agent to install, without the leading `v`.
 
 ### Module Resources
 
@@ -138,7 +138,7 @@ module.vm_jumpbox_linux.azurerm_key_vault_secret.ssh_private_key | jumplinux2&#8
 module.vm_jumpbox_linux.azurerm_linux_virtual_machine.this | jumplinux2 | The Linux virtual machine resource.
 module.vm_jumpbox_linux.azurerm_network_interface.this | nic&#8209;devops&#8209;dev&#8209;jumplinux2 | The network interface associated with the Linux virtual machine.
 module.vm_jumpbox_linux.azurerm_monitor_data_collection_rule_association.dce | configurationAccessEndpoint | Associates the VM with the data collection endpoint so the Azure Monitor Agent retrieves its configuration through the AMPLS private endpoint.
-module.vm_jumpbox_linux.azurerm_monitor_data_collection_rule_association.dcr | dcr&#8209;devops&#8209;dev&#8209;jumplinux2&#8209;association | Associates the VM with the Linux data collection rule.
+module.vm_jumpbox_linux.azurerm_monitor_data_collection_rule_association.dcr | dcradevopsdev&#8209;jumplinux2 | Associates the VM with the Linux data collection rule.
 module.vm_jumpbox_linux.azurerm_role_assignment.operator_vm_admin_login | | Grants `Virtual Machine Administrator Login` role on jumplinux2 to the operator applying the configuration, enabling Microsoft Entra ID SSH sign-in with passwordless `sudo`.
 module.vm_jumpbox_linux.azurerm_role_assignment.this | | Grants `Storage Blob Data Contributor` role to the managed identity of jumplinux2. This is intended to be used for accessing a Terraform state backend hosted in Azure Blob Storage.
 module.vm_jumpbox_linux.azurerm_virtual_machine_extension.aad_ssh_login | | The `AADSSHLoginForLinux` extension that enables Microsoft Entra ID SSH sign-in. Installed after `wait_for_cloud_init` to avoid apt lock contention.

@@ -337,11 +337,11 @@ azapi_update_resource.ampls_disable_public_access | | Sets the AMPLS ingestion a
 azapi_update_resource.key_vault_disable_public_access | | Disables key vault public network access after the key vault barrier.
 azapi_update_resource.log_analytics_disable_public_access | | Disables public ingestion and query on the Log Analytics workspace after the AMPLS barrier.
 azapi_update_resource.storage_disable_public_access | | Disables storage account public network access after the storage barrier.
-azurerm_bastion_host.this | snap-devops-dev | Bastion host for secure remote access to `jumplinux2`.
+azurerm_bastion_host.this | bas-devops-dev | Bastion host for secure remote access to `jumplinux2`.
 azurerm_key_vault.this | kv-devops-dev-xxx | Key vault for secure secret storage.
 azurerm_log_analytics_workspace.this | log-devops-dev-xxx | Azure Monitor LAW workspace for observability (diagnostic logs and metrics).
-azurerm_monitor_data_collection_endpoint.this | dce-devops-dev-xxx | Data collection endpoint used by the Azure Monitor Agent on `jumplinux2`.
-azurerm_monitor_data_collection_rule.linux | dcr-devops-dev-linux | Linux data collection rule: syslog (`auth` and `authpriv` at `Info` and above, other facilities at `Warning` and above) and performance counters.
+azurerm_monitor_data_collection_endpoint.this | dcedevopsdevxxx | Data collection endpoint used by the Azure Monitor Agent on `jumplinux2`.
+azurerm_monitor_data_collection_rule.linux | dcrdevopsdev-linux | Linux data collection rule: syslog (`auth` and `authpriv` at `Info` and above, other facilities at `Warning` and above) and performance counters.
 azurerm_monitor_diagnostic_setting.bastion | Diagnostic Logs | Sends `BastionAuditLogs` and metrics for the Bastion host to the workspace.
 azurerm_monitor_diagnostic_setting.data_collection_rule_linux | Diagnostic Logs | Sends data collection errors (`allLogs`) and metrics for the Linux data collection rule to the workspace.
 azurerm_monitor_diagnostic_setting.key_vault | Audit Logs | Sends key vault `audit` logs (including secret reads) and metrics to the workspace.
@@ -350,15 +350,15 @@ azurerm_monitor_diagnostic_setting.storage_blob | Diagnostic Logs | Sends blob s
 azurerm_monitor_private_link_scope.this | ampls-devops-dev | Azure Monitor Private Link Scope. Starts in `Open` mode and is set to `PrivateOnly` by the AMPLS barrier.
 azurerm_monitor_private_link_scoped_service.dce | ampls-scope-dce | Adds the data collection endpoint to the AMPLS.
 azurerm_monitor_private_link_scoped_service.log_analytics | ampls-scope-log-analytics | Adds the Log Analytics workspace to the AMPLS.
-azurerm_nat_gateway.this | ng-devops-dev | NAT gateway for outbound internet connectivity.
+azurerm_nat_gateway.this | ngdevopsdev | NAT gateway for outbound internet connectivity.
 azurerm_nat_gateway_public_ip_association.this | | Associates the NAT gateway with the public IP address.
 azurerm_network_security_group.groups[*] | | One NSG for each subnet in `local.subnets` that has NSG rules. The private link subnet has no NSG.
 azurerm_network_security_rule.rules[*] | | NSG rules from `local.nsg_rules`. See [Virtual Network Design](#virtual-network-design).
 azurerm_private_dns_zone.zones[*] | | Private DNS zones from `local.private_dns_zones`. See [Virtual Network Design](#virtual-network-design).
 azurerm_private_dns_zone_virtual_network_link.zones[*] | | Links each private DNS zone to the virtual network. See [Virtual Network Design](#virtual-network-design).
-azurerm_private_endpoint.ampls | pe-devops-dev-ampls | Private endpoint for the AMPLS (`azuremonitor` subresource)
-azurerm_private_endpoint.key_vault | pe-devops-dev-key-vault | Private endpoint for Azure key vault
-azurerm_private_endpoint.storage_blob | pe-devops-dev-storage-blob | Private endpoint for Azure blob storage
+azurerm_private_endpoint.ampls | pep-devops-dev-ampls | Private endpoint for the AMPLS (`azuremonitor` subresource)
+azurerm_private_endpoint.key_vault | pep-devops-dev-key-vault | Private endpoint for Azure key vault
+azurerm_private_endpoint.storage_blob | pep-devops-dev-storage-blob | Private endpoint for Azure blob storage
 azurerm_public_ip.bastion | pip-devops-dev-bastion | Public IP address for the Bastion host.
 azurerm_public_ip.this | pip-devops-dev-nat | Public IP address for the NAT gateway.
 azurerm_resource_group.this | rg-devops-dev-xxx | Resource group for all resources in this configuration.
@@ -446,7 +446,7 @@ This project is built built using Terraform, a cross platform, open-source Infra
   * **time**: Used to implement wait cycles and other time based operations.
   * **tls**: Used to generate the break-glass SSH key pair for the Linux virtual machine's local admin account.
 * **Modules**: The following Terraform modules are used in this project:
-  * **Azure/naming**: A module for generating consistent and compliant Azure resource names.
+  * **Azure/avm-utl-naming**: The Azure Verified Module naming utility, used to generate consistent and compliant Azure resource names from its `names` output (replaces the archived `Azure/naming/azurerm` module).
 
 #### **Scripting Technologies**
 
@@ -493,7 +493,9 @@ jumplinux2 | Jumpbox / DevOps agent | `vm-jumpbox-linux` | Ubuntu Server LTS 24.
     ├── Invoke-SandboxDeployment.sh       # Workflow: Bash entry point for Invoke-SandboxDeployment.ps1
     ├── new-runner-registration-token.sh  # Bash (sourced): sets TF_VAR_github_runner_token to a new runner registration token
     ├── SandboxOidc.ps1                   # Workflow: shared GitHub Actions OIDC sign-in helpers
-    └── SandboxProgress.ps1               # Workflow: shared apply and unit test progress parsing helpers
+    ├── SandboxProgress.ps1               # Workflow: shared apply and unit test progress parsing helpers
+    ├── SandboxRedaction.ps1              # Workflow: redacts ids and tags from everything published to the job log and summary
+    └── SandboxTerraformError.ps1         # Workflow: extracts Terraform errors from a failed preflight or apply for the job log and summary
 ```
 
 #### Root Module Input Variables (Optional)
@@ -521,11 +523,9 @@ Address | Name | Notes
 --- | --- | ---
 azurerm_federated_identity_credential.deployment_identity_github[*] | github-sandbox-deployment, github-sandbox-release-gate | Trusts GitHub Actions OIDC tokens for the deployment identity, one per environment in `deployment_identity_github_environments`. Created only when `deployment_identity` is `oidc`.
 azurerm_federated_identity_credential.runner_power_state_github[0] | github-sandbox-runner-power-state | Trusts GitHub Actions OIDC tokens for the runner power state identity from the `github_runner_power_state_environment` environment. Created only when `deployment_identity` is `oidc`.
-azurerm_role_assignment.deployment_identity_rbac_admin[0] | | Assigns `Role Based Access Control Administrator` at the subscription scope to the deployment identity, with a condition that allows only the roles in `local.deployment_identity_assignable_roles`. Created only when `deployment_identity` is `managed_identity`.
-azurerm_role_assignment.deployment_identity_reader[0] | | Assigns standing `Reader` at the subscription scope to the deployment identity.
 azurerm_role_assignment.runner_power_state[0] | | Assigns `Desktop Virtualization Power On Off Contributor` on `jumplinux2` to the runner power state identity. Created only when `deployment_identity` is `oidc`.
-azurerm_user_assigned_identity.deployment[0] | uai-devops-dev-deployment | Deployment identity for Azure Sandbox applies. Attached to `jumplinux2` when `deployment_identity` is `managed_identity`; unattached and federated with GitHub Actions when it is `oidc`. Not created when `deployment_identity` is `none`.
-azurerm_user_assigned_identity.runner_power_state[0] | uai-devops-dev-runner | Runner power state identity that starts and deallocates `jumplinux2` for workflow runs. Unattached and federated with GitHub Actions. Created only when `deployment_identity` is `oidc`.
+azurerm_user_assigned_identity.deployment[0] | id-devops-dev-deployment | Deployment identity for Azure Sandbox applies. Attached to `jumplinux2` when `deployment_identity` is `managed_identity`; unattached and federated with GitHub Actions when it is `oidc`. Not created when `deployment_identity` is `none`.
+azurerm_user_assigned_identity.runner_power_state[0] | id-devops-dev-runner | Runner power state identity that starts and deallocates `jumplinux2` for workflow runs. Unattached and federated with GitHub Actions. Created only when `deployment_identity` is `oidc`.
 
 #### Root Module Output Variables (Optional)
 
@@ -549,6 +549,7 @@ This section describes the [Sandbox deployment workflow](../../../.github/workfl
 * [Just-in-Time Deployment Roles](#just-in-time-deployment-roles)
 * [Runner Power State Identity](#runner-power-state-identity)
 * [Sandbox Deployment Workflow](#sandbox-deployment-workflow)
+* [Runner Records](#runner-records)
 * [Terraform State](#terraform-state)
 * [Operator Access](#operator-access)
 * [Security Considerations](#security-considerations)
@@ -560,7 +561,7 @@ This section describes the [Sandbox deployment workflow](../../../.github/workfl
 flowchart LR
     subgraph rgdevops["rg-devops-iac"]
         vm["jumplinux2<br/>self-hosted runner"]
-        did["Deployment identity<br/>standing Reader"]
+        did["Deployment identity<br/>no standing roles"]
         pid["Runner power state identity<br/>oidc only"]
         st["Storage account<br/>tfstate container"]
     end
@@ -582,7 +583,7 @@ flowchart LR
 Component | Provided by | Purpose
 --- | --- | ---
 `jumplinux2` runner | rg-devops-iac (`enable_github_runner = true`) | Runs the `sandbox` job with the pre-installed IaC toolchain, inside the private network.
-Deployment identity | rg-devops-iac (`deployment_identity`) | The identity the Azure Sandbox providers authenticate as. Standing `Reader`, plus time-bound deployment roles granted per run.
+Deployment identity | rg-devops-iac (`deployment_identity`) | The identity the Azure Sandbox providers authenticate as. No standing Azure RBAC roles, only time-bound deployment roles granted per run.
 Runner power state identity | rg-devops-iac, `oidc` only | Starts and deallocates `jumplinux2` around a run, from GitHub-hosted jobs.
 Storage account | rg-devops-iac | Holds each sandbox's Terraform state, reached with `jumplinux2`'s system-assigned identity.
 Environments, secrets and variables | GitHub repository settings | Supply the sandbox's `backend.tf` and `terraform.tfvars`, require owner approval, and select the authentication mode.
@@ -618,7 +619,7 @@ Who can use it while a grant is active | Anything on `jumplinux2`: any job on th
 Terminal applies on `jumplinux2` | Supported | Not supported
 Runner VM power state | `jumplinux2` must be running before the run | Started after approval and deallocated afterwards by the [runner power state identity](#runner-power-state-identity)
 Extra GitHub setup | None | OIDC subject claim template, `sandbox-runner-power-state` environment and its secrets
-Standing roles | `Reader` on the subscription | `Reader` on the subscription
+Standing roles | None | None
 Per-run roles | [Time-bound deployment roles](#just-in-time-deployment-roles) | [Time-bound deployment roles](#just-in-time-deployment-roles)
 
 Things to know:
@@ -626,6 +627,7 @@ Things to know:
 * `deployment_identity` takes one value. Switching between `managed_identity` and `oidc` keeps the same identity, client id and roles, and attaches or detaches it from `jumplinux2` in place. The VM is not replaced.
 * With `managed_identity`, the system-assigned identity stays the VM's default, so cloud-init, `az login --identity` and the state backend keep using it. Use the deployment identity explicitly, e.g. `az login --identity --client-id <client-id>` or `Connect-AzAccount -Identity -AccountId <client-id>`.
 * With `oidc`, each federated credential has issuer `https://token.actions.githubusercontent.com`, audience `api://AzureADTokenExchange` and a subject such as `repository_owner_id:987654321:repository_id:123456789:environment:sandbox-deployment`. `github_subjects` in the `deployment_identity` output lists them.
+* With `oidc`, the unit-test stage signs in once. A GitHub Actions OIDC token expires after 5 minutes, after which the session can't get a token for a new audience. So `Connect-SandboxRunner.ps1` gets the Azure Resource Manager and Key Vault tokens the tests use right after sign-in. If a later token request still fails because the OIDC token has expired, the test signs in again once with a new OIDC token and retries.
 * The `oidc` subjects use numeric repository and owner ids, which don't change on a rename. Terraform looks them up anonymously from the GitHub API on each plan, which works only for public repositories. For a private repository, set `github_repository_id` (`gh api repos/OWNER/NAME --jq .id`) and `github_repository_owner_id` (`gh api repos/OWNER/NAME --jq .owner.id`).
 * Managed identities have no app registration, so grant Microsoft Graph permissions with `grant-graph-permissions.sh`, not the Entra admin center **API permissions** page. The grant is removed when the identity is deleted.
 
@@ -635,7 +637,6 @@ The identity Terraform authenticates as needs the same permissions in every auth
 
 Permission | Scope | `client_secret` | `managed_identity` / `oidc` | Why
 --- | --- | --- | --- | ---
-`Reader` | Subscription | Not needed | Standing | Lets the identity sign in and check its own grant.
 `Contributor` | Subscription | Standing | [Time-bound](#just-in-time-deployment-roles) | Creates and manages the sandbox resources.
 `Role Based Access Control Administrator`, with a condition | Subscription | Standing | [Time-bound](#just-in-time-deployment-roles) | Creates and removes the sandbox's role assignments. The condition allows only the sandbox's roles, so the identity can't grant `Owner`, `User Access Administrator` or `Role Based Access Control Administrator`.
 `Group.Create`, `GroupMember.Read.All`, `User.Read.All`, `Application.Read.All` (Microsoft Graph application permissions) | Tenant | Standing | Standing | Creates the SQL administrators group. Required only with the `mssql` module. Graph permissions can't be time-bound.
@@ -657,7 +658,8 @@ GitHub repository administrator | Runner registration token; environments, secre
 GitHub repository administrator | OIDC subject claim template, unless the repository already uses it | `oidc` | Once, after the federated credentials exist
 Microsoft Entra Privileged Role Administrator | Microsoft Graph permissions. The least privileged role that can grant them; Global Administrator also works. `Owner`, Cloud Application Administrator and Global Reader can't. | Both, `mssql` only | Once, after the identity is created
 Microsoft Entra ID P2 or Microsoft Entra ID Governance | Time-bound role assignments | Both | Before the first run
-Subscription `Owner`, ideally PIM eligible | Applying this configuration and granting the time-bound roles | Both | Each apply and each run
+Subscription `Owner`, ideally PIM eligible | Applying this configuration | Both | Each apply
+Subscription `Role Based Access Control Administrator`, ideally PIM eligible | Granting the time-bound roles | Both | Each run
 
 ##### Workflow Configuration
 
@@ -678,6 +680,7 @@ Setting | Type | Value | Modes
 --- | --- | --- | ---
 `SANDBOX_AUTH_MODE` | Repository variable | `managed_identity` or `oidc`. Must match `auth_mode` in `SANDBOX_TFVARS_HCL`. Runs fail without it. | Both
 `SANDBOX_JIT_MIN_REMAINING_MINUTES` | Repository or environment variable, optional | Minutes that must remain on the grant at preflight. Default `150`, range `0`-`1440`; `0` skips the check. | Both
+`SANDBOX_RETAINED_DEPLOYMENTS` | Repository or environment variable, optional | Previous runs whose private records stay on the runner, besides the current run. Default `3`, range `1`-`10`. Preflight purges older runs' records and state blobs; see [Runner Records](#runner-records). | Both
 `SANDBOX_BACKEND_HCL` | Secret in `sandbox-deployment` and `sandbox-release-gate` | Azure Sandbox `backend.tf`, as below | Both
 `SANDBOX_TFVARS_HCL` | Secret in `sandbox-deployment` and `sandbox-release-gate` | Azure Sandbox `terraform.tfvars`, as below | Both
 `RUNNER_POWER_STATE_CLIENT_ID`, `AZURE_TENANT_ID`, `RUNNER_VM_ID` | Secrets in `sandbox-runner-power-state` | See [Runner Power State Identity](#runner-power-state-identity) | `oidc`
@@ -718,7 +721,7 @@ Step | Task | Who | Modes | Details
 4 | Check or set the OIDC subject claim template | Repository administrator | `oidc` | Below
 5 | Add the power state secrets to `sandbox-runner-power-state` | Repository administrator | `oidc` | [Runner Power State Identity](#runner-power-state-identity)
 6 | Set `SANDBOX_BACKEND_HCL`, `SANDBOX_TFVARS_HCL` and `SANDBOX_AUTH_MODE` | Repository administrator | Both | [Workflow Configuration](#workflow-configuration)
-7 | Before each run, grant the time-bound roles | Operator, with `Owner` | Both | [Just-in-Time Deployment Roles](#just-in-time-deployment-roles)
+7 | Before each run, grant the time-bound roles | Operator, with `Role Based Access Control Administrator` | Both | [Just-in-Time Deployment Roles](#just-in-time-deployment-roles)
 8 | Start a manual run or mark a release PR ready, then approve | Owner | Both | [Sandbox Deployment Workflow](#sandbox-deployment-workflow)
 
 Grant the Microsoft Graph permissions from this configuration's directory, signed in to Azure CLI as a Privileged Role Administrator. If you activated the role just before, sign in again with `az login` so your token includes it:
@@ -783,7 +786,7 @@ sequenceDiagram
     participant Op as Operator
     participant Az as Azure
     participant Wf as Workflow preflight
-    Op->>Az: grant-jit-roles.sh (activates Owner through PIM if needed)
+    Op->>Az: grant-jit-roles.sh (activates RBAC Administrator through PIM if needed)
     Az-->>Op: Contributor + conditioned RBAC Administrator, time-bound
     Op->>Az: Wait until both roles are listed in PIM (about 5 minutes)
     Op->>Wf: Approve the run
@@ -795,7 +798,7 @@ sequenceDiagram
 The script:
 
 1. Reads the identity, subscription and `jit_condition` from this configuration's outputs. Run it as the operator, from any directory, with Azure CLI signed in.
-1. Activates your eligible subscription `Owner` through PIM for 1 hour, unless `Owner` or `User Access Administrator` is already active. If PIM requires approval or multifactor authentication that Azure CLI can't satisfy, activate `Owner` in the portal and run it again.
+1. Activates your eligible subscription `Role Based Access Control Administrator` through PIM for 1 hour, unless it's already active. If PIM requires approval or multifactor authentication that Azure CLI can't satisfy, activate the role in the portal and run it again.
 1. Assigns `Contributor`, and `Role Based Access Control Administrator` constrained by `jit_condition`, as time-bound active assignments. Existing active assignments are kept unless you pass `--force`.
 1. Lists the end times, warns if less than `SANDBOX_JIT_MIN_REMAINING_MINUTES` remains, and checks that the applied condition matches `jit_condition`.
 
@@ -811,7 +814,7 @@ Things to know:
 
 * Preflight accepts a permanent assignment with a warning.
 * The 8-hour grant and 150-minute minimum cover preflight, a full apply and unit testing, with time left for a manual teardown. With `oidc`, the window also covers `jumplinux2` booting.
-* To grant in the portal instead, activate `Owner`, then use the subscription's *Access control (IAM)* > *Add role assignment* with *Assignment type* *Active* and *Time bound*. For `Role Based Access Control Administrator`, paste `terraform output -json deployment_identity | jq -r .jit_condition` into the condition editor's code view.
+* To grant in the portal instead, activate `Role Based Access Control Administrator`, then use the subscription's *Access control (IAM)* > *Add role assignment* with *Assignment type* *Active* and *Time bound*. For `Role Based Access Control Administrator`, paste `terraform output -json deployment_identity | jq -r .jit_condition` into the condition editor's code view.
 * After the run, revoke the assignments with `--revoke` or let them expire.
 
 ##### Runner Power State Identity
@@ -863,22 +866,87 @@ Trigger | `workflow_dispatch` | `pull_request_target` for a ready, same-reposito
 Environment | `sandbox-deployment` | `sandbox-release-gate`
 Source | Tip of `source_branch`: `main` (default) or `vnext` | Exact PR head SHA
 Stages | `run_through`: `preflight`, `apply` (default) or `unit-test` | All three
+Sandboxes | `sandbox_count`: 1 (default) to 20, deployed in parallel; above 1, `preflight` or `apply` only. See [Deploying Several Sandboxes](#deploying-several-sandboxes) | 1
 Base modules | Any, with `vnet_app` enabled | All six
 Static CI | Not run | Six static CI workflows must pass before approval is requested
 PR statuses | Not published | `release-static-ci` and `sandbox-deployment-gate`; see [Releasing to `main`](../../../CONTRIBUTING.md#releasing-to-main)
 
 Stage | What it does
 --- | ---
-`preflight` | Confirms the trusted `main` workflow context and `jumplinux2`. Checks the backend and tfvars secrets, that `auth_mode` matches `SANDBOX_AUTH_MODE`, the module scope, and that the run's state key is unused. Installs a Terraform version that satisfies the deployed `required_version` if the runner's doesn't. Signs in as the deployment identity and waits for the time-bound roles.
+`preflight` | Confirms the trusted `main` workflow context and `jumplinux2`. Checks the backend and tfvars secrets, that `auth_mode` matches `SANDBOX_AUTH_MODE`, the module scope, and that the run's state key is unused. Installs a Terraform version that satisfies the deployed `required_version` if the runner's doesn't. Purges runs older than `SANDBOX_RETAINED_DEPLOYMENTS` from the runner and the state backend. Signs in as the deployment identity and waits for the time-bound roles.
 `apply` | Rechecks the roles, then applies the saved plan from preflight.
-`unit-test` | Rechecks the roles, starts every sandbox VM, runs the unit and integration tests, and publishes sanitized JSON results as a workflow artifact, pass or fail.
+`unit-test` | Rechecks the roles, starts every sandbox VM, runs the unit and integration tests, and publishes the full JSON results, redacted the same way as the job log, as a workflow artifact, pass or fail.
 
 Things to know:
 
 * **New sandboxes only.** Each run uses its own state key, `sandboxes/<deployment id>/terraform.tfstate`. The workflow never updates, recovers or destroys a sandbox. Tear down manually.
 * **One run at a time.** Runs share a concurrency group, and an active apply isn't cancelled.
-* **Private logs.** Raw logs and plans stay on the runner. The job summary shows the stage results, the deployed commit and the sandbox resource group name after a successful apply.
+* **Private logs.** Raw logs and plans stay on the runner. The job summary shows the stage results, the deployed commit and the sandbox resource group name after a successful apply. When `preflight` or `apply` fails with a Terraform error, each `Error:` block is also shown in full, in red in the job log, as an error annotation and in a caution alert in the job summary. Everything the runner publishes (status messages, progress, errors, annotations, the job summary and the unit-test evidence artifact) is redacted the same way: Microsoft Entra ID ids (tenant, client and object ids) and subscription ids are redacted, along with any other GUID. All tag values are redacted, and so are tag names other than the `project`, `costcenter` and `environment` names in the root `tags` design. Resource names and other details are kept for troubleshooting.
+* **Runner records.** Older runs are purged at preflight; see [Runner Records](#runner-records).
 * **Retry.** **Re-run failed jobs** isn't supported for release PRs. Start a new manual run, or mark the release PR as a draft and ready again.
+
+###### Deploying Several Sandboxes
+
+For a class or hackathon, set `sandbox_count` on a manual run to deploy up to 20 identical sandboxes in parallel, with one approval. Each sandbox is independent, with its own deployment id `sandbox-<run id>-<n>`, state key `sandboxes/sandbox-<run id>-<n>/terraform.tfstate`, resource group and private records on the runner. All of them use the same `SANDBOX_TFVARS_HCL`. With a count of 1 the run works as described above, with deployment id `sandbox-<run id>`.
+
+How it works:
+
+* **Preflight or apply only.** The tests use host-wide network state on the runner, such as the Virtual WAN point-to-site test's VPN tunnel and routes, so `unit-test` needs a count of 1. Release PRs always deploy one sandbox.
+* **Parallel processes in one job.** The `preflight` step checks the Terraform version and downloads the providers once, into a cache shared by the run. It then runs each sandbox's preflight in its own process, from its own copy of the source (a git worktree), starting one every 10 seconds. The `apply` step then applies every sandbox. The `Report stage results` step removes the source copies and the provider cache. A single-sandbox run uses the same kind of provider cache.
+* **Failures.** If any sandbox fails preflight, no sandbox is applied. During apply, a failed sandbox doesn't stop the others, but the job fails. Each failed sandbox gets an error annotation.
+* **Reporting.** The job log shows each sandbox's status lines prefixed with its deployment id, and a run-wide heartbeat every 2 minutes. The job summary has a table of every sandbox's resource group and stage results, with a details section per sandbox, including any Terraform errors.
+* **Shared limits.** All sandboxes share the job's 180-minute timeout, the just-in-time grant and the deployment identity's [Azure Resource Manager request limits](https://learn.microsoft.com/azure/azure-resource-manager/management/request-limits-and-throttling). Throttled requests are retried, so a larger run takes longer than a single sandbox.
+
+Plan capacity before the event. Figures are per sandbox with all base modules; fewer modules need less.
+
+Resource | Per sandbox | Notes
+--- | --- | ---
+Runner memory | Up to 1.5 GB during plan and apply | The runner itself uses about 1 GB. A measured run with `vnet_app` and `mssql` used about 0.9 GB per sandbox, rising slowly during apply.
+Runner CPU | About 1 vCPU during preflight | `terraform init` and `plan` keep the CPU busy for about 5 minutes. Apply mostly waits on Azure and uses under 10%. Fewer vCPUs than sandboxes only slows preflight.
+Runner disk | About 40 MB kept per sandbox, plus a provider cache of about 730 MB removed at the end of the run. Records of runs older than `SANDBOX_RETAINED_DEPLOYMENTS` are purged at preflight | The default 30 GB Standard SSD is enough. Its bandwidth peaks briefly while the cache fills, which only slows preflight.
+Regional vCPUs | 10: 2 each for `adds1`, `jumpwin1` and `jumplinux1`, and 4 for `mssqlwin1` | 200 for 20 sandboxes. Check *Total Regional vCPUs* and the VM family quotas under the subscription's *Usage + quotas*, and request an increase if needed.
+Public IP addresses | 2 Standard | For Azure Firewall and Bastion.
+Cost | Dominated by Azure Firewall, the Virtual WAN hub and point-to-site gateway, and Bastion | Billed hourly whether or not the sandbox is used. Disable modules the event doesn't need, such as `vwan`, and tear down promptly.
+
+Size the runner with `vm_jumpbox_linux_size` before the event, apply this configuration, and size it back down afterwards:
+
+Sandboxes | Runner size
+--- | ---
+Up to 2 | `Standard_D2ls_v6` (2 vCPUs, 4 GiB), the default
+Up to 8 | `Standard_D4s_v6` (4 vCPUs, 16 GiB)
+Up to 20 | `Standard_D8s_v6` (8 vCPUs, 32 GiB)
+
+The sandbox VMs keep running after the run, unless an Azure Policy in the subscription shuts them down.
+
+To tear down, delete each sandbox's resource group, listed in the job summary, and its state blob. Once the run is older than `SANDBOX_RETAINED_DEPLOYMENTS` allows, preflight has already deleted its state blobs; only the resource groups remain. Run this on `jumplinux2`, from this directory, signed in to Azure CLI with access to both:
+
+```bash
+RUN_ID=YOUR-RUN-ID-HERE
+COUNT=YOUR-SANDBOX-COUNT-HERE
+for rg in YOUR-RESOURCE-GROUP-NAMES-HERE; do az group delete --name "$rg" --yes --no-wait; done
+for n in $(seq 1 "$COUNT"); do ./scripts/delete-tfstate.sh --yes "sandboxes/sandbox-$RUN_ID-$n/terraform.tfstate"; done
+```
+
+With `mssql` enabled, also delete each sandbox's `grp-sql-admins-*` Microsoft Entra group. The group name ends with the same suffix as the sandbox's resource group.
+
+##### Runner Records
+
+Each deployment's private records (logs, plan, receipts and Terraform data) stay on `jumplinux2` in `~/.local/state/azuresandbox/deployments/<deployment id>/`. Terraform data links each provider to a per-run cache of about 730 MB, which the `Report stage results` step removes, so a deployment keeps about 40 MB. A run cancelled before that step leaves its cache behind until the run is purged.
+
+At preflight, the runner keeps the current run plus the `SANDBOX_RETAINED_DEPLOYMENTS` most recent previous runs (default `3`, range `1`-`10`), ordered by run id, and purges every older run:
+
+* A run is purged as a whole, including every sandbox of a multi-sandbox run.
+* Each purged deployment's state blob, `sandboxes/<deployment id>/terraform.tfstate`, is deleted from the backend first, breaking any leftover state lock. Only then are its records deleted, so a failure leaves them to retry on the next run. The `tfstate` container has no versioning or soft delete, so this is permanent.
+* Purging doesn't touch Azure resources. A sandbox that wasn't torn down keeps running; delete its resource group as described in [Deploying Several Sandboxes](#deploying-several-sandboxes).
+* Deployments recorded against another storage account or container are purged from the runner only, and reported, so their state blobs can be deleted manually with `delete-tfstate.sh`.
+* Entries in the folder that aren't deployment records are left in place, and reported.
+* Any error fails preflight.
+
+Preflight reports the result in the job log and the job summary, for example:
+
+```text
+preflight: runner records: kept the current run and 3 previous runs (SANDBOX_RETAINED_DEPLOYMENTS = 3); purged 2 runs: 3 deployments, 2 state blobs deleted, 2.3 GB freed.
+```
 
 ##### Terraform State
 
@@ -926,7 +994,8 @@ Day-to-day use of `jumplinux2` needs only `Reader` on the VM, its network interf
 Access | How it's granted
 --- | ---
 Azure RBAC `Reader` on the subscription | Standing
-Azure RBAC `Owner` on the subscription | PIM eligible, activated for `terraform plan`, `terraform apply` and `grant-jit-roles.sh`
+Azure RBAC `Owner` on the subscription | PIM eligible, activated for `terraform plan` and `terraform apply`
+Azure RBAC `Role Based Access Control Administrator` on the subscription | PIM eligible, activated for `grant-jit-roles.sh`. Narrower than `Owner`: it can manage role assignments but not resources.
 Microsoft Entra Privileged Role Administrator | PIM eligible, activated for `grant-graph-permissions.sh`
 Other Microsoft Entra directory roles, such as Global Administrator | PIM eligible, activated only when needed
 `User Access Administrator` at root scope (`/`) | Removed
@@ -935,7 +1004,7 @@ Apply it in the Azure portal in this order, so you don't lock yourself out:
 
 1. Confirm the prerequisites: Microsoft Entra ID P2, at least two multifactor authentication methods, and an [emergency access account](https://learn.microsoft.com/entra/identity/role-based-access-control/security-emergency-access) with permanent Global Administrator.
 1. Go to *PIM* > *Azure resources* > your subscription > *Settings* > *Owner*. Set the activation duration to 4-8 hours, require multifactor authentication and a justification, don't require approval, and allow permanent eligible assignments.
-1. Add an **eligible** `Owner` assignment for the operator on the subscription, and a standing `Reader` assignment.
+1. Add **eligible** `Owner` and `Role Based Access Control Administrator` assignments for the operator on the subscription, and a standing `Reader` assignment. Configure the `Role Based Access Control Administrator` role settings the same way as `Owner`.
 1. Test activation and deactivation **before** removing any standing access.
 1. Remove the operator's standing `Owner` assignment, including any inherited from a management group such as the Tenant Root Group.
 1. Remove the standing root-scope `User Access Administrator`: activate Global Administrator, then go to *Microsoft Entra ID* > *Properties* > *Access management for Azure resources* and select *No*. This grant persists after Global Administrator is deactivated.
@@ -964,7 +1033,7 @@ Risk | Applies to | Mitigation
 While a grant is active, anything on `jumplinux2` can use the deployment identity, including against this configuration's resource group | `managed_identity` | Keep grants short and revoke them after the run. Prefer `oidc`.
 The federated subjects don't name a workflow file, so any workflow in an allowed environment can federate | `oidc` | Restrict the environments to `main` and require owner approval. See [CONTRIBUTING.md](../../../CONTRIBUTING.md#deployment-environments-and-identities).
 The time-bound roles belong to the identity, not a run, so another approved run in the same window can use them | Both | The concurrency group runs one deployment at a time.
-Standing `Reader` and Microsoft Graph permissions are usable by any approved run, or anything on `jumplinux2` with `managed_identity` | Both | Grant Graph permissions only when `mssql` is used.
+Microsoft Graph permissions are standing and usable by any approved run, or anything on `jumplinux2` with `managed_identity` | Both | Grant Graph permissions only when `mssql` is used.
 The job's federated token is passed to Azure CLI on the command line, where other processes on `jumplinux2` can see it | `oidc` | Sign-in to `jumplinux2` requires Microsoft Entra ID through Bastion. Limit who has `Virtual Machine Administrator Login` or `Virtual Machine User Login`.
 
 ##### Removing the Runner

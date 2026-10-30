@@ -1,6 +1,6 @@
 #region private endpoints
 resource "azurerm_private_endpoint" "ai_services" {
-  name                = "${module.naming.private_endpoint.name}-ais"
+  name                = "${module.naming.names["private_endpoint"].name}-ais"
   resource_group_name = var.resource_group_name
   location            = var.location
   subnet_id           = var.subnets["snet-privatelink-01"].id
@@ -24,7 +24,7 @@ resource "azurerm_private_endpoint" "ai_services" {
 }
 
 resource "azurerm_private_endpoint" "search_service" {
-  name                = "${module.naming.private_endpoint.name}-srch"
+  name                = "${module.naming.names["private_endpoint"].name}-srch"
   resource_group_name = var.resource_group_name
   location            = var.location
   subnet_id           = var.subnets["snet-privatelink-01"].id
@@ -46,7 +46,7 @@ resource "azurerm_private_endpoint" "search_service" {
 }
 
 resource "azurerm_private_endpoint" "container_registry" {
-  name                = "${module.naming.private_endpoint.name}-acr"
+  name                = "${module.naming.names["private_endpoint"].name}-acr"
   resource_group_name = var.resource_group_name
   location            = var.location
   subnet_id           = var.subnets["snet-privatelink-01"].id
@@ -68,7 +68,7 @@ resource "azurerm_private_endpoint" "container_registry" {
 }
 
 resource "azurerm_private_endpoint" "ai_foundry" {
-  name                = "${module.naming.private_endpoint.name}-aif"
+  name                = "${module.naming.names["private_endpoint"].name}-aif"
   resource_group_name = var.resource_group_name
   location            = var.location
   subnet_id           = var.subnets["snet-privatelink-01"].id

@@ -58,7 +58,7 @@ resource "azurerm_linux_virtual_machine" "this" {
 }
 
 resource "azurerm_virtual_machine_run_command" "wait_for_cloud_init" {
-  name               = "${module.naming.virtual_machine_extension.name}-${var.vm_jumpbox_linux_name}-WaitForCloudInit"
+  name               = "${module.naming.names["virtual_machine_extension"].name}-${var.vm_jumpbox_linux_name}-WaitForCloudInit"
   location           = var.location
   virtual_machine_id = azurerm_linux_virtual_machine.this.id
 
@@ -83,7 +83,7 @@ resource "azurerm_role_assignment" "this" {
 # Operators sign in as their own Entra identity instead of the local admin account.
 # The extension installs with apt, so it waits for cloud-init and the dpkg/apt locks.
 resource "azurerm_virtual_machine_extension" "aad_ssh_login" {
-  name                       = "${module.naming.virtual_machine_extension.name}-${var.vm_jumpbox_linux_name}-AADSSHLoginForLinux"
+  name                       = "${module.naming.names["virtual_machine_extension"].name}-${var.vm_jumpbox_linux_name}-AADSSHLoginForLinux"
   virtual_machine_id         = azurerm_linux_virtual_machine.this.id
   publisher                  = "Microsoft.Azure.ActiveDirectory"
   type                       = "AADSSHLoginForLinux"
@@ -115,7 +115,7 @@ resource "azurerm_virtual_machine_extension" "ama" {
 }
 
 resource "azurerm_monitor_data_collection_rule_association" "dcr" {
-  name                    = "${module.naming.monitor_data_collection_rule.name}-${var.vm_jumpbox_linux_name}-association"
+  name                    = "${module.naming.names["data_collection_rule_association"].name}-${var.vm_jumpbox_linux_name}"
   target_resource_id      = azurerm_linux_virtual_machine.this.id
   data_collection_rule_id = var.data_collection_rule_linux_id
 
@@ -138,7 +138,7 @@ resource "azapi_resource" "github_runner" {
   count = var.enable_github_runner ? 1 : 0
 
   type      = "Microsoft.Compute/virtualMachines/runCommands@2025-04-01"
-  name      = "${module.naming.virtual_machine_extension.name}-${var.vm_jumpbox_linux_name}-ConfigureGitHubRunner"
+  name      = "${module.naming.names["virtual_machine_extension"].name}-${var.vm_jumpbox_linux_name}-ConfigureGitHubRunner"
   parent_id = azurerm_linux_virtual_machine.this.id
   location  = var.location
 

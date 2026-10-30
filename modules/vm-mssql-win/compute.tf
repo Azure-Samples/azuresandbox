@@ -36,7 +36,7 @@ resource "azurerm_managed_disk" "disks" {
   for_each = local.disks
 
   resource_group_name = var.resource_group_name
-  name                = "${module.naming.managed_disk.name}-${each.value.name}"
+  name                = "${module.naming.names["disk"].name}-${each.value.name}"
   location            = var.location
   zone                = var.vm_mssql_win_zone
 
@@ -67,14 +67,49 @@ resource "azurerm_role_assignment" "assignments" {
 #endregion
 
 #region sql-vm-configuration
+# Patch first: install pending Critical/Security updates (and reboot if required) before any run
+# command or extension runs, so update-driven reboots don't interrupt guest configuration.
+# Runs after the data disk attachments so the two VM operations don't conflict.
+# The apply fails if the patch run reports status "Failed" (e.g. a patch failed to install or the
+# maximumDuration window ran out with patches outstanding), so configuration never runs on a
+# partially patched VM. The patch result is also exported.
+resource "azapi_resource_action" "install_patches" {
+  type        = "Microsoft.Compute/virtualMachines@2025-04-01"
+  resource_id = azurerm_windows_virtual_machine.this.id
+  action      = "installPatches"
+  method      = "POST"
+  depends_on  = [azurerm_virtual_machine_data_disk_attachment.attachments]
+
+  body = {
+    maximumDuration = "PT2H"
+    rebootSetting   = "IfRequired"
+    windowsParameters = {
+      classificationsToInclude = ["Critical", "Security"]
+    }
+  }
+
+  response_export_values = ["status", "rebootStatus", "installedPatchCount", "failedPatchCount", "pendingPatchCount", "maintenanceWindowExceeded"]
+
+  timeouts {
+    create = "135m"
+  }
+
+  lifecycle {
+    postcondition {
+      condition     = try(self.output.status, "") != "Failed"
+      error_message = "Patch installation on ${azurerm_windows_virtual_machine.this.name} reported status Failed (maintenanceWindowExceeded=${try(self.output.maintenanceWindowExceeded, "unknown")}, installed=${try(self.output.installedPatchCount, "unknown")}, failed=${try(self.output.failedPatchCount, "unknown")}, pending=${try(self.output.pendingPatchCount, "unknown")}, rebootStatus=${try(self.output.rebootStatus, "unknown")})."
+    }
+  }
+}
+
 resource "azurerm_virtual_machine_extension" "join_domain" {
-  name                       = "${module.naming.virtual_machine_extension.name}-${var.vm_mssql_win_name}-JsonADDomainExtension"
+  name                       = "${module.naming.names["virtual_machine_extension"].name}-${var.vm_mssql_win_name}-JsonADDomainExtension"
   virtual_machine_id         = azurerm_windows_virtual_machine.this.id
   publisher                  = "Microsoft.Compute"
   type                       = "JsonADDomainExtension"
   type_handler_version       = "1.3"
   auto_upgrade_minor_version = true
-  depends_on                 = [azurerm_virtual_machine_data_disk_attachment.attachments]
+  depends_on                 = [azapi_resource_action.install_patches]
 
   settings = jsonencode({
     Name    = var.adds_domain_name
@@ -117,7 +152,7 @@ resource "azurerm_virtual_machine_run_command" "configure_sql_login" {
 #endregion
 
 resource "azurerm_virtual_machine_extension" "configure_sql_server" {
-  name                       = "${module.naming.virtual_machine_extension.name}-${var.vm_mssql_win_name}-ConfigureSqlServer"
+  name                       = "${module.naming.names["virtual_machine_extension"].name}-${var.vm_mssql_win_name}-ConfigureSqlServer"
   virtual_machine_id         = azurerm_windows_virtual_machine.this.id
   publisher                  = "Microsoft.Compute"
   type                       = "CustomScriptExtension"
@@ -160,7 +195,7 @@ resource "azurerm_virtual_machine_extension" "ama" {
 }
 
 resource "azurerm_monitor_data_collection_rule_association" "mssqlwin1_dcr" {
-  name                    = "${module.naming.monitor_data_collection_rule.name}-${var.vm_mssql_win_name}-association"
+  name                    = "${module.naming.names["data_collection_rule_association"].name}-${var.vm_mssql_win_name}"
   target_resource_id      = azurerm_windows_virtual_machine.this.id
   data_collection_rule_id = var.data_collection_rule_windows_id
 

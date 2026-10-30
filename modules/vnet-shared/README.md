@@ -24,6 +24,8 @@ This module implements a virtual network with shared services used by all the co
 
 The estimated provisioning time for this module is 23 minutes.
 
+Before any run command or VM extension touches *adds1*, Terraform installs pending Critical and Security Windows updates on it using the platform [installPatches](https://learn.microsoft.com/en-us/rest/api/compute/virtual-machines/install-patches) action and reboots it if required (patch → reboot → configure). This keeps an update-driven reboot from interrupting later configuration steps. Patching runs for up to 2 hours. If the patch run reports a status of `Failed` (a patch failed to install, or the window ran out with patches outstanding), the apply fails instead of configuring a partially patched VM. The patch result is also surfaced in the `patch_install_result` output. Because the failed result stays in Terraform state, later plans fail too until you re-run patching with `terraform apply -replace='module.vnet_shared.azapi_resource_action.install_patches'`. Automatic patching stays enabled. Patching adds time to provisioning that varies with the number of pending updates. Adding this step to an existing sandbox patches and may reboot *adds1* on the next apply.
+
 > [!IMPORTANT]
 > **OS disk type change (Standard HDD retirement).** The default for `vm_adds_storage_account_type` is now `StandardSSD_LRS` and Standard HDD (`Standard_LRS`) is no longer permitted, because [Azure is retiring Standard HDD OS disks on September 8, 2028](https://learn.microsoft.com/en-us/azure/virtual-machines/disks-hdd-os-retirement). Fresh deployments are unaffected. For an **existing** deployment created with `Standard_LRS`, changing `os_disk.storage_account_type` forces Terraform to **replace the VM** (destroy and recreate). This VM is the Active Directory domain controller and DNS server that other modules depend on, so its replacement causes an AD/DNS outage that will disrupt domain-joined VMs and dependent modules until it re-provisions. To avoid replacement and downtime, deallocate the VM and change its OS disk SKU in place (Azure portal/CLI) *before* applying, then set the variable to the new SKU so Terraform detects no change. If you allow a replacement instead, schedule a maintenance window and expect dependent VMs to require domain re-join/re-provisioning.
 
@@ -31,15 +33,15 @@ The estimated provisioning time for this module is 23 minutes.
 
 * Explore your newly provisioned resources in the Azure portal:
   * Key vault
-    * Temporarily enable public access to the key vault by navigating to *portal.azure.com* > *Key vaults* > *kv-sand-dev-xxxxxxxx* > *Networking* > *Firewalls and virtual networks* > *Allow access from:* > *Allow public access from all networks*.
-    * Navigate to *portal.azure.com* > *Key vaults* > *kv-sand-dev-xxxxxxxx* > *Objects* > *Secrets* > *adminpassword* > *CURRENT VERSION* > *00000000-0000-0000-0000-000000000000* > *Show Secret Value*
+    * Temporarily enable public access to the key vault by navigating to *portal.azure.com* > *Key vaults* > *kv-sand-dev-xxxx* > *Networking* > *Firewalls and virtual networks* > *Allow access from:* > *Allow public access from all networks*.
+    * Navigate to *portal.azure.com* > *Key vaults* > *kv-sand-dev-xxxx* > *Objects* > *Secrets* > *adminpassword* > *CURRENT VERSION* > *00000000-0000-0000-0000-000000000000* > *Show Secret Value*
     * Make a note of the *Secret value*. This is a strong password associated with the *adminuser* key vault secret. Together these credentials are used to set up initial administrative access to resources in Azure Sandbox.
-    * Disable public access to the key vault by navigating to *portal.azure.com* > *Key vaults* > *kv-sand-dev-xxxxxxxx* > *Networking* > *Firewalls and virtual networks* > *Allow access from:* > *Disable public access*.
+    * Disable public access to the key vault by navigating to *portal.azure.com* > *Key vaults* > *kv-sand-dev-xxxx* > *Networking* > *Firewalls and virtual networks* > *Allow access from:* > *Disable public access*.
   * Bastion host
-    * Navigate to *portal.azure.com* > *Bastions* > *snap-sand-dev*.
+    * Navigate to *portal.azure.com* > *Bastions* > *bas-sand-dev*.
     * Review the information in the *Overview* section.
   * Firewall
-    * Navigate to *portal.azure.com* > *Firewalls* > *fw-sand-dev*.
+    * Navigate to *portal.azure.com* > *Firewalls* > *afw-sand-dev*.
     * Review the information in the *Overview* section.
 
 ## Documentation
@@ -99,7 +101,7 @@ subnet_misc_address_prefix | 10.1.2.0/24 | The address prefix for the miscellane
 subnet_misc_02_address_prefix | 10.1.3.0/24 | The address prefix for the miscellaneous 2 subnet.
 subnet_privatelink_address_prefix | 10.1.5.0/24 | The address prefix for the PrivateLink subnet, which hosts the private endpoints for the entire sandbox environment.
 tags | | The tags defined in the root module.
-unique_seed | | A unique seed used by the Azure/naming module to generate random values for resources. Set in the root module and used here for consistent naming.
+unique_seed | | The random seed generated by the root module's naming module. Its first characters are added to globally unique names so they share the resource group's random suffix.
 vm_adds_image_offer | WindowsServer | The offer type of the virtual machine image used to create the VM.
 vm_adds_image_publisher | MicrosoftWindowsServer | The publisher for the virtual machine image used to create the VM.
 vm_adds_image_sku | 2025-datacenter-azure-edition-core | The SKU of the virtual machine image used to create the VM.
@@ -114,19 +116,20 @@ vnet_name | shared | The name of the new virtual network.
 
 Address | Name | Notes
 --- | --- | ---
-module.vnet_shared.azurerm_bastion_host.this | snap&#8209;sand&#8209;dev | The Azure Bastion used for secure RDP/SSH access to sandbox VMs. Uses the `Standard` SKU, which is required to emit `BastionAuditLogs` via a diagnostic setting.
-module.vnet_shared.azurerm_firewall.this | fw&#8209;sand&#8209;dev | The Azure Firewall used for network security.
+module.vnet_shared.azapi_resource_action.install_patches | | Installs Critical and Security updates on *adds1* (rebooting if required) within a 2-hour window, failing the apply if the patch run reports `Failed`, before any run command or extension runs on it.
+module.vnet_shared.azurerm_bastion_host.this | bas&#8209;sand&#8209;dev | The Azure Bastion used for secure RDP/SSH access to sandbox VMs. Uses the `Standard` SKU, which is required to emit `BastionAuditLogs` via a diagnostic setting.
+module.vnet_shared.azurerm_firewall.this | afw&#8209;sand&#8209;dev | The Azure Firewall used for network security.
 module.vnet_shared.azurerm_firewall_policy.this | awfp&#8209;sand&#8209;dev | The firewall policy. Threat intelligence mode is set to `Deny`.
 module.vnet_shared.azurerm_firewall_policy_rule_collection_group.this | fwprcg&#8209;sand&#8209;dev | The firewall rules. Allows all outbound traffic for ports `80`, `443` and `1688` (Windows Activation).
 module.vnet_shared.azurerm_key_vault.this | kv&#8209;sand&#8209;dev | The Azure Key Vault used to store secrets.
 module.vnet_shared.azurerm_key_vault_secret.adminpassword | adminpassword | Randomly generated admin password used for sandbox VMs and services.
 module.vnet_shared.azurerm_key_vault_secret.adminusername | adminuser | Admin username used for sandbox VMs and services, default is *bootstrapadmin*.
-module.vnet_shared.azurerm_log_analytics_workspace.this | log&#8209;sand&#8209;dev&#8209;xxx | The Log Analytics workspace used to collect logs and metrics from Azure resources.
-module.vnet_shared.azurerm_monitor_data_collection_endpoint.this | dce&#8209;sand&#8209;dev&#8209;xxx | The data collection endpoint (DCE) for Azure Monitor.
-module.vnet_shared.azurerm_monitor_data_collection_rule.linux | dcr&#8209;sand&#8209;dev&#8209;linux | The data collection rules (DCR) for Linux VMs.
-module.vnet_shared.azurerm_monitor_data_collection_rule.windows | dcr&#8209;sand&#8209;dev&#8209;windows | The data collection rules (DCR) for Windows VMs.
+module.vnet_shared.azurerm_log_analytics_workspace.this | log&#8209;sand&#8209;dev&#8209;xxxx | The Log Analytics workspace used to collect logs and metrics from Azure resources.
+module.vnet_shared.azurerm_monitor_data_collection_endpoint.this | dcesanddevxxxx | The data collection endpoint (DCE) for Azure Monitor.
+module.vnet_shared.azurerm_monitor_data_collection_rule.linux | dcrsanddev&#8209;linux | The data collection rules (DCR) for Linux VMs.
+module.vnet_shared.azurerm_monitor_data_collection_rule.windows | dcrsanddev&#8209;windows | The data collection rules (DCR) for Windows VMs.
 module.vnet_shared.azurerm_monitor_data_collection_rule_association.adds1_dce | configurationAccessEndpoint | Associates the DCE with adds1.
-module.vnet_shared.azurerm_monitor_data_collection_rule_association.adds1_dcr | dcr&#8209;sand&#8209;dev&#8209;adds1&#8209;association | Associates the DCR with adds1.
+module.vnet_shared.azurerm_monitor_data_collection_rule_association.adds1_dcr | dcrasanddev&#8209;adds1 | Associates the DCR with adds1.
 module.vnet_shared.azurerm_monitor_diagnostic_setting.bastion | Diagnostic Logs | The Azure Monitor diagnostic setting that streams Azure Bastion audit logs (`BastionAuditLogs`) and `AllMetrics` to the Log Analytics workspace. `BastionAuditLogs` only ever writes to the resource-specific `MicrosoftAzureBastionAuditLogs` table and requires the Bastion `Standard` SKU.
 module.vnet_shared.azurerm_monitor_diagnostic_setting.firewall | Diagnostic Logs | The Azure Monitor diagnostic setting that streams Azure Firewall structured (resource-specific) logs (`AZFWApplicationRule`, `AZFWNetworkRule`, `AZFWNatRule`, `AZFWThreatIntel`, `AZFWDnsQuery`) and `AllMetrics` to the Log Analytics workspace. Uses `Dedicated` destination tables. High-volume aggregation/flow-trace categories and Premium-only IDPS logs are intentionally omitted to control ingestion cost.
 module.vnet_shared.azurerm_monitor_diagnostic_setting.this | Audit Logs | The Azure Monitor diagnostic setting used to send key vault logs and metrics to the Log Analytics workspace.
@@ -148,12 +151,12 @@ module.vnet_shared.azurerm_private_dns_zone.zones["privatelink.oms.opinsights.az
 module.vnet_shared.azurerm_private_dns_zone.zones["privatelink.vaultcore.azure.net"] | | Private DNS zone for the key vault.
 module.vnet_shared.azurerm_private_dns_zone.zones["privatelink.&lt;location&gt;.azurecontainerapps.io"] | | Private DNS zone for Azure Container Apps, consumed by the *petstore* configuration.
 module.vnet_shared.azurerm_private_dns_zone_virtual_network_link.zones[*] | | Links each private DNS zone to *vnet-sand-dev-shared*. Zones are linked to the shared services virtual network only; see the root README section on Private Endpoints and Private DNS.
-module.vnet_shared.azurerm_private_endpoint.ampls | pe&#8209;sand&#8209;dev&#8209;ampls | The private endpoint for Azure Monitor.
-module.vnet_shared.azurerm_private_endpoint.key_vault | pe&#8209;sand&#8209;dev&#8209;key&#8209;vault | The private endpoint for the key vault.
+module.vnet_shared.azurerm_private_endpoint.ampls | pep&#8209;sand&#8209;dev&#8209;ampls | The private endpoint for Azure Monitor.
+module.vnet_shared.azurerm_private_endpoint.key_vault | pep&#8209;sand&#8209;dev&#8209;key&#8209;vault | The private endpoint for the key vault.
 module.vnet_shared.azurerm_public_ip.bastion | pip&#8209;sand&#8209;dev&#8209;bastion | Public IP for Azure Bastion.
 module.vnet_shared.azurerm_public_ip.firewall | pip&#8209;sand&#8209;dev&#8209;firewall | Public IP for Azure Firewall.
 module.vnet_shared.azurerm_role_assignment.roles[*] | | Assigns `Key Vault Secrets Officer` role to the service principal and user for managing key vault secrets.
-module.vnet_shared.azurerm_route_table.this | route&#8209;sand&#8209;dev | Configures next hop for default route to go to Azure Firewall for all sandbox subnets.
+module.vnet_shared.azurerm_route_table.this | rt&#8209;sand&#8209;dev | Configures next hop for default route to go to Azure Firewall for all sandbox subnets.
 module.vnet_shared.azurerm_subnet.subnets["AzureBastionSubnet"] | | Dedicated subnet Azure Bastion.
 module.vnet_shared.azurerm_subnet.subnets["AzureFirewallSubnet"] | | Dedicated subnet for Azure Firewall.
 module.vnet_shared.azurerm_subnet.subnets["snet-adds-01"] | | Dedicated subnet for *adds1* Domain Controller / DNS Server VM.
@@ -161,7 +164,7 @@ module.vnet_shared.azurerm_subnet.subnets["snet-misc-01"] | | Reserved for use b
 module.vnet_shared.azurerm_subnet.subnets["snet-misc-02"] | | Reserved for use by optional configurations.
 module.vnet_shared.azurerm_subnet.subnets["snet-privatelink-01"] | | Dedicated subnet for Private Link, hosting the private endpoints for every module in the sandbox environment.
 module.vnet_shared.azurerm_subnet_network_security_group_association.associations[*] | | NSGs are associated with all subnets except *AzureFirewallSubnet* and *snet-privatelink-01*.
-module.vnet_shared.azurerm_subnet_route_table_association.associations[*] | | The *route-sand-dev* route table is associated with all subnets except *AzureFirewallSubnet*,*AzureBastionSubnet* and *snet-privatelink-01*.
+module.vnet_shared.azurerm_subnet_route_table_association.associations[*] | | The *rt-sand-dev* route table is associated with all subnets except *AzureFirewallSubnet*,*AzureBastionSubnet* and *snet-privatelink-01*.
 module.vnet_shared.azurerm_virtual_network.this | vnet&#8209;sand&#8209;dev&#8209;shared | The shared services virtual network.
 module.vnet_shared.azurerm_windows_virtual_machine.this | adds1 | The AD DS Domain Controller / DNS Server VM.
 
@@ -178,6 +181,7 @@ admin_username | bootstrapadmin | The user name for provisioning administrator a
 admin_username_secret | adminuser | The name of the key vault secret containing the admin username.
 dns_server | 10.1.1.4 | The primary DNS server IP address for the virtual network.
 fqdns | | A map of fqdns for resources provisioned in the module.
+patch_install_result | | The result of the *adds1* patch installation (status, rebootStatus, installed/failed/pending patch counts, maintenanceWindowExceeded).
 private_dns_zone_links_complete | | A dependency signal indicating all private DNS zone virtual network links have been created. Consumed by modules that provision private endpoints.
 private_dns_zones | | A map of all private DNS zones used by the sandbox environment, keyed by zone name. Consumed by modules that provision private endpoints.
 resource_ids | | A map of resource IDs for key resources in the module.

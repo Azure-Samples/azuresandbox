@@ -33,6 +33,8 @@ This configuration implements a virtual network for applications including:
 
 The estimated provisioning time for this module is 15 minutes.
 
+Before any run command or VM extension touches *jumpwin1*, Terraform installs pending Critical and Security Windows updates on it using the platform [installPatches](https://learn.microsoft.com/en-us/rest/api/compute/virtual-machines/install-patches) action and reboots it if required (patch → reboot → configure). This keeps an update-driven reboot from interrupting later configuration steps. Patching runs for up to 2 hours. If the patch run reports a status of `Failed` (a patch failed to install, or the window ran out with patches outstanding), the apply fails instead of configuring a partially patched VM. The patch result is also surfaced in the `patch_install_result` output. Because the failed result stays in Terraform state, later plans fail too until you re-run patching with `terraform apply -replace='module.vnet_app[0].azapi_resource_action.install_patches'`. Automatic patching stays enabled. Patching adds time to provisioning that varies with the number of pending updates. Adding this step to an existing sandbox patches and may reboot *jumpwin1* on the next apply.
+
 > [!IMPORTANT]
 > **OS disk type change (Standard HDD retirement).** The default for `vm_jumpbox_win_storage_account_type` is now `StandardSSD_LRS` and Standard HDD (`Standard_LRS`) is no longer permitted, because [Azure is retiring Standard HDD OS disks on September 8, 2028](https://learn.microsoft.com/en-us/azure/virtual-machines/disks-hdd-os-retirement). Fresh deployments are unaffected. For an **existing** deployment created with `Standard_LRS`, changing `os_disk.storage_account_type` forces Terraform to **replace the VM** (destroy and recreate), which causes downtime; the Windows jumpbox is domain-joined and re-provisioned by its run-command configuration, so the recommended path is to let Terraform recreate it during a maintenance window. To avoid replacement, deallocate the VM and change its OS disk SKU in place (Azure portal/CLI) *before* applying, then set the variable to the new SKU so Terraform detects no change.
 
@@ -182,8 +184,9 @@ This section lists the resources included in this configuration.
 
 Address | Name | Notes
 --- | --- | ---
-module.vnet_app[0].azurerm_application_insights.this | appi-sand-dev-xxx | Workspace-based Application Insights linked to the shared Log Analytics workspace.
-module.vnet_app[0].azurerm_container_registry.this | crsandboxdevxxxxxxxx | Shared container registry.
+module.vnet_app[0].azapi_resource_action.install_patches | | Installs Critical and Security updates on *jumpwin1* (rebooting if required) within a 2-hour window, failing the apply if the patch run reports `Failed`, before any run command or extension runs on it.
+module.vnet_app[0].azurerm_application_insights.this | appisanddevxxx | Workspace-based Application Insights linked to the shared Log Analytics workspace.
+module.vnet_app[0].azurerm_container_registry.this | crsanddevxxxxxxxx | Shared container registry.
 module.vnet_app[0].azurerm_monitor_data_collection_rule_association.jumpwin1_dce | | Data collection endpoint association for jumpwin1.
 module.vnet_app[0].azurerm_monitor_data_collection_rule_association.jumpwin1_dcr | | Data collection rule association for jumpwin1.
 module.vnet_app[0].azurerm_monitor_diagnostic_setting.container_registry | | Diagnostic settings for container registry.
@@ -193,9 +196,9 @@ module.vnet_app[0].azurerm_monitor_private_link_scoped_service.app_insights | | 
 module.vnet_app[0].azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;jumpwin1 | Network interface for the VM.
 module.vnet_app[0].azurerm_network_security_group.groups[*] | | NSGs for each subnet.
 module.vnet_app[0].azurerm_network_security_rule.rules[*] | | NSG rules for each NSG. See *locals.tf* for rule definitions.
-module.vnet_app[0].azurerm_private_endpoint.container_registry | pe&#8209;sand&#8209;dev&#8209;cr | Private endpoint for the container registry. Provisioned in the centralized private endpoint subnet in *vnet-shared*.
-module.vnet_app[0].azurerm_private_endpoint.storage_blob | pe&#8209;sand&#8209;dev&#8209;storage&#8209;blob | Private endpoint for the blob storage endpoint. Provisioned in the centralized private endpoint subnet in *vnet-shared*.
-module.vnet_app[0].azurerm_private_endpoint.storage_file | pe&#8209;sand&#8209;dev&#8209;storage&#8209;file | Private endpoint for the file storage endpoint. Provisioned in the centralized private endpoint subnet in *vnet-shared*.
+module.vnet_app[0].azurerm_private_endpoint.container_registry | pep&#8209;sand&#8209;dev&#8209;cr | Private endpoint for the container registry. Provisioned in the centralized private endpoint subnet in *vnet-shared*.
+module.vnet_app[0].azurerm_private_endpoint.storage_blob | pep&#8209;sand&#8209;dev&#8209;storage&#8209;blob | Private endpoint for the blob storage endpoint. Provisioned in the centralized private endpoint subnet in *vnet-shared*.
+module.vnet_app[0].azurerm_private_endpoint.storage_file | pep&#8209;sand&#8209;dev&#8209;storage&#8209;file | Private endpoint for the file storage endpoint. Provisioned in the centralized private endpoint subnet in *vnet-shared*.
 module.vnet_app[0].azurerm_role_assignment.assignments_storage[*] | | Role assignments for the storage account as defined in *locals.tf*.
 module.vnet_app[0].azurerm_role_assignment.assignments_vm_win[*] | | Role assignments for the VM as defined in *locals.tf*.
 module.vnet_app[0].azurerm_storage_account.this | stsanddevxxxxxxxx | Storage account for the blob and file storage.
@@ -223,6 +226,7 @@ Name | Comments
 --- | --- | ---
 app_insights_connection_string | | Application Insights connection string. Use this in application code instead of the legacy instrumentation key.
 fqdns | | A map of fqdns for resources provisioned in the module.
+patch_install_result | | The result of the *jumpwin1* patch installation (status, rebootStatus, installed/failed/pending patch counts, maintenanceWindowExceeded).
 resource_ids | | A map of resource IDs for key resources in the module.
 resource_names | | A map of resource names for key resources in the module.
 storage_container_name | scripts | The name of the storage container used to store scripts.

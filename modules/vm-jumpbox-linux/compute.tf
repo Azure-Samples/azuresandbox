@@ -43,7 +43,7 @@ resource "azurerm_role_assignment" "kv_secrets_user_vm_linux" {
 # The AMA installer fails (exit code 56) if the package manager is locked for more than a few
 # minutes, so wait for cloud-init package installs and first-boot apt activity to finish first.
 resource "azurerm_virtual_machine_run_command" "wait_for_cloud_init" {
-  name               = "${module.naming.virtual_machine_extension.name}-${var.vm_jumpbox_linux_name}-WaitForCloudInit"
+  name               = "${module.naming.names["virtual_machine_extension"].name}-${var.vm_jumpbox_linux_name}-WaitForCloudInit"
   location           = var.location
   virtual_machine_id = azurerm_linux_virtual_machine.this.id
 
@@ -70,7 +70,7 @@ resource "azurerm_virtual_machine_extension" "ama" {
 }
 
 resource "azurerm_monitor_data_collection_rule_association" "jumplinux1_dcr" {
-  name                    = "${module.naming.monitor_data_collection_rule.name}-${var.vm_jumpbox_linux_name}-association"
+  name                    = "${module.naming.names["data_collection_rule_association"].name}-${var.vm_jumpbox_linux_name}"
   target_resource_id      = azurerm_linux_virtual_machine.this.id
   data_collection_rule_id = var.data_collection_rule_linux_id
 

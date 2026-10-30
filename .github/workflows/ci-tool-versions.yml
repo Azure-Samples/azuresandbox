@@ -4,6 +4,8 @@
 # unmonitored: each is pinned as a direct binary download gated by an env-var
 # version, an Install-Module / npx inline invocation with no manifest, or an
 # input to a setup action (Dependabot bumps the action ref, not its inputs).
+# The Terraform CLI required_version and the jumplinux2 GitHub Actions runner
+# version (a Terraform variable default) are tracked here for the same reason.
 # This scheduled workflow closes that gap. scripts/Check-ToolVersionDrift.sh
 # compares each pinned version against its upstream latest stable release; when
 # anything is behind it opens (or updates) a SINGLE tracking issue, and closes

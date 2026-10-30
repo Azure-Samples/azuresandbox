@@ -35,13 +35,13 @@ data "http" "github_repository" {
 
 #region key-vault
 resource "azurerm_resource_group" "this" {
-  name     = module.naming.resource_group.name_unique
+  name     = module.naming.names["resource_group"].name_unique
   location = var.location
   tags     = var.tags
 }
 
 resource "azurerm_key_vault" "this" {
-  name                          = module.naming.key_vault.name_unique
+  name                          = module.naming.names["key_vault_vault"].name_unique
   location                      = var.location
   resource_group_name           = azurerm_resource_group.this.name
   tenant_id                     = var.entra_tenant_id
@@ -83,7 +83,7 @@ resource "time_sleep" "wait_for_roles" {
 
 #region azure-monitor
 resource "azurerm_log_analytics_workspace" "this" {
-  name                           = module.naming.log_analytics_workspace.name_unique
+  name                           = module.naming.names["operational_insights_workspace"].name_unique
   location                       = var.location
   resource_group_name            = azurerm_resource_group.this.name
   sku                            = "PerGB2018"
@@ -122,7 +122,7 @@ resource "azurerm_monitor_private_link_scoped_service" "dce" {
 }
 
 resource "azurerm_monitor_data_collection_endpoint" "this" {
-  name                = module.naming.monitor_data_collection_endpoint.name_unique
+  name                = module.naming.names["data_collection_endpoint"].name_unique
   location            = var.location
   resource_group_name = azurerm_resource_group.this.name
   kind                = "Linux"
@@ -130,7 +130,7 @@ resource "azurerm_monitor_data_collection_endpoint" "this" {
 }
 
 resource "azurerm_monitor_data_collection_rule" "linux" {
-  name                        = "${module.naming.monitor_data_collection_rule.name}-linux"
+  name                        = "${module.naming.names["data_collection_rule"].name}-linux"
   location                    = var.location
   resource_group_name         = azurerm_resource_group.this.name
   data_collection_endpoint_id = azurerm_monitor_data_collection_endpoint.this.id
@@ -202,24 +202,15 @@ resource "azurerm_monitor_diagnostic_setting" "data_collection_rule_linux" {
 # - "none" (default): no deployment UAMI is created.
 # - "managed_identity": the deployment UAMI is attached to jumplinux2 and used by Terraform running there, from a terminal or a GitHub Actions job on its self-hosted runner.
 # - "oidc": the deployment UAMI is NOT attached to jumplinux2. Instead, it is used by approved GitHub Actions jobs on jumplinux2's self-hosted runner through federated identity credentials.
-# In both modes it holds only standing Reader. Before each apply, the operator grants time-bound Contributor and Role Based Access Control Administrator,
+# In both modes it holds no standing Azure RBAC role. Before each apply, the operator grants time-bound Contributor and Role Based Access Control Administrator,
 # restricted by the allow-list ABAC condition (scripts/grant-jit-roles.sh).
 resource "azurerm_user_assigned_identity" "deployment" {
   count = var.deployment_identity != "none" ? 1 : 0
 
-  name                = "${module.naming.user_assigned_identity.name}-deployment"
+  name                = "${module.naming.names["user_assigned_identity"].name}-deployment"
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
   tags                = var.tags
-}
-
-resource "azurerm_role_assignment" "deployment_identity_reader" {
-  count = var.deployment_identity != "none" ? 1 : 0
-
-  principal_id         = azurerm_user_assigned_identity.deployment[0].principal_id
-  principal_type       = "ServicePrincipal"
-  role_definition_name = "Reader"
-  scope                = "/subscriptions/${var.subscription_id}"
 }
 
 # Trusts GitHub Actions OIDC tokens for the oidc deployment identity, one credential per subject in local.github_oidc_subjects.
@@ -245,7 +236,7 @@ resource "azurerm_federated_identity_credential" "deployment_identity_github" {
 resource "azurerm_user_assigned_identity" "runner_power_state" {
   count = var.deployment_identity == "oidc" ? 1 : 0
 
-  name                = "${module.naming.user_assigned_identity.name}-runner"
+  name                = "${module.naming.names["user_assigned_identity"].name}-runner"
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
   tags                = var.tags
@@ -365,11 +356,11 @@ resource "azapi_update_resource" "log_analytics_disable_public_access" {
 
 #region modules
 module "naming" {
-  source                 = "Azure/naming/azurerm"
-  version                = "~> 0.4.3"
+  source                 = "Azure/avm-utl-naming/azure"
+  version                = "~> 0.3.0"
   suffix                 = [var.tags["project"], var.tags["environment"]]
-  unique-include-numbers = true
-  unique-length          = 8
+  unique_include_numbers = true
+  unique_length          = 8
 }
 
 module "vm_jumpbox_linux" {

@@ -56,7 +56,7 @@ This section describes how to test the module after deployment.
 * Wait for 5 minutes to proceed to allow time for cloud-init configurations to complete.
 
 * Retrieve SSH private key from key vault
-  * From the client environment, navigate to *portal.azure.com* > *Key Vaults* > *kv-sand-dev-xxxxxxxx*
+  * From the client environment, navigate to *portal.azure.com* > *Key Vaults* > *kv-sand-dev-xxxx*
   * Temporarily enable public network access to the key vault.
   * Click on *Secrets*
   * Click on *jumplinux1-ssh-private-key*

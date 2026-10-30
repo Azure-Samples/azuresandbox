@@ -1,6 +1,6 @@
 #region resources
 resource "azurerm_mssql_server" "this" {
-  name                          = module.naming.sql_server.name_unique
+  name                          = module.naming_unique.names["sql_server"].name
   resource_group_name           = var.resource_group_name
   location                      = var.location
   version                       = "12.0"
@@ -47,11 +47,18 @@ resource "azurerm_monitor_diagnostic_setting" "this" {
 
 #region modules
 module "naming" {
-  source                 = "Azure/naming/azurerm"
-  version                = "~> 0.4.3"
-  suffix                 = [var.tags["project"], var.tags["environment"]]
-  unique-seed            = var.unique_seed
-  unique-include-numbers = true
-  unique-length          = 8
+  source        = "Azure/avm-utl-naming/azure"
+  version       = "~> 0.3.0"
+  suffix        = [var.tags["project"], var.tags["environment"]]
+  unique_length = 0
+}
+
+# unique_seed comes from a resource in the root module, so it's unknown at plan time and can't be passed as the
+# naming module's unique_seed input. Adding it to the suffix keeps names consistent with the resource group.
+module "naming_unique" {
+  source        = "Azure/avm-utl-naming/azure"
+  version       = "~> 0.3.0"
+  suffix        = [var.tags["project"], var.tags["environment"], substr(var.unique_seed, 0, 8)]
+  unique_length = 0
 }
 #endregion

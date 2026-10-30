@@ -27,3 +27,8 @@ output "vm_run_command_output" {
   }
   description = "Instance view output from VM run commands for troubleshooting."
 }
+
+output "patch_install_result" {
+  value       = azapi_resource_action.install_patches.output
+  description = "Result of the patch-first installPatches operation on mssqlwin1 (status, rebootStatus, patch counts). A status of Failed also fails the apply via a postcondition on install_patches."
+}
