@@ -30,5 +30,5 @@ output "vm_run_command_output" {
 
 output "patch_install_result" {
   value       = azapi_resource_action.install_patches.output
-  description = "Result of the patch-first installPatches operation on mssqlwin1 (status, rebootStatus, patch counts). Informational only; a failed patch install does not fail the apply."
+  description = "Result of the patch-first installPatches operation on mssqlwin1 (status, rebootStatus, patch counts). A status of Failed also fails the apply via a postcondition on install_patches."
 }
