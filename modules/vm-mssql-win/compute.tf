@@ -70,7 +70,9 @@ resource "azurerm_role_assignment" "assignments" {
 # Patch first: install pending Critical/Security updates (and reboot if required) before any run
 # command or extension runs, so update-driven reboots don't interrupt guest configuration.
 # Runs after the data disk attachments so the two VM operations don't conflict.
-# Best-effort: only an API/operation error fails the apply; the patch result is exported.
+# The apply fails if the patch run reports status "Failed" (e.g. a patch failed to install or the
+# maximumDuration window ran out with patches outstanding), so configuration never runs on a
+# partially patched VM. The patch result is also exported.
 resource "azapi_resource_action" "install_patches" {
   type        = "Microsoft.Compute/virtualMachines@2025-04-01"
   resource_id = azurerm_windows_virtual_machine.this.id
@@ -79,7 +81,7 @@ resource "azapi_resource_action" "install_patches" {
   depends_on  = [azurerm_virtual_machine_data_disk_attachment.attachments]
 
   body = {
-    maximumDuration = "PT1H"
+    maximumDuration = "PT2H"
     rebootSetting   = "IfRequired"
     windowsParameters = {
       classificationsToInclude = ["Critical", "Security"]
@@ -89,7 +91,14 @@ resource "azapi_resource_action" "install_patches" {
   response_export_values = ["status", "rebootStatus", "installedPatchCount", "failedPatchCount", "pendingPatchCount", "maintenanceWindowExceeded"]
 
   timeouts {
-    create = "75m"
+    create = "135m"
+  }
+
+  lifecycle {
+    postcondition {
+      condition     = try(self.output.status, "") != "Failed"
+      error_message = "Patch installation on ${azurerm_windows_virtual_machine.this.name} reported status Failed (maintenanceWindowExceeded=${try(self.output.maintenanceWindowExceeded, "unknown")}, installed=${try(self.output.installedPatchCount, "unknown")}, failed=${try(self.output.failedPatchCount, "unknown")}, pending=${try(self.output.pendingPatchCount, "unknown")}, rebootStatus=${try(self.output.rebootStatus, "unknown")})."
+    }
   }
 }
 
