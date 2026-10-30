@@ -484,13 +484,6 @@ key $clientKeyPath
     }
 
     Set-Content -Path $ovpnConfigPath -Value $ovpnContent -NoNewline
-    # Save a copy for manual debugging
-    Copy-Item -Path $ovpnConfigPath -Destination '/tmp/debug-vpn.ovpn' -Force
-    Copy-Item -Path $caCertPath -Destination '/tmp/debug-ca.pem' -Force
-    Copy-Item -Path $clientCertPath -Destination '/tmp/debug-client.crt' -Force
-    Copy-Item -Path $clientKeyPath -Destination '/tmp/debug-client.key' -Force
-    $debugOvpn = (Get-Content '/tmp/debug-vpn.ovpn' -Raw) -replace [regex]::Escape($caCertPath), '/tmp/debug-ca.pem' -replace [regex]::Escape($clientCertPath), '/tmp/debug-client.crt' -replace [regex]::Escape($clientKeyPath), '/tmp/debug-client.key'
-    Set-Content -Path '/tmp/debug-vpn.ovpn' -Value $debugOvpn -NoNewline
     Write-Log 'OpenVPN config file generated.'
 
     # Step 3: Start OpenVPN tunnel
