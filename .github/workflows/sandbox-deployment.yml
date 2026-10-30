@@ -397,6 +397,7 @@ jobs:
       SANDBOX_AUTH_MODE: ${{ needs.selection.outputs.auth_mode }}
       SANDBOX_COUNT: ${{ needs.selection.outputs.sandbox_count }}
       SANDBOX_JIT_MIN_REMAINING_MINUTES: ${{ vars.SANDBOX_JIT_MIN_REMAINING_MINUTES }}
+      SANDBOX_RETAINED_DEPLOYMENTS: ${{ vars.SANDBOX_RETAINED_DEPLOYMENTS }}
       SANDBOX_RUN_THROUGH: ${{ needs.selection.outputs.run_through }}
       SANDBOX_SOURCE_SHA: ${{ github.event_name == 'pull_request_target' && needs.selection.outputs.source_ref || '' }}
     outputs:
