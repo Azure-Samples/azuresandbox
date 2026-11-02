@@ -1,8 +1,9 @@
 # Azure Sandbox deployment.
 # Release path (pull_request_target on main): a ready vnext -> main release PR
-# first runs the six static CI workflows (ci-*.yml, called below) against its
-# exact head SHA and full diff. Only after they pass and a live recheck of the PR
-# succeeds does the environment-protected deployment job request approval.
+# first waits for the six static CI workflows (ci-*.yml), which run on the PR as
+# ordinary pull_request CI, to pass on its exact head SHA. Only after they pass
+# and a live recheck of the PR succeeds does the environment-protected
+# deployment job request approval.
 # Manual path (workflow_dispatch): deploys the tip of this repository's main
 # (default) or vnext branch, chosen by source_branch, through apply by default;
 # no static CI dependency and no release status publication.
@@ -195,84 +196,130 @@ jobs:
             -f target_url="$attempt_url" \
             --silent
 
-  # Release static CI: the explicit allowlist of trusted static workflows, loaded
-  # from this (main) revision and run read-only against the release head SHA.
-  # Adding or removing a call here must be mirrored in static_ci below.
-  ci_bash:
-    name: Static CI (bash)
+  # Release static CI: the six ci-*.yml workflows run on the release PR as
+  # ordinary pull_request CI (workflow file and code from the PR merge commit,
+  # read-only token, no secrets). This read-only job waits for their runs on the
+  # exact head SHA and applies one verdict rule to each. It holds no status lock,
+  # so a newer attempt is never blocked behind it. Adding or removing a static
+  # workflow must be mirrored in the specs list below.
+  ci_results:
+    name: Wait for static CI
     needs: [selection, pending_status]
     if: ${{ github.event_name == 'pull_request_target' && needs.selection.outputs.deploy == 'true' && needs.pending_status.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
     permissions:
-      contents: read
-      pull-requests: read
-    uses: ./.github/workflows/ci-bash.yml
-    with:
-      head_sha: ${{ needs.selection.outputs.source_ref }}
-      base_sha: ${{ needs.selection.outputs.base_sha }}
-
-  ci_powershell:
-    name: Static CI (powershell)
-    needs: [selection, pending_status]
-    if: ${{ github.event_name == 'pull_request_target' && needs.selection.outputs.deploy == 'true' && needs.pending_status.result == 'success' }}
-    permissions:
-      contents: read
-      pull-requests: read
-    uses: ./.github/workflows/ci-powershell.yml
-    with:
-      head_sha: ${{ needs.selection.outputs.source_ref }}
-      base_sha: ${{ needs.selection.outputs.base_sha }}
-
-  ci_docs:
-    name: Static CI (docs)
-    needs: [selection, pending_status]
-    if: ${{ github.event_name == 'pull_request_target' && needs.selection.outputs.deploy == 'true' && needs.pending_status.result == 'success' }}
-    permissions:
-      contents: read
-      pull-requests: read
-    uses: ./.github/workflows/ci-docs.yml
-    with:
-      head_sha: ${{ needs.selection.outputs.source_ref }}
-      base_sha: ${{ needs.selection.outputs.base_sha }}
-
-  ci_actions:
-    name: Static CI (actions)
-    needs: [selection, pending_status]
-    if: ${{ github.event_name == 'pull_request_target' && needs.selection.outputs.deploy == 'true' && needs.pending_status.result == 'success' }}
-    permissions:
-      contents: read
-      pull-requests: read
-    uses: ./.github/workflows/ci-actions.yml
-    with:
-      head_sha: ${{ needs.selection.outputs.source_ref }}
-      base_sha: ${{ needs.selection.outputs.base_sha }}
-
-  ci_secrets:
-    name: Static CI (secrets)
-    needs: [selection, pending_status]
-    if: ${{ github.event_name == 'pull_request_target' && needs.selection.outputs.deploy == 'true' && needs.pending_status.result == 'success' }}
-    permissions:
-      contents: read
-      pull-requests: read
-    uses: ./.github/workflows/ci-secrets.yml
-    with:
-      head_sha: ${{ needs.selection.outputs.source_ref }}
-      base_sha: ${{ needs.selection.outputs.base_sha }}
-
-  ci_terraform:
-    name: Static CI (terraform)
-    needs: [selection, pending_status]
-    if: ${{ github.event_name == 'pull_request_target' && needs.selection.outputs.deploy == 'true' && needs.pending_status.result == 'success' }}
-    permissions:
-      contents: read
-      pull-requests: read
-    uses: ./.github/workflows/ci-terraform.yml
-    with:
-      head_sha: ${{ needs.selection.outputs.source_ref }}
-      base_sha: ${{ needs.selection.outputs.base_sha }}
+      actions: read
+    outputs:
+      verdict: ${{ steps.wait.outputs.verdict }}
+      problems: ${{ steps.wait.outputs.problems }}
+    steps:
+      - name: Wait for static CI runs on the release head
+        id: wait
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ needs.selection.outputs.source_ref }}
+          EVENT_ACTION: ${{ github.event.action }}
+          WAIT_MINUTES: 30
+        run: |
+          set -euo pipefail
+          if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Invalid release candidate SHA."
+            exit 1
+          fi
+          # workflow file | jobs that must succeed | path-gated jobs (all succeed,
+          # or all skipped when change detection found no relevant files)
+          specs=(
+            "ci-bash.yml|detect changes|ShellCheck"
+            "ci-powershell.yml|detect changes|PSScriptAnalyzer"
+            "ci-docs.yml|detect changes|markdownlint;lychee (internal links)"
+            "ci-actions.yml|detect changes|actionlint"
+            "ci-secrets.yml|gitleaks|"
+            "ci-terraform.yml|detect changes;terraform validate (.);terraform validate (extras/configurations/rg-devops-iac)|terraform fmt;tflint"
+          )
+          # The same PR event that started this run starts the static CI runs, so
+          # only runs created around or after it count. A base retarget (edited)
+          # starts no static CI, so it uses the latest run for the head SHA.
+          run_created="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq '.created_at')"
+          not_before=0
+          if [[ "$EVENT_ACTION" != edited ]]; then
+            not_before=$(( $(date -d "$run_created" +%s) - 120 ))
+          fi
+          # Latest pull_request run of a workflow for the head SHA from this
+          # repository's vnext branch: "id status conclusion", or empty.
+          latest_run() {
+            gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$1/runs?head_sha=$SOURCE_SHA&event=pull_request&per_page=100" |
+              jq -r --arg repo "$GITHUB_REPOSITORY" --argjson nb "$not_before" '
+                [.workflow_runs[]
+                  | select(.head_sha == env.SOURCE_SHA and .event == "pull_request" and .head_branch == "vnext"
+                           and .head_repository.full_name == $repo and (.created_at | fromdateiso8601) >= $nb)]
+                | max_by(.id) // empty | "\(.id) \(.status) \(.conclusion // "none")"'
+          }
+          deadline=$(( SECONDS + WAIT_MINUTES * 60 ))
+          declare -A runs
+          while :; do
+            waiting=()
+            for spec in "${specs[@]}"; do
+              wf="${spec%%|*}"
+              runs[$wf]="$(latest_run "$wf")"
+              read -r _ status _ <<< "${runs[$wf]:-x none none}"
+              [[ "$status" == completed ]] || waiting+=("$wf")
+            done
+            [[ "${#waiting[@]}" -gt 0 ]] || break
+            if (( SECONDS >= deadline )); then
+              echo "::warning::Timed out waiting for: ${waiting[*]}"
+              break
+            fi
+            echo "Waiting for: ${waiting[*]}"
+            sleep 20
+          done
+          # The one verdict rule for every static workflow:
+          #   pass           = the run succeeded, every required job succeeded, and
+          #                    every path-gated job succeeded.
+          #   not-applicable = the same, except change detection found no relevant
+          #                    files and every path-gated job was skipped.
+          #   fail           = anything else (failed, cancelled, missing, still
+          #                    running, or an unexpectedly skipped job).
+          all_are() { local want=$1; shift; for r in "$@"; do [[ "$r" == "$want" ]] || return 1; done; }
+          problems=()
+          printf '## Static CI on %s\n\n| Workflow | Verdict | Run |\n| --- | --- | --- |\n' "$SOURCE_SHA" >> "$GITHUB_STEP_SUMMARY"
+          for spec in "${specs[@]}"; do
+            IFS='|' read -r wf required_spec gated_spec <<< "$spec"
+            read -r id status conclusion <<< "${runs[$wf]:-none none none}"
+            verdict=fail
+            detail="status=$status conclusion=$conclusion"
+            if [[ "$status" == completed && "$conclusion" == success ]]; then
+              jobs="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs?filter=latest&per_page=100" --jq '[.jobs[] | {name, conclusion}]')"
+              job_result() { jq -r --arg n "$1" '[.[] | select(.name == $n)] | if length == 1 then (.[0].conclusion // "none") else "missing" end' <<< "$jobs"; }
+              IFS=';' read -ra required <<< "$required_spec"
+              IFS=';' read -ra gated <<< "$gated_spec"
+              required_results=(); for j in "${required[@]}"; do required_results+=("$(job_result "$j")"); done
+              gated_results=(); for j in "${gated[@]}"; do gated_results+=("$(job_result "$j")"); done
+              detail="required=[${required_results[*]}] gated=[${gated_results[*]}]"
+              if all_are success "${required_results[@]}"; then
+                if [[ "${#gated_results[@]}" -eq 0 ]] || all_are success "${gated_results[@]}"; then
+                  verdict=pass
+                elif all_are skipped "${gated_results[@]}"; then
+                  verdict=not-applicable
+                fi
+              fi
+            fi
+            echo "$wf: $verdict (run=$id $detail)"
+            run_link="none"
+            [[ "$id" =~ ^[0-9]+$ ]] && run_link="[$id]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$id)"
+            printf '| %s | %s | %s |\n' "$wf" "$verdict" "$run_link" >> "$GITHUB_STEP_SUMMARY"
+            [[ "$verdict" != fail ]] || problems+=("${wf%.yml}")
+          done
+          if [[ "${#problems[@]}" -gt 0 ]]; then
+            { echo "verdict=fail"; echo "problems=${problems[*]}"; } >> "$GITHUB_OUTPUT"
+            echo "::error::Static CI did not pass: ${problems[*]}"
+            exit 1
+          fi
+          { echo "verdict=pass"; echo "problems="; } >> "$GITHUB_OUTPUT"
 
   static_ci:
     name: Release static CI
-    needs: [selection, pending_status, ci_bash, ci_powershell, ci_docs, ci_actions, ci_secrets, ci_terraform]
+    needs: [selection, pending_status, ci_results]
     if: ${{ always() && github.event_name == 'pull_request_target' && needs.selection.outputs.deploy == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -287,18 +334,20 @@ jobs:
       - name: Verify static results and live PR eligibility
         env:
           GH_TOKEN: ${{ github.token }}
-          NEEDS_JSON: ${{ toJSON(needs) }}
+          PENDING_STATUS_RESULT: ${{ needs.pending_status.result }}
+          CI_RESULT: ${{ needs.ci_results.result }}
+          CI_VERDICT: ${{ needs.ci_results.outputs.verdict }}
+          CI_PROBLEMS: ${{ needs.ci_results.outputs.problems }}
           SOURCE_SHA: ${{ needs.selection.outputs.source_ref }}
           BASE_SHA: ${{ needs.selection.outputs.base_sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          STATIC_CALLS: ci_bash ci_powershell ci_docs ci_actions ci_secrets ci_terraform
         run: |
           set -euo pipefail
           if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ || ! "$BASE_SHA" =~ ^[0-9a-f]{40}$ || ! "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
             echo "::error::Invalid release candidate identity; no status was published."
             exit 1
           fi
-          if [[ "$(jq -r '.pending_status.result' <<< "$NEEDS_JSON")" != success ]]; then
+          if [[ "$PENDING_STATUS_RESULT" != success ]]; then
             echo "::error::Pending status publication failed; no status was published."
             exit 1
           fi
@@ -312,36 +361,11 @@ jobs:
             echo "::error::This attempt does not own the candidate's status (a newer run took over, or this is a re-run). Start a fresh run: mark the PR draft then ready, or close and reopen it."
             exit 1
           fi
-          # The one verdict rule for every static workflow (each ends with a
-          # no-logic "release report" job that passes back these raw results):
-          #   pass           = workflow succeeded, change detection succeeded,
-          #                    always-run checks succeeded, filters matched, and
-          #                    every path-gated check succeeded.
-          #   not-applicable = the same, except the filters matched nothing and
-          #                    every path-gated check was skipped.
-          #   fail           = anything else (failed, cancelled, missing, or an
-          #                    unexpectedly skipped check).
-          all_are() { local want=$1; shift; for r in "$@"; do [[ "$r" == "$want" ]] || return 1; done; }
-          field() { jq -r --arg c "$1" --arg f "$2" \
-            'if $f == "result" then .[$c].result else .[$c].outputs[$f] end // ""' <<< "$NEEDS_JSON"; }
+          # The Wait for static CI job applies the per-workflow verdict rule.
           problems=()
-          for call in $STATIC_CALLS; do
-            result="$(field "$call" result)"
-            changes="$(field "$call" changes)"
-            applicable="$(field "$call" applicable)"
-            read -ra gated <<< "$(field "$call" gated)"
-            read -ra always <<< "$(field "$call" always)"
-            verdict=fail
-            if [[ "$result" == success && "$changes" == success ]] && all_are success "${always[@]}"; then
-              if [[ "$applicable" == true ]] && all_are success "${gated[@]}"; then
-                verdict=pass
-              elif [[ "$applicable" == false ]] && all_are skipped "${gated[@]}"; then
-                verdict=not-applicable
-              fi
-            fi
-            echo "$call: $verdict (result=$result changes=$changes applicable=$applicable gated=[${gated[*]}] always=[${always[*]}])"
-            [[ "$verdict" != fail ]] || problems+=("$call")
-          done
+          if [[ "$CI_RESULT" != success || "$CI_VERDICT" != pass ]]; then
+            problems+=("static CI (${CI_PROBLEMS:-results unavailable})")
+          fi
           if ! gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" | jq -e \
             --arg repo "$GITHUB_REPOSITORY" --arg head "$SOURCE_SHA" --arg base "$BASE_SHA" '
               .state == "open" and .draft == false and

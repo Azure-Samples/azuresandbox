@@ -850,7 +850,7 @@ flowchart TD
     manual["Manual dispatch<br/>workflow_dispatch"] --> sel
     release["Ready vnext to main release PR<br/>pull_request_target"] --> sel
     sel["selection<br/>validates the entry and SANDBOX_AUTH_MODE"]
-    sel -- release --> ci["pending statuses, then<br/>six static CI workflows"]
+    sel -- release --> ci["pending statuses, then wait for<br/>six static CI workflows on the PR"]
     ci --> appr
     sel -- manual --> appr{"Owner approval<br/>environment"}
     appr --> start["start_runner<br/>oidc only"]
@@ -868,7 +868,7 @@ Source | Tip of `source_branch`: `main` (default) or `vnext` | Exact PR head SHA
 Stages | `run_through`: `preflight`, `apply` (default) or `unit-test` | All three
 Sandboxes | `sandbox_count`: 1 (default) to 20, deployed in parallel; above 1, `preflight` or `apply` only. See [Deploying Several Sandboxes](#deploying-several-sandboxes) | 1
 Base modules | Any, with `vnet_app` enabled | All six
-Static CI | Not run | Six static CI workflows must pass before approval is requested
+Static CI | Not run | The six static CI workflows run on the PR as `pull_request` CI and must pass on the exact head SHA before approval is requested
 PR statuses | Not published | `release-static-ci` and `sandbox-deployment-gate`; see [Releasing to `main`](../../../CONTRIBUTING.md#releasing-to-main)
 
 Stage | What it does

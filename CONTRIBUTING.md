@@ -45,7 +45,7 @@ Complete the [pull request template](.github/PULL_REQUEST_TEMPLATE.md). To addre
 
 ### CI checks
 
-CI runs on ready (non-draft) PRs to `vnext` and on every push to `vnext`. It's static analysis only: nothing is deployed and no credentials are used. Each workflow runs only when files it covers change. All ten checks below are required.
+CI runs on ready (non-draft) PRs to `vnext` or `main` and on every push to `vnext`. It's static analysis only: nothing is deployed and no credentials are used. Each workflow runs only when files it covers change. All ten checks below are required on `vnext`; on `main`, the [release gate](#release-deployment-gate) requires them through `release-static-ci`.
 
 | Workflow | Required checks | Config | `Invoke-CIChecks.sh` name |
 | --- | --- | --- | --- |
@@ -105,7 +105,7 @@ This is a project convention. GitHub allows all three merge methods, so pick the
 Only owners open and merge the `vnext` → `main` release PR:
 
 1. Open the release PR as a draft, then mark it ready.
-2. The [deployment workflow](.github/workflows/sandbox-deployment.yml) runs the static CI checks against the release head commit and its full diff from `main`.
+2. The [CI checks](#ci-checks) run on the PR, and the [deployment workflow](.github/workflows/sandbox-deployment.yml) waits for them to pass on the release head commit.
 3. The deployment waits in the `sandbox-release-gate` environment until an owner approves it. Admins can't skip this approval. To merge without a deployment, see [Emergency merges](#emergency-merges).
 4. A fresh sandbox is deployed and the unit and integration tests run.
 5. If everything passes, merge with a **merge commit**.
@@ -123,7 +123,7 @@ The release PR's required statuses are all published by GitHub-hosted jobs in th
 | `sandbox-deployment-gate` and `Publish release deployment status` | Preflight, apply, unit-test, stage reporting and evidence upload all succeed, and the JSON evidence reports exit code 0, `result = "pass"`, passing counts above zero, and no failed tests or suites. |
 
 - **Triggers.** Opening, reopening, marking ready, pushing to, or retargeting the PR to `main` starts a fresh run. Drafts and title or description edits run nothing and don't overwrite statuses.
-- **Static CI.** The six workflows run from the trusted `main` revision against the exact head SHA, read-only, with no secrets, write tokens or caches. Path filters apply to the full release diff from the merge base with `main`. `not-applicable` means change detection succeeded and found no relevant files; `gitleaks` and both `terraform validate` checks always run. Results from topic-PR, push or manual runs are never reused, and the CLA check isn't part of it.
+- **Static CI.** The six workflows run on the release PR as ordinary `pull_request` CI, read-only, with no secrets, write tokens or caches. Their workflow definitions come from the release candidate, which reached `vnext` through a reviewed PR. Path filters apply to the PR's full file list, which is the release diff from `main`. The deployment workflow waits up to 30 minutes for each workflow's run on the exact head SHA from this repository's `vnext` branch, and never checks out the candidate itself to run them. `not-applicable` means change detection succeeded and found no relevant files; `gitleaks` and both `terraform validate` checks always run. Results from topic-PR, push or manual runs are never reused, and the CLA check isn't part of it.
 - **Pending first.** Both release statuses are published as pending on the head SHA before static CI starts. Missing evidence, skipped stages, failures and cancellations never produce success; an API outage can leave a status pending.
 - **Recheck after approval.** Before checkout or any Azure access, the deployment job confirms the PR is unchanged and this attempt owns a passing `release-static-ci`.
 - **No overwrites.** Status writers use a per-SHA lock and attempt-specific run links, so an older attempt can't overwrite a newer one. No workflow closes or merges a PR.
