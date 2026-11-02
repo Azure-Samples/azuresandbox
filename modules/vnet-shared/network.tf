@@ -278,6 +278,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "zones" {
   name                = "link-${each.value.name}-${azurerm_virtual_network.this.name}"
   private_dns_zone_id = each.value.id
   virtual_network_id  = azurerm_virtual_network.this.id
+  resolution_policy   = "NxDomainRedirect" # Enables fallback to internet when a zone has no record for a name.
 }
 
 # Dependency signal consumed by modules that provision private endpoints, so they are not
