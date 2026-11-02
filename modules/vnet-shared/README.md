@@ -150,7 +150,7 @@ module.vnet_shared.azurerm_private_dns_zone.zones["privatelink.ods.opinsights.az
 module.vnet_shared.azurerm_private_dns_zone.zones["privatelink.oms.opinsights.azure.com"] | | Private DNS zone for Log Analytics agent onboarding.
 module.vnet_shared.azurerm_private_dns_zone.zones["privatelink.vaultcore.azure.net"] | | Private DNS zone for the key vault.
 module.vnet_shared.azurerm_private_dns_zone.zones["privatelink.&lt;location&gt;.azurecontainerapps.io"] | | Private DNS zone for Azure Container Apps, consumed by the *petstore* configuration.
-module.vnet_shared.azurerm_private_dns_zone_virtual_network_link.zones[*] | | Links each private DNS zone to *vnet-sand-dev-shared*. Zones are linked to the shared services virtual network only; see the root README section on Private Endpoints and Private DNS.
+module.vnet_shared.azurerm_private_dns_zone_virtual_network_link.zones[*] | | Links each private DNS zone to *vnet-sand-dev-shared* with [fallback to internet](https://learn.microsoft.com/azure/dns/private-dns-fallback) (`resolution_policy = "NxDomainRedirect"`) enabled. Zones are linked to the shared services virtual network only; see the root README section on Private Endpoints and Private DNS.
 module.vnet_shared.azurerm_private_endpoint.ampls | pep&#8209;sand&#8209;dev&#8209;ampls | The private endpoint for Azure Monitor.
 module.vnet_shared.azurerm_private_endpoint.key_vault | pep&#8209;sand&#8209;dev&#8209;key&#8209;vault | The private endpoint for the key vault.
 module.vnet_shared.azurerm_public_ip.bastion | pip&#8209;sand&#8209;dev&#8209;bastion | Public IP for Azure Bastion.
