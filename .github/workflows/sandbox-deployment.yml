@@ -373,8 +373,10 @@ jobs:
   sandbox:
     name: Sandbox preflight / apply / unit-test
     # Release PRs wait for static_ci; manual runs ignore it (it is skipped).
+    # The head-repo check duplicates selection's same-repository rule as a
+    # declarative guard that CodeQL recognizes as a control check (#993).
     needs: [selection, pending_status, static_ci]
-    if: ${{ !cancelled() && needs.selection.result == 'success' && needs.selection.outputs.deploy == 'true' && (github.event_name == 'workflow_dispatch' || (needs.pending_status.result == 'success' && needs.static_ci.result == 'success')) }}
+    if: ${{ !cancelled() && needs.selection.result == 'success' && needs.selection.outputs.deploy == 'true' && (github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && needs.pending_status.result == 'success' && needs.static_ci.result == 'success')) }}
     concurrency:
       group: azure-sandbox-deployment
       cancel-in-progress: false
