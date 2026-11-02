@@ -16,4 +16,7 @@ exclude = [
   # The Microsoft Entra admin center returns 403 Forbidden to non-browser
   # user agents (see issue #516). The URL is valid for human visitors.
   "^https://entra\\.microsoft\\.com",
+  # The Azure portal likewise returns 403 Forbidden to non-browser user agents
+  # (see issue #973). The URL is valid for human visitors.
+  "^https://portal\\.azure\\.com",
 ]
