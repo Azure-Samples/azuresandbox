@@ -4,18 +4,21 @@
 #   - Terraform CLI in PATH with initialized state in the repo root
 #   - openvpn installed and in PATH: install via 'sudo apt-get install -y openvpn' (Debian/Ubuntu)
 #     or 'winget install OpenVPNTechnologies.OpenVPN' (Windows)
-#   - sudo access (Linux/macOS) for openvpn tunnel creation
+#   - Linux/macOS: root, or sudo access to the vwan tunnel wrapper (see below)
 #   - dig (Linux/macOS): install via 'sudo apt-get install -y dnsutils' (Debian/Ubuntu)
 #     or 'sudo yum install -y bind-utils' (RHEL/CentOS). Used for DNS resolution against
 #     the sandbox DNS server. On Windows, Resolve-DnsName is used instead.
 
-# **WSL automation note
-#   `vwan` now runs unattended via a sudoers drop-in.** The vwan integration tests invoke privileged commands (`openvpn`, `cat`, `tail`, `kill`, `pkill`) at runtime.
-#   These are granted promptlessly by the persistent command-scoped sudoers drop-in at `/etc/sudoers.d/azuresandbox-vwan`.
-#   `Invoke-UnitTests.ps1` runs fully autonomously in WSL **with `vwan` enabled** — no cached sudo timestamp and no mid-run password prompt.
-#   The test scripts probe sudo readiness with `sudo -n cat /dev/null` (an allowed command), not `sudo -n true`.
-#   If that drop-in is missing on a given execution environment, the vwan tests will instead prompt for a password the agent cannot answer.
-#   Note: the openvpn launch runs `bash -c "sudo openvpn …"` (elevating only `openvpn`) rather than `sudo bash -c …`, which is what keeps the NOPASSWD allowlist scoped to specific binaries instead of all of `bash`.
+# Privileged operations (Linux/macOS):
+#   Starting, reading and stopping the OpenVPN tunnel needs root. All of it goes through one wrapper,
+#   scripts/vwan-tunnel.sh, called by the helpers in scripts/VwanTunnel.ps1: directly when running as
+#   root, otherwise through 'sudo -n'. The wrapper accepts the OpenVPN config on stdin (certificate and
+#   private key inline) and keeps it in a root-only directory until the tunnel is stopped.
+#   The certificates are still retrieved from the target sandbox on every run, so one client can test
+#   any number of sandboxes, one at a time.
+#   For unattended non-root runs (CI, agents), run 'sudo ./scripts/install-vwan-tunnel.sh --user <name>'
+#   once. It installs a root-owned copy of the wrapper and grants passwordless sudo for that copy only.
+#   Without it, an interactive run prompts for a sudo password up front.
 
 param(
     [Parameter(Mandatory = $true)]
@@ -221,31 +224,18 @@ Write-Log "Parameters: ResourceGroupName='$ResourceGroupName' VirtualWanName='$V
 $passed = 0
 $failed = 0
 
-# Verify sudo access (required for openvpn on Linux)
+# Verify the privileged tunnel wrapper can run (Linux/macOS)
 if ($IsLinux -or $IsMacOS) {
-    Write-Log 'Validating sudo access...'
-    # Probe an allowed command (cat) rather than 'true': command-scoped NOPASSWD
-    # sudoers entries only permit the specific vwan binaries, so 'sudo -n true' would fail.
-    & sudo -n cat /dev/null 2>&1 | Out-Null
-    if ($LASTEXITCODE -eq 0) {
-        Write-Log 'Passwordless sudo available.'
+    . (Join-Path $PSScriptRoot 'VwanTunnel.ps1')
+    Write-Log 'Validating access to the vwan tunnel wrapper...'
+    $tunnelAccess = Test-VwanTunnelAccess -AllowPrompt
+    if ($tunnelAccess.Success) {
+        Write-Log $tunnelAccess.Message
     }
     else {
-        # Fall back to interactive prompt if running in a terminal
-        if ([System.Environment]::UserInteractive -or (Test-Path /dev/tty)) {
-            Write-Log 'Passwordless sudo not available, requesting credentials...'
-            & sudo -v 2>&1
-            if ($LASTEXITCODE -ne 0) {
-                Write-TestResult $moduleName 'FAIL' 'P2S VPN: sudo access required but authentication failed.' -SanitizedMessage 'P2S VPN: sudo access required but authentication failed.'
-                Write-TestResult $moduleName 'SUMMARY' "Passed: 0 Failed: 1 Total: 1"
-                exit 1
-            }
-        }
-        else {
-            Write-TestResult $moduleName 'FAIL' 'P2S VPN: sudo access required but not available (non-interactive, no passwordless sudo). Configure NOPASSWD in sudoers for this user.' -SanitizedMessage 'P2S VPN: sudo access required but not available (non-interactive, no passwordless sudo). Configure NOPASSWD in sudoers for this user.'
-            Write-TestResult $moduleName 'SUMMARY' "Passed: 0 Failed: 1 Total: 1"
-            exit 1
-        }
+        Write-TestResult $moduleName 'FAIL' "P2S VPN: $($tunnelAccess.Message)" -SanitizedMessage 'P2S VPN: root or sudo access to the vwan tunnel wrapper is required but not available.'
+        Write-TestResult $moduleName 'SUMMARY' "Passed: 0 Failed: 1 Total: 1"
+        exit 1
     }
 }
 
@@ -263,8 +253,6 @@ $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "vwan-integration-test-$(
 New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
 
 $caCertPath = Join-Path $tempDir 'ca.pem'
-$clientCertPath = Join-Path $tempDir 'client.crt'
-$clientKeyPath = Join-Path $tempDir 'client.key'
 $ovpnConfigPath = Join-Path $tempDir 'vpn.ovpn'
 $ovpnLogPath = Join-Path $tempDir 'openvpn.log'
 $ovpnPidPath = Join-Path $tempDir 'openvpn.pid'
@@ -375,15 +363,10 @@ try {
         }
     }
 
-    # Write cert files (join array output with newlines — PowerShell captures multi-line output as string arrays)
+    # Join array output with newlines — PowerShell captures multi-line output as string arrays.
+    # The client certificate and key are inlined into the OpenVPN config rather than written to files.
     Set-Content -Path $caCertPath -Value ($rootCertPem -join "`n") -NoNewline
-    Set-Content -Path $clientCertPath -Value ($clientCertPem -join "`n") -NoNewline
-    Set-Content -Path $clientKeyPath -Value ($clientKeyPem -join "`n") -NoNewline
-
-    # Restrict permissions on private key
-    if ($IsLinux -or $IsMacOS) {
-        & chmod 600 $clientKeyPath
-    }
+    $inlineClientCredentials = "<cert>`n$(($clientCertPem -join "`n").Trim())`n</cert>`n<key>`n$(($clientKeyPem -join "`n").Trim())`n</key>`n"
 
     Write-Log 'Certificates exported successfully.'
 
@@ -443,7 +426,7 @@ try {
         # Use system CA bundle for server cert verification (Azure VPN gateway uses Microsoft public CA),
         # and client cert/key for mutual TLS authentication
         $systemCaBundle = if ($IsLinux) { '/etc/ssl/certs/ca-certificates.crt' } elseif ($IsMacOS) { '/etc/ssl/cert.pem' } else { $caCertPath }
-        $ovpnContent = $ovpnContent.TrimEnd() + "`nca $systemCaBundle`ncert $clientCertPath`nkey $clientKeyPath`n"
+        $ovpnContent = $ovpnContent.TrimEnd() + "`nca $systemCaBundle`n$inlineClientCredentials"
     }
     else {
         # Fallback: parse the AzureVPN XML config for the server hostname
@@ -478,38 +461,34 @@ persist-tun
 remote-cert-tls server
 verb 3
 ca $systemCaBundle
-cert $clientCertPath
-key $clientKeyPath
+$inlineClientCredentials
 "@
     }
 
-    Set-Content -Path $ovpnConfigPath -Value $ovpnContent -NoNewline
-    Write-Log 'OpenVPN config file generated.'
+    # On Linux/macOS the config goes to the tunnel wrapper on stdin; Windows reads it from a file.
+    if ($IsWindows) {
+        Set-Content -Path $ovpnConfigPath -Value $ovpnContent -NoNewline
+    }
+    Write-Log 'OpenVPN config generated.'
 
     # Step 3: Start OpenVPN tunnel
     Write-Log 'Starting OpenVPN tunnel...'
 
-    $ovpnStderrPath = Join-Path $tempDir 'openvpn-stderr.log'
-
     if ($IsLinux -or $IsMacOS) {
-        # Run openvpn in background, capturing stderr separately for diagnostics.
-        # The user shell (bash) handles backgrounding/redirection; only openvpn is elevated
-        # so a command-scoped NOPASSWD sudoers entry (not 'sudo bash') is sufficient.
-        # All three standard streams must be redirected: openvpn is a long-lived daemon,
-        # and if stdout stays attached to the pipe created by PowerShell's call operator (&),
-        # PowerShell blocks indefinitely waiting for EOF that never arrives. openvpn already
-        # writes its output to --log, so stdout is safely discarded here.
-        & bash -c "sudo openvpn --config '$ovpnConfigPath' --log '$ovpnLogPath' --writepid '$ovpnPidPath' 1>/dev/null 2>'$ovpnStderrPath' </dev/null &"
-        $ovpnExitCode = $LASTEXITCODE
+        # The wrapper validates the config, then starts openvpn as a daemon with its log, PID file and
+        # config in a root-only directory. Its output holds openvpn's errors if it couldn't start.
+        $startResult = Invoke-VwanTunnel -Action start -InputText $ovpnContent
+        $ovpnExitCode = $startResult.ExitCode
+        $stderrContent = $startResult.Output
     }
     else {
         Start-Process -FilePath 'openvpn' -ArgumentList "--config `"$ovpnConfigPath`" --log `"$ovpnLogPath`" --service-pipe" -WindowStyle Hidden
         $ovpnExitCode = 0
+        $stderrContent = ''
         # On Windows, OpenVPN runs in the foreground by default in service mode; we'll use Start-Process
     }
 
     if ($ovpnExitCode -ne 0) {
-        $stderrContent = if (Test-Path $ovpnStderrPath) { Get-Content -Path $ovpnStderrPath -Raw -ErrorAction SilentlyContinue } else { '' }
         Write-TestResult $moduleName 'FAIL' "P2S VPN: OpenVPN failed to start (exit code $ovpnExitCode). Stderr: $stderrContent" -SanitizedMessage 'P2S VPN: OpenVPN failed to start (exit code <value>). Stderr: <value>'
         $failed++
         throw 'OpenVPN failed to start'
@@ -517,27 +496,21 @@ key $clientKeyPath
 
     $vpnStarted = $true
 
-    # Wait briefly then verify the daemon is running and log file exists
+    # Wait briefly then verify the daemon is still running
     Start-Sleep -Seconds 5
-    if (-not (Test-Path $ovpnLogPath)) {
-        # Check if openvpn process is running at all
-        $ovpnRunning = if ($IsLinux -or $IsMacOS) { & pgrep -x openvpn 2>/dev/null } else { $null }
-        $stderrContent = if (Test-Path $ovpnStderrPath) {
-            & sudo cat $ovpnStderrPath 2>/dev/null
-        } else { '' }
-        $diagMsg = "OpenVPN log file not created at '$ovpnLogPath'."
-        if (-not $ovpnRunning) {
-            $diagMsg += ' OpenVPN process is not running — it likely exited immediately after starting.'
-        } else {
-            $diagMsg += " OpenVPN process is running (PID: $ovpnRunning) but log file missing."
+    $ovpnRunning = if ($IsWindows) { Test-Path $ovpnLogPath } else { (Invoke-VwanTunnel -Action status).ExitCode -eq 0 }
+    if (-not $ovpnRunning) {
+        if ($IsWindows) {
+            $diagMsg = "OpenVPN log file not created at '$ovpnLogPath'."
         }
-        if ($stderrContent) { $diagMsg += " Stderr: $stderrContent" }
-        # Also dump the config for debugging
-        $configContent = Get-Content -Path $ovpnConfigPath -Raw -ErrorAction SilentlyContinue
-        Write-Log "OpenVPN config contents:`n$configContent"
+        else {
+            $diagMsg = 'OpenVPN process is not running — it likely exited immediately after starting.'
+            $ovpnLog = (Invoke-VwanTunnel -Action log -Tail 50).Output
+            if ($ovpnLog) { $diagMsg += " Log: $ovpnLog" }
+        }
         Write-TestResult $moduleName 'FAIL' "P2S VPN: $diagMsg" -SanitizedMessage 'P2S VPN: <value>'
         $failed++
-        throw 'OpenVPN log file not created'
+        throw 'OpenVPN is not running'
     }
 
     # Poll for tunnel establishment
@@ -550,22 +523,21 @@ key $clientKeyPath
         Start-Sleep -Seconds $pollInterval
         $elapsed += $pollInterval
 
-        if (Test-Path $ovpnLogPath) {
-            $logContent = if ($IsLinux -or $IsMacOS) {
-                & sudo cat $ovpnLogPath 2>/dev/null
-            } else {
-                Get-Content -Path $ovpnLogPath -Raw -ErrorAction SilentlyContinue
-            }
-            if ($logContent -match 'Initialization Sequence Completed') {
-                $tunnelEstablished = $true
-                Write-Log "VPN tunnel established after $elapsed seconds."
-                break
-            }
+        $logContent = if ($IsWindows) {
+            if (Test-Path $ovpnLogPath) { Get-Content -Path $ovpnLogPath -Raw -ErrorAction SilentlyContinue }
+        }
+        else {
+            (Invoke-VwanTunnel -Action log).Output
+        }
+        if ($logContent -match 'Initialization Sequence Completed') {
+            $tunnelEstablished = $true
+            Write-Log "VPN tunnel established after $elapsed seconds."
+            break
+        }
 
-            if ($logContent -match 'AUTH_FAILED|TLS Error|Connection refused') {
-                Write-Log "OpenVPN error detected in log after $elapsed seconds."
-                break
-            }
+        if ($logContent -match 'AUTH_FAILED|TLS Error|Connection refused') {
+            Write-Log "OpenVPN error detected in log after $elapsed seconds."
+            break
         }
 
         if ($elapsed % 30 -eq 0) {
@@ -574,13 +546,11 @@ key $clientKeyPath
     }
 
     if (-not $tunnelEstablished) {
-        $logTail = ''
-        if (Test-Path $ovpnLogPath) {
-            $logTail = if ($IsLinux -or $IsMacOS) {
-                & sudo tail -n 20 $ovpnLogPath 2>/dev/null | Out-String
-            } else {
-                Get-Content -Path $ovpnLogPath -Tail 20 -ErrorAction SilentlyContinue | Out-String
-            }
+        $logTail = if ($IsWindows) {
+            if (Test-Path $ovpnLogPath) { Get-Content -Path $ovpnLogPath -Tail 20 -ErrorAction SilentlyContinue | Out-String }
+        }
+        else {
+            (Invoke-VwanTunnel -Action log -Tail 20).Output
         }
         Write-TestResult $moduleName 'FAIL' "P2S VPN: Tunnel did not establish within $maxWaitSeconds seconds. Log tail:`n$logTail" -SanitizedMessage 'P2S VPN: Tunnel did not establish within <value> seconds. Log tail:
 <value>'
@@ -912,17 +882,21 @@ finally {
     Write-Log 'Tearing down VPN tunnel and cleaning up...'
 
     if ($vpnStarted) {
-        # Kill OpenVPN process
-        if (Test-Path $ovpnPidPath) {
+        if ($IsLinux -or $IsMacOS) {
+            # Stops the tunnel and deletes the wrapper's state, including the config and private key.
+            $stopResult = Invoke-VwanTunnel -Action stop
+            if ($stopResult.ExitCode -eq 0) {
+                Write-Log "OpenVPN tunnel stopped. $($stopResult.Output)"
+            }
+            else {
+                Write-Log "WARNING: Could not stop the OpenVPN tunnel: $($stopResult.Output)"
+            }
+        }
+        elseif (Test-Path $ovpnPidPath) {
             $ovpnPid = Get-Content -Path $ovpnPidPath -ErrorAction SilentlyContinue
             if ($ovpnPid) {
                 try {
-                    if ($IsLinux -or $IsMacOS) {
-                        & sudo kill $ovpnPid 2>&1 | Out-Null
-                    }
-                    else {
-                        Stop-Process -Id $ovpnPid -Force -ErrorAction SilentlyContinue
-                    }
+                    Stop-Process -Id $ovpnPid -Force -ErrorAction SilentlyContinue
                     Write-Log "OpenVPN process (PID $ovpnPid) terminated."
                 }
                 catch {
@@ -933,12 +907,7 @@ finally {
         else {
             # Fallback: kill by process name
             try {
-                if ($IsLinux -or $IsMacOS) {
-                    & sudo pkill -f "openvpn.*$ovpnConfigPath" 2>&1 | Out-Null
-                }
-                else {
-                    Get-Process -Name 'openvpn' -ErrorAction SilentlyContinue | Stop-Process -Force
-                }
+                Get-Process -Name 'openvpn' -ErrorAction SilentlyContinue | Stop-Process -Force
             }
             catch {
                 Write-Log "WARNING: Could not terminate OpenVPN process by name: $_"
