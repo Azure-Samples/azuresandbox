@@ -177,7 +177,7 @@ Two workflows use the `pull_request_target` trigger: [`main-source-policy.yml`](
 | Set `persist-credentials: false` on `actions/checkout`. | Set on every checkout in both workflows and in the six release static CI workflows. |
 | Don't leave a write token where PR code can read it. | The repository's default `GITHUB_TOKEN` is read-only and can't approve PRs. `sandbox-deployment.yml` defaults to `contents: read` and grants more per job; `statuses: write` is granted only to the GitHub-hosted status jobs, which never run candidate code. `main-source-policy.yml` has only `statuses: write`. |
 | PRs opened before a fix can still use the vulnerable workflow. | Only same-repository `vnext` → `main` PRs are eligible. Fork PRs were never eligible under any version of either workflow. |
-| Use CodeQL to find these patterns. | CodeQL code scanning, including the `actions` language, runs on `main` and on PRs. The untrusted-checkout (critical, high, medium and TOCTOU) and cache-poisoning queries report no findings. All earlier alerts were closed as fixed, not dismissed. |
+| Use CodeQL to find these patterns. | CodeQL code scanning, including the `actions` language, runs on `main` and on PRs. The untrusted-checkout (critical, high, medium and TOCTOU) and cache-poisoning queries report no findings. All earlier alerts were closed as fixed, not dismissed. See [CodeQL verification](#codeql-verification). |
 
 #### Running release candidate code
 
@@ -216,6 +216,13 @@ These are accepted for now and reviewed with this section:
 
 - **Self-approval.** **Prevent self-review** is off in `sandbox-release-gate`, so the owner who starts a release run (for example, by marking the release PR ready) can also approve its deployment. The code itself still needed a code-owner review to reach `vnext`.
 - **Persistent self-hosted runner.** The runner is registered once rather than as an ephemeral runner. It keeps each run's private records (logs, plans and Terraform data) for troubleshooting. They're stored in the runner service account's home directory, so other users on the runner can't read them without `sudo`, and preflight purges runs older than `SANDBOX_RETAINED_DEPLOYMENTS` (default `3`); see [Runner records](extras/configurations/rg-devops-iac/README.md#runner-records). Integration tests run without `sudo`, except the VPN tests, which still rely on a passwordless `sudo` grant on the runner. Removing that grant is tracked in [#1000](https://github.com/Azure-Samples/azuresandbox/issues/1000).
+
+#### CodeQL verification
+
+This repository must have zero findings for [`actions/untrusted-checkout/critical`](https://codeql.github.com/codeql-query-help/actions/actions-untrusted-checkout-critical/), [`actions/untrusted-checkout/medium`](https://codeql.github.com/codeql-query-help/actions/actions-untrusted-checkout-medium/) and [`actions/untrusted-checkout-toctou/high`](https://codeql.github.com/codeql-query-help/actions/actions-untrusted-checkout-toctou-high/). Code scanning default setup uses the **Extended** query suite, because the **Default** suite doesn't run the medium query. Don't switch it back. Verified on 2026-11-04 with CodeQL 2.27.4:
+
+- The code scanning analysis of `main` ran all three queries and reported no results, and there are no open alerts.
+- A local CodeQL CLI scan (an `actions` database built from `.github`, analyzed with the untrusted-checkout and TOCTOU queries) reported no findings on `main` or `vnext`. The same scan of `main` before the [#964](https://github.com/Azure-Samples/azuresandbox/issues/964) fixes found 1 critical and 14 medium findings, which confirms the queries detect the pattern.
 
 ### Emergency merges
 
