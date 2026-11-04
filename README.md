@@ -654,6 +654,7 @@ The Azure Sandbox project is organized into the following structure:
 │   ├── bootstrap.ps1                             # PowerShell helper script for generating terraform.tfvars
 │   ├── bootstrap.sh                              # Bash helper script for generating terraform.tfvars
 │   ├── Create-AzSqlDbUser.ps1                    # Creates Azure SQL Database user
+│   ├── install-vwan-tunnel.sh                    # Installs the vwan tunnel wrapper and its sudo grant
 │   ├── Invoke-UnitTests.ps1                      # Orchestrates module unit and integration tests
 │   ├── Test-Integration-AvdPersonal.ps1          # Integration test for AVD Personal Desktop
 │   ├── Test-Integration-AvdRemoteapp.ps1         # Integration test for AVD RemoteApp
@@ -664,7 +665,9 @@ The Azure Sandbox project is organized into the following structure:
 │   ├── Test-Integration-Petstore.ps1             # Integration test for Petstore container app
 │   ├── Test-Integration-SqlConnectivity.ps1      # Integration test for SQL Server connectivity
 │   ├── Test-Integration-SshConnectivity.ps1      # Integration test for SSH connectivity
-│   └── Test-Integration-VwanConnectivity.ps1     # Integration test for P2S VPN connectivity
+│   ├── Test-Integration-VwanConnectivity.ps1     # Integration test for P2S VPN connectivity
+│   ├── vwan-tunnel.sh                            # Root wrapper for the vwan integration test's VPN tunnel
+│   └── VwanTunnel.ps1                            # PowerShell helper that runs vwan-tunnel.sh as root or via sudo
 ├── locals.tf                                     # Local variables
 ├── main.tf                                       # Resource configurations
 ├── outputs.tf                                    # Output variables 
@@ -943,6 +946,21 @@ Fully automated unit test scripts are provided for each module and are orchestra
 * Integration tests: These tests focus on functionality that spans multiple modules.
 
 The orchestration script returns 0 if all tests completed successfully, 1 if any tests failed, or 2 if the test harness itself failed (for example, missing Azure authentication or Terraform state). The orchestration script can be incorporated in a CI/CD pipeline. For CI/CD consumption, supply `-ResultsJsonPath` to also write machine-readable JSON results with a per-check breakdown, e.g. `pwsh -File ./scripts/Invoke-UnitTests.ps1 -ResultsJsonPath ./test-results.json`. This output is optional and does not change the exit codes, log file, or console output. If a VM-based suite fails because a VM it uses rebooted mid-run (for example, due to automatic patching), the orchestrator waits for the VM to settle and re-runs that suite once; retried suites are annotated in the log and JSON results. See the header comments in [Invoke-UnitTests.ps1](./scripts/Invoke-UnitTests.ps1) for the output schema.
+
+#### Root access for the vwan integration test
+
+On Linux and macOS, the `vwan` integration test in [Test-Integration-VwanConnectivity.ps1](./scripts/Test-Integration-VwanConnectivity.ps1) opens a point-to-site VPN tunnel, which needs root. Everything that runs as root goes through one wrapper script, [vwan-tunnel.sh](./scripts/vwan-tunnel.sh). It accepts only an allowlisted OpenVPN configuration and can start, check, read the log of, and stop that one tunnel. The tests work the same way on a developer workstation and on the self-hosted runner:
+
+* **As root:** the tests run the wrapper directly, so no setup or `sudo` is needed.
+* **As a non-root user:** the tests run the wrapper through `sudo`. An interactive run asks for your `sudo` password before the tests start. For unattended runs, install a root-owned copy of the wrapper and give your account passwordless `sudo` for that copy only:
+
+  ```bash
+  sudo ./scripts/install-vwan-tunnel.sh --user "$USER"
+  ```
+
+  Re-run the installer after pulling changes to `vwan-tunnel.sh`. If the installed copy is out of date, the test fails and tells you to re-run it. The [self-hosted runner](./extras/configurations/rg-devops-iac/) uses the same installer at deployment time.
+
+The test pulls the VPN client certificate and the VPN profile from the target sandbox each time it runs, so one machine can test any number of sandboxes, one at a time. Linux, including WSL, is supported. macOS is best effort and untested. Windows uses its own OpenVPN path and doesn't need the wrapper.
 
 ### Additional Resources
 

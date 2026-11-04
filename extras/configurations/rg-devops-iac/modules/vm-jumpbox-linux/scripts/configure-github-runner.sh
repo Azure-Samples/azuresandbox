@@ -10,6 +10,10 @@
 # The runner registration token arrives as the protected parameter RUNNER_TOKEN. Terraform passes it through the
 # write-only azapi sensitive_body argument, so it is never written to Terraform state, the saved plan,
 # the VM custom data or Azure Key Vault.
+#
+# VWAN_TUNNEL_B64 and VWAN_TUNNEL_INSTALLER_B64 carry the root repo's scripts/vwan-tunnel.sh and
+# scripts/install-vwan-tunnel.sh, base64 encoded. They're used to give the runner sudo for the vwan
+# tunnel wrapper only.
 
 set -euo pipefail
 
@@ -20,6 +24,8 @@ runner_version="${RUNNER_VERSION:-}"
 runner_user="githubrunner"
 runner_home="${RUNNER_HOME:-/opt/actions-runner}"
 aad_tenant_id="${AAD_TENANT_ID:-}"
+vwan_tunnel_b64="${VWAN_TUNNEL_B64:-}"
+vwan_tunnel_installer_b64="${VWAN_TUNNEL_INSTALLER_B64:-}"
 
 registration_token="${RUNNER_TOKEN:-}"
 unset RUNNER_TOKEN
@@ -75,29 +81,18 @@ else
 fi
 
 # The vwan integration tests (scripts/Test-Integration-VwanConnectivity.ps1) establish a P2S VPN
-# tunnel, which requires root to create the tun device and rewrite the routing table. The runner
-# service account is unprivileged, so grant command-scoped NOPASSWD sudo for exactly the binaries
-# those tests invoke. This mirrors the /etc/sudoers.d/azuresandbox-vwan drop-in used on interactive
-# Terraform execution environments.
-log "Granting '$runner_user' command-scoped sudo for the vwan P2S VPN integration tests..."
-sudoers_file=/etc/sudoers.d/azuresandbox-github-runner
-
-cat > "$sudoers_file" << EOF
-# Managed by the ConfigureGitHubRunner Run Command (configure-github-runner.sh). Do not edit by hand.
-# Command-scoped NOPASSWD sudo for the privileged binaries invoked by
-# scripts/Test-Integration-VwanConnectivity.ps1 when the vwan P2S VPN integration
-# tests run on this self-hosted runner.
-$runner_user ALL=(root) NOPASSWD: /usr/sbin/openvpn, /usr/bin/cat, /usr/bin/tail, /usr/bin/kill, /usr/bin/pkill
-EOF
-
-chown root:root "$sudoers_file"
-chmod 0440 "$sudoers_file"
-
-# A malformed drop-in breaks sudo for every user, so validate and discard it if invalid.
-if ! visudo -cf "$sudoers_file" > /dev/null; then
-    rm -f "$sudoers_file"
-    fail "generated sudoers file $sudoers_file is invalid and has been removed"
-fi
+# tunnel, which requires root. The runner service account is unprivileged, so install the root repo's
+# vwan tunnel wrapper with its installer (both passed in as base64 Run Command parameters from the
+# root repo's scripts/ directory) and grant passwordless sudo for the installed wrapper only. This is
+# the same documented install a developer workstation uses.
+log "Installing the vwan tunnel wrapper and granting '$runner_user' sudo for it only..."
+[ -n "$vwan_tunnel_b64" ] || fail "required parameter 'VWAN_TUNNEL_B64' is not set"
+[ -n "$vwan_tunnel_installer_b64" ] || fail "required parameter 'VWAN_TUNNEL_INSTALLER_B64' is not set"
+vwan_install_dir=$(mktemp -d)
+printf '%s' "$vwan_tunnel_b64" | base64 -d > "$vwan_install_dir/vwan-tunnel.sh"
+printf '%s' "$vwan_tunnel_installer_b64" | base64 -d > "$vwan_install_dir/install-vwan-tunnel.sh"
+bash "$vwan_install_dir/install-vwan-tunnel.sh" --user "$runner_user" --source "$vwan_install_dir/vwan-tunnel.sh"
+rm -rf "$vwan_install_dir"
 
 # The Sandbox deployment workflow's preflight installs a Terraform CLI version that satisfies the
 # deployed branch's required_version when the installed one doesn't. Granting 'apt-get install' through
