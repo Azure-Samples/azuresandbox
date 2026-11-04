@@ -153,7 +153,11 @@ resource "azapi_resource" "github_runner" {
         { name = "RUNNER_LABELS", value = join(",", var.github_runner_labels) },
         { name = "RUNNER_VERSION", value = var.github_runner_version },
         { name = "RUNNER_HOME", value = local.github_runner_home },
-        { name = "AAD_TENANT_ID", value = data.azurerm_client_config.current.tenant_id }
+        { name = "AAD_TENANT_ID", value = data.azurerm_client_config.current.tenant_id },
+        # The vwan tunnel wrapper and its installer belong to the root repo's unit-testing scripts. They're
+        # read from there so rg-devops-iac never keeps its own copy.
+        { name = "VWAN_TUNNEL_B64", value = filebase64("${path.module}/../../../../../scripts/vwan-tunnel.sh") },
+        { name = "VWAN_TUNNEL_INSTALLER_B64", value = filebase64("${path.module}/../../../../../scripts/install-vwan-tunnel.sh") }
       ]
       asyncExecution                  = false
       treatFailureAsDeploymentFailure = true

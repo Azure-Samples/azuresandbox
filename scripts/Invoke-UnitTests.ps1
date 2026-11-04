@@ -914,17 +914,12 @@ $moduleIntegrationMap = @{
     'vnet_onprem'      = @('Onprem -> cloud connectivity', 'Cloud -> onprem DNS')
 }
 
-# Pre-validate sudo early if vwan integration tests will run (avoids waiting for prompt mid-test)
+# Pre-validate root or sudo access early if vwan integration tests will run (avoids waiting for a prompt mid-test)
 $willRunVwanIntegration = ((-not $Module) -or ($Module -eq 'vwan' -and $Integration)) -and $resourceNames['virtual_wan'] -and $resourceNames['virtual_wan_hub']
 if ($willRunVwanIntegration -and ($IsLinux -or $IsMacOS)) {
-    Write-Log "Pre-validating sudo access for vwan integration test..."
-    # Probe an allowed command (cat); command-scoped NOPASSWD won't permit 'true'.
-    & sudo -n cat /dev/null 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        if ([System.Environment]::UserInteractive -or (Test-Path /dev/tty)) {
-            & sudo -v
-        }
-    }
+    Write-Log "Pre-validating access to the vwan tunnel wrapper for the vwan integration test..."
+    . (Join-Path $PSScriptRoot 'VwanTunnel.ps1')
+    Write-Log (Test-VwanTunnelAccess -AllowPrompt).Message
 }
 
 # Define test configurations
@@ -1362,15 +1357,11 @@ if ($runIntegration) {
             Write-Log "Integration: $($test.Name) | Local"
             Write-Log "========================================"
 
-            # Pre-validate sudo: prompt interactively if needed, or rely on passwordless in CI.
-            # Probe an allowed command (cat); command-scoped NOPASSWD won't permit 'true'.
+            # Pre-validate access to the vwan tunnel wrapper: prompt interactively if needed, or rely on
+            # root or passwordless sudo in CI.
             if ($test.RequiresSudo -and ($IsLinux -or $IsMacOS)) {
-                & sudo -n cat /dev/null 2>&1 | Out-Null
-                if ($LASTEXITCODE -ne 0) {
-                    if ([System.Environment]::UserInteractive -or (Test-Path /dev/tty)) {
-                        & sudo -v
-                    }
-                }
+                . (Join-Path $PSScriptRoot 'VwanTunnel.ps1')
+                Write-Log (Test-VwanTunnelAccess -AllowPrompt).Message
             }
 
             $testResult = Invoke-LocalTest -ScriptPath $test.ScriptPath -Parameters $test.Parameters -Label "INTEGRATION:$($test.Name)"
