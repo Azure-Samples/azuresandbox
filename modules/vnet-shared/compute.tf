@@ -29,8 +29,27 @@ resource "azurerm_windows_virtual_machine" "this" {
 }
 
 #region vm-configuration
+# A new VM's guest agent may self-update at first boot and skip goal states meanwhile, so an
+# installPatches request issued then is failed by the platform (#1023). This run command is itself a
+# goal state, so it completes only once the agent is processing goal states again.
+resource "azurerm_virtual_machine_run_command" "wait_for_guest_agent" {
+  name               = "WaitForGuestAgent"
+  location           = var.location
+  virtual_machine_id = azurerm_windows_virtual_machine.this.id
+
+  source {
+    script = file("${path.module}/scripts/Wait-GuestAgentReady.ps1")
+  }
+
+  timeouts {
+    create = "30m"
+    update = "30m"
+  }
+}
+
 # Patch first: install pending Critical/Security updates (and reboot if required) before any run
 # command or extension runs, so update-driven reboots don't interrupt guest configuration.
+# Runs after the guest agent readiness gate.
 # The apply fails if the patch run reports status "Failed" (e.g. a patch failed to install or the
 # maximumDuration window ran out with patches outstanding), so configuration never runs on a
 # partially patched VM. The patch result is also exported.
@@ -39,6 +58,7 @@ resource "azapi_resource_action" "install_patches" {
   resource_id = azurerm_windows_virtual_machine.this.id
   action      = "installPatches"
   method      = "POST"
+  depends_on  = [azurerm_virtual_machine_run_command.wait_for_guest_agent]
 
   body = {
     maximumDuration = "PT2H"

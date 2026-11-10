@@ -31,9 +31,9 @@ This configuration implements a virtual network for applications including:
     * MySQL Workbench — when the *mysql* module is enabled.
   * Enabling a database module on an existing sandbox installs its tool; disabling it does **not** uninstall the tool.
 
-The estimated provisioning time for this module is 15 minutes.
+The estimated provisioning time for this module is 15 - 60 minutes depending upon how recently the Windows Server platform image was built which can impact patching freshness.
 
-Before any run command or VM extension touches *jumpwin1*, Terraform installs pending Critical and Security Windows updates on it using the platform [installPatches](https://learn.microsoft.com/en-us/rest/api/compute/virtual-machines/install-patches) action and reboots it if required (patch → reboot → configure). This keeps an update-driven reboot from interrupting later configuration steps. Patching runs for up to 2 hours. If the patch run reports a status of `Failed` (a patch failed to install, or the window ran out with patches outstanding), the apply fails instead of configuring a partially patched VM. The patch result is also surfaced in the `patch_install_result` output. Because the failed result stays in Terraform state, later plans fail too until you re-run patching with `terraform apply -replace='module.vnet_app[0].azapi_resource_action.install_patches'`. Automatic patching stays enabled. Patching adds time to provisioning that varies with the number of pending updates. Adding this step to an existing sandbox patches and may reboot *jumpwin1* on the next apply.
+Before any run command or VM extension touches *jumpwin1*, Terraform first waits for the Windows guest agent to be ready, then installs pending Critical and Security Windows updates on it using the platform [installPatches](https://learn.microsoft.com/en-us/rest/api/compute/virtual-machines/install-patches) action and reboots it if required (wait for agent → patch → reboot → configure). This keeps an update-driven reboot from interrupting later configuration steps. The readiness wait is a run command (*Wait-GuestAgentReady.ps1*): it can't run while a new VM's guest agent is self-updating, so patching never starts mid-update, when the platform would fail it. Patching runs for up to 2 hours. If the patch run reports a status of `Failed` (a patch failed to install, or the window ran out with patches outstanding), the apply fails instead of configuring a partially patched VM. The patch result is also surfaced in the `patch_install_result` output. Because the failed result stays in Terraform state, later plans fail too until you re-run patching with `terraform apply -replace='module.vnet_app[0].azapi_resource_action.install_patches'`. Automatic patching stays enabled. Patching adds time to provisioning that varies with the number of pending updates. Adding this step to an existing sandbox patches and may reboot *jumpwin1* on the next apply.
 
 After patching, *jumpwin1* joins the AD domain. The domain join extension doesn't restart the VM itself, because its asynchronous restart could kill configuration steps that had already started. Instead, Terraform restarts *jumpwin1* with the platform [restart](https://learn.microsoft.com/en-us/rest/api/compute/virtual-machines/restart) action, waits for the restart to finish, waits 2 more minutes for the guest agent to settle, and then runs the Azure Files configuration extension (patch → join domain → restart → configure).
 
@@ -119,7 +119,8 @@ This module is organized as follows:
 |   ├── Install-WindowsFeatures.ps1         # Enables Windows features on jumpwin1
 |   ├── Invoke-AzureFilesConfiguration.ps1  # Runs Set-AzureFilesConfiguration.ps1 as domain admin
 |   ├── Set-AzureFilesConfiguration.ps1     # Configures Azure Files Kerberos authentication with mysandbox.local AD domain
-|   └── Test-VnetApp.ps1                    # Module unit test script
+|   ├── Test-VnetApp.ps1                    # Module unit test script
+|   └── Wait-GuestAgentReady.ps1            # Waits for the guest agent to finish any self-update before patching
 ├── compute.tf                              # Compute resource configurations   
 ├── locals.tf                               # Local variables
 ├── main.tf                                 # Resource configurations  
@@ -186,7 +187,7 @@ This section lists the resources included in this configuration.
 
 Address | Name | Notes
 --- | --- | ---
-module.vnet_app[0].azapi_resource_action.install_patches | | Installs Critical and Security updates on *jumpwin1* (rebooting if required) within a 2-hour window, failing the apply if the patch run reports `Failed`, before any run command or extension runs on it.
+module.vnet_app[0].azapi_resource_action.install_patches | | Installs Critical and Security updates on *jumpwin1* (rebooting if required) within a 2-hour window, failing the apply if the patch run reports `Failed`, after the guest agent readiness wait and before any run command or extension runs on it.
 module.vnet_app[0].azapi_resource_action.restart_after_domain_join | | Restarts *jumpwin1* synchronously after it joins the AD domain, so the reboot the join requires can't interrupt later configuration steps.
 module.vnet_app[0].azurerm_application_insights.this | appisanddevxxx | Workspace-based Application Insights linked to the shared Log Analytics workspace.
 module.vnet_app[0].azurerm_container_registry.this | crsanddevxxxxxxxx | Shared container registry.
@@ -216,6 +217,7 @@ module.vnet_app[0].azurerm_subnet.subnets["snet-misc-03"] | | Reserved for futur
 module.vnet_app[0].azurerm_subnet_network_security_group_association.associations[*] | | Associates the NSGs with the subnets.
 module.vnet_app[0].azurerm_subnet_route_table_association.associations[*] | | Associates the route table with the subnets.
 module.vnet_app[0].azurerm_virtual_machine_extension.this | | Custom script extension for the VM. Downloads scripts from the storage container and runs the orchestration script.
+module.vnet_app[0].azurerm_virtual_machine_run_command.wait_for_guest_agent | vmx&#8209;sand&#8209;dev&#8209;jumpwin1&#8209;WaitForGuestAgent | Waits until the guest agent on *jumpwin1* has finished any self-update and is processing goal states, logging the agent version, before `install_patches` runs.
 module.vnet_app[0].azurerm_virtual_network.this | vnet&#8209;sand&#8209;dev&#8209;app | Virtual network for application workloads in the sandbox environment.
 module.vnet_app[0].azurerm_virtual_network_peering.app_to_shared | | Virtual network peering from the application virtual network to the shared services virtual network (vnet-shared).
 module.vnet_app[0].azurerm_virtual_network_peering.shared_to_app | | Virtual network peering from the *vnet-shared* virtual network to the application virtual network.
