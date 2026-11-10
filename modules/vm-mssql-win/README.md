@@ -24,9 +24,11 @@ Enabling this module also causes the *vnet-app* module to install SQL Server Man
 
 **Note:** Only [Ddsv6](https://learn.microsoft.com/en-us/azure/virtual-machines/sizes/general-purpose/ddsv6-series?tabs=sizebasic) and [Edsv6](https://learn.microsoft.com/en-us/azure/virtual-machines/sizes/memory-optimized/edsv6-series?tabs=sizebasic) virtual machine sizes with a minimum of 4 vCPUs are supported by this module.
 
-The estimated provisioning time for this module is 10 minutes.
+The estimated provisioning time for this module is 15-60 minutes depending upon how recently the SQL Server platform image was built which can impact patching freshness.
 
 Before any run command or VM extension touches *mssqlwin1*, Terraform installs pending Critical and Security Windows updates on it using the platform [installPatches](https://learn.microsoft.com/en-us/rest/api/compute/virtual-machines/install-patches) action and reboots it if required (patch → reboot → configure). This keeps an update-driven reboot from interrupting later configuration steps. Patching runs for up to 2 hours. If the patch run reports a status of `Failed` (a patch failed to install, or the window ran out with patches outstanding), the apply fails instead of configuring a partially patched VM. The patch result is also surfaced in the `patch_install_result` output. Because the failed result stays in Terraform state, later plans fail too until you re-run patching with `terraform apply -replace='module.vm_mssql_win[0].azapi_resource_action.install_patches'`. Automatic patching stays enabled. Patching adds time to provisioning that varies with the number of pending updates. Adding this step to an existing sandbox patches and may reboot *mssqlwin1* on the next apply.
+
+After patching, *mssqlwin1* joins the AD domain. The domain join extension doesn't restart the VM itself, because its asynchronous restart could kill configuration steps that had already started. Instead, Terraform restarts *mssqlwin1* with the platform [restart](https://learn.microsoft.com/en-us/rest/api/compute/virtual-machines/restart) action, waits for the restart to finish, waits 2 more minutes for the guest agent to settle, and then runs the *ConfigureFirewallRules* and *ConfigureSqlLogin* run commands (patch → join domain → restart → configure).
 
 After a stop/deallocate, the `Set-MssqlStartupConfiguration` startup task rebuilds the temp disk volume, and if that requires a restart it restarts the VM and exits without starting SQL Server. SQL Server is started by the task on the following boot.
 
@@ -138,6 +140,7 @@ This section lists the resources included in this module.
 Address | Name | Notes
 --- | --- | ---
 module.vm_mssql_win[0].azapi_resource_action.install_patches | | Installs Critical and Security updates on *mssqlwin1* (rebooting if required) within a 2-hour window, failing the apply if the patch run reports `Failed`, after the data disks are attached and before any run command or extension runs on it.
+module.vm_mssql_win[0].azapi_resource_action.restart_after_domain_join | | Restarts *mssqlwin1* synchronously after it joins the AD domain, so the reboot the join requires can't interrupt later configuration steps.
 module.vm_mssql_win[0].azurerm_managed_disk.disks["sqldata"] | disk&#8209;sand&#8209;dev&#8209;vol_sqldata_M | The managed disk for SQL Server data. The format of the *vol_* portion is used by automation to locate SQL Server data files vs. log files and set the drive letter mapping.
 module.vm_mssql_win[0].azurerm_managed_disk.disks["sqllog"] | disk&#8209;sand&#8209;dev&#8209;vol_sqllog_L | The managed disk for SQL Server logs. The format of the *vol_* portion is used by automation to locate SQL Server data files vs. log files and set the drive letter mapping.
 module.vm_mssql_win[0].azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;mssqlwin1 | The network interface associated with the SQL Server VM. Configured with accelerated networking enabled for improved performance.
@@ -147,6 +150,7 @@ module.vm_mssql_win[0].azurerm_storage_blob.remote_scripts["startup"] | Set&#820
 module.vm_mssql_win[0].azurerm_storage_blob.remote_scripts["worker"] | Set&#8209;MssqlConfiguration.ps1 | The script that prepares data and log disks and configures SQL Server instance.
 module.vm_mssql_win[0].azurerm_virtual_machine_data_disk_attachment.attachments[*] | | The data and log disk attachments for the SQL Server VM.
 module.vm_mssql_win[0].azurerm_windows_virtual_machine.this | mssqlwin1 | The SQL Server VM resource. Configured with NVMe disk controller, encryption at host, secure boot, vTPM, and automatic patch assessment for enhanced security and performance.
+module.vm_mssql_win[0].time_sleep.wait_for_domain_join_restart | | Waits 2 minutes after the post-domain-join restart so the guest agent and WMI are ready before configuration runs on *mssqlwin1*.
 
 ### Output Variables
 
