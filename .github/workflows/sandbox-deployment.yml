@@ -509,9 +509,12 @@ jobs:
         if: ${{ success() && env.SANDBOX_RUN_THROUGH == 'unit-test' }}
         run: bash extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.sh unit-test
 
+      # An artifact service outage must not fail an otherwise good deployment; the
+      # structured results stay on the runner and the job summary notes the failure.
       - name: Publish redacted unit-test evidence
         id: upload_evidence
         if: ${{ always() && steps.unit_test.outputs.ready == 'true' }}
+        continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ steps.unit_test.outputs.name }}
@@ -673,11 +676,9 @@ jobs:
                 "$UNIT_TEST_OUTCOME" == success &&
                 "$EVIDENCE_READY" == true &&
                 "$TESTS_PASSED" == true &&
-                "$ARTIFACT_OUTCOME" == success &&
-                -n "$ARTIFACT_URL" &&
                 "$REPORT_OUTCOME" == success ]]; then
             state=success
-            description="Preflight, apply, tests and JSON publication passed."
+            description="Preflight, apply and tests passed."
           fi
           gh api --method POST \
             "repos/$GITHUB_REPOSITORY/statuses/$SOURCE_SHA" \
@@ -688,7 +689,11 @@ jobs:
             --silent
           printf '## Release deployment status\n\nsandbox-deployment-gate: **%s** on %s.\n\n%s\n' \
             "$state" "$SOURCE_SHA" "$description" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$EVIDENCE_READY" == true && ( "$ARTIFACT_OUTCOME" != success || -z "$ARTIFACT_URL" ) ]]; then
+            echo "::warning::The unit-test evidence upload failed; the JSON results remain on the runner."
+            printf '\nThe unit-test evidence upload failed; the JSON results remain on the runner.\n' >> "$GITHUB_STEP_SUMMARY"
+          fi
           if [[ "$state" != success ]]; then
-            echo "::error::Full deployment and published passing JSON evidence are required. The PR remains open."
+            echo "::error::Full deployment with passing unit-test evidence is required. The PR remains open."
             exit 1
           fi
