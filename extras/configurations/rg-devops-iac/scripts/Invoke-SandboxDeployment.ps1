@@ -340,9 +340,9 @@ function Confirm-SandboxJitGrant {
     }
     if ($remaining -eq [TimeSpan]::MaxValue) { return }
     if ($remaining.TotalMinutes -lt $MinimumMinutes) {
-        Stop-SandboxStage "The deployment identity's time-bound grant ends in $([int][Math]::Floor($remaining.TotalMinutes)) minutes; at least $MinimumMinutes minutes are required. Extend or renew the grant, then start a new run."
+        Stop-SandboxStage "The deployment identity's time-bound grant ends in $([int][Math]::Floor($remaining.TotalMinutes)) minutes; it must outlast the job's $MinimumMinutes-minute timeout (SANDBOX_JOB_TIMEOUT_MINUTES). Extend or renew the grant, then start a new run."
     }
-    Write-SandboxSummary "Just-in-time grant: $([int][Math]::Floor($remaining.TotalMinutes)) minutes remaining (minimum $MinimumMinutes).`n`n"
+    Write-SandboxSummary "Just-in-time grant: $([int][Math]::Floor($remaining.TotalMinutes)) minutes remaining (job timeout $MinimumMinutes).`n`n"
 }
 
 function Get-SandboxTerraformVersion {
@@ -589,9 +589,10 @@ function Invoke-SandboxPreflight {
     if ($Instance -and -not [System.IO.Directory]::Exists($script:root)) {
         Stop-SandboxStage 'The sandbox source tree is missing.'
     }
-    $jitMinimum = if ($env:SANDBOX_JIT_MIN_REMAINING_MINUTES) { $env:SANDBOX_JIT_MIN_REMAINING_MINUTES } else { '150' }
-    if ($jitMinimum -cnotmatch '^[0-9]{1,4}$' -or [int]$jitMinimum -gt 1440) {
-        Stop-SandboxStage 'SANDBOX_JIT_MIN_REMAINING_MINUTES must be a whole number of minutes from 0 to 1440.'
+    # The grant must outlast the job's timeout. The workflow validates SANDBOX_JOB_TIMEOUT_MINUTES; recheck it here.
+    $jitMinimum = if ($env:SANDBOX_JOB_TIMEOUT_MINUTES) { $env:SANDBOX_JOB_TIMEOUT_MINUTES } else { '360' }
+    if ($jitMinimum -cnotmatch '^[0-9]{1,4}$' -or [int]$jitMinimum -lt 60 -or [int]$jitMinimum -gt 1440) {
+        Stop-SandboxStage 'SANDBOX_JOB_TIMEOUT_MINUTES must be a whole number of minutes from 60 to 1440.'
     }
     if ([string]::IsNullOrWhiteSpace($env:SANDBOX_BACKEND_HCL) -or [string]::IsNullOrWhiteSpace($env:SANDBOX_TFVARS_HCL)) {
         Stop-SandboxStage 'Both environment HCL secrets are required.'

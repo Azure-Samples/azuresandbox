@@ -22,8 +22,9 @@
 #                             assignments instead of granting them.
 #   -h, --help                Show this help.
 #
-# The workflow preflight requires at least SANDBOX_JIT_MIN_REMAINING_MINUTES (default 150) remaining on both
-# assignments, so grant them shortly before approving the run.
+# The workflow preflight requires both assignments to outlast the sandbox job's timeout, SANDBOX_JOB_TIMEOUT_MINUTES
+# (default 360), so grant them shortly before approving the run. If the repository variable overrides the default,
+# export the same value before running this script so its warning matches preflight.
 
 set -euo pipefail
 
@@ -39,7 +40,7 @@ declare -A ROLE_NAMES=(
   ["${RBAC_ADMIN_ROLE_ID}"]="Role Based Access Control Administrator"
 )
 GRANT_ROLE_IDS=("${CONTRIBUTOR_ROLE_ID}" "${RBAC_ADMIN_ROLE_ID}")
-MIN_REMAINING_MINUTES="${SANDBOX_JIT_MIN_REMAINING_MINUTES:-150}"
+MIN_REMAINING_MINUTES="${SANDBOX_JOB_TIMEOUT_MINUTES:-360}"
 
 HOURS=8
 JUSTIFICATION="Azure Sandbox apply"
@@ -47,7 +48,7 @@ FORCE=false
 REVOKE=false
 
 usage() {
-  sed -n '/^# Usage:/,/^# assignments, so/p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '/^# Usage:/,/^# export the same value/p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 while [[ $# -gt 0 ]]; do
@@ -64,6 +65,17 @@ done
 if ! [[ "${HOURS}" =~ ^[0-9]+$ ]] || (( HOURS < 1 || HOURS > 24 )); then
   echo "Error: --hours must be a whole number from 1 to 24."
   exit 1
+fi
+if [[ "${REVOKE}" != true ]]; then
+  if ! [[ "${MIN_REMAINING_MINUTES}" =~ ^[0-9]{1,4}$ ]] || (( 10#${MIN_REMAINING_MINUTES} < 60 || 10#${MIN_REMAINING_MINUTES} > 1440 )); then
+    echo "Error: SANDBOX_JOB_TIMEOUT_MINUTES must be a whole number of minutes from 60 to 1440."
+    exit 1
+  fi
+  MIN_REMAINING_MINUTES=$((10#${MIN_REMAINING_MINUTES}))
+  if (( HOURS * 60 < MIN_REMAINING_MINUTES )); then
+    echo "Error: a ${HOURS}-hour grant can't outlast the ${MIN_REMAINING_MINUTES}-minute job timeout, so the workflow preflight would fail."
+    exit 1
+  fi
 fi
 if [[ -z "${JUSTIFICATION}" ]]; then
   echo "Error: --justification can't be empty."
@@ -306,7 +318,7 @@ for role_id in "${GRANT_ROLE_IDS[@]}"; do
   fi
 done
 if [[ "${SHORT}" == true ]]; then
-  echo "Warning: less than ${MIN_REMAINING_MINUTES} minutes remain on an assignment, so the workflow preflight will fail."
+  echo "Warning: less than ${MIN_REMAINING_MINUTES} minutes (the job timeout) remain on an assignment, so the workflow preflight will fail."
   echo "Run again with --force to replace it."
 fi
 
