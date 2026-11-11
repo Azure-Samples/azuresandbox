@@ -679,7 +679,7 @@ GitHub repository settings (protection rules are in [CONTRIBUTING.md](../../../C
 Setting | Type | Value | Modes
 --- | --- | --- | ---
 `SANDBOX_AUTH_MODE` | Repository variable | `managed_identity` or `oidc`. Must match `auth_mode` in `SANDBOX_TFVARS_HCL`. Runs fail without it. | Both
-`SANDBOX_JIT_MIN_REMAINING_MINUTES` | Repository or environment variable, optional | Minutes that must remain on the grant at preflight. Default `150`, range `0`-`1440`; `0` skips the check. | Both
+`SANDBOX_JOB_TIMEOUT_MINUTES` | Repository variable, optional | Timeout of the `sandbox` job, which runs preflight, apply and unit tests. Preflight also requires the just-in-time grant to have at least this many minutes left. Default `360`, range `60`-`1440`. | Both
 `SANDBOX_RETAINED_DEPLOYMENTS` | Repository or environment variable, optional | Previous runs whose private records stay on the runner, besides the current run. Default `3`, range `1`-`10`. Preflight purges older runs' records and state blobs; see [Runner Records](#runner-records). | Both
 `SANDBOX_BACKEND_HCL` | Secret in `sandbox-deployment` and `sandbox-release-gate` | Azure Sandbox `backend.tf`, as below | Both
 `SANDBOX_TFVARS_HCL` | Secret in `sandbox-deployment` and `sandbox-release-gate` | Azure Sandbox `terraform.tfvars`, as below | Both
@@ -776,7 +776,7 @@ Before each `managed_identity` or `oidc` apply, from the workflow or a terminal 
 
 ```bash
 ./scripts/grant-jit-roles.sh             # grant both roles for 8 hours
-./scripts/grant-jit-roles.sh --hours 6   # grant a different window (1-24 hours)
+./scripts/grant-jit-roles.sh --hours 10  # grant a different window (1-24 hours)
 ./scripts/grant-jit-roles.sh --force     # replace assignments that are already active
 ./scripts/grant-jit-roles.sh --revoke    # remove both assignments after the run
 ```
@@ -791,7 +791,7 @@ sequenceDiagram
     Op->>Az: Wait until both roles are listed in PIM (about 5 minutes)
     Op->>Wf: Approve the run
     Wf->>Az: Wait up to 5 minutes for both roles to take effect
-    Wf->>Wf: Check SANDBOX_JIT_MIN_REMAINING_MINUTES remain
+    Wf->>Wf: Check the grant outlasts SANDBOX_JOB_TIMEOUT_MINUTES
     Wf->>Az: Apply and unit-test recheck both roles before they start
 ```
 
@@ -800,7 +800,7 @@ The script:
 1. Reads the identity, subscription and `jit_condition` from this configuration's outputs. Run it as the operator, from any directory, with Azure CLI signed in.
 1. Activates your eligible subscription `Role Based Access Control Administrator` through PIM for 1 hour, unless it's already active. If PIM requires approval or multifactor authentication that Azure CLI can't satisfy, activate the role in the portal and run it again.
 1. Assigns `Contributor`, and `Role Based Access Control Administrator` constrained by `jit_condition`, as time-bound active assignments. Existing active assignments are kept unless you pass `--force`.
-1. Lists the end times, warns if less than `SANDBOX_JIT_MIN_REMAINING_MINUTES` remains, and checks that the applied condition matches `jit_condition`.
+1. Lists the end times, warns if less than the job timeout remains (`SANDBOX_JOB_TIMEOUT_MINUTES`, default `360`; export it if the repository variable overrides the default), and checks that the applied condition matches `jit_condition`.
 
 Things to know:
 
@@ -813,7 +813,7 @@ Things to know:
   ```
 
 * Preflight accepts a permanent assignment with a warning.
-* The 8-hour grant and 150-minute minimum cover preflight, a full apply and unit testing, with time left for a manual teardown. With `oidc`, the window also covers `jumplinux2` booting.
+* The 8-hour grant leaves about 2 hours after granting to approve the run before less than the 360-minute job timeout remains. The timeout covers preflight, a full apply and unit testing, and the rest of the grant leaves time for a manual teardown. With `oidc`, the approval window also covers `jumplinux2` booting. The script refuses a `--hours` value shorter than the job timeout.
 * To grant in the portal instead, activate `Role Based Access Control Administrator`, then use the subscription's *Access control (IAM)* > *Add role assignment* with *Assignment type* *Active* and *Time bound*. For `Role Based Access Control Administrator`, paste `terraform output -json deployment_identity | jq -r .jit_condition` into the condition editor's code view.
 * After the run, revoke the assignments with `--revoke` or let them expire.
 
@@ -895,7 +895,7 @@ How it works:
 * **Parallel processes in one job.** The `preflight` step checks the Terraform version and downloads the providers once, into a cache shared by the run. It then runs each sandbox's preflight in its own process, from its own copy of the source (a git worktree), starting one every 10 seconds. The `apply` step then applies every sandbox. The `Report stage results` step removes the source copies and the provider cache. A single-sandbox run uses the same kind of provider cache.
 * **Failures.** If any sandbox fails preflight, no sandbox is applied. During apply, a failed sandbox doesn't stop the others, but the job fails. Each failed sandbox gets an error annotation.
 * **Reporting.** The job log shows each sandbox's status lines prefixed with its deployment id, and a run-wide heartbeat every 2 minutes. The job summary has a table of every sandbox's resource group and stage results, with a details section per sandbox, including any Terraform errors.
-* **Shared limits.** All sandboxes share the job's 180-minute timeout, the just-in-time grant and the deployment identity's [Azure Resource Manager request limits](https://learn.microsoft.com/azure/azure-resource-manager/management/request-limits-and-throttling). Throttled requests are retried, so a larger run takes longer than a single sandbox.
+* **Shared limits.** All sandboxes share the job's timeout (`SANDBOX_JOB_TIMEOUT_MINUTES`, default 360 minutes), the just-in-time grant and the deployment identity's [Azure Resource Manager request limits](https://learn.microsoft.com/azure/azure-resource-manager/management/request-limits-and-throttling). Throttled requests are retried, so a larger run takes longer than a single sandbox.
 
 Plan capacity before the event. Figures are per sandbox with all base modules; fewer modules need less.
 
