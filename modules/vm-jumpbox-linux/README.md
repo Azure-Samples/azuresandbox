@@ -21,7 +21,7 @@ This configuration implements a Linux virtual machine for use as a jumpbox. The 
 * Remote-ssh development capabilities using Visual Studio Code on *jumpwin1*.
 * Azure PowerShell is installed from the latest GitHub release offline bundle, with Microsoft Artifact Registry as a fallback. Installation metadata points to PSGallery for subsequent PowerShell 7 upgrades using `Update-PSResource -Name Az -Scope AllUsers`.
 * Secure AD integrated access to Azure Files SMB/cifs share automatically mounted by the VM.
-* Pre-installed software packages, including:
+* Pre-installed software packages, installed by *install-vm-jumpbox-linux-packages.sh*, including:
   * autofs
   * azure-cli
   * cifs-utils
@@ -200,6 +200,7 @@ This module is organized as follows:
 ├── scripts/
 |   ├── configure-vm-jumpbox-linux.sh       # cloud-init shell script to configure the VM
 |   ├── configure-vm-jumpbox-linux.yaml     # cloud-init cloud-config file to configure the VM
+|   ├── install-vm-jumpbox-linux-packages.sh # Installs apt keyrings, repositories and packages (shared with image builds)
 |   ├── test-vm-jumpbox-linux.sh            # Module unit test script
 |   └── wait-for-cloud-init.sh              # Run command script that waits for cloud-init and apt locks before AMA install
 ├── compute.tf                              # Compute resource configurations

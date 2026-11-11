@@ -17,6 +17,14 @@ data "cloudinit_config" "vm_jumpbox_linux" {
     filename = "configure-vm-jumpbox-linux.yaml"
   }
 
+  # cloud-init runs user-data scripts in filename order, so the 00- prefix installs the packages
+  # before configure-vm-jumpbox-linux.sh (which needs them) and the runcmd script run.
+  part {
+    content_type = "text/x-shellscript"
+    content      = file("./${path.module}/scripts/install-vm-jumpbox-linux-packages.sh")
+    filename     = "00-install-vm-jumpbox-linux-packages.sh"
+  }
+
   part {
     content_type = "text/x-shellscript"
     content      = file("./${path.module}/scripts/configure-vm-jumpbox-linux.sh")

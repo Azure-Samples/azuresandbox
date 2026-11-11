@@ -115,8 +115,8 @@ This module is organized as follows:
 ├── images/
 |   └── vnet-app-diagram.drawio.svg         # Architecture diagram
 ├── scripts/
-|   ├── Install-Software.ps1                # Installs software on jumpwin1
-|   ├── Install-WindowsFeatures.ps1         # Enables Windows features on jumpwin1
+|   ├── Install-Software.ps1                # Installs software on jumpwin1 (shared with image builds)
+|   ├── Install-WindowsFeatures.ps1         # Enables Windows features on jumpwin1 (shared with image builds)
 |   ├── Invoke-AzureFilesConfiguration.ps1  # Runs Set-AzureFilesConfiguration.ps1 as domain admin
 |   ├── Set-AzureFilesConfiguration.ps1     # Configures Azure Files Kerberos authentication with mysandbox.local AD domain
 |   ├── Test-VnetApp.ps1                    # Module unit test script

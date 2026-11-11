@@ -1,7 +1,12 @@
+# Installs jumpwin1 software with winget. This is the single source for that step, shared by the
+# deploy-time run command (compute.tf) and the pre-built image build, which passes -InstallAll true
+# to install every optional package. Runs as SYSTEM, either under a run command or the image
+# builder's PowerShell customizer with runElevated and runAsSystem, and is idempotent.
 param(
     # Run-command parameters arrive as strings; parsed to bool below.
     [string]$InstallSsms = 'false',
-    [string]$InstallMysqlWorkbench = 'false'
+    [string]$InstallMysqlWorkbench = 'false',
+    [string]$InstallAll = 'false'
 )
 
 #region functions
@@ -21,9 +26,10 @@ function Exit-WithError {
 #region main
 Write-Log "Running '$PSCommandPath' (PowerShell $($PSVersionTable.PSVersion))..."
 
-$installSsmsFlag = [System.Convert]::ToBoolean($InstallSsms)
-$installMysqlWorkbenchFlag = [System.Convert]::ToBoolean($InstallMysqlWorkbench)
-Write-Log "Parameters: InstallSsms='$installSsmsFlag' InstallMysqlWorkbench='$installMysqlWorkbenchFlag'"
+$installAllFlag = [System.Convert]::ToBoolean($InstallAll)
+$installSsmsFlag = $installAllFlag -or [System.Convert]::ToBoolean($InstallSsms)
+$installMysqlWorkbenchFlag = $installAllFlag -or [System.Convert]::ToBoolean($InstallMysqlWorkbench)
+Write-Log "Parameters: InstallAll='$installAllFlag' InstallSsms='$installSsmsFlag' InstallMysqlWorkbench='$installMysqlWorkbenchFlag'"
 
 # Resolve winget executable path
 # When running as SYSTEM (e.g. via VM RunCommand), winget is not in PATH and the
