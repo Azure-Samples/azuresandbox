@@ -57,6 +57,7 @@ jobs:
       environment: ${{ steps.select.outputs.environment }}
       auth_mode: ${{ steps.select.outputs.auth_mode }}
       sandbox_count: ${{ steps.select.outputs.sandbox_count }}
+      job_timeout_minutes: ${{ steps.select.outputs.job_timeout_minutes }}
     steps:
       # No checkout or environment secrets until the event is eligible.
       - name: Select trusted deployment path
@@ -66,6 +67,7 @@ jobs:
           MANUAL_SOURCE_BRANCH: ${{ inputs.source_branch }}
           MANUAL_SANDBOX_COUNT: ${{ inputs.sandbox_count }}
           SANDBOX_AUTH_MODE: ${{ vars.SANDBOX_AUTH_MODE }}
+          SANDBOX_JOB_TIMEOUT_MINUTES: ${{ vars.SANDBOX_JOB_TIMEOUT_MINUTES }}
         run: |
           set -euo pipefail
           if [[ "$GITHUB_REF" != refs/heads/main ]]; then
@@ -78,6 +80,15 @@ jobs:
               managed_identity|oidc) ;;
               *) echo "::error::Set the SANDBOX_AUTH_MODE repository variable to managed_identity or oidc."; exit 1 ;;
             esac
+          }
+          # The sandbox job's timeout, which preflight also requires the just-in-time grant to outlast.
+          job_timeout="${SANDBOX_JOB_TIMEOUT_MINUTES:-360}"
+          require_job_timeout() {
+            if [[ ! "$job_timeout" =~ ^[0-9]{1,4}$ ]] || (( 10#$job_timeout < 60 || 10#$job_timeout > 1440 )); then
+              echo "::error::SANDBOX_JOB_TIMEOUT_MINUTES must be a whole number of minutes from 60 to 1440."
+              exit 1
+            fi
+            job_timeout=$((10#$job_timeout))
           }
           case "$GITHUB_EVENT_NAME" in
             workflow_dispatch)
@@ -101,16 +112,18 @@ jobs:
                 exit 1
               fi
               require_auth_mode
+              require_job_timeout
               {
                 echo "source_ref=refs/heads/$MANUAL_SOURCE_BRANCH"
                 echo "run_through=$MANUAL_RUN_THROUGH"
                 echo "environment=sandbox-deployment"
                 echo "auth_mode=$SANDBOX_AUTH_MODE"
                 echo "sandbox_count=$MANUAL_SANDBOX_COUNT"
+                echo "job_timeout_minutes=$job_timeout"
                 echo "deploy=true"
               } >> "$GITHUB_OUTPUT"
-              printf "## Deployment source\n\nManual run: \`%s\` branch, through \`%s\`, environment \`sandbox-deployment\`, auth mode \`%s\`, sandbox count \`%s\`.\n" \
-                "$MANUAL_SOURCE_BRANCH" "$MANUAL_RUN_THROUGH" "$SANDBOX_AUTH_MODE" "$MANUAL_SANDBOX_COUNT" >> "$GITHUB_STEP_SUMMARY"
+              printf "## Deployment source\n\nManual run: \`%s\` branch, through \`%s\`, environment \`sandbox-deployment\`, auth mode \`%s\`, sandbox count \`%s\`, job timeout \`%s\` minutes.\n" \
+                "$MANUAL_SOURCE_BRANCH" "$MANUAL_RUN_THROUGH" "$SANDBOX_AUTH_MODE" "$MANUAL_SANDBOX_COUNT" "$job_timeout" >> "$GITHUB_STEP_SUMMARY"
               ;;
             pull_request_target)
               if ! jq -e --arg repository "$GITHUB_REPOSITORY" '
@@ -139,6 +152,7 @@ jobs:
               head_sha="$(jq -er '.pull_request.head.sha' "$GITHUB_EVENT_PATH")"
               base_sha="$(jq -er '.pull_request.base.sha' "$GITHUB_EVENT_PATH")"
               require_auth_mode
+              require_job_timeout
               {
                 printf 'source_ref=%s\n' "$head_sha"
                 printf 'base_sha=%s\n' "$base_sha"
@@ -146,6 +160,7 @@ jobs:
                 echo "environment=sandbox-release-gate"
                 echo "auth_mode=$SANDBOX_AUTH_MODE"
                 echo "sandbox_count=1"
+                echo "job_timeout_minutes=$job_timeout"
                 echo "deploy=true"
               } >> "$GITHUB_OUTPUT"
               ;;
@@ -408,7 +423,8 @@ jobs:
     environment:
       name: ${{ needs.selection.outputs.environment }}
       url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-    timeout-minutes: 180
+    # SANDBOX_JOB_TIMEOUT_MINUTES, validated by selection. The fallback only applies when selection didn't deploy.
+    timeout-minutes: ${{ fromJSON(needs.selection.outputs.job_timeout_minutes || '360') }}
     # The job signs in as the deployment identity: with auth_mode = "managed_identity", the identity attached to the
     # runner VM; with auth_mode = "oidc", by exchanging a GitHub OIDC token (id-token: write). Its federated credentials
     # accept only this workflow on main in the deployment environments. In both modes the identity has no deployment
@@ -422,7 +438,7 @@ jobs:
     env:
       SANDBOX_AUTH_MODE: ${{ needs.selection.outputs.auth_mode }}
       SANDBOX_COUNT: ${{ needs.selection.outputs.sandbox_count }}
-      SANDBOX_JIT_MIN_REMAINING_MINUTES: ${{ vars.SANDBOX_JIT_MIN_REMAINING_MINUTES }}
+      SANDBOX_JOB_TIMEOUT_MINUTES: ${{ needs.selection.outputs.job_timeout_minutes }}
       SANDBOX_RETAINED_DEPLOYMENTS: ${{ vars.SANDBOX_RETAINED_DEPLOYMENTS }}
       SANDBOX_RUN_THROUGH: ${{ needs.selection.outputs.run_through }}
       SANDBOX_SOURCE_SHA: ${{ github.event_name == 'pull_request_target' && needs.selection.outputs.source_ref || '' }}
