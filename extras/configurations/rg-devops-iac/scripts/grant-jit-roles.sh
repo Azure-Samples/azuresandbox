@@ -154,9 +154,10 @@ active_assignments() {
 }
 
 # Submits a roleAssignmentScheduleRequest. Retries authorization failures for up to 5 minutes, which covers
-# propagation of a PIM activation made moments earlier.
+# propagation of a PIM activation made moments earlier. With retry_exists=true it also retries RoleAssignmentExists,
+# which PIM returns for several minutes after it revokes an assignment that is being replaced.
 submit_request() {
-  local body="$1" output attempt
+  local body="$1" retry_exists="${2:-false}" output attempt
   for attempt in $(seq 1 20); do
     if output=$(az rest --method PUT --body "${body}" \
       --url "${ARM}/roleAssignmentScheduleRequests/$(new_guid)?api-version=${API_VERSION}" \
@@ -164,7 +165,9 @@ submit_request() {
       echo "${output}"
       return 0
     fi
-    if grep -q "AuthorizationFailed" <<<"${output}" && (( attempt < 20 )); then
+    if { grep -q "AuthorizationFailed" <<<"${output}" ||
+      { [[ "${retry_exists}" == true ]] && grep -q "RoleAssignmentExists" <<<"${output}"; }; } &&
+      (( attempt < 20 )); then
       sleep 15
       continue
     fi
@@ -259,6 +262,7 @@ for role_id in "${GRANT_ROLE_IDS[@]}"; do
   role_name="${ROLE_NAMES[${role_id}]}"
   current=$(jq -c --arg role "${role_id}" 'select(.roleId == $role)' <<<"${EXISTING}" | head -n 1)
 
+  replaced=false
   if [[ -n "${current}" ]]; then
     end=$(jq -r '.endDateTime // empty' <<<"${current}")
     if [[ "${FORCE}" != true ]]; then
@@ -274,6 +278,7 @@ for role_id in "${GRANT_ROLE_IDS[@]}"; do
     fi
     echo "  ${role_name}: removing the existing assignment..."
     remove_assignment "${role_id}"
+    replaced=true
   fi
 
   body=$(jq -n \
@@ -291,7 +296,10 @@ for role_id in "${GRANT_ROLE_IDS[@]}"; do
   fi
 
   echo "  ${role_name}: assigning for ${HOURS} hours..."
-  if ! status=$(submit_request "${body}"); then
+  if [[ "${replaced}" == true ]]; then
+    echo "  ${role_name}: PIM can take a few minutes to finish removing the old assignment; retrying until it does..."
+  fi
+  if ! status=$(submit_request "${body}" "${replaced}"); then
     echo "Error: assigning ${role_name} failed."
     exit 1
   fi
