@@ -48,8 +48,27 @@ resource "azurerm_role_assignment" "assignments_vm_win" {
 #endregion
 
 #region vm-configuration
+# A new VM's guest agent may self-update at first boot and skip goal states meanwhile, so an
+# installPatches request issued then is failed by the platform (#1023). This run command is itself a
+# goal state, so it completes only once the agent is processing goal states again.
+resource "azurerm_virtual_machine_run_command" "wait_for_guest_agent" {
+  name               = "${module.naming.names["virtual_machine_extension"].name}-${var.vm_jumpbox_win_name}-WaitForGuestAgent"
+  location           = var.location
+  virtual_machine_id = azurerm_windows_virtual_machine.this.id
+
+  source {
+    script = file("${path.module}/scripts/Wait-GuestAgentReady.ps1")
+  }
+
+  timeouts {
+    create = "30m"
+    update = "30m"
+  }
+}
+
 # Patch first: install pending Critical/Security updates (and reboot if required) before any run
 # command or extension runs, so update-driven reboots don't interrupt guest configuration.
+# Runs after the guest agent readiness gate.
 # The apply fails if the patch run reports status "Failed" (e.g. a patch failed to install or the
 # maximumDuration window ran out with patches outstanding), so configuration never runs on a
 # partially patched VM. The patch result is also exported.
@@ -58,6 +77,7 @@ resource "azapi_resource_action" "install_patches" {
   resource_id = azurerm_windows_virtual_machine.this.id
   action      = "installPatches"
   method      = "POST"
+  depends_on  = [azurerm_virtual_machine_run_command.wait_for_guest_agent]
 
   body = {
     maximumDuration = "PT2H"
@@ -104,13 +124,33 @@ resource "azurerm_virtual_machine_extension" "join_domain" {
   settings = jsonencode({
     Name    = var.adds_domain_name
     User    = "${local.adds_domain_name_netbios}\\${var.admin_username}"
-    Restart = "true"
+    Restart = "false"
     Options = "3"
   })
 
   protected_settings = jsonencode({
     Password = var.admin_password
   })
+}
+
+# The domain join requires a reboot. With Restart = "true" the extension only schedules it and
+# reports success, so extensions started next can be killed mid-run by the shutdown (#1024).
+# Instead, restart synchronously and wait for the guest agent and WMI to settle before configuring.
+resource "azapi_resource_action" "restart_after_domain_join" {
+  type        = "Microsoft.Compute/virtualMachines@2025-04-01"
+  resource_id = azurerm_windows_virtual_machine.this.id
+  action      = "restart"
+  method      = "POST"
+  depends_on  = [azurerm_virtual_machine_extension.join_domain]
+
+  timeouts {
+    create = "30m"
+  }
+}
+
+resource "time_sleep" "wait_for_domain_join_restart" {
+  create_duration = "2m"
+  depends_on      = [azapi_resource_action.restart_after_domain_join]
 }
 
 resource "azurerm_virtual_machine_run_command" "install_software" {
@@ -155,7 +195,7 @@ resource "azurerm_virtual_machine_extension" "configure_azure_files" {
   depends_on = [
     azurerm_role_assignment.assignments_vm_win,
     azurerm_storage_blob.remote_scripts,
-    azurerm_virtual_machine_extension.join_domain
+    time_sleep.wait_for_domain_join_restart
   ]
 
   settings = jsonencode({

@@ -67,9 +67,29 @@ resource "azurerm_role_assignment" "assignments" {
 #endregion
 
 #region sql-vm-configuration
+# A new VM's guest agent may self-update at first boot and skip goal states meanwhile, so an
+# installPatches request issued then is failed by the platform (#1023). This run command is itself a
+# goal state, so it completes only once the agent is processing goal states again. It runs after the
+# data disk attachments so those VM operations don't conflict with it or with patching.
+resource "azurerm_virtual_machine_run_command" "wait_for_guest_agent" {
+  name               = "WaitForGuestAgent"
+  location           = var.location
+  virtual_machine_id = azurerm_windows_virtual_machine.this.id
+  depends_on         = [azurerm_virtual_machine_data_disk_attachment.attachments]
+
+  source {
+    script = file("${path.module}/scripts/Wait-GuestAgentReady.ps1")
+  }
+
+  timeouts {
+    create = "30m"
+    update = "30m"
+  }
+}
+
 # Patch first: install pending Critical/Security updates (and reboot if required) before any run
 # command or extension runs, so update-driven reboots don't interrupt guest configuration.
-# Runs after the data disk attachments so the two VM operations don't conflict.
+# Runs after the guest agent readiness gate (and so after the data disk attachments).
 # The apply fails if the patch run reports status "Failed" (e.g. a patch failed to install or the
 # maximumDuration window ran out with patches outstanding), so configuration never runs on a
 # partially patched VM. The patch result is also exported.
@@ -78,7 +98,7 @@ resource "azapi_resource_action" "install_patches" {
   resource_id = azurerm_windows_virtual_machine.this.id
   action      = "installPatches"
   method      = "POST"
-  depends_on  = [azurerm_virtual_machine_data_disk_attachment.attachments]
+  depends_on  = [azurerm_virtual_machine_run_command.wait_for_guest_agent]
 
   body = {
     maximumDuration = "PT2H"
@@ -114,7 +134,7 @@ resource "azurerm_virtual_machine_extension" "join_domain" {
   settings = jsonencode({
     Name    = var.adds_domain_name
     User    = "${local.adds_domain_name_netbios}\\${var.admin_username}"
-    Restart = "true"
+    Restart = "false"
     Options = "3"
   })
 
@@ -123,11 +143,31 @@ resource "azurerm_virtual_machine_extension" "join_domain" {
   })
 }
 
+# The domain join requires a reboot. With Restart = "true" the extension only schedules it and
+# reports success, so run commands started next can be killed mid-run by the shutdown (#1024).
+# Instead, restart synchronously and wait for the guest agent and WMI to settle before configuring.
+resource "azapi_resource_action" "restart_after_domain_join" {
+  type        = "Microsoft.Compute/virtualMachines@2025-04-01"
+  resource_id = azurerm_windows_virtual_machine.this.id
+  action      = "restart"
+  method      = "POST"
+  depends_on  = [azurerm_virtual_machine_extension.join_domain]
+
+  timeouts {
+    create = "30m"
+  }
+}
+
+resource "time_sleep" "wait_for_domain_join_restart" {
+  create_duration = "2m"
+  depends_on      = [azapi_resource_action.restart_after_domain_join]
+}
+
 resource "azurerm_virtual_machine_run_command" "configure_firewall_rules" {
   name               = "ConfigureFirewallRules"
   location           = var.location
   virtual_machine_id = azurerm_windows_virtual_machine.this.id
-  depends_on         = [azurerm_virtual_machine_extension.join_domain]
+  depends_on         = [time_sleep.wait_for_domain_join_restart]
 
   source {
     script = file("${path.module}/scripts/Configure-FirewallRules.ps1")
@@ -138,7 +178,7 @@ resource "azurerm_virtual_machine_run_command" "configure_sql_login" {
   name               = "ConfigureSqlLogin"
   location           = var.location
   virtual_machine_id = azurerm_windows_virtual_machine.this.id
-  depends_on         = [azurerm_virtual_machine_extension.join_domain]
+  depends_on         = [time_sleep.wait_for_domain_join_restart]
 
   source {
     script = file("${path.module}/scripts/Configure-SqlLogin.ps1")
