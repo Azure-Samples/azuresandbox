@@ -97,7 +97,13 @@ resource "azurerm_storage_blob" "remote_scripts" {
   type                 = "Block"
   source               = "./${path.module}/scripts/${each.value.name}"
 
-  depends_on = [time_sleep.wait_for_roles]
+  # Blob data-plane writes must wait for the blob private endpoint (and its DNS zone group).
+  # Approving the endpoint rewrites the account's public DNS record to add the privatelink
+  # CNAME, and a lookup during that rewrite can return a cached NXDOMAIN ("no such host").
+  depends_on = [
+    azurerm_private_endpoint.storage_blob,
+    time_sleep.wait_for_roles
+  ]
 }
 #endregion
 
