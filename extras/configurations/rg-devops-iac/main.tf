@@ -385,8 +385,29 @@ module "vm_jumpbox_linux" {
   # The VM needs the NAT gateway for outbound access during cloud-init, and its NIC must not be created while the
   # subnet associations are still being written.
   depends_on = [
-    azurerm_subnet_nat_gateway_association.devops,
+    azurerm_subnet_nat_gateway_association.associations,
     time_sleep.wait_for_roles
+  ]
+}
+
+module "image_gallery" {
+  source = "./modules/image-gallery"
+  count  = var.enable_image_gallery ? 1 : 0
+
+  image_build_vm_size       = var.image_build_vm_size
+  location                  = azurerm_resource_group.this.location
+  resource_group_id         = azurerm_resource_group.this.id
+  resource_group_name       = azurerm_resource_group.this.name
+  subnet_image_build_aci_id = azurerm_subnet.subnets[var.subnet_image_build_aci_name].id
+  subnet_image_build_id     = azurerm_subnet.subnets[var.subnet_image_build_name].id
+  tags                      = var.tags
+  unique_seed               = module.naming.names["resource_group"].unique_seed
+  virtual_network_id        = azurerm_virtual_network.this.id
+
+  # Builds need the NSGs and the NAT gateway on the image build subnets.
+  depends_on = [
+    azurerm_subnet_nat_gateway_association.associations,
+    azurerm_subnet_network_security_group_association.associations,
   ]
 }
 #endregion

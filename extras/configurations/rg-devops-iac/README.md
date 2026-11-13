@@ -24,7 +24,7 @@ This configuration provides a minimal set of resources to function as a Terrafor
   * Managed-identity access to a pre-configured Terraform state backend (Azure Blob Storage).
   * Pre-installed Azure CLI and PowerShell + Azure PowerShell for custom automation.
 * **Network isolation**
-  * Virtual network and subnets and NSGs for bastion, VMs and private endpoints.
+  * Virtual network and subnets and NSGs for bastion, VMs, private endpoints and image builds.
   * NAT gateway for outbound internet access.
   * Private endpoints and private DNS zones for blob storage, key vault and Azure Monitor. Public network access is disabled.
 * **Secure access**
@@ -39,6 +39,7 @@ This configuration provides a minimal set of resources to function as a Terrafor
 * **Optional features** (disabled by default)
   * Deployment identity for sandbox applies, either attached to the virtual machine (`managed_identity`) or federated with GitHub Actions (`oidc`), with time-bound deployment roles granted before each apply.
   * See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration)
+  * Azure Compute Gallery and Azure VM Image Builder templates that pre-build fully patched Azure Sandbox VM images. See [Optional: Pre-built Images](#optional-pre-built-images).
 
 ## Prerequisites
 
@@ -273,6 +274,7 @@ This section provides documentation regarding the overall structure of the root 
 * [Virtual Network Design](#virtual-network-design)
 * [Dependencies](#dependencies)
 * [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration)
+* [Optional: Pre-built Images](#optional-pre-built-images)
 
 ### Root Module Structure
 
@@ -282,6 +284,7 @@ This configuration is organized into the following structure:
 ├── images/                               # Diagrams
 │   └── rg-devops-iac-diagram.drawio.svg  # Architecture diagram
 ├── modules/                              # Child modules
+│   ├── image-gallery/                    # Compute gallery and image builder module (optional pre-built images)
 │   └── vm-jumpbox-linux/                 # Linux jumpbox virtual machine module (jumplinux2)
 ├── scripts/                              # Helper scripts
 │   ├── bootstrap.ps1                     # PowerShell: generates terraform.tfvars
@@ -290,7 +293,8 @@ This configuration is organized into the following structure:
 │   ├── Connect-Jumplinux2.ps1            # PowerShell: connects to jumplinux2 through a Bastion tunnel with Entra ID
 │   ├── connect-jumplinux2.sh             # Bash: connects to jumplinux2 through a Bastion tunnel with Entra ID
 │   ├── delete-tfstate.sh                 # Bash: deletes Terraform state blob(s) from the storage backend
-│   └── enable-public-access.sh           # Bash: re-enables public access on the key vault and storage account (not the AMPLS or workspace)
+│   ├── enable-public-access.sh           # Bash: re-enables public access on the key vault and storage account (not the AMPLS or workspace)
+│   └── invoke-image-build.sh             # Bash: runs image builds and tags new image versions (optional pre-built images)
 ├── locals.tf                             # Local variables
 ├── main.tf                               # Resource configurations
 ├── network.tf                            # Network resource blocks
@@ -301,7 +305,7 @@ This configuration is organized into the following structure:
 └── variables.tf                          # Variable definitions
 ```
 
-There are additional scripts used for optional use cases. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration).
+There are additional scripts used for optional use cases. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration) and [Optional: Pre-built Images](#optional-pre-built-images).
 
 ### Root Module Input Variables
 
@@ -318,6 +322,10 @@ storage_replication_type | LRS | The type of replication for the storage account
 subnet_bastion_address_prefix | 10.0.0.0/26 | The address prefix for the `AzureBastionSubnet`.
 subnet_devops_address_prefix | 10.0.1.0/29 | The address prefix for the devops subnet.
 subnet_devops_name | snet-devops-01 | The name of the devops subnet, which hosts `jumplinux2`.
+subnet_image_build_aci_address_prefix | 10.0.4.0/28 | The address prefix for the image build Container Instances subnet, used by the optional [image-gallery](./modules/image-gallery/) module.
+subnet_image_build_aci_name | snet-imagebuild-aci-05 | The name of the image build Container Instances subnet.
+subnet_image_build_address_prefix | 10.0.3.0/27 | The address prefix for the image build VM subnet, used by the optional [image-gallery](./modules/image-gallery/) module.
+subnet_image_build_name | snet-imagebuild-04 | The name of the image build VM subnet.
 subnet_privatelink_address_prefix | 10.0.2.0/27 | The address prefix for the private link subnet, which hosts the private endpoints.
 subnet_privatelink_name | snet-privatelink-03 | The name of the private link subnet.
 subscription_id | | The Azure subscription id used to provision resources.
@@ -325,7 +333,7 @@ tags | | The tags in map format to be used when creating new resources.
 vm_jumpbox_linux_size | `Standard_D2ls_v6` | The size of the Linux virtual machine (`jumplinux2`).
 vnet_address_space | 10.0.0.0/16 | The address space in CIDR notation for the virtual network.
 
-There are additional input variables used for optional use cases. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration).
+There are additional input variables used for optional use cases. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration) and [Optional: Pre-built Images](#optional-pre-built-images).
 
 ### Root Module Resources
 
@@ -366,12 +374,12 @@ azurerm_role_assignment.key_vault_secrets_officer | | Assigns `Key Vault Secrets
 azurerm_role_assignment.storage_blob_data_contributor | | Assigns `Storage Blob Data Contributor` on the storage account to the operator signed in to Azure CLI.
 azurerm_storage_account.this | stdevopsdevxxx | Storage account for storing Terraform state files.
 azurerm_storage_container.this | tfstate | Storage container for storing Terraform state files.
-azurerm_subnet.subnets[*] | | Subnets from `local.subnets`. See [Virtual Network Design](#virtual-network-design).
-azurerm_subnet_nat_gateway_association.devops | | Associates the NAT gateway with the subnet.
+azurerm_subnet.subnets[*] | | Subnets from `local.subnets`. Each must be inside `vnet_address_space` and must not overlap another subnet. See [Virtual Network Design](#virtual-network-design).
+azurerm_subnet_nat_gateway_association.associations[*] | | Associates the NAT gateway with the devops and image build subnets.
 azurerm_subnet_network_security_group_association.associations[*] | | Associates each NSG with its subnet.
 azurerm_virtual_network.this | vnet-devops-dev | Virtual network for the Linux virtual machine.
 
-There are additional resources used for optional use cases. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration).
+There are additional resources used for optional use cases. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration) and [Optional: Pre-built Images](#optional-pre-built-images).
 
 ### Root Module Output Variables
 
@@ -382,7 +390,7 @@ Name | Comments
 resource_ids | A map of resource IDs for key resources in the configuration.
 resource_names | A map of resource names for key resources in the configuration.
 
-There are additional output variables for optional use cases. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration).
+There are additional output variables for optional use cases. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration) and [Optional: Pre-built Images](#optional-pre-built-images).
 
 ### Child Modules
 
@@ -390,6 +398,7 @@ The following [modules](./modules/) are included in this configuration:
 
 Name | Required | Depends On | Description
 --- | --- | --- | ---
+[image-gallery](./modules/image-gallery/) | No | Root module | Creates an Azure Compute Gallery and Azure VM Image Builder templates for pre-built Azure Sandbox VM images. Enabled by `enable_image_gallery`.
 [vm-jumpbox-linux](./modules/vm-jumpbox-linux/) | No | Root module | Creates a preconfigured Linux jumpbox VM in the DevOps virtual network.
 
 ### Virtual Network Design
@@ -399,7 +408,7 @@ This configuration implements a virtual network and network-isolated Azure servi
 VNet Property | Default Value | Notes
 --- | --- | ---
 Name | `vnet-devops-dev` | N/A
-Address Space | `10.0.0.0/16` | Minimum /25 required (128 IP addresses) when subnets are contiguous.
+Address Space | `10.0.0.0/16` | Minimum /24 required (256 IP addresses) when subnets are contiguous.
 DNS Server | `168.63.129.16` | Azure DNS with private DNS zones.
 
 The virtual network contains the following subnets.
@@ -409,6 +418,8 @@ Subnet | Address Prefix | IP Addresses | Notes
 `AzureBastionSubnet` (name required) | `10.0.0.0/26` | 64 | Requires a `/26` minimum. NSG attached as per [Secure your Azure Bastion deployment](https://learn.microsoft.com/azure/bastion/secure-bastion#network-security).
 `snet-devops-01` (default name) | `10.0.1.0/29` | 8 | Requires a `/29` minimum. NSG attached allowing inbound SSH only. Egress via NAT gateway.
 `snet-privatelink-03` (default name) | `10.0.2.0/27` | 32 | Requires a `/27` minimum for AMPLS. No NSG is attached. Hosts private endpoints for key vault, blob storage and AMPLS.
+`snet-imagebuild-04` (default name) | `10.0.3.0/27` | 32 | Temporary Azure VM Image Builder build VMs for the optional [image-gallery](./modules/image-gallery/) module. NSG allows only TCP 22 and 5986 from the image build Container Instances subnet and denies other virtual network inbound traffic. Egress via NAT gateway.
+`snet-imagebuild-aci-05` (default name) | `10.0.4.0/28` | 16 | The Azure VM Image Builder container. Delegated to `Microsoft.ContainerInstance/containerGroups`. NSG denies virtual network inbound traffic. Egress via NAT gateway.
 
 The following private DNS zones are linked to the virtual network and are configured for internet fallback (`NxDomainRedirect`).
 
@@ -1046,3 +1057,14 @@ sudo /opt/actions-runner/svc.sh stop
 sudo /opt/actions-runner/svc.sh uninstall
 sudo -u githubrunner /opt/actions-runner/config.sh remove --token YOUR-REMOVAL-TOKEN-HERE
 ```
+
+### Optional: Pre-built Images
+
+`rg-devops-iac` can optionally host an Azure Compute Gallery and Azure VM Image Builder templates that pre-build fully patched images for the Azure Sandbox VMs. Set `enable_image_gallery = true` in `terraform.tfvars` to create them with the [image-gallery](./modules/image-gallery/README.md) module. Its README documents the image design, build networking, identity, prerequisites and costs, and how to [build images](./modules/image-gallery/README.md#building-images) and [disable the image gallery](./modules/image-gallery/README.md#disabling-the-image-gallery).
+
+Variable | Default | Description
+--- | --- | ---
+enable_image_gallery | false | Set to true to create the compute gallery, image definitions, image templates and image builder identity, and to register the `Microsoft.VirtualMachineImages` resource provider. The image build subnets are always created; see [Virtual Network Design](#virtual-network-design).
+image_build_vm_size | `Standard_D4s_v6` | The size of the temporary build VM AIB uses for every build. Independent of the size of VMs deployed from the images. See [Image Design](./modules/image-gallery/README.md#image-design).
+
+When `enable_image_gallery` is true, the `resource_ids` and `resource_names` outputs also include `image_builder_identity`, `image_gallery`, and `image_definition_<image>` and `image_template_<image>` for each image.
