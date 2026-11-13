@@ -3,13 +3,13 @@
 # (enable_github_runner = true) and exports it as TF_VAR_github_runner_token. Not needed otherwise.
 #
 # Usage, from extras/configurations/rg-devops-iac, in the bash shell that will run terraform:
-#   source ./scripts/new-runner-registration-token.sh [runner_url]
+#   source ./modules/github-runner/scripts/new-runner-registration-token.sh [runner_url]
 #
 # The script must be sourced, so it can set the variable in the current shell. Run directly, it
 # refuses to print the token to a terminal; its output can only be captured, e.g.
-#   export TF_VAR_github_runner_token="$(./scripts/new-runner-registration-token.sh)"
+#   export TF_VAR_github_runner_token="$(./modules/github-runner/scripts/new-runner-registration-token.sh)"
 #
-# runner_url is the GitHub repository URL. It defaults to github_runner_url in ../terraform.tfvars,
+# runner_url is the GitHub repository URL. It defaults to github_runner_url in ../../../terraform.tfvars,
 # then to the variable's default, the Azure Sandbox repository.
 #
 # Requires the GitHub CLI (gh) signed in as a repository admin. The token is never displayed. It expires after 1 hour, so run terraform plan
@@ -24,7 +24,7 @@ _new_runner_registration_token() (
         exit 1
     }
 
-    tfvars="$(cd "$(dirname "$1")/.." && pwd)/terraform.tfvars"
+    tfvars="$(cd "$(dirname "$1")/../../.." && pwd)/terraform.tfvars"
     shift
     runner_url="${1:-}"
 
@@ -32,7 +32,7 @@ _new_runner_registration_token() (
         runner_url=$(sed -nE 's/^[[:space:]]*github_runner_url[[:space:]]*=[[:space:]]*"([^"]*)".*$/\1/p' "$tfvars" | tail -n 1)
     fi
 
-    # Matches the default of github_runner_url in ../variables.tf.
+    # Matches the default of github_runner_url in ../../../variables.tf.
     runner_url="${runner_url:-https://github.com/Azure-Samples/azuresandbox}"
 
     if ! [[ "$runner_url" =~ ^https://github\.com/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]]; then

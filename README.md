@@ -756,8 +756,8 @@ Terraform authenticates the `azurerm`, `azapi` and `azuread` providers as the de
 `auth_mode` | Use for | Deployment identity | Credential | Used from | More information
 --- | --- | --- | --- | --- | ---
 `client_secret` (default) | Manual deployments by sandbox users | Service principal | Service principal secret from the `TF_VAR_client_secret` environment variable, so it never lands in `terraform.tfvars` | Any Terraform execution environment | [Service Principal](#service-principal)
-`managed_identity` | Automated deployments | User-assigned managed identity | Host's managed identity (secretless) | An Azure VM with a managed identity, from a terminal or a GitHub Actions self-hosted runner | [rg-devops-iac](./extras/configurations/rg-devops-iac/)
-`oidc` | Automated deployments integrated with GitHub | User-assigned managed identity with a GitHub federated credential | GitHub Actions OIDC token (secretless) | A GitHub Actions workflow | [rg-devops-iac](./extras/configurations/rg-devops-iac/)
+`managed_identity` | Automated deployments | User-assigned managed identity | Host's managed identity (secretless) | An Azure VM with a managed identity, from a terminal or a GitHub Actions self-hosted runner | [rg-devops-iac](./extras/configurations/rg-devops-iac/modules/github-runner/README.md#deployment-identity)
+`oidc` | Automated deployments integrated with GitHub | User-assigned managed identity with a GitHub federated credential | GitHub Actions OIDC token (secretless) | A GitHub Actions workflow | [rg-devops-iac](./extras/configurations/rg-devops-iac/modules/github-runner/README.md#deployment-identity)
 
 In every mode, `client_id` identifies the deployment identity. The sandbox user is identified separately by `operator_object_id`, which the configuration uses to grant that user data-plane access to the sandbox. The Terraform state backend, when one is configured, authenticates independently of `auth_mode`.
 
@@ -958,7 +958,7 @@ On Linux and macOS, the `vwan` integration test in [Test-Integration-VwanConnect
   sudo ./scripts/install-vwan-tunnel.sh --user "$USER"
   ```
 
-  Re-run the installer after pulling changes to `vwan-tunnel.sh`. If the installed copy is out of date, the test fails and tells you to re-run it. The [self-hosted runner](./extras/configurations/rg-devops-iac/) uses the same installer at deployment time.
+  Re-run the installer after pulling changes to `vwan-tunnel.sh`. If the installed copy is out of date, the test fails and tells you to re-run it. The [self-hosted runner](./extras/configurations/rg-devops-iac/modules/github-runner/README.md#elevated-permissions-for-integration-tests) uses the same installer at deployment time.
 
 The test pulls the VPN client certificate and the VPN profile from the target sandbox each time it runs, so one machine can test any number of sandboxes, one at a time. Linux, including WSL, is supported. macOS is best effort and untested. Windows uses its own OpenVPN path and doesn't need the wrapper.
 
