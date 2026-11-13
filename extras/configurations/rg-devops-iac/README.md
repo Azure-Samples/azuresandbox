@@ -293,8 +293,7 @@ This configuration is organized into the following structure:
 │   ├── Connect-Jumplinux2.ps1            # PowerShell: connects to jumplinux2 through a Bastion tunnel with Entra ID
 │   ├── connect-jumplinux2.sh             # Bash: connects to jumplinux2 through a Bastion tunnel with Entra ID
 │   ├── delete-tfstate.sh                 # Bash: deletes Terraform state blob(s) from the storage backend
-│   ├── enable-public-access.sh           # Bash: re-enables public access on the key vault and storage account (not the AMPLS or workspace)
-│   └── invoke-image-build.sh             # Bash: runs image builds and tags new image versions (optional pre-built images)
+│   └── enable-public-access.sh           # Bash: re-enables public access on the key vault and storage account (not the AMPLS or workspace)
 ├── locals.tf                             # Local variables
 ├── main.tf                               # Resource configurations
 ├── network.tf                            # Network resource blocks

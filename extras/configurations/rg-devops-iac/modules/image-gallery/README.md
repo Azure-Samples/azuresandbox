@@ -24,7 +24,7 @@ Use this checklist to validate changes to the image gallery or templates:
 
 1. With `enable_image_gallery = false`, `terraform apply` creates the image build subnets but no `module.image_gallery` resources.
 2. With `enable_image_gallery = true`, `terraform apply` succeeds.
-3. `./scripts/invoke-image-build.sh` builds all four images, validation passes, and each image definition has a new version tagged with `source_image`, `source_image_version` and `build_time`.
+3. `./modules/image-gallery/scripts/invoke-image-build.sh` builds all four images, validation passes, and each image definition has a new version tagged with `source_image`, `source_image_version` and `build_time`.
 4. No public IP address is created in the staging resource groups during a build.
 5. A test VM deployed from each image on a v6 size (Standard and, for `mssqlwin`, Trusted Launch) has the expected software and patches.
 
@@ -59,8 +59,9 @@ The root module also registers the `Microsoft.VirtualMachineImages` resource pro
 This module is organized as follows:
 
 ```plaintext
-├── scripts/                              # Scripts the image templates run on the build VM
+├── scripts/                              # Build VM and operator scripts
 │   ├── Enable-MicrosoftUpdate.ps1        # PowerShell: opts the mssqlwin build VM into Microsoft Update
+│   ├── invoke-image-build.sh             # Bash (operator): runs image builds and tags new image versions
 │   ├── Set-AutomaticUpdates.ps1          # PowerShell: sets Configure Automatic Updates to 4 (jumpwin and mssqlwin)
 │   ├── Test-ImageWindows.ps1             # PowerShell: validates the adds, jumpwin and mssqlwin images
 │   └── test-image-jumplinux.sh           # Bash: validates the jumplinux image
@@ -71,6 +72,8 @@ This module is organized as follows:
 ├── terraform.tf                          # Terraform configuration block
 └── variables.tf                          # Input variables
 ```
+
+The image templates run the PowerShell and `test-image-jumplinux.sh` scripts on the build VM. Run the operator script from the rg-devops-iac directory, e.g. `./modules/image-gallery/scripts/invoke-image-build.sh`. It reads the root module's outputs.
 
 The image templates also run the install scripts the Azure Sandbox modules run at deploy time, so both stay identical: [Install-WindowsFeatures.ps1](../../../../../modules/vnet-app/scripts/Install-WindowsFeatures.ps1), [Install-Software.ps1](../../../../../modules/vnet-app/scripts/Install-Software.ps1) and [install-vm-jumpbox-linux-packages.sh](../../../../../modules/vm-jumpbox-linux/scripts/install-vm-jumpbox-linux-packages.sh).
 
@@ -158,11 +161,11 @@ The gallery, image definitions and templates cost nothing while idle. Each build
 
 ### Building Images
 
-Terraform creates the templates but doesn't run builds. Run them as the operator with Azure CLI from the root module directory after `terraform apply`, using [invoke-image-build.sh](../../scripts/invoke-image-build.sh). It reads the `image_template_<image>` names from the root `resource_names` output.
+Terraform creates the templates but doesn't run builds. Run them as the operator with Azure CLI from the root module directory after `terraform apply`, using [invoke-image-build.sh](./scripts/invoke-image-build.sh). It reads the `image_template_<image>` names from the root `resource_names` output.
 
 ```bash
-./scripts/invoke-image-build.sh                     # all four images
-./scripts/invoke-image-build.sh jumplinux mssqlwin  # selected images
+./modules/image-gallery/scripts/invoke-image-build.sh                     # all four images
+./modules/image-gallery/scripts/invoke-image-build.sh jumplinux mssqlwin  # selected images
 ```
 
 The script starts the builds in parallel, reports their status until they finish, then tags each new image version with `source_image_version` and `build_time`. Builds take from about 30 minutes (`jumplinux`) to a few hours (Windows images with several Windows Update passes). If a build fails, check `customization.log` in the template's staging resource group.
