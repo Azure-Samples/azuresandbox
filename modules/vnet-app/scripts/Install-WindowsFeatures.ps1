@@ -1,3 +1,7 @@
+# Installs the jumpwin1 RSAT Windows features. This is the single source for that step, shared by
+# the deploy-time run command (compute.tf) and the pre-built image build. Runs elevated, as SYSTEM
+# under a run command or the image builder's PowerShell customizer, and is idempotent.
+
 #region functions
 function Write-Log {
     param( [string] $msg)

@@ -4,20 +4,11 @@
 
 cloud_config_modules:
   - apt_configure
-  - package_update_upgrade_install
   - runcmd
 
-# Note: bootcmd runs very early in boot (before cloud-init's network/DNS readiness is guaranteed), so all
-# external key downloads below use curl's --retry family to ride out transient DNS resolution failures
-# (curl treats "Could not resolve host" as a retryable transient error). Keyring files must exist before
-# apt_configure/package_update_upgrade_install run (cloud_config_modules stage), so this cannot be deferred
-# to runcmd, which only executes later in the modules-final stage.
-bootcmd:
-  - test -d /etc/apt/keyrings || install -m 0755 -d /etc/apt/keyrings
-  - test -f /etc/apt/keyrings/docker.asc || (curl -fsSL --retry 6 --retry-all-errors --retry-connrefused --retry-delay 2 https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc && chmod a+r /etc/apt/keyrings/docker.asc)
-  - test -f /etc/apt/keyrings/hashicorp-archive-keyring.gpg || (curl -fsSL --retry 6 --retry-all-errors --retry-connrefused --retry-delay 2 https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /etc/apt/keyrings/hashicorp-archive-keyring.gpg && chmod a+r /etc/apt/keyrings/hashicorp-archive-keyring.gpg)
-  - test -f /etc/apt/keyrings/helm.gpg || (curl -fsSL --retry 6 --retry-all-errors --retry-connrefused --retry-delay 2 https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | gpg --dearmor | sudo tee /etc/apt/keyrings/helm.gpg && chmod a+r /etc/apt/keyrings/helm.gpg)
-  - test -f /etc/apt/keyrings/microsoft.gpg || (curl -fsSL --retry 6 --retry-all-errors --retry-connrefused --retry-delay 2 https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | sudo tee /etc/apt/keyrings/microsoft.gpg && chmod go+r /etc/apt/keyrings/microsoft.gpg)
+# The apt keyrings, repositories and packages are installed by the shared
+# install-vm-jumpbox-linux-packages.sh script, which main.tf adds as a separate user-data part. The
+# same script is used to build pre-built images.
 
 apt:
   # Use the Canonical archive and security servers directly instead of the Azure regional mirror
@@ -28,54 +19,6 @@ apt:
   security:
     - arches: [default]
       uri: http://security.ubuntu.com/ubuntu
-  sources:
-    azure-cli:
-      source: 'deb [arch=amd64 signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ $RELEASE main'
-      filename: azure-cli.list
-    docker:
-      source: 'deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $RELEASE stable'
-      filename: docker.list
-    helm:
-      source: 'deb [arch=amd64 signed-by=/etc/apt/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main'
-      filename: helm-stable-debian.list
-    powershell:
-      source: 'deb [arch=amd64 signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/ubuntu/24.04/prod $RELEASE main'
-      filename: microsoft-prod.list
-    terraform:
-      source: 'deb [arch=amd64 signed-by=/etc/apt/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $RELEASE main'
-      filename: hashicorp.list
-  
-package_update: true
-
-packages:
-  - autofs
-  - azure-cli
-  - cifs-utils
-  - containerd.io
-  - docker-buildx-plugin
-  - docker-ce
-  - docker-ce-cli
-  - docker-compose-plugin
-  - helm
-  - jp
-  - keyutils
-  - krb5-config
-  - krb5-user
-  - libnss-winbind
-  - libpam-winbind
-  - notary
-  - ntp
-  - powershell
-  - python3-pip
-  - samba
-  - terraform
-  - winbind
-
-# A full dist-upgrade is deliberately not performed at provisioning time. It is not required to
-# install the packages above, it makes provisioning depend on every package on the image being
-# downloadable from the Ubuntu mirror, and it triggers a mid-provisioning reboot when a new kernel is
-# installed. Ongoing security patching is handled by unattended-upgrades, which is enabled by default.
-package_upgrade: false
 
 write_files:
   - content: |
