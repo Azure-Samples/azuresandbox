@@ -93,6 +93,10 @@ for image in "${IMAGES[@]}"; do
   fi
 done
 
+# Record the start time before launching any run, so every new run's startTime is later than it. A run that started
+# before stale_cutoff is an earlier run. The 60 s margin allows for clock skew between this host and Azure.
+started=$(date +%s)
+stale_cutoff=$(( started - 60 ))
 for image in "${IMAGES[@]}"; do
   echo "Starting the '${image}' build (template '${TEMPLATES[${image}]}')..."
   az image builder run --subscription "${SUBSCRIPTION_ID}" -g "${RESOURCE_GROUP}" -n "${TEMPLATES[${image}]}" --no-wait
@@ -101,7 +105,6 @@ done
 # Wait for every build to leave the Running state. 'az image builder run --no-wait' returns before the run starts, so
 # an empty or stale state is treated as still starting.
 declare -A RESULTS=()
-started=$(date +%s)
 while [[ ${#RESULTS[@]} -lt ${#IMAGES[@]} ]]; do
   sleep "${INTERVAL}"
   elapsed=$(( ($(date +%s) - started) / 60 ))
@@ -111,7 +114,7 @@ while [[ ${#RESULTS[@]} -lt ${#IMAGES[@]} ]]; do
       --query 'lastRunStatus' -o json)
     state=$(jq -r '.runState // empty' <<<"${status}")
     start_time=$(jq -r '.startTime // empty' <<<"${status}")
-    if [[ -z "${state}" || "${state}" == "Running" ]] || [[ -n "${start_time}" && "$(date -d "${start_time}" +%s)" -lt "${started}" ]]; then
+    if [[ -z "${state}" || "${state}" == "Running" ]] || [[ -n "${start_time}" && "$(date -d "${start_time}" +%s)" -lt "${stale_cutoff}" ]]; then
       echo "[${elapsed}m] ${image}: ${state:-Starting} $(jq -r '.runSubState // empty' <<<"${status}")"
       continue
     fi
