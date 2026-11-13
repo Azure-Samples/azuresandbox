@@ -15,6 +15,7 @@ output "resource_ids" {
     var.deployment_identity == "oidc" ? {
       runner_power_state_identity = azurerm_user_assigned_identity.runner_power_state[0].id
     } : {},
+    var.enable_image_gallery ? module.image_gallery[0].resource_ids : {},
     module.vm_jumpbox_linux.resource_ids
   )
 }
@@ -36,6 +37,7 @@ output "resource_names" {
     var.deployment_identity == "oidc" ? {
       runner_power_state_identity = azurerm_user_assigned_identity.runner_power_state[0].name
     } : {},
+    var.enable_image_gallery ? module.image_gallery[0].resource_names : {},
     module.vm_jumpbox_linux.resource_names
   )
 }

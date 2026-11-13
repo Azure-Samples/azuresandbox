@@ -121,7 +121,8 @@ apt-get "${apt_opts[@]}" update
 # the packages below, it makes provisioning depend on every package on the image being
 # downloadable from the Ubuntu mirror, and it triggers a mid-provisioning reboot when a new kernel
 # is installed. Ongoing security patching is handled by unattended-upgrades, which is enabled by
-# default. Image builds do upgrade, and the image builder reboots the VM afterward.
+# default. Image builds do upgrade, without a reboot, so a new kernel takes effect when a VM is
+# first deployed from the image.
 if [ "$image_build" = true ]; then
   log "Upgrading installed packages (dist-upgrade)..."
   apt-get "${apt_opts[@]}" dist-upgrade

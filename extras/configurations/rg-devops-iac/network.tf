@@ -16,8 +16,23 @@ resource "azurerm_subnet" "subnets" {
   private_endpoint_network_policies = each.value.private_endpoint_network_policies
   default_outbound_access_enabled   = false
 
+  dynamic "delegation" {
+    for_each = each.value.delegation != "" ? [each.value.delegation] : []
+    content {
+      name = "delegation"
+      service_delegation {
+        name = each.value.delegation
+      }
+    }
+  }
+
   lifecycle {
-    ignore_changes = [delegation]
+    ignore_changes = [delegation[0].service_delegation[0].actions]
+
+    precondition {
+      condition     = local.subnet_prefixes_valid[each.key]
+      error_message = "Subnet ${each.key} (${each.value.address_prefix}) must be inside vnet_address_space (${var.vnet_address_space}) and must not overlap another subnet."
+    }
   }
 }
 #endregion
@@ -184,8 +199,10 @@ resource "azurerm_nat_gateway_public_ip_association" "this" {
   public_ip_address_id = azurerm_public_ip.this.id
 }
 
-resource "azurerm_subnet_nat_gateway_association" "devops" {
-  subnet_id      = azurerm_subnet.subnets[var.subnet_devops_name].id
+resource "azurerm_subnet_nat_gateway_association" "associations" {
+  for_each = { for key, subnet in local.subnets : key => subnet if subnet.nat_gateway }
+
+  subnet_id      = azurerm_subnet.subnets[each.key].id
   nat_gateway_id = azurerm_nat_gateway.this.id
 
   depends_on = [azurerm_subnet_network_security_group_association.associations]

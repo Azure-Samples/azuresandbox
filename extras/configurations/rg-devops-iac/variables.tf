@@ -26,6 +26,12 @@ variable "enable_github_runner" {
   default     = false
 }
 
+variable "enable_image_gallery" {
+  type        = bool
+  description = "Set to true to create the optional Azure Compute Gallery, image definitions, Azure VM Image Builder templates and build networking used to pre-build Azure Sandbox VM images."
+  default     = false
+}
+
 variable "entra_tenant_id" {
   type        = string
   description = "The Microsoft Entra tenant id."
@@ -120,6 +126,17 @@ variable "github_runner_url" {
   }
 }
 
+variable "image_build_vm_size" {
+  type        = string
+  description = "The size of the temporary build VM that Azure VM Image Builder uses for every image build. This is independent of the size of the VMs later deployed from the images."
+  default     = "Standard_D4s_v6"
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9_]+$", var.image_build_vm_size))
+    error_message = "Must conform to Azure virtual machine size naming conventions: it can only contain alphanumeric characters and underscores (_), e.g. 'Standard_D4s_v6'."
+  }
+}
+
 variable "location" {
   type        = string
   description = "The name of the Azure Region where resources will be provisioned."
@@ -203,6 +220,50 @@ variable "subnet_devops_name" {
 
   validation {
     condition     = can(regex("^[a-zA-Z0-9-]{1,64}$", var.subnet_devops_name))
+    error_message = "Must conform to Azure subnet naming standards: it can only contain alphanumeric characters and hyphens (-), must start and end with an alphanumeric character, and must be between 1 and 64 characters long."
+  }
+}
+
+variable "subnet_image_build_aci_address_prefix" {
+  type        = string
+  description = "The address prefix for the image build Container Instances subnet, which Azure VM Image Builder uses to reach the build VM. Used by the optional image-gallery module."
+  default     = "10.0.4.0/28"
+
+  validation {
+    condition     = can(cidrhost(var.subnet_image_build_aci_address_prefix, 0))
+    error_message = "Must be valid IPv4 CIDR."
+  }
+}
+
+variable "subnet_image_build_aci_name" {
+  type        = string
+  description = "The name of the image build Container Instances subnet. Used by the optional image-gallery module."
+  default     = "snet-imagebuild-aci-05"
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9-]{1,64}$", var.subnet_image_build_aci_name))
+    error_message = "Must conform to Azure subnet naming standards: it can only contain alphanumeric characters and hyphens (-), must start and end with an alphanumeric character, and must be between 1 and 64 characters long."
+  }
+}
+
+variable "subnet_image_build_address_prefix" {
+  type        = string
+  description = "The address prefix for the image build VM subnet, which hosts the temporary Azure VM Image Builder build VMs. Used by the optional image-gallery module."
+  default     = "10.0.3.0/27"
+
+  validation {
+    condition     = can(cidrhost(var.subnet_image_build_address_prefix, 0))
+    error_message = "Must be valid IPv4 CIDR."
+  }
+}
+
+variable "subnet_image_build_name" {
+  type        = string
+  description = "The name of the image build VM subnet. Used by the optional image-gallery module."
+  default     = "snet-imagebuild-04"
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9-]{1,64}$", var.subnet_image_build_name))
     error_message = "Must conform to Azure subnet naming standards: it can only contain alphanumeric characters and hyphens (-), must start and end with an alphanumeric character, and must be between 1 and 64 characters long."
   }
 }
