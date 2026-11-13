@@ -19,3 +19,9 @@ output "log_analytics_operations_complete" {
   value       = terraform_data.log_analytics_operations_complete.id
   description = "Dependency signal: the Azure Monitor Agent and the data collection rule and endpoint associations are complete. Consumed by the root ampls_access_barrier."
 }
+
+output "virtual_machine_extensions_complete" {
+  value       = azurerm_linux_virtual_machine.this.id
+  description = "Dependency signal: the VM id, available only after cloud-init and the VM extensions (the last apt-based one is the Azure Monitor Agent) are complete. Consumed by the optional github-runner module, so installing the runner doesn't contend for the dpkg/apt locks."
+  depends_on  = [azurerm_virtual_machine_extension.ama]
+}

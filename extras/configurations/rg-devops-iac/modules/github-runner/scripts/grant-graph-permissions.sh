@@ -15,14 +15,14 @@
 # role that can grant Microsoft Graph application permissions (Global Administrator also works). Azure RBAC
 # roles, including subscription Owner, cannot grant application permissions.
 #
-# Usage: ./scripts/grant-graph-permissions.sh [client-id-or-object-id]
+# Usage: ./modules/github-runner/scripts/grant-graph-permissions.sh [client-id-or-object-id]
 # The identity defaults to 'principal_id' in the 'deployment_identity' terraform output, which requires jq.
 # The script is idempotent: permissions that are already granted are skipped.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TERRAFORM_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+TERRAFORM_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 GRAPH_APP_ID="00000003-0000-0000-c000-000000000000"
 GRAPH_PERMISSIONS=("Group.Create" "GroupMember.Read.All" "User.Read.All" "Application.Read.All")

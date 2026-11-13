@@ -93,7 +93,7 @@ variable "github_runner_power_state_environment" {
 
 variable "github_runner_token" {
   type        = string
-  description = "The GitHub runner registration token used to register the self-hosted runner (expires after 1 hour), e.g. from 'scripts/new-runner-registration-token.sh'. Set using the environment variable 'TF_VAR_github_runner_token' for both 'terraform plan' and 'terraform apply'. Ephemeral: never stored in Terraform state or the saved plan. Required only when the runner is registered (on first deployment or when var.github_runner_token_version changes)."
+  description = "The GitHub runner registration token used to register the self-hosted runner (expires after 1 hour), e.g. from 'modules/github-runner/scripts/new-runner-registration-token.sh'. Set using the environment variable 'TF_VAR_github_runner_token' for both 'terraform plan' and 'terraform apply'. Ephemeral: never stored in Terraform state or the saved plan. Required only when the runner is registered (on first deployment or when var.github_runner_token_version changes)."
   sensitive   = true
   ephemeral   = true
   default     = ""
