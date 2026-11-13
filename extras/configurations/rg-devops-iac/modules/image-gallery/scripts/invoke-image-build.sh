@@ -7,10 +7,10 @@
 # The template already tags each version with source_image (publisher:offer:sku).
 #
 # Run as the operator with Azure CLI signed in, after 'terraform apply'. Template and resource group names come from
-# this configuration's terraform outputs, so it works from any directory. Builds run in parallel and take from about
-# 30 minutes (jumplinux) to a few hours (Windows images with several Windows Update passes).
+# the rg-devops-iac root module's terraform outputs, so it works from any directory. Builds run in parallel and take
+# from about 30 minutes (jumplinux) to a few hours (Windows images with several Windows Update passes).
 #
-# Usage: ./scripts/invoke-image-build.sh [options] [IMAGE...]
+# Usage: ./modules/image-gallery/scripts/invoke-image-build.sh [options] [IMAGE...]
 #   IMAGE                     One or more of adds, jumpwin, jumplinux, mssqlwin (default: all four).
 #   -i, --interval SECONDS    How often to check build status (default 60).
 #   -h, --help                Show this help.
@@ -18,7 +18,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TERRAFORM_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+TERRAFORM_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 INTERVAL=60
 IMAGES=()
