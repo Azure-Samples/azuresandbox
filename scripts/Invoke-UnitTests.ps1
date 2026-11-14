@@ -87,7 +87,7 @@
 #     mssqlwin1) under that VM's module, with suite target 'patching-<vm>'. It checks patch mode
 #     AutomaticByPlatform, the bypass-platform-safety-checks flag, assessment mode, and the VM's
 #     assignment to the sandbox maintenance configuration. Guest-side patching checks (Microsoft
-#     Update, native Automatic Updates disabled) are in each VM's own test script.
+#     Update on Windows, unattended-upgrades on Linux) are in each VM's own test script.
 #   - A local suite is skipped when a required parameter is missing from the Terraform outputs.
 #
 # Prerequisites:

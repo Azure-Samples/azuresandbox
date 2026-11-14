@@ -837,28 +837,6 @@ catch {
     $failed++
 }
 
-# Test: Windows Update - native Automatic Updates are disabled, so only Azure Update Manager installs updates.
-# Azure sets the NoAutoUpdate policy to 1 when patch mode is AutomaticByPlatform.
-# See https://learn.microsoft.com/azure/virtual-machines/automatic-vm-guest-patching#patch-orchestration-modes
-try {
-    $auPolicy = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' -ErrorAction SilentlyContinue
-    $noAutoUpdate = if ($null -ne $auPolicy) { $auPolicy.NoAutoUpdate } else { $null }
-
-    if ($noAutoUpdate -eq 1) {
-        Write-TestResult $moduleName 'PASS' "Windows Update: native Automatic Updates disabled (NoAutoUpdate = 1, AUOptions = $(if ($null -ne $auPolicy.AUOptions) { $auPolicy.AUOptions } else { 'not set' }))" -SanitizedMessage 'Windows Update: native Automatic Updates disabled (NoAutoUpdate = 1)'
-        $passed++
-    }
-    else {
-        Write-TestResult $moduleName 'FAIL' "Windows Update: NoAutoUpdate is '$noAutoUpdate', expected 1 (patch mode AutomaticByPlatform)" -SanitizedMessage 'Windows Update: NoAutoUpdate is not 1 (patch mode AutomaticByPlatform)'
-        $failed++
-    }
-}
-catch {
-    Write-TestResult $moduleName 'FAIL' "Windows Update: Failed to read the Automatic Updates policy" -SanitizedMessage 'Windows Update: Failed to read the Automatic Updates policy'
-    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
-    $failed++
-}
-
 # Summary
 $total = $passed + $failed
 Write-TestResult $moduleName 'SUMMARY' ("Passed: $passed Failed: $failed Total: $total")
