@@ -1,12 +1,15 @@
-# Validates a Windows image on the Azure VM Image Builder build VM, after customization and before the image is
-# generalized and distributed. Any failed check exits with a non-zero code, which stops the build, because the image
-# templates set continueDistributeOnFailure = false. Runs elevated, as SYSTEM, under the AIB PowerShell validator.
+# Validates a Windows image before it's distributed. Azure VM Image Builder runs this on a validation VM that Packer
+# deploys from the generalized image, not on the build VM. Any failed check exits with a non-zero code, which stops the
+# build, because the image templates set continueDistributeOnFailure = false. Runs elevated, as SYSTEM, under the AIB
+# PowerShell validator.
+#
+# Don't check the Windows Update policy key (SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU). Azure writes it
+# when it provisions a VM, based on the VM's patch mode. The validation VM uses the default mode, AutomaticByOS, which
+# sets AUOptions = 4, so the key shows how the validation VM was provisioned, not what is in the image.
 #
 # Checks for every image:
 #   * No Critical or Security updates are pending (using the same search criteria as the WindowsUpdate customizers).
 #   * Microsoft Update is registered, so updates for other Microsoft products such as SQL Server are offered.
-#   * No Configure Automatic Updates (AUOptions) policy is set; it would conflict with Azure Update Manager scheduled
-#     patching of VMs deployed from the image.
 # Image-specific checks:
 #   * adds:     The AD-Domain-Services feature is NOT installed (Sysprep doesn't support the AD DS role).
 #   * jumpwin:  RSAT-ADDS and RSAT-DNS-Server are installed, and VS Code, SSMS and MySQL Workbench are present.
@@ -50,12 +53,6 @@ function Test-FeatureInstalled {
     return ($null -ne $feature -and $feature.InstallState -eq 'Installed')
 }
 
-function Test-NoAutomaticUpdatePolicy {
-    $settings = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' -ErrorAction SilentlyContinue
-    $auOptions = if ($null -ne $settings) { $settings.AUOptions } else { $null }
-    Write-CheckResult ($null -eq $auOptions) "No Configure Automatic Updates policy (AUOptions = $(if ($null -eq $auOptions) { 'not set' } else { $auOptions }))"
-}
-
 function Test-MicrosoftUpdate {
     try {
         $serviceManager = New-Object -ComObject 'Microsoft.Update.ServiceManager'
@@ -97,7 +94,6 @@ catch {
 }
 
 Test-MicrosoftUpdate
-Test-NoAutomaticUpdatePolicy
 
 switch ($ImageName) {
     'adds' {

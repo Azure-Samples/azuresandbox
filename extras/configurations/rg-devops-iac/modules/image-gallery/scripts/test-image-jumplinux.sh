@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Validates the jumplinux image on the Azure VM Image Builder build VM, after customization and before the image is
-# deprovisioned and distributed. Any failed check exits non-zero, which stops the build, because the image template
-# sets continueDistributeOnFailure = false. Must run as root.
+# Validates the jumplinux image before it's distributed. Azure VM Image Builder runs this on a validation VM that Packer
+# deploys from the captured image, not on the build VM. Any failed check exits non-zero, which stops the build, because
+# the image template sets continueDistributeOnFailure = false. Must run as root.
 #
 # Checks:
 #   * Every package passed as an argument is installed. The image template passes the 'packages' array from the shared
