@@ -124,6 +124,7 @@ This module is organized as follows:
 |   ├── Invoke-AzureFilesConfiguration.ps1  # Runs Set-AzureFilesConfiguration.ps1 as domain admin
 |   ├── Set-AzureFilesConfiguration.ps1     # Configures Azure Files Kerberos authentication with mysandbox.local AD domain
 |   ├── Test-VnetApp.ps1                    # Module unit test script
+|   ├── Test-VnetAppLocal.ps1               # Module local (control-plane) unit test script
 |   └── Wait-GuestAgentReady.ps1            # Waits for the guest agent to finish any self-update before patching
 ├── compute.tf                              # Compute resource configurations   
 ├── locals.tf                               # Local variables

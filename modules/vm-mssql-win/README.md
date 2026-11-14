@@ -95,6 +95,7 @@ The module is organized as follows:
 |   ├── Set-MssqlConfiguration.ps1        # Prepares data and log disks and configures SQL Server instance (runs as domain admin); registers the AtStartup task below to run as NT AUTHORITY\SYSTEM
 |   ├── Set-MssqlStartupConfiguration.ps1 # Re-configures the SQL Server tempdb folder after a VM stop/deallocate event and starts SQL Server (exits early if it restarts the VM); runs as NT AUTHORITY\SYSTEM (local-only work, reliable at boot)
 |   ├── Test-VmMssqlWin.ps1               # Unit test script
+|   ├── Test-VmMssqlWinLocal.ps1          # Local (control-plane) unit test script
 |   └── Wait-GuestAgentReady.ps1          # Waits for the guest agent to finish any self-update before patching
 ├── compute.tf                            # Compute resource configurations
 ├── locals.tf                             # Local variables

@@ -75,6 +75,7 @@ vnet-shared/
 │   ├── Configure-AddsDns.ps1           # Configures AD Integrated DNS Server
 │   ├── Enable-MicrosoftUpdate.ps1      # Registers Microsoft Update so other Microsoft products are patched
 │   ├── Test-VnetShared.ps1             # Module unit test script
+│   ├── Test-VnetSharedLocal.ps1        # Module local (control-plane) unit test script
 │   └── Wait-GuestAgentReady.ps1        # Waits for the guest agent to finish any self-update before patching
 ├── compute.tf                          # Compute resource configurations
 ├── locals.tf                           # Local variables

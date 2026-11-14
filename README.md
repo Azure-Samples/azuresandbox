@@ -668,7 +668,6 @@ The Azure Sandbox project is organized into the following structure:
 │   ├── Test-Integration-SqlConnectivity.ps1      # Integration test for SQL Server connectivity
 │   ├── Test-Integration-SshConnectivity.ps1      # Integration test for SSH connectivity
 │   ├── Test-Integration-VwanConnectivity.ps1     # Integration test for P2S VPN connectivity
-│   ├── Test-VmPatchingLocal.ps1                  # Checks each VM's patch settings and maintenance assignment
 │   ├── vwan-tunnel.sh                            # Root wrapper for the vwan integration test's VPN tunnel
 │   └── VwanTunnel.ps1                            # PowerShell helper that runs vwan-tunnel.sh as root or via sudo
 ├── locals.tf                                     # Local variables

@@ -6,9 +6,6 @@ param(
     [string]$VmName,
 
     [Parameter(Mandatory = $true)]
-    [string]$ModuleName,
-
-    [Parameter(Mandatory = $true)]
     [string]$MaintenanceConfigurationName,
 
     [ValidateSet('true', 'false')]
@@ -36,16 +33,20 @@ function Write-TestResult {
 #endregion
 
 #region main
-# Client-side (orchestrator) unit tests for the scheduled patching configuration of one sandbox VM.
-# Every base VM (Windows and Linux, platform image or custom image) is patched the same way:
-# patch_mode AutomaticByPlatform with Customer Managed Schedules (bypass platform safety checks), and
-# an assignment to the sandbox's Azure Update Manager maintenance configuration (owned by vnet-shared).
-# With the bypass flag on, an unassigned VM is never patched by Azure, so the assignment is checked too.
-# Runs in the orchestrator's authenticated Az session (RunLocal = $true in Invoke-UnitTests.ps1).
+# Client-side (orchestrator) unit tests for control-plane resources in the vm-jumpbox-linux module.
+# These run in the orchestrator's authenticated Az session (RunLocal = $true in Invoke-UnitTests.ps1)
+# rather than VM-side on jumplinux1. VM-side checks stay in test-vm-jumpbox-linux.sh.
+#
+# Scheduled patching: every base VM (Windows and Linux, platform image or custom image) uses patch_mode
+# AutomaticByPlatform with Customer Managed Schedules (bypass platform safety checks) and is assigned to the
+# sandbox's Azure Update Manager maintenance configuration (owned by vnet-shared). With the bypass flag on, an
+# unassigned VM is never patched by Azure, so the assignment is checked too.
 $WarningPreference = 'SilentlyContinue'
 $ProgressPreference = 'SilentlyContinue'
 
-Write-Log "Starting local (control-plane) patching tests for VM '$VmName' in module '$ModuleName'..."
+$moduleName = 'vm-jumpbox-linux'
+
+Write-Log "Starting local (control-plane) unit tests for module '$moduleName'..."
 Write-Log ("Parameters: ResourceGroupName='$ResourceGroupName' VmName='$VmName' MaintenanceConfigurationName='$MaintenanceConfigurationName'")
 
 $passed = 0
@@ -75,17 +76,17 @@ try {
     }
 
     if ($patchIssues.Count -eq 0) {
-        Write-TestResult $ModuleName 'PASS' "VM '$VmName' patch settings: AutomaticByPlatform with Customer Managed Schedules and AutomaticByPlatform assessment" -SanitizedMessage 'VM patch settings: AutomaticByPlatform with Customer Managed Schedules and AutomaticByPlatform assessment'
+        Write-TestResult $moduleName 'PASS' "VM '$VmName' patch settings: AutomaticByPlatform with Customer Managed Schedules and AutomaticByPlatform assessment" -SanitizedMessage 'VM patch settings: AutomaticByPlatform with Customer Managed Schedules and AutomaticByPlatform assessment'
         $passed++
     }
     else {
-        Write-TestResult $ModuleName 'FAIL' ("VM '$VmName' patch settings: " + ($patchIssues -join '; ')) -SanitizedMessage 'VM patch settings: <value>'
+        Write-TestResult $moduleName 'FAIL' ("VM '$VmName' patch settings: " + ($patchIssues -join '; ')) -SanitizedMessage 'VM patch settings: <value>'
         $failed++
     }
 }
 catch {
-    Write-TestResult $ModuleName 'FAIL' "Failed to verify patch settings for VM '$VmName'" -SanitizedMessage 'Failed to verify VM patch settings'
-    Write-TestResult $ModuleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
+    Write-TestResult $moduleName 'FAIL' "Failed to verify patch settings for VM '$VmName'" -SanitizedMessage 'Failed to verify VM patch settings'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
@@ -103,23 +104,23 @@ try {
     $assignedConfigurationNames = @(($response.Content | ConvertFrom-Json).value | ForEach-Object { ($_.properties.maintenanceConfigurationId -split '/')[-1] })
 
     if ($assignedConfigurationNames -contains $MaintenanceConfigurationName) {
-        Write-TestResult $ModuleName 'PASS' "VM '$VmName' is assigned to maintenance configuration '$MaintenanceConfigurationName'" -SanitizedMessage 'VM is assigned to the sandbox maintenance configuration'
+        Write-TestResult $moduleName 'PASS' "VM '$VmName' is assigned to maintenance configuration '$MaintenanceConfigurationName'" -SanitizedMessage 'VM is assigned to the sandbox maintenance configuration'
         $passed++
     }
     else {
-        Write-TestResult $ModuleName 'FAIL' ("VM '$VmName' isn't assigned to maintenance configuration '$MaintenanceConfigurationName' (assigned: '" + ($assignedConfigurationNames -join "', '") + "')") -SanitizedMessage 'VM is not assigned to the sandbox maintenance configuration'
+        Write-TestResult $moduleName 'FAIL' ("VM '$VmName' isn't assigned to maintenance configuration '$MaintenanceConfigurationName' (assigned: '" + ($assignedConfigurationNames -join "', '") + "')") -SanitizedMessage 'VM is not assigned to the sandbox maintenance configuration'
         $failed++
     }
 }
 catch {
-    Write-TestResult $ModuleName 'FAIL' "Failed to verify maintenance assignment for VM '$VmName'" -SanitizedMessage 'Failed to verify the VM maintenance assignment'
-    Write-TestResult $ModuleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
+    Write-TestResult $moduleName 'FAIL' "Failed to verify maintenance assignment for VM '$VmName'" -SanitizedMessage 'Failed to verify the VM maintenance assignment'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }
 
 # Summary
 $total = $passed + $failed
-Write-TestResult $ModuleName 'SUMMARY' ("Passed: $passed Failed: $failed Total: $total")
+Write-TestResult $moduleName 'SUMMARY' ("Passed: $passed Failed: $failed Total: $total")
 
 if ($failed -gt 0) { exit 1 } else { exit 0 }
 #endregion

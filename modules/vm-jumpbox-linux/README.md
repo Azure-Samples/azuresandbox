@@ -204,6 +204,7 @@ This module is organized as follows:
 |   ├── configure-vm-jumpbox-linux.yaml     # cloud-init cloud-config file to configure the VM
 |   ├── install-vm-jumpbox-linux-packages.sh # Installs apt keyrings, repositories and packages (shared with image builds)
 |   ├── test-vm-jumpbox-linux.sh            # Module unit test script
+|   ├── Test-VmJumpboxLinuxLocal.ps1        # Module local (control-plane) unit test script
 |   └── wait-for-cloud-init.sh              # Run command script that waits for cloud-init and apt locks before AMA install
 ├── compute.tf                              # Compute resource configurations
 ├── main.tf                                 # Resource configurations
