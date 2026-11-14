@@ -281,6 +281,7 @@ resource "azurerm_maintenance_assignment_virtual_machine" "this" {
   depends_on = [
     azurerm_monitor_data_collection_rule_association.mssqlwin1_dce,
     azurerm_monitor_data_collection_rule_association.mssqlwin1_dcr,
+    azurerm_virtual_machine_run_command.configure_firewall_rules,
   ]
 }
 #endregion
