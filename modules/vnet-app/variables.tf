@@ -153,6 +153,16 @@ variable "log_analytics_workspace_id" {
   }
 }
 
+variable "maintenance_configuration_id" {
+  type        = string
+  description = "The ID of the Azure Update Manager maintenance configuration owned by vnet-shared. The VM is assigned to it as the module's last deployment step, so it's patched on the sandbox schedule."
+
+  validation {
+    condition     = can(regex("(?i)^/subscriptions/[0-9a-f-]+/resourceGroups/[^/]+/providers/Microsoft\\.Maintenance/maintenanceConfigurations/[^/]+$", var.maintenance_configuration_id))
+    error_message = "Must be a maintenance configuration resource ID: '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Maintenance/maintenanceConfigurations/{name}'."
+  }
+}
+
 variable "monitor_private_link_scope_id" {
   type        = string
   description = "The ID of the Azure Monitor Private Link Scope (AMPLS) owned by vnet-shared. Used to register Application Insights as a scoped service."
@@ -359,6 +369,12 @@ variable "virtual_network_shared_name" {
   }
 }
 
+
+variable "vm_image_gallery_id" {
+  type        = string
+  description = "Optional resource ID of an Azure Compute Gallery with custom images. When set, jumpwin1 uses the latest version of the 'jumpwin' image definition and the 'vm_jumpbox_win_image_*' variables are ignored. Checked by the root module."
+  default     = null
+}
 
 variable "vm_jumpbox_win_image_offer" {
   type        = string

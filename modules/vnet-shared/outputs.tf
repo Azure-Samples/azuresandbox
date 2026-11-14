@@ -49,6 +49,7 @@ output "resource_ids" {
     firewall_route_table         = azurerm_route_table.this.id
     key_vault                    = azurerm_key_vault.this.id
     log_analytics_workspace      = azurerm_log_analytics_workspace.this.id
+    maintenance_configuration    = azurerm_maintenance_configuration.this.id
     monitor_private_link_scope   = azurerm_monitor_private_link_scope.this.id
     subnet_privatelink           = azurerm_subnet.subnets["snet-privatelink-01"].id
     virtual_machine_adds1        = azurerm_windows_virtual_machine.this.id
@@ -63,6 +64,7 @@ output "resource_names" {
     firewall_route_table       = azurerm_route_table.this.name
     key_vault                  = azurerm_key_vault.this.name
     log_analytics_workspace    = azurerm_log_analytics_workspace.this.name
+    maintenance_configuration  = azurerm_maintenance_configuration.this.name
     monitor_private_link_scope = azurerm_monitor_private_link_scope.this.name
     virtual_machine_adds1      = azurerm_windows_virtual_machine.this.name
     virtual_network_shared     = azurerm_virtual_network.this.name

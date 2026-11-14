@@ -80,6 +80,16 @@
 #     retry is also interrupted by a reboot, the suite fails with a 'VM rebooted during test
 #     execution' harness error. Passing suites incur no extra probes. Local suites are not retried.
 #
+# Local (control-plane) suites:
+#   - Some suites run in this script's Az session instead of on a VM (RunLocal), e.g.
+#     Test-VnetSharedLocal.ps1 (which also checks the Update Manager maintenance configuration).
+#   - scripts/Test-VmPatchingLocal.ps1 runs once per deployed base VM (adds1, jumpwin1, jumplinux1,
+#     mssqlwin1) under that VM's module, with suite target 'patching-<vm>'. It checks patch mode
+#     AutomaticByPlatform, the bypass-platform-safety-checks flag, assessment mode, and the VM's
+#     assignment to the sandbox maintenance configuration. Guest-side patching checks (Microsoft
+#     Update, native Automatic Updates disabled) are in each VM's own test script.
+#   - A local suite is skipped when a required parameter is missing from the Terraform outputs.
+#
 # Prerequisites:
 #   - PowerShell 7.x (pwsh) with Az.Accounts, Az.Compute, Az.Resources, Az.Sql, Az.Network,
 #     Az.PrivateDns, Az.MySql, and Az.DesktopVirtualization installed (missing modules exit 2)
@@ -999,9 +1009,65 @@ $testConfigs = [ordered]@{
         RunLocal   = $true
         ScriptPath = Join-Path $repoRoot 'modules' 'vnet-shared' 'scripts' 'Test-VnetSharedLocal.ps1'
         Parameters = @{
-            ResourceGroupName = $resourceGroupName
-            FirewallName      = $resourceNames['firewall']
-            BastionName       = $resourceNames['bastion_host']
+            ResourceGroupName            = $resourceGroupName
+            FirewallName                 = $resourceNames['firewall']
+            BastionName                  = $resourceNames['bastion_host']
+            MaintenanceConfigurationName = $resourceNames['maintenance_configuration']
+        }
+    }
+    # Scheduled patching checks (patch settings and maintenance assignment) for each base VM, run in the
+    # orchestrator's Az session. One shared script, because every base VM is patched the same way. Each
+    # suite reports under its VM's module and is skipped when that VM isn't deployed.
+    '$local_patching_adds1' = @{
+        Module      = 'vnet-shared'
+        ModuleName  = 'vnet_shared'
+        RunLocal    = $true
+        SuiteTarget = 'patching-adds1'
+        ScriptPath  = Join-Path $repoRoot 'scripts' 'Test-VmPatchingLocal.ps1'
+        Parameters  = @{
+            ResourceGroupName            = $resourceGroupName
+            VmName                       = $resourceNames['virtual_machine_adds1']
+            ModuleName                   = 'vnet-shared'
+            MaintenanceConfigurationName = $resourceNames['maintenance_configuration']
+        }
+    }
+    '$local_patching_jumpwin1' = @{
+        Module      = 'vnet-app'
+        ModuleName  = 'vnet_app'
+        RunLocal    = $true
+        SuiteTarget = 'patching-jumpwin1'
+        ScriptPath  = Join-Path $repoRoot 'scripts' 'Test-VmPatchingLocal.ps1'
+        Parameters  = @{
+            ResourceGroupName            = $resourceGroupName
+            VmName                       = $resourceNames['virtual_machine_jumpwin1']
+            ModuleName                   = 'vnet-app'
+            MaintenanceConfigurationName = $resourceNames['maintenance_configuration']
+        }
+    }
+    '$local_patching_jumplinux1' = @{
+        Module      = 'vm-jumpbox-linux'
+        ModuleName  = 'vm_jumpbox_linux'
+        RunLocal    = $true
+        SuiteTarget = 'patching-jumplinux1'
+        ScriptPath  = Join-Path $repoRoot 'scripts' 'Test-VmPatchingLocal.ps1'
+        Parameters  = @{
+            ResourceGroupName            = $resourceGroupName
+            VmName                       = $resourceNames['virtual_machine_jumplinux1']
+            ModuleName                   = 'vm-jumpbox-linux'
+            MaintenanceConfigurationName = $resourceNames['maintenance_configuration']
+        }
+    }
+    '$local_patching_mssqlwin1' = @{
+        Module      = 'vm-mssql-win'
+        ModuleName  = 'vm_mssql_win'
+        RunLocal    = $true
+        SuiteTarget = 'patching-mssqlwin1'
+        ScriptPath  = Join-Path $repoRoot 'scripts' 'Test-VmPatchingLocal.ps1'
+        Parameters  = @{
+            ResourceGroupName            = $resourceGroupName
+            VmName                       = $resourceNames['virtual_machine_mssqlwin1']
+            ModuleName                   = 'vm-mssql-win'
+            MaintenanceConfigurationName = $resourceNames['maintenance_configuration']
         }
     }
     '$local_petstore' = @{
@@ -1105,17 +1171,19 @@ foreach ($configKey in $testConfigs.Keys) {
             }
         }
 
+        # Modules with more than one local suite give each a distinct SuiteTarget.
+        $suiteTarget = if ($config.SuiteTarget) { $config.SuiteTarget } else { 'local' }
+
         if ($skipLocal) {
-            Write-Log "Skipping module '$($config.Module)': required terraform outputs not found (module not deployed)."
-            Add-SkippedSuite -Name "$($config.Module) (local)" -Type 'module' -ModuleName $config.ModuleName -Target 'local' -Reason 'Required terraform outputs not found (module not deployed).'
+            Write-Log "Skipping module '$($config.Module)' ($suiteTarget): required terraform outputs not found (module not deployed)."
+            Add-SkippedSuite -Name "$($config.Module) ($suiteTarget)" -Type 'module' -ModuleName $config.ModuleName -Target $suiteTarget -Reason 'Required terraform outputs not found (module not deployed).'
             continue
         }
 
         Write-Log "========================================"
-        Write-Log "Module: $($config.Module) | Local"
+        Write-Log "Module: $($config.Module) | Local ($suiteTarget)"
         Write-Log "========================================"
 
-        $suiteTarget = 'local'
         $suiteStartedAt = Get-Date
         $suiteStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
         $testResult = Invoke-LocalTest -ScriptPath $config.ScriptPath -Parameters $config.Parameters -Label "MODULE:$($config.Module)"

@@ -79,6 +79,21 @@ variable "operator_object_id" {
   }
 }
 
+variable "patch_schedule" {
+  type = object({
+    duration                = optional(string, "03:55")
+    linux_classifications   = optional(list(string), ["Critical", "Security"])
+    reboot                  = optional(string, "IfRequired")
+    recurrence              = optional(string, "1Week Sunday")
+    start_time              = optional(string, "03:00")
+    time_zone               = optional(string, "UTC")
+    windows_classifications = optional(list(string), ["Critical", "Security", "UpdateRollup", "Definition", "Updates"])
+  })
+  description = "Settings for the Azure Update Manager maintenance configuration that patches all sandbox VMs on a schedule. Values are validated by the root module's 'patch_schedule_*' variables."
+  default     = {}
+  nullable    = false
+}
+
 variable "resource_group_name" {
   type        = string
   description = "The name of the new resource group to be provisioned."
@@ -221,6 +236,12 @@ variable "vm_adds_image_version" {
     condition     = can(regex("^(Latest|[0-9]+\\.[0-9]+\\.[0-9]+)$", var.vm_adds_image_version))
     error_message = "Must conform to Azure Marketplace image version naming requirements: it must be 'Latest' or in the format 'Major.Minor.Patch' (e.g., '1.0.0')."
   }
+}
+
+variable "vm_image_gallery_id" {
+  type        = string
+  description = "Optional resource ID of an Azure Compute Gallery with custom images. When set, adds1 uses the latest version of the 'adds' image definition and the 'vm_adds_image_*' variables are ignored. Checked by the root module."
+  default     = null
 }
 
 variable "vm_adds_name" {

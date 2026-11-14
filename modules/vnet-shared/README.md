@@ -24,7 +24,11 @@ This module implements a virtual network with shared services used by all the co
 
 The estimated provisioning time for this module is 30 - 60 minutes depending upon how recentiy the Windows Server Core platform image was built which can impact patching freshness.
 
-Before any run command or VM extension touches *adds1*, Terraform first waits for the Windows guest agent to be ready, then installs pending Critical and Security Windows updates on it using the platform [installPatches](https://learn.microsoft.com/en-us/rest/api/compute/virtual-machines/install-patches) action and reboots it if required (wait for agent → patch → reboot → configure). This keeps an update-driven reboot from interrupting later configuration steps. The readiness wait is a run command (*Wait-GuestAgentReady.ps1*): it can't run while a new VM's guest agent is self-updating, so patching never starts mid-update, when the platform would fail it. Patching runs for up to 2 hours. If the patch run reports a status of `Failed` (a patch failed to install, or the window ran out with patches outstanding), the apply fails instead of configuring a partially patched VM. The patch result is also surfaced in the `patch_install_result` output. Because the failed result stays in Terraform state, later plans fail too until you re-run patching with `terraform apply -replace='module.vnet_shared.azapi_resource_action.install_patches'`. Automatic patching stays enabled. Patching adds time to provisioning that varies with the number of pending updates. Adding this step to an existing sandbox patches and may reboot *adds1* on the next apply.
+Before any run command or VM extension touches *adds1*, Terraform first waits for the Windows guest agent to be ready, then installs pending Critical and Security Windows updates on it using the platform [installPatches](https://learn.microsoft.com/en-us/rest/api/compute/virtual-machines/install-patches) action and reboots it if required (wait for agent → patch → reboot → configure). This keeps an update-driven reboot from interrupting later configuration steps. The readiness wait is a run command (*Wait-GuestAgentReady.ps1*): it can't run while a new VM's guest agent is self-updating, so patching never starts mid-update, when the platform would fail it. Patching runs for up to 2 hours. If the patch run reports a status of `Failed` (a patch failed to install, or the window ran out with patches outstanding), the apply fails instead of configuring a partially patched VM. The patch result is also surfaced in the `patch_install_result` output. Because the failed result stays in Terraform state, later plans fail too until you re-run patching with `terraform apply -replace='module.vnet_shared.azapi_resource_action.install_patches'`. Patching adds time to provisioning that varies with the number of pending updates. Adding this step to an existing sandbox patches and may reboot *adds1* on the next apply.
+
+After deployment, *adds1* is patched by the sandbox's Azure Update Manager schedule, and Microsoft Update is enabled so other Microsoft products are patched too. See [Patching](../../README.md#patching).
+
+When the root module's `vm_image_gallery_id` is set, *adds1* uses the latest version of the `adds` custom image instead of a platform image. The image is patched only; AD DS installation and promotion still run at deployment time. See [Custom images](../../README.md#custom-images).
 
 > [!IMPORTANT]
 > **OS disk type change (Standard HDD retirement).** The default for `vm_adds_storage_account_type` is now `StandardSSD_LRS` and Standard HDD (`Standard_LRS`) is no longer permitted, because [Azure is retiring Standard HDD OS disks on September 8, 2028](https://learn.microsoft.com/en-us/azure/virtual-machines/disks-hdd-os-retirement). Fresh deployments are unaffected. For an **existing** deployment created with `Standard_LRS`, changing `os_disk.storage_account_type` forces Terraform to **replace the VM** (destroy and recreate). This VM is the Active Directory domain controller and DNS server that other modules depend on, so its replacement causes an AD/DNS outage that will disrupt domain-joined VMs and dependent modules until it re-provisions. To avoid replacement and downtime, deallocate the VM and change its OS disk SKU in place (Azure portal/CLI) *before* applying, then set the variable to the new SKU so Terraform detects no change. If you allow a replacement instead, schedule a maintenance window and expect dependent VMs to require domain re-join/re-provisioning.
@@ -69,6 +73,7 @@ vnet-shared/
 ├── scripts/                                    
 │   ├── Configure-Adds.ps1              # Configures Active Directory Domain Services
 │   ├── Configure-AddsDns.ps1           # Configures AD Integrated DNS Server
+│   ├── Enable-MicrosoftUpdate.ps1      # Registers Microsoft Update so other Microsoft products are patched
 │   ├── Test-VnetShared.ps1             # Module unit test script
 │   └── Wait-GuestAgentReady.ps1        # Waits for the guest agent to finish any self-update before patching
 ├── compute.tf                          # Compute resource configurations
@@ -94,6 +99,7 @@ admin_username_secret | adminuser | The name of the key vault secret containing 
 location | | The Azure region defined in the root module.
 log_analytics_workspace_retention_days | 30 | The retention period for the new log analytics workspace.
 operator_object_id | | The Microsoft Entra object id of the operator. Defined in the root module.
+patch_schedule | `{}` | Scheduled patching settings for the sandbox maintenance configuration: `start_time`, `time_zone`, `recurrence`, `duration`, `reboot`, `windows_classifications` and `linux_classifications`. Defined by the root module's `patch_schedule_*` variables; module defaults match the root defaults.
 resource_group_name | | The resource group defined in the root module.
 subnet_adds_address_prefix | 10.1.1.0/24 | The address prefix for the AD Domain Services subnet.
 subnet_AzureBastionSubnet_address_prefix | 10.1.0.0/26 | The address prefix for the AzureBastionSubnet subnet. `/26` is the minimum size required for the Bastion Standard SKU (host scaling).
@@ -110,6 +116,7 @@ vm_adds_image_version | Latest | The version of the virtual machine image used t
 vm_adds_name | adds1 | The name of the VM.
 vm_adds_size | `Standard_D2ls_v6` | The size of the virtual machine. Defined by the root module's `vm_jumpbox_size` variable.
 vm_adds_storage_account_type | `StandardSSD_LRS` | The storage type to be used for the VM's OS disk. Standard HDD (`Standard_LRS`) is not permitted because Azure is retiring Standard HDD OS disks on September 8, 2028.
+vm_image_gallery_id | `null` | Resource ID of the Azure Compute Gallery with custom images, or `null` for platform images. Defined by the root module's `vm_image_gallery_id` variable and checked there. When set, the `*_image_*` variables are ignored.
 vnet_address_space | 10.1.0.0/16 | The address range for the virtual network.
 vnet_name | shared | The name of the new virtual network.
 
@@ -126,6 +133,8 @@ module.vnet_shared.azurerm_key_vault.this | kv&#8209;sand&#8209;dev | The Azure 
 module.vnet_shared.azurerm_key_vault_secret.adminpassword | adminpassword | Randomly generated admin password used for sandbox VMs and services.
 module.vnet_shared.azurerm_key_vault_secret.adminusername | adminuser | Admin username used for sandbox VMs and services, default is *bootstrapadmin*.
 module.vnet_shared.azurerm_log_analytics_workspace.this | log&#8209;sand&#8209;dev&#8209;xxxx | The Log Analytics workspace used to collect logs and metrics from Azure resources.
+module.vnet_shared.azurerm_maintenance_assignment_virtual_machine.this | | Assigns *adds1* to the sandbox maintenance configuration for scheduled patching. Created as the last step of the VM's deployment so scheduled installs and reboots can't interrupt configuration.
+module.vnet_shared.azurerm_maintenance_configuration.this | mc&#8209;sand&#8209;dev | The Azure Update Manager maintenance configuration (scope `InGuestPatch`) used for scheduled patching of every sandbox VM. Exposed as `maintenance_configuration` in `resource_ids` and `resource_names`. See [Patching](../../README.md#patching).
 module.vnet_shared.azurerm_monitor_data_collection_endpoint.this | dcesanddevxxxx | The data collection endpoint (DCE) for Azure Monitor.
 module.vnet_shared.azurerm_monitor_data_collection_rule.linux | dcrsanddev&#8209;linux | The data collection rules (DCR) for Linux VMs.
 module.vnet_shared.azurerm_monitor_data_collection_rule.windows | dcrsanddev&#8209;windows | The data collection rules (DCR) for Windows VMs.
@@ -166,9 +175,11 @@ module.vnet_shared.azurerm_subnet.subnets["snet-misc-02"] | | Reserved for use b
 module.vnet_shared.azurerm_subnet.subnets["snet-privatelink-01"] | | Dedicated subnet for Private Link, hosting the private endpoints for every module in the sandbox environment.
 module.vnet_shared.azurerm_subnet_network_security_group_association.associations[*] | | NSGs are associated with all subnets except *AzureFirewallSubnet* and *snet-privatelink-01*.
 module.vnet_shared.azurerm_subnet_route_table_association.associations[*] | | The *rt-sand-dev* route table is associated with all subnets except *AzureFirewallSubnet*,*AzureBastionSubnet* and *snet-privatelink-01*.
+module.vnet_shared.azurerm_virtual_machine_run_command.enable_microsoft_update | EnableMicrosoftUpdate | Registers Microsoft Update on *adds1* so Windows Update and Azure Update Manager also patch other Microsoft products. Runs after the guest agent readiness wait and before `install_patches`.
 module.vnet_shared.azurerm_virtual_machine_run_command.wait_for_guest_agent | WaitForGuestAgent | Waits until the guest agent on *adds1* has finished any self-update and is processing goal states, logging the agent version, before `install_patches` runs.
 module.vnet_shared.azurerm_virtual_network.this | vnet&#8209;sand&#8209;dev&#8209;shared | The shared services virtual network.
 module.vnet_shared.azurerm_windows_virtual_machine.this | adds1 | The AD DS Domain Controller / DNS Server VM.
+module.vnet_shared.time_static.patch_schedule | | Records the creation time used to set the maintenance window's first start date (48 hours later, so it is always in the future).
 
 ### Output Variables
 

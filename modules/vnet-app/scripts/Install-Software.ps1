@@ -78,11 +78,11 @@ foreach ($pattern in $frameworkPatterns) {
 $env:PATH = ($frameworkDirs -join ";") + ";$env:PATH"
 Write-Log "Updated PATH with winget framework dependencies."
 
-# Winget exit codes
-$WINGET_SUCCESS              =  0
-$WINGET_ALREADY_INSTALLED    = -1978335207  # 0x8A150019 UPDATE_NOT_APPLICABLE
-$WINGET_MISSING_DEPENDENCY   = -1978335189  # 0x8A15002B INSTALL_MISSING_DEPENDENCY
-$WINGET_PACKAGE_IN_USE       = -1978335231  # 0x8A150101 APPINSTALLER_CLI_ERROR_INSTALL_PACKAGE_IN_USE
+# Winget exit codes (https://github.com/microsoft/winget-cli/blob/master/doc/windows/package-manager/winget/returnCodes.md)
+$WINGET_SUCCESS                =  0
+$WINGET_UPDATE_NOT_APPLICABLE  = -1978335189  # 0x8A15002B APPINSTALLER_CLI_ERROR_UPDATE_NOT_APPLICABLE
+$WINGET_ALREADY_INSTALLED      = -1978335135  # 0x8A150061 APPINSTALLER_CLI_ERROR_PACKAGE_ALREADY_INSTALLED
+$WINGET_PACKAGE_IN_USE         = -1978334975  # 0x8A150101 APPINSTALLER_CLI_ERROR_INSTALL_PACKAGE_IN_USE
 
 # Install software using winget CLI.
 Write-Log "Installing software using winget..."
@@ -129,8 +129,8 @@ foreach ($package in $packages) {
     elseif ($exitCode -eq $WINGET_ALREADY_INSTALLED) {
         Write-Log "$($package.Name) is already installed."
     }
-    elseif ($exitCode -eq $WINGET_MISSING_DEPENDENCY) {
-        Write-Log "$($package.Name) installed successfully (unmanaged dependency warning ignored)."
+    elseif ($exitCode -eq $WINGET_UPDATE_NOT_APPLICABLE) {
+        Write-Log "$($package.Name) is already installed (no applicable update)."
     }
     elseif ($exitCode -eq $WINGET_PACKAGE_IN_USE) {
         Write-Log "FAILED: $($package.Name). Package in use (APPINSTALLER_CLI_ERROR_INSTALL_PACKAGE_IN_USE)."

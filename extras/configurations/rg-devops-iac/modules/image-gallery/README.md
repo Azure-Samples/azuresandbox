@@ -8,7 +8,7 @@
 
 ## Overview
 
-This optional module creates an [Azure Compute Gallery](https://learn.microsoft.com/azure/virtual-machines/azure-compute-gallery) and [Azure VM Image Builder](https://learn.microsoft.com/azure/virtual-machines/image-builder-overview) (AIB) templates that pre-build fully patched images for the Azure Sandbox VMs, so sandbox deployments spend less time installing software and updates. The root module creates it when `enable_image_gallery` is true. Builds run in the root module's image build subnets with no public IP addresses, and reach the internet through the root module's NAT gateway. Like the other root subnets, the image build subnets exist whether or not this module is enabled. Deploying sandbox VMs from these images is a separate change to the Azure Sandbox configuration.
+This optional module creates an [Azure Compute Gallery](https://learn.microsoft.com/azure/virtual-machines/azure-compute-gallery) and [Azure VM Image Builder](https://learn.microsoft.com/azure/virtual-machines/image-builder-overview) (AIB) templates that pre-build fully patched images for the Azure Sandbox VMs, so sandbox deployments spend less time installing software and updates. The root module creates it when `enable_image_gallery` is true. Builds run in the root module's image build subnets with no public IP addresses, and reach the internet through the root module's NAT gateway. Like the other root subnets, the image build subnets exist whether or not this module is enabled. To deploy sandbox VMs from these images, set `vm_image_gallery_id` in the Azure Sandbox `terraform.tfvars` to the gallery's resource ID. See [Custom images](../../../../../README.md#custom-images).
 
 The module creates:
 
@@ -60,9 +60,8 @@ This module is organized as follows:
 
 ```plaintext
 ├── scripts/                              # Build VM and operator scripts
-│   ├── Enable-MicrosoftUpdate.ps1        # PowerShell: opts the mssqlwin build VM into Microsoft Update
+│   ├── Enable-MicrosoftUpdate.ps1        # PowerShell: opts Windows build VMs into Microsoft Update
 │   ├── invoke-image-build.sh             # Bash (operator): runs image builds and tags new image versions
-│   ├── Set-AutomaticUpdates.ps1          # PowerShell: sets Configure Automatic Updates to 4 (jumpwin and mssqlwin)
 │   ├── Test-ImageWindows.ps1             # PowerShell: validates the adds, jumpwin and mssqlwin images
 │   └── test-image-jumplinux.sh           # Bash: validates the jumplinux image
 ├── compute.tf                            # Compute gallery, image definitions and image templates
@@ -116,18 +115,18 @@ resource_names | A map of resource names for key resources in the module, includ
 
 Image | Sandbox VM | Source platform image | Customization
 --- | --- | --- | ---
-`adds` | `adds1` | `MicrosoftWindowsServer:WindowsServer:2025-datacenter-azure-edition-core` | Patching only. AD DS is installed at deploy time, because [Sysprep doesn't support the AD DS role](https://learn.microsoft.com/windows-hardware/manufacture/desktop/sysprep-support-for-server-roles).
-`jumpwin` | `jumpwin1` | `MicrosoftWindowsServer:WindowsServer:2025-datacenter-azure-edition` | RSAT, VS Code, SSMS and MySQL Workbench, then patching and Configure Automatic Updates.
+`adds` | `adds1` | `MicrosoftWindowsServer:WindowsServer:2025-datacenter-azure-edition-core` | Microsoft Update opt-in and patching only. AD DS is installed at deploy time, because [Sysprep doesn't support the AD DS role](https://learn.microsoft.com/windows-hardware/manufacture/desktop/sysprep-support-for-server-roles).
+`jumpwin` | `jumpwin1` | `MicrosoftWindowsServer:WindowsServer:2025-datacenter-azure-edition` | RSAT, VS Code, SSMS and MySQL Workbench, then Microsoft Update opt-in and patching.
 `jumplinux` | `jumplinux1` | `Canonical:ubuntu-24_04-lts:server` | The jumpbox packages and a full `dist-upgrade`.
-`mssqlwin` | `mssqlwin1` | `MicrosoftSQLServer:sql2025-ws2025:entdev-gen2` | Microsoft Update opt-in, so SQL Server is patched too, then patching and Configure Automatic Updates.
+`mssqlwin` | `mssqlwin1` | `MicrosoftSQLServer:sql2025-ws2025:entdev-gen2` | Microsoft Update opt-in, so SQL Server is patched too, then patching.
 
 * **Image definitions:** Generation 2, generalized, with accelerated networking. Every definition supports the SCSI and NVMe disk controllers and the Standard and Trusted Launch security types, so the images run on the NVMe-only v6 sizes the sandbox VMs use, as Standard or Trusted Launch VMs.
 * **Source images:** The templates use the `latest` source image version when a build runs. The template tags each image version with `source_image` (publisher:offer:sku), and `scripts/invoke-image-build.sh` adds `source_image_version` and `build_time` after the build.
-* **Windows patching:** Two passes of Windows Update (Critical and Security updates, excluding previews), each followed by a restart. Patching runs after software installs, so updates also cover what was installed.
-* **Configure Automatic Updates:** `jumpwin` and `mssqlwin` set `AUOptions = 4` (auto download and schedule the install) as their last step, because VMs deployed from custom images use `patch_mode = "AutomaticByOS"`, since [automatic VM guest patching doesn't support custom images](https://learn.microsoft.com/azure/update-manager/manage-updates-customized-images). `adds` leaves it alone; `adds1` sets it at deploy time.
+* **Windows patching:** Every Windows image opts into Microsoft Update, then runs two passes of Windows Update (Critical and Security updates, excluding previews), each followed by a restart. Patching runs after software installs, so updates also cover what was installed.
+* **Patching after deployment:** The images don't set a Configure Automatic Updates policy, which would conflict with Azure orchestration. Sandbox VMs deployed from these images are patched by the sandbox's Azure Update Manager schedule, the same as VMs from platform images. See [Patching](../../../../../README.md#patching).
 * **Linux restart:** AIB has no Linux restart customizer, so `jumplinux` isn't restarted during the build. A kernel installed by the upgrade takes effect when a VM is first deployed from the image.
 * **Validation:** Each template runs a validation script on the build VM after customization. A failed check stops the build before anything is published (`continueDistributeOnFailure = false`).
-  * Windows: no pending Critical or Security updates; for `adds`, AD-Domain-Services isn't installed; for `jumpwin`, RSAT-ADDS and RSAT-DNS-Server are installed and VS Code, SSMS and MySQL Workbench are present; for `mssqlwin`, the SQL Server service and binaries are present; for `jumpwin` and `mssqlwin`, Configure Automatic Updates is 4.
+  * Windows: no pending Critical or Security updates; for `adds`, AD-Domain-Services isn't installed; for `jumpwin`, RSAT-ADDS and RSAT-DNS-Server are installed and VS Code, SSMS and MySQL Workbench are present; for `mssqlwin`, the SQL Server service and binaries are present; for every Windows image, Microsoft Update is registered and no Configure Automatic Updates policy is set.
   * Linux: every package from the install script is installed, `az`, `docker`, `helm`, `pwsh` and `terraform` are on the PATH, and no security upgrades are pending.
 * **Distribution:** One replica in `location` on `Standard_LRS`, with automatic version numbering.
 * **Build VM size:** `image_build_vm_size` defaults to `Standard_D4s_v6`, the same generation as the sandbox VMs. If AIB can't build on a v6 size in your region or subscription, set it to an older generation, e.g. `Standard_D4s_v5`. The build VM size doesn't affect the image or the sizes VMs deployed from it can use.

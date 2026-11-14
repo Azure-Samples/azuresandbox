@@ -45,7 +45,9 @@ This configuration implements a Linux virtual machine for use as a jumpbox. The 
   * terraform
   * winbind
 * Ubuntu packages are installed from the Canonical archive (`archive.ubuntu.com`) and security (`security.ubuntu.com`) servers rather than the Azure regional mirror.
-* Security patching using `unattended-upgrades`. A full package upgrade is not performed during provisioning, so provisioning does not depend on every package on the image being downloadable and does not trigger a mid-provisioning reboot.
+* Scheduled patching by Azure Update Manager (see [Patching](../../README.md#patching)); Azure disables Ubuntu's default `unattended-upgrades` once scheduled patching is enabled. A full package upgrade is not performed during provisioning, so provisioning does not depend on every package on the image being downloadable and does not trigger a mid-provisioning reboot.
+
+When the root module's `vm_image_gallery_id` is set, *jumplinux1* uses the latest version of the `jumplinux` custom image, which already has these packages, so cloud-init skips *install-vm-jumpbox-linux-packages.sh*. Domain join, swapfile and Azure Files configuration still run at deployment time. See [Custom images](../../README.md#custom-images).
 
 The estimated provisioning time for this module is 3 minutes.
 
@@ -225,12 +227,14 @@ dns_server | `10.1.1.4` | The IP address of the DNS server used for the virtual 
 key_vault_id | | The ID of the key vault defined in the root module.
 key_vault_name | | The name of the key vault defined in the root module.
 location | | The Azure region defined in the root module.
+maintenance_configuration_id | | The ID of the sandbox's Azure Update Manager maintenance configuration from the vnet-shared module. The VM is assigned to it for scheduled patching.
 resource_group_name | | The name of the resource group defined in the root module.
 ssh_private_key_version | 1 | Increment to create new ssh_private_key.
 storage_account_name | | The storage account name from the vnet-app module.
 storage_share_name | | The Azure Files share name from the vnet-app module.
 subnet_id | | The subnet ID from the vnet-app module.
 tags | | The tags from the root module.
+vm_image_gallery_id | `null` | Resource ID of the Azure Compute Gallery with custom images, or `null` for platform images. Defined by the root module's `vm_image_gallery_id` variable and checked there. When set, the `*_image_*` variables are ignored.
 vm_jumpbox_linux_image_offer | `ubuntu-24_04-lts` | The offer type of the virtual machine image used to create the VM.
 vm_jumpbox_linux_image_publisher | `Canonical` | The publisher for the virtual machine image used to create the VM.
 vm_jumpbox_linux_image_sku | `server` | The SKU of the virtual machine image used to create the VM.
@@ -247,6 +251,7 @@ Address | Name | Notes
 --- | --- | ---
 module.vm_jumpbox_linux[0].azurerm_key_vault_secret.ssh_private_key | jumplinux1&#8209;ssh&#8209;private&#8209;key | The private SSH key stored in Azure Key Vault.
 module.vm_jumpbox_linux[0].azurerm_linux_virtual_machine.this | jumplinux1 | The Linux virtual machine resource.
+module.vm_jumpbox_linux[0].azurerm_maintenance_assignment_virtual_machine.this | | Assigns *jumplinux1* to the sandbox maintenance configuration for scheduled patching. Created as the last step of the VM's deployment so scheduled installs and reboots can't interrupt configuration.
 module.vm_jumpbox_linux[0].azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;jumplinux1 | The network interface associated with the Linux virtual machine.
 module.vm_jumpbox_linux[0].azurerm_role_assignment.kv_secrets_user_vm_linux | | Role assignment for accessing Key Vault secrets from the Linux virtual machine.
 module.vm_jumpbox_linux[0].azurerm_virtual_machine_run_command.wait_for_cloud_init | vmx&#8209;sand&#8209;dev&#8209;jumplinux1&#8209;WaitForCloudInit | Waits for cloud-init and the dpkg/apt locks to be released before the Azure Monitor Agent extension is installed.

@@ -162,6 +162,87 @@ variable "operator_object_id" {
   }
 }
 
+variable "patch_schedule_duration" {
+  type        = string
+  description = "The length of the Azure Update Manager maintenance window for scheduled patching of all sandbox VMs, in 'HH:mm' format. Must be between '01:30' and '03:55'."
+  default     = "03:55"
+
+  validation {
+    condition = (
+      can(regex("^[0-9]{2}:[0-5][0-9]$", var.patch_schedule_duration)) &&
+      try(tonumber(split(":", var.patch_schedule_duration)[0]) * 60 + tonumber(split(":", var.patch_schedule_duration)[1]) >= 90, false) &&
+      try(tonumber(split(":", var.patch_schedule_duration)[0]) * 60 + tonumber(split(":", var.patch_schedule_duration)[1]) <= 235, false)
+    )
+    error_message = "Must be in 'HH:mm' format and between '01:30' and '03:55', the limits for in-guest patching maintenance windows."
+  }
+}
+
+variable "patch_schedule_linux_classifications" {
+  type        = list(string)
+  description = "The update classifications installed on Linux VMs by the scheduled patching maintenance configuration. Valid values are 'Critical', 'Security' and 'Other'."
+  default     = ["Critical", "Security"]
+
+  validation {
+    condition     = length(var.patch_schedule_linux_classifications) > 0 && alltrue([for c in var.patch_schedule_linux_classifications : contains(["Critical", "Security", "Other"], c)])
+    error_message = "Must contain one or more of 'Critical', 'Security' and 'Other'."
+  }
+}
+
+variable "patch_schedule_reboot" {
+  type        = string
+  description = "The reboot setting for scheduled patching of all sandbox VMs: 'IfRequired', 'Never' or 'Always'."
+  default     = "IfRequired"
+
+  validation {
+    condition     = contains(["IfRequired", "Never", "Always"], var.patch_schedule_reboot)
+    error_message = "Must be 'IfRequired', 'Never' or 'Always'."
+  }
+}
+
+variable "patch_schedule_recurrence" {
+  type        = string
+  description = "How often scheduled patching runs, in maintenance configuration recurrence syntax, e.g. '1Week Sunday', '1Day' or '1Month Second Tuesday Offset4'."
+  default     = "1Week Sunday"
+
+  validation {
+    condition     = can(regex("^[0-9]*(Day|Week|Month)s?( .+)?$", var.patch_schedule_recurrence))
+    error_message = "Must use maintenance configuration recurrence syntax, e.g. '1Week Sunday', '1Day' or '1Month Second Tuesday Offset4'."
+  }
+}
+
+variable "patch_schedule_start_time" {
+  type        = string
+  description = "The time of day scheduled patching starts, in 'HH:mm' (24-hour) format, in the time zone set by 'patch_schedule_time_zone'."
+  default     = "03:00"
+
+  validation {
+    condition     = can(regex("^([01][0-9]|2[0-3]):[0-5][0-9]$", var.patch_schedule_start_time))
+    error_message = "Must be a 24-hour time in 'HH:mm' format, e.g. '03:00'."
+  }
+}
+
+variable "patch_schedule_time_zone" {
+  type        = string
+  description = "The Windows time zone ID used for the scheduled patching start time, e.g. 'UTC' or 'Pacific Standard Time'."
+  default     = "UTC"
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9 .+()-]{1,64}$", var.patch_schedule_time_zone))
+    error_message = "Must be a Windows time zone ID, e.g. 'UTC' or 'Pacific Standard Time'."
+  }
+}
+
+variable "patch_schedule_windows_classifications" {
+  type        = list(string)
+  description = "The update classifications installed on Windows VMs by the scheduled patching maintenance configuration. Valid values are 'Critical', 'Security', 'UpdateRollup', 'FeaturePack', 'ServicePack', 'Definition', 'Tools' and 'Updates'."
+  default     = ["Critical", "Security", "UpdateRollup", "Definition", "Updates"]
+
+  validation {
+    condition     = length(var.patch_schedule_windows_classifications) > 0 && alltrue([for c in var.patch_schedule_windows_classifications : contains(["Critical", "Security", "UpdateRollup", "FeaturePack", "ServicePack", "Definition", "Tools", "Updates"], c)])
+    error_message = "Must contain one or more of 'Critical', 'Security', 'UpdateRollup', 'FeaturePack', 'ServicePack', 'Definition', 'Tools' and 'Updates'."
+  }
+}
+
 variable "subscription_id" {
   type        = string
   description = "The Azure subscription id used to provision resources."
@@ -195,6 +276,22 @@ variable "vm_avd_size" {
   validation {
     condition     = can(regex("^[a-zA-Z0-9_]+$", var.vm_avd_size))
     error_message = "The 'vm_avd_size' must conform to Azure virtual machine size naming conventions: it can only contain alphanumeric characters and underscores (_). Examples include 'Standard_D4s_v6' or 'Standard_D8s_v6'."
+  }
+}
+
+variable "vm_image_gallery_id" {
+  type        = string
+  description = "Optional resource ID of an Azure Compute Gallery with custom images built by the rg-devops-iac image-gallery module. When null (the default), the sandbox VMs use platform images and install their software at deployment time. When set, the VMs of enabled modules use the latest version of the matching custom image ('adds', 'jumpwin', 'jumplinux', 'mssqlwin'). The gallery must be in the same subscription and region as the sandbox."
+  default     = null
+
+  validation {
+    condition     = var.vm_image_gallery_id == null || can(regex("(?i)^/subscriptions/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/resourceGroups/[^/]+/providers/Microsoft\\.Compute/galleries/[^/]+$", var.vm_image_gallery_id))
+    error_message = "Must be null or an Azure Compute Gallery resource ID: '/subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.Compute/galleries/<gallery-name>'."
+  }
+
+  validation {
+    condition     = var.vm_image_gallery_id == null || try(lower(split("/", var.vm_image_gallery_id)[2]) == lower(var.subscription_id), false)
+    error_message = "The gallery must be in the same subscription as the sandbox ('subscription_id')."
   }
 }
 

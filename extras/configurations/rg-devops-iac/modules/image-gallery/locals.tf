@@ -20,10 +20,6 @@ locals {
       content  = file("${path.module}/../../../../../modules/vnet-app/scripts/Install-WindowsFeatures.ps1")
       filename = "Install-WindowsFeatures.ps1"
     }
-    set_automatic_updates = {
-      content  = file("${path.module}/scripts/Set-AutomaticUpdates.ps1")
-      filename = "Set-AutomaticUpdates.ps1"
-    }
     test_image_jumplinux = {
       content  = file("${path.module}/scripts/test-image-jumplinux.sh")
       filename = "test-image-jumplinux.sh"
@@ -77,22 +73,23 @@ locals {
     restartTimeout = "30m"
   }
 
-  # Windows images are patched last, so updates also cover anything the build installed. Configure Automatic Updates
-  # is set after the final restart, so Windows Update doesn't start installing on its own during the build.
+  # Windows images are patched last, so updates also cover anything the build installed. Opting into Microsoft Update
+  # first lets the Windows Update passes install updates for other Microsoft products, such as SQL Server, too. No
+  # Configure Automatic Updates policy is set: after deployment, VMs are patched by the sandbox's Azure Update Manager
+  # schedule, and such a policy would conflict with it.
   image_windows_patch_steps = [
+    {
+      type        = "PowerShell"
+      name        = "enable-microsoft-update"
+      runElevated = true
+      runAsSystem = true
+      inline      = concat(local.image_powershell_steps.enable_microsoft_update, ["& $path", "exit $LASTEXITCODE"])
+    },
     merge(local.image_windows_update, { name = "windows-update-1" }),
     merge(local.image_windows_restart, { name = "restart-after-windows-update-1" }),
     merge(local.image_windows_update, { name = "windows-update-2" }),
     merge(local.image_windows_restart, { name = "restart-after-windows-update-2" }),
   ]
-
-  image_set_automatic_updates_step = {
-    type        = "PowerShell"
-    name        = "set-automatic-updates"
-    runElevated = true
-    runAsSystem = true
-    inline      = concat(local.image_powershell_steps.set_automatic_updates, ["& $path", "exit $LASTEXITCODE"])
-  }
 
   # The images to build, keyed by image definition name. The names are the contract with the Azure Sandbox
   # configuration, so don't change them. Source images match the root modules' platform image defaults.
@@ -106,8 +103,7 @@ locals {
         sku       = "2025-datacenter-azure-edition-core"
       }
 
-      # Patching only. Configure Automatic Updates is left alone; adds1 sets it at deploy time, after the forest
-      # promotion restart.
+      # Patching only.
       customize = local.image_windows_patch_steps
     }
 
@@ -139,7 +135,6 @@ locals {
           merge(local.image_windows_restart, { name = "restart-after-install" }),
         ],
         local.image_windows_patch_steps,
-        [local.image_set_automatic_updates_step]
       )
     }
 
@@ -176,20 +171,8 @@ locals {
         sku       = "entdev-gen2"
       }
 
-      # Opting into Microsoft Update first lets the Windows Update passes install SQL Server updates too.
-      customize = concat(
-        [
-          {
-            type        = "PowerShell"
-            name        = "enable-microsoft-update"
-            runElevated = true
-            runAsSystem = true
-            inline      = concat(local.image_powershell_steps.enable_microsoft_update, ["& $path", "exit $LASTEXITCODE"])
-          },
-        ],
-        local.image_windows_patch_steps,
-        [local.image_set_automatic_updates_step]
-      )
+      # The Microsoft Update opt-in in the patch steps lets the Windows Update passes install SQL Server updates too.
+      customize = local.image_windows_patch_steps
     }
   }
 

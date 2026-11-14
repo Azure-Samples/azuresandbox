@@ -30,12 +30,15 @@ This configuration implements a virtual network for applications including:
     * SQL Server Management Studio (SSMS) — when the *mssql* or *vm-mssql-win* module (or both) is enabled.
     * MySQL Workbench — when the *mysql* module is enabled.
   * Enabling a database module on an existing sandbox installs its tool; disabling it does **not** uninstall the tool.
+  * When the root module's `vm_image_gallery_id` is set, *jumpwin1* uses the latest version of the `jumpwin` custom image, which already has the Windows features, VS Code, SSMS and MySQL Workbench. The features and software steps are skipped, so `install_ssms` and `install_mysql_workbench` have no effect. See [Custom images](../../README.md#custom-images).
 
 The estimated provisioning time for this module is 15 - 60 minutes depending upon how recently the Windows Server platform image was built which can impact patching freshness.
 
-Before any run command or VM extension touches *jumpwin1*, Terraform first waits for the Windows guest agent to be ready, then installs pending Critical and Security Windows updates on it using the platform [installPatches](https://learn.microsoft.com/en-us/rest/api/compute/virtual-machines/install-patches) action and reboots it if required (wait for agent → patch → reboot → configure). This keeps an update-driven reboot from interrupting later configuration steps. The readiness wait is a run command (*Wait-GuestAgentReady.ps1*): it can't run while a new VM's guest agent is self-updating, so patching never starts mid-update, when the platform would fail it. Patching runs for up to 2 hours. If the patch run reports a status of `Failed` (a patch failed to install, or the window ran out with patches outstanding), the apply fails instead of configuring a partially patched VM. The patch result is also surfaced in the `patch_install_result` output. Because the failed result stays in Terraform state, later plans fail too until you re-run patching with `terraform apply -replace='module.vnet_app[0].azapi_resource_action.install_patches'`. Automatic patching stays enabled. Patching adds time to provisioning that varies with the number of pending updates. Adding this step to an existing sandbox patches and may reboot *jumpwin1* on the next apply.
+Before any run command or VM extension touches *jumpwin1*, Terraform first waits for the Windows guest agent to be ready, then installs pending Critical and Security Windows updates on it using the platform [installPatches](https://learn.microsoft.com/en-us/rest/api/compute/virtual-machines/install-patches) action and reboots it if required (wait for agent → patch → reboot → configure). This keeps an update-driven reboot from interrupting later configuration steps. The readiness wait is a run command (*Wait-GuestAgentReady.ps1*): it can't run while a new VM's guest agent is self-updating, so patching never starts mid-update, when the platform would fail it. Patching runs for up to 2 hours. If the patch run reports a status of `Failed` (a patch failed to install, or the window ran out with patches outstanding), the apply fails instead of configuring a partially patched VM. The patch result is also surfaced in the `patch_install_result` output. Because the failed result stays in Terraform state, later plans fail too until you re-run patching with `terraform apply -replace='module.vnet_app[0].azapi_resource_action.install_patches'`. Patching adds time to provisioning that varies with the number of pending updates. Adding this step to an existing sandbox patches and may reboot *jumpwin1* on the next apply.
 
 After patching, *jumpwin1* joins the AD domain. The domain join extension doesn't restart the VM itself, because its asynchronous restart could kill configuration steps that had already started. Instead, Terraform restarts *jumpwin1* with the platform [restart](https://learn.microsoft.com/en-us/rest/api/compute/virtual-machines/restart) action, waits for the restart to finish, waits 2 more minutes for the guest agent to settle, and then runs the Azure Files configuration extension (patch → join domain → restart → configure).
+
+After deployment, *jumpwin1* is patched by the sandbox's Azure Update Manager schedule, and Microsoft Update is enabled so other Microsoft products are patched too. See [Patching](../../README.md#patching).
 
 > [!IMPORTANT]
 > **OS disk type change (Standard HDD retirement).** The default for `vm_jumpbox_win_storage_account_type` is now `StandardSSD_LRS` and Standard HDD (`Standard_LRS`) is no longer permitted, because [Azure is retiring Standard HDD OS disks on September 8, 2028](https://learn.microsoft.com/en-us/azure/virtual-machines/disks-hdd-os-retirement). Fresh deployments are unaffected. For an **existing** deployment created with `Standard_LRS`, changing `os_disk.storage_account_type` forces Terraform to **replace the VM** (destroy and recreate), which causes downtime; the Windows jumpbox is domain-joined and re-provisioned by its run-command configuration, so the recommended path is to let Terraform recreate it during a maintenance window. To avoid replacement, deallocate the VM and change its OS disk SKU in place (Azure portal/CLI) *before* applying, then set the variable to the new SKU so Terraform detects no change.
@@ -115,6 +118,7 @@ This module is organized as follows:
 ├── images/
 |   └── vnet-app-diagram.drawio.svg         # Architecture diagram
 ├── scripts/
+|   ├── Enable-MicrosoftUpdate.ps1          # Registers Microsoft Update so other Microsoft products are patched
 |   ├── Install-Software.ps1                # Installs software on jumpwin1 (shared with image builds)
 |   ├── Install-WindowsFeatures.ps1         # Enables Windows features on jumpwin1 (shared with image builds)
 |   ├── Invoke-AzureFilesConfiguration.ps1  # Runs Set-AzureFilesConfiguration.ps1 as domain admin
@@ -152,6 +156,7 @@ key_vault_id | | The ID of the key vault defined in the root module.
 key_vault_name | | The name of the key vault defined in the root module.
 location | | The Azure region defined in the root module.
 log_analytics_workspace_id | | The ID of the shared log analytics workspace.
+maintenance_configuration_id | | The ID of the sandbox's Azure Update Manager maintenance configuration from the vnet-shared module. The VM is assigned to it for scheduled patching.
 monitor_private_link_scope_id | | The ID of the Azure Monitor Private Link Scope (AMPLS) owned by vnet-shared. Used to register Application Insights as a scoped service.
 monitor_private_link_scope_name | | The name of the Azure Monitor Private Link Scope (AMPLS) owned by vnet-shared. Required by azurerm_monitor_private_link_scoped_service.
 operator_object_id | | The Microsoft Entra object id of the operator. Defined in the root module.
@@ -171,6 +176,7 @@ tags | | The tags defined in the root module.
 unique_seed | | The unique seed used to generate unique names for resources. Defined in the root module.
 virtual_network_shared_id | | The resource ID of the shared services virtual network.  Defined in the *vnet-shared*  module.
 virtual_network_shared_name | | The name of the shared services virtual network.  Defined in the *vnet-shared* module.
+vm_image_gallery_id | `null` | Resource ID of the Azure Compute Gallery with custom images, or `null` for platform images. Defined by the root module's `vm_image_gallery_id` variable and checked there. When set, the `*_image_*` variables are ignored.
 vm_jumpbox_win_image_offer | `WindowsServer` | The offer type of the virtual machine image used to create the VM.
 vm_jumpbox_win_image_publisher | `MicrosoftWindowsServer` | The publisher for the virtual machine image used to create VM.
 vm_jumpbox_win_image_sku | `2025-datacenter-azure-edition` | The SKU for the virtual machine image used to create the VM.
@@ -191,6 +197,7 @@ module.vnet_app[0].azapi_resource_action.install_patches | | Installs Critical a
 module.vnet_app[0].azapi_resource_action.restart_after_domain_join | | Restarts *jumpwin1* synchronously after it joins the AD domain, so the reboot the join requires can't interrupt later configuration steps.
 module.vnet_app[0].azurerm_application_insights.this | appisanddevxxx | Workspace-based Application Insights linked to the shared Log Analytics workspace.
 module.vnet_app[0].azurerm_container_registry.this | crsanddevxxxxxxxx | Shared container registry.
+module.vnet_app[0].azurerm_maintenance_assignment_virtual_machine.this | | Assigns *jumpwin1* to the sandbox maintenance configuration for scheduled patching. Created as the last step of the VM's deployment so scheduled installs and reboots can't interrupt configuration.
 module.vnet_app[0].azurerm_monitor_data_collection_rule_association.jumpwin1_dce | | Data collection endpoint association for jumpwin1.
 module.vnet_app[0].azurerm_monitor_data_collection_rule_association.jumpwin1_dcr | | Data collection rule association for jumpwin1.
 module.vnet_app[0].azurerm_monitor_diagnostic_setting.container_registry | | Diagnostic settings for container registry.
@@ -217,6 +224,7 @@ module.vnet_app[0].azurerm_subnet.subnets["snet-misc-03"] | | Reserved for futur
 module.vnet_app[0].azurerm_subnet_network_security_group_association.associations[*] | | Associates the NSGs with the subnets.
 module.vnet_app[0].azurerm_subnet_route_table_association.associations[*] | | Associates the route table with the subnets.
 module.vnet_app[0].azurerm_virtual_machine_extension.this | | Custom script extension for the VM. Downloads scripts from the storage container and runs the orchestration script.
+module.vnet_app[0].azurerm_virtual_machine_run_command.enable_microsoft_update | vmx&#8209;sand&#8209;dev&#8209;jumpwin1&#8209;EnableMicrosoftUpdate | Registers Microsoft Update on *jumpwin1* so Windows Update and Azure Update Manager also patch other Microsoft products. Runs after the guest agent readiness wait and before `install_patches`.
 module.vnet_app[0].azurerm_virtual_machine_run_command.wait_for_guest_agent | vmx&#8209;sand&#8209;dev&#8209;jumpwin1&#8209;WaitForGuestAgent | Waits until the guest agent on *jumpwin1* has finished any self-update and is processing goal states, logging the agent version, before `install_patches` runs.
 module.vnet_app[0].azurerm_virtual_network.this | vnet&#8209;sand&#8209;dev&#8209;app | Virtual network for application workloads in the sandbox environment.
 module.vnet_app[0].azurerm_virtual_network_peering.app_to_shared | | Virtual network peering from the application virtual network to the shared services virtual network (vnet-shared).

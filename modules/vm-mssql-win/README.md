@@ -26,9 +26,13 @@ Enabling this module also causes the *vnet-app* module to install SQL Server Man
 
 The estimated provisioning time for this module is 15-60 minutes depending upon how recently the SQL Server platform image was built which can impact patching freshness.
 
-Before any run command or VM extension touches *mssqlwin1*, Terraform first waits for the Windows guest agent to be ready, then installs pending Critical and Security Windows updates on it using the platform [installPatches](https://learn.microsoft.com/en-us/rest/api/compute/virtual-machines/install-patches) action and reboots it if required (wait for agent → patch → reboot → configure). This keeps an update-driven reboot from interrupting later configuration steps. The readiness wait is a run command (*Wait-GuestAgentReady.ps1*): it can't run while a new VM's guest agent is self-updating, so patching never starts mid-update, when the platform would fail it. Patching runs for up to 2 hours. If the patch run reports a status of `Failed` (a patch failed to install, or the window ran out with patches outstanding), the apply fails instead of configuring a partially patched VM. The patch result is also surfaced in the `patch_install_result` output. Because the failed result stays in Terraform state, later plans fail too until you re-run patching with `terraform apply -replace='module.vm_mssql_win[0].azapi_resource_action.install_patches'`. Automatic patching stays enabled. Patching adds time to provisioning that varies with the number of pending updates. Adding this step to an existing sandbox patches and may reboot *mssqlwin1* on the next apply.
+Before any run command or VM extension touches *mssqlwin1*, Terraform first waits for the Windows guest agent to be ready, then installs pending Critical and Security Windows updates on it using the platform [installPatches](https://learn.microsoft.com/en-us/rest/api/compute/virtual-machines/install-patches) action and reboots it if required (wait for agent → patch → reboot → configure). This keeps an update-driven reboot from interrupting later configuration steps. The readiness wait is a run command (*Wait-GuestAgentReady.ps1*): it can't run while a new VM's guest agent is self-updating, so patching never starts mid-update, when the platform would fail it. Patching runs for up to 2 hours. If the patch run reports a status of `Failed` (a patch failed to install, or the window ran out with patches outstanding), the apply fails instead of configuring a partially patched VM. The patch result is also surfaced in the `patch_install_result` output. Because the failed result stays in Terraform state, later plans fail too until you re-run patching with `terraform apply -replace='module.vm_mssql_win[0].azapi_resource_action.install_patches'`. Patching adds time to provisioning that varies with the number of pending updates. Adding this step to an existing sandbox patches and may reboot *mssqlwin1* on the next apply.
 
 After patching, *mssqlwin1* joins the AD domain. The domain join extension doesn't restart the VM itself, because its asynchronous restart could kill configuration steps that had already started. Instead, Terraform restarts *mssqlwin1* with the platform [restart](https://learn.microsoft.com/en-us/rest/api/compute/virtual-machines/restart) action, waits for the restart to finish, waits 2 more minutes for the guest agent to settle, and then runs the *ConfigureFirewallRules* and *ConfigureSqlLogin* run commands (patch → join domain → restart → configure).
+
+After deployment, *mssqlwin1* is patched by the sandbox's Azure Update Manager schedule, and Microsoft Update is enabled so other Microsoft products are patched too. See [Patching](../../README.md#patching). SQL Server updates are installed by the schedule through Microsoft Update.
+
+When the root module's `vm_image_gallery_id` is set, *mssqlwin1* uses the latest version of the `mssqlwin` custom image instead of a platform image. SQL Server configuration still runs at deployment time. See [Custom images](../../README.md#custom-images).
 
 After a stop/deallocate, the `Set-MssqlStartupConfiguration` startup task rebuilds the temp disk volume, and if that requires a restart it restarts the VM and exits without starting SQL Server. SQL Server is started by the task on the following boot.
 
@@ -86,6 +90,7 @@ The module is organized as follows:
 ├── scripts/
 |   ├── Configure-FirewallRules.ps1       # Configures Windows firewall rules for SQL Server
 |   ├── Configure-SqlLogin.ps1            # Creates SQL Server login for domain admin and adds it to sysadmin server role
+|   ├── Enable-MicrosoftUpdate.ps1        # Registers Microsoft Update so SQL Server and other Microsoft products are patched
 |   ├── Invoke-MssqlConfiguration.ps1     # Runs Set-MssqlConfiguration.ps1 as domain admin, then reboots the VM via a one-time task run as NT AUTHORITY\SYSTEM
 |   ├── Set-MssqlConfiguration.ps1        # Prepares data and log disks and configures SQL Server instance (runs as domain admin); registers the AtStartup task below to run as NT AUTHORITY\SYSTEM
 |   ├── Set-MssqlStartupConfiguration.ps1 # Re-configures the SQL Server tempdb folder after a VM stop/deallocate event and starts SQL Server (exits early if it restarts the VM); runs as NT AUTHORITY\SYSTEM (local-only work, reliable at boot)
@@ -117,6 +122,7 @@ data_collection_rule_windows_id | | The resource ID for DCR rules used by mssqlw
 key_vault_id | | The ID of the key vault defined in the root module.
 key_vault_name | | The name of the key vault defined in the root module.
 location | | The name of the Azure Region where resources will be provisioned.
+maintenance_configuration_id | | The ID of the sandbox's Azure Update Manager maintenance configuration from the vnet-shared module. The VM is assigned to it for scheduled patching.
 resource_group_name | | The name of the resource group defined in the root module.
 storage_account_id | | The ID of the storage account defined in the vnet-app module.
 storage_container_id | | The ID of the storage container defined in the vnet-app module.
@@ -124,6 +130,7 @@ storage_container_name | scripts | The name of the storage container defined in 
 storage_blob_endpoint | | The blob endpoint for the storage account defined in the vnet-app module.
 subnet_id | | The subnet ID defined in the vnet-app module.
 tags | | The tags from the root module.
+vm_image_gallery_id | `null` | Resource ID of the Azure Compute Gallery with custom images, or `null` for platform images. Defined by the root module's `vm_image_gallery_id` variable and checked there. When set, the `*_image_*` variables are ignored.
 vm_mssql_win_image_offer | `sql2025-ws2025` | The offer type of the virtual machine image used to create the SQL Server VM.
 vm_mssql_win_image_publisher | `MicrosoftSQLServer` | The publisher for the virtual machine image used to create the SQL Server VM.
 vm_mssql_win_image_sku | `entdev-gen2` | The SKU of the virtual machine image used to create the SQL Server VM.
@@ -142,6 +149,7 @@ Address | Name | Notes
 --- | --- | ---
 module.vm_mssql_win[0].azapi_resource_action.install_patches | | Installs Critical and Security updates on *mssqlwin1* (rebooting if required) within a 2-hour window, failing the apply if the patch run reports `Failed`, after the data disks are attached and the guest agent readiness wait, and before any run command or extension runs on it.
 module.vm_mssql_win[0].azapi_resource_action.restart_after_domain_join | | Restarts *mssqlwin1* synchronously after it joins the AD domain, so the reboot the join requires can't interrupt later configuration steps.
+module.vm_mssql_win[0].azurerm_maintenance_assignment_virtual_machine.this | | Assigns *mssqlwin1* to the sandbox maintenance configuration for scheduled patching. Created as the last step of the VM's deployment so scheduled installs and reboots can't interrupt configuration.
 module.vm_mssql_win[0].azurerm_managed_disk.disks["sqldata"] | disk&#8209;sand&#8209;dev&#8209;vol_sqldata_M | The managed disk for SQL Server data. The format of the *vol_* portion is used by automation to locate SQL Server data files vs. log files and set the drive letter mapping.
 module.vm_mssql_win[0].azurerm_managed_disk.disks["sqllog"] | disk&#8209;sand&#8209;dev&#8209;vol_sqllog_L | The managed disk for SQL Server logs. The format of the *vol_* portion is used by automation to locate SQL Server data files vs. log files and set the drive letter mapping.
 module.vm_mssql_win[0].azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;mssqlwin1 | The network interface associated with the SQL Server VM. Configured with accelerated networking enabled for improved performance.
@@ -150,6 +158,7 @@ module.vm_mssql_win[0].azurerm_storage_blob.remote_scripts["orchestrator"] | Inv
 module.vm_mssql_win[0].azurerm_storage_blob.remote_scripts["startup"] | Set&#8209;MssqlStartupConfiguration.ps1 | The script that re-creates the Storage Spaces stripe across all local NVMe temp disks and re-configures the SQL Server tempdb folder after VM stop/deallocate.
 module.vm_mssql_win[0].azurerm_storage_blob.remote_scripts["worker"] | Set&#8209;MssqlConfiguration.ps1 | The script that prepares data and log disks and configures SQL Server instance.
 module.vm_mssql_win[0].azurerm_virtual_machine_data_disk_attachment.attachments[*] | | The data and log disk attachments for the SQL Server VM.
+module.vm_mssql_win[0].azurerm_virtual_machine_run_command.enable_microsoft_update | EnableMicrosoftUpdate | Registers Microsoft Update on *mssqlwin1* so Windows Update and Azure Update Manager also patch other Microsoft products. Runs after the guest agent readiness wait and before `install_patches`.
 module.vm_mssql_win[0].azurerm_virtual_machine_run_command.wait_for_guest_agent | WaitForGuestAgent | Waits until the guest agent on *mssqlwin1* has finished any self-update and is processing goal states, logging the agent version, before `install_patches` runs.
 module.vm_mssql_win[0].azurerm_windows_virtual_machine.this | mssqlwin1 | The SQL Server VM resource. Configured with NVMe disk controller, encryption at host, secure boot, vTPM, and automatic patch assessment for enhanced security and performance.
 module.vm_mssql_win[0].time_sleep.wait_for_domain_join_restart | | Waits 2 minutes after the post-domain-join restart so the guest agent and WMI are ready before configuration runs on *mssqlwin1*.

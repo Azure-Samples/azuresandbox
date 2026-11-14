@@ -305,6 +305,18 @@ else
     failed=$((failed + 1))
 fi
 
+# Test 11: Patching - Ubuntu automatic updates (unattended-upgrades) disabled. Azure disables them once
+# Azure-orchestrated patching (patch mode AutomaticByPlatform) completes enablement, which can take
+# several hours after deployment, so a value other than 0 is reported as SKIP rather than FAIL.
+# See https://learn.microsoft.com/azure/virtual-machines/automatic-vm-guest-patching#enablement-and-assessment
+unattended_upgrade=$(apt-config dump APT::Periodic::Unattended-Upgrade 2>/dev/null | awk -F'"' '/^APT::Periodic::Unattended-Upgrade /{print $2}' | tail -1)
+if [ "$unattended_upgrade" = "0" ]; then
+    write_test_result 'PASS' "Patching: Ubuntu automatic updates disabled (APT::Periodic::Unattended-Upgrade = 0)" 'Patching: Ubuntu automatic updates disabled (APT::Periodic::Unattended-Upgrade = 0)'
+    passed=$((passed + 1))
+else
+    write_test_result 'SKIP' "Patching: APT::Periodic::Unattended-Upgrade is '${unattended_upgrade:-not set}'; Azure-orchestrated patching enablement may still be pending" 'Patching: Ubuntu automatic updates not yet disabled; Azure-orchestrated patching enablement may still be pending'
+fi
+
 # Summary
 total=$((passed + failed))
 write_test_result 'SUMMARY' "Passed: $passed Failed: $failed Total: $total"

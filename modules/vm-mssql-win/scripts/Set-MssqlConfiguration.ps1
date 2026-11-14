@@ -6,7 +6,6 @@
 # Moves SQL Server errorlog to data disk.
 # Sets SQL Server for manual startup.
 # Registers a scheduled task that runs on startup that prepares the temp disk if necessary and starts SQL Server.
-# Configures Windows Update for first-party updates to enable SQL Server patching.
 
 # This script has only been tested under the following conditions:
 # - Windows Server 2025 using PowerShell 5.x for Windows
@@ -867,19 +866,6 @@ try {
         -Trigger $taskTrigger `
         -Settings $taskSettings `
         -Description "Prepare temp drive folders for tempdb and start SQL Server."
-}
-catch {
-    Exit-WithError $_
-}
-
-# Configure Windows Update
-Write-ScriptLog "Configuring Windows Update first-party updates to enable SQL Server patching..."
-$serviceManager = (New-Object -com "Microsoft.Update.ServiceManager")
-$serviceManager.Services
-$serviceID = "7971f918-a847-4430-9279-4a52d1efe18d"
-
-try {
-    $serviceManager.AddService2($serviceID,7,"")
 }
 catch {
     Exit-WithError $_

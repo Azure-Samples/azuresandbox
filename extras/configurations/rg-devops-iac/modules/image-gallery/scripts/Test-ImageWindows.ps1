@@ -4,11 +4,13 @@
 #
 # Checks for every image:
 #   * No Critical or Security updates are pending (using the same search criteria as the WindowsUpdate customizers).
+#   * Microsoft Update is registered, so updates for other Microsoft products such as SQL Server are offered.
+#   * No Configure Automatic Updates (AUOptions) policy is set; it would conflict with Azure Update Manager scheduled
+#     patching of VMs deployed from the image.
 # Image-specific checks:
 #   * adds:     The AD-Domain-Services feature is NOT installed (Sysprep doesn't support the AD DS role).
-#   * jumpwin:  RSAT-ADDS and RSAT-DNS-Server are installed, VS Code, SSMS and MySQL Workbench are present, and
-#               Configure Automatic Updates is 4.
-#   * mssqlwin: The SQL Server (MSSQLSERVER) service and binaries are present, and Configure Automatic Updates is 4.
+#   * jumpwin:  RSAT-ADDS and RSAT-DNS-Server are installed, and VS Code, SSMS and MySQL Workbench are present.
+#   * mssqlwin: The SQL Server (MSSQLSERVER) service and binaries are present.
 
 param(
     [Parameter(Mandatory = $true)]
@@ -48,10 +50,21 @@ function Test-FeatureInstalled {
     return ($null -ne $feature -and $feature.InstallState -eq 'Installed')
 }
 
-function Test-AutomaticUpdate {
+function Test-NoAutomaticUpdatePolicy {
     $settings = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' -ErrorAction SilentlyContinue
-    Write-CheckResult ($null -ne $settings -and $settings.NoAutoUpdate -eq 0 -and $settings.AUOptions -eq 4) `
-        "Configure Automatic Updates: NoAutoUpdate = $($settings.NoAutoUpdate), AUOptions = $($settings.AUOptions) (expected 0 and 4)"
+    $auOptions = if ($null -ne $settings) { $settings.AUOptions } else { $null }
+    Write-CheckResult ($null -eq $auOptions) "No Configure Automatic Updates policy (AUOptions = $(if ($null -eq $auOptions) { 'not set' } else { $auOptions }))"
+}
+
+function Test-MicrosoftUpdate {
+    try {
+        $serviceManager = New-Object -ComObject 'Microsoft.Update.ServiceManager'
+        $registered = $serviceManager.Services | Where-Object { $_.ServiceID -eq '7971f918-a847-4430-9279-4a52d1efe18d' }
+        Write-CheckResult ($null -ne $registered) 'Microsoft Update is registered'
+    }
+    catch {
+        Write-CheckResult $false "Couldn't query the Windows Update service manager: $_"
+    }
 }
 
 function Test-FilePresent {
@@ -83,6 +96,9 @@ catch {
     Write-CheckResult $false "Couldn't search for pending updates: $_"
 }
 
+Test-MicrosoftUpdate
+Test-NoAutomaticUpdatePolicy
+
 switch ($ImageName) {
     'adds' {
         Write-CheckResult (-not (Test-FeatureInstalled 'AD-Domain-Services')) 'Windows feature AD-Domain-Services is not installed'
@@ -96,14 +112,12 @@ switch ($ImageName) {
         Test-FilePresent 'Visual Studio Code' 'C:\Program Files\Microsoft VS Code\Code.exe'
         Test-FilePresent 'SQL Server Management Studio' 'C:\Program Files\Microsoft SQL Server Management Studio*\Release\Common7\IDE\Ssms.exe'
         Test-FilePresent 'MySQL Workbench' 'C:\Program Files\MySQL\MySQL Workbench*\MySQL*Workbench.exe'
-        Test-AutomaticUpdate
     }
 
     'mssqlwin' {
         $service = Get-Service -Name 'MSSQLSERVER' -ErrorAction SilentlyContinue
         Write-CheckResult ($null -ne $service) 'SQL Server (MSSQLSERVER) service is present'
         Test-FilePresent 'SQL Server database engine' 'C:\Program Files\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Binn\sqlservr.exe'
-        Test-AutomaticUpdate
     }
 }
 
