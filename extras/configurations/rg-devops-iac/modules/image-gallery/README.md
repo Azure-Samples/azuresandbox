@@ -115,8 +115,8 @@ resource_names | A map of resource names for key resources in the module, includ
 
 Image | Sandbox VM | Source platform image | Customization
 --- | --- | --- | ---
-`adds` | `adds1` | `MicrosoftWindowsServer:WindowsServer:2025-datacenter-azure-edition-core` | Microsoft Update opt-in and patching only. AD DS is installed at deploy time, because [Sysprep doesn't support the AD DS role](https://learn.microsoft.com/windows-hardware/manufacture/desktop/sysprep-support-for-server-roles).
-`jumpwin` | `jumpwin1` | `MicrosoftWindowsServer:WindowsServer:2025-datacenter-azure-edition` | RSAT, VS Code, SSMS and MySQL Workbench, then Microsoft Update opt-in and patching.
+`adds` | `adds1` | `MicrosoftWindowsServer:WindowsServer:2025-datacenter-core-g2` | Microsoft Update opt-in and patching only. AD DS is installed at deploy time, because [Sysprep doesn't support the AD DS role](https://learn.microsoft.com/windows-hardware/manufacture/desktop/sysprep-support-for-server-roles).
+`jumpwin` | `jumpwin1` | `MicrosoftWindowsServer:WindowsServer:2025-datacenter-g2` | RSAT, VS Code, SSMS and MySQL Workbench, then Microsoft Update opt-in and patching.
 `jumplinux` | `jumplinux1` | `Canonical:ubuntu-24_04-lts:server` | The jumpbox packages and a full `dist-upgrade`.
 `mssqlwin` | `mssqlwin1` | `MicrosoftSQLServer:sql2025-ws2025:entdev-gen2` | Microsoft Update opt-in, so SQL Server is patched too, then patching.
 

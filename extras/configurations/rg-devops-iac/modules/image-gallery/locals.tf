@@ -95,12 +95,12 @@ locals {
   # configuration, so don't change them. Source images match the root modules' platform image defaults.
   images = {
     adds = {
-      description = "Domain controller (adds1): Windows Server 2025 Datacenter Azure Edition Core, fully patched. AD DS is installed at deploy time because Sysprep doesn't support the AD DS role."
+      description = "Domain controller (adds1): Windows Server 2025 Datacenter Server Core, fully patched. AD DS is installed at deploy time because Sysprep doesn't support the AD DS role."
       os_type     = "Windows"
       source = {
         publisher = "MicrosoftWindowsServer"
         offer     = "WindowsServer"
-        sku       = "2025-datacenter-azure-edition-core"
+        sku       = "2025-datacenter-core-g2"
       }
 
       # Patching only.
@@ -108,12 +108,12 @@ locals {
     }
 
     jumpwin = {
-      description = "Windows jumpbox (jumpwin1): Windows Server 2025 Datacenter Azure Edition with RSAT, VS Code, SSMS and MySQL Workbench, fully patched."
+      description = "Windows jumpbox (jumpwin1): Windows Server 2025 Datacenter with RSAT, VS Code, SSMS and MySQL Workbench, fully patched."
       os_type     = "Windows"
       source = {
         publisher = "MicrosoftWindowsServer"
         offer     = "WindowsServer"
-        sku       = "2025-datacenter-azure-edition"
+        sku       = "2025-datacenter-g2"
       }
 
       customize = concat(
