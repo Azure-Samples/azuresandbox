@@ -955,7 +955,7 @@ By default the sandbox VMs (`adds1`, `jumpwin1`, `jumplinux1`, `mssqlwin1`) use 
 * The gallery must be in the same subscription and region as the sandbox, and each required image definition needs a version that is replicated to that region and not excluded from latest. `terraform plan` checks this and fails with an error naming the missing image or module.
 * The platform image variables of each module are ignored for custom images.
 * Steps already done in the image are skipped: on `jumpwin1`, Windows features and software (VS Code, SSMS and MySQL Workbench are always present, so `install_ssms` and `install_mysql_workbench` have no effect); on `jumplinux1`, the package install part of cloud-init. Deployment-specific steps (AD DS promotion, domain join, SQL Server configuration, Azure Files) still run at deployment time.
-* Patching works the same for platform images and custom images. See [Patching](#patching).
+* Patching, including deployment-time patching, works the same for platform images and custom images. See [Patching](#patching).
 
 ---
 
@@ -966,9 +966,9 @@ All sandbox VMs (Windows and Linux, platform images and custom images) are patch
 Behavior | Windows | Linux
 --- | --- | ---
 Patch orchestration | Patch mode `AutomaticByPlatform` with Customer Managed Schedules (`bypass_platform_safety_checks_on_user_schedule_enabled = true`) | Same
-Schedule | One maintenance configuration in the vnet-shared module, assigned to each VM as the last step of its deployment. Default weekly on Sunday at 03:00 UTC, reboot if required; set with the `patch_schedule_*` variables | Same
+Schedule | One maintenance configuration in the vnet-shared module, assigned to each VM as the last step of its deployment, so a scheduled window can't interrupt deployment. Default weekly on Sunday at 03:00 UTC, reboot if required; set with the `patch_schedule_*` variables | Same
 Assessment | Every 24 hours (`AutomaticByPlatform`); results in Update Manager | Same
-Deployment-time patching | `installPatches` run command before configuration | Packages from cloud-init (platform images)
+Deployment-time patching | `installPatches` action before any run command or extension, so an update reboot can't interrupt configuration. Short on a current custom image | None. Platform images get current packages from cloud-init; custom images keep the image's packages until the first scheduled window
 Product coverage | Microsoft Update enabled, so SQL Server and other Microsoft products are patched; native Automatic Updates are disabled by Azure | Configured apt repositories; Ubuntu's `unattended-upgrades` is disabled by Azure
 
 Scheduled patching skips VMs that are deallocated during the window, so start the sandbox VMs (`./scripts/manage-vms.sh start`) for the window or patch them on demand from Update Manager. Scheduled reboots can restart the domain controller `adds1`.
