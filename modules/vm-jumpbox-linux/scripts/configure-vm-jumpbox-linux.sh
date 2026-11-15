@@ -18,6 +18,41 @@ printdiv() {
     printf  '\n' >> $log_file
 }
 
+# Logs the error and exits non-zero so cloud-init reports status 'error'.
+fail() {
+    printf "ERROR: %s\n" "$1" >> $log_file
+    printf "ERROR: %s\n" "$1"
+    printdiv
+    exit 1
+}
+
+# The VM's Key Vault role is assigned after the VM is created, and RBAC takes time to propagate.
+# On a custom image this script runs right after boot, so retry until the secret can be read.
+kv_retry_seconds=600
+kv_retry_interval=10
+
+get_kv_secret() {
+    local secret_name="$1"
+    local deadline=$(( $(date +%s) + kv_retry_seconds ))
+    local response access_token value
+    while :; do
+        response=$(curl -s -H Metadata:true 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fvault.azure.net')
+        access_token=$(echo "$response" | jp -u 'access_token' 2>/dev/null)
+        if [ -n "$access_token" ] && [ "$access_token" != 'null' ]; then
+            value=$(curl -s -H "Authorization: Bearer $access_token" "https://$key_vault_name.vault.azure.net/secrets/$secret_name?api-version=7.2" | jp -u 'value' 2>/dev/null)
+            if [ -n "$value" ] && [ "$value" != 'null' ]; then
+                printf '%s' "$value"
+                return 0
+            fi
+        fi
+        if [ "$(date +%s)" -ge "$deadline" ]; then
+            return 1
+        fi
+        printf "Secret '%s' not readable yet, retrying in %ss...\n" "$secret_name" "$kv_retry_interval" >> $log_file
+        sleep "$kv_retry_interval"
+    done
+}
+
 # Startup
 printdiv
 printf "Timestamp: $(date +"%Y-%m-%d %H:%M:%S.%N %Z")...\n" > $log_file
@@ -60,24 +95,16 @@ var_name='storage_share_name'
 storage_share_name=$(jp -f $config_file -u $var_name)
 printf "CIFS share name is '$storage_share_name'...\n" >> $log_file
 
-# Get managed identity access token for key vault
-printf "Getting managed identity access token...\n" >> $log_file
-response=$(curl 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fvault.azure.net' -H Metadata:true -s)
-access_token=$(echo $response |  jp -u 'access_token')
-printf "Access token length is '${#access_token}'...\n" >> $log_file
-
 # Get adminuser secret from key vault
 secret_name="adminuser"
 printf "Getting '$secret_name' secret from key vault...\n" >> $log_file
-secret_uri="https://$key_vault_name.vault.azure.net/secrets/$secret_name?api-version=7.2"
-admin_username=$(curl -X GET -H "Authorization: Bearer $access_token" -H "Content-Type:appplication/json" "$secret_uri" | jp -u 'value')
+admin_username=$(get_kv_secret "$secret_name") || fail "Could not read secret '$secret_name' from key vault '$key_vault_name' within ${kv_retry_seconds}s"
 printf "Value of '$secret_name' secret is '$admin_username'...\n" >> $log_file
 
 # Get adminpassword secret from key vault
 secret_name="adminpassword"
 printf "Getting '$secret_name' secret from key vault...\n" >> $log_file
-secret_uri="https://$key_vault_name.vault.azure.net/secrets/$secret_name?api-version=7.2"
-admin_password=$(curl -X GET -H "Authorization: Bearer $access_token" -H "Content-Type:appplication/json" "$secret_uri" | jp -u 'value')
+admin_password=$(get_kv_secret "$secret_name") || fail "Could not read secret '$secret_name' from key vault '$key_vault_name' within ${kv_retry_seconds}s"
 printf "Length of '$secret_name' secret is '${#admin_password}'...\n" >> $log_file
 printdiv
 
@@ -201,7 +228,8 @@ printdiv
 
 # Join domain
 printf "Joining domain...\n" >> $log_file
-echo $admin_password | sudo net ads join -U $admin_username &>> $log_file
+echo $admin_password | sudo net ads join -U $admin_username &>> $log_file || fail "Domain join failed"
+sudo net ads testjoin &>> $log_file || fail "Domain join is not valid (net ads testjoin)"
 printf "Verifying keytab contains host SPN...\n" >> $log_file
 sudo klist -ke /etc/krb5.keytab 2>&1 | grep -i "host/" >> $log_file
 printdiv
@@ -220,7 +248,7 @@ printf "Configuring pluggable authentication (PAM) module for winbind...\n" >> $
 sudo pam-auth-update --enable winbind &>> $log_file
 sudo pam-auth-update --enable mkhomedir &>> $log_file
 printf "Restarting '$servicename'...\n" >> $log_file
-sudo systemctl restart $servicename &>> $log_file
+sudo systemctl restart $servicename &>> $log_file || fail "Could not start '$servicename'"
 sudo systemctl status winbind &>> $log_file
 groupname='sudo'
 printf "Adding user '$admin_username' to group '$groupname'...\n" >> $log_file
