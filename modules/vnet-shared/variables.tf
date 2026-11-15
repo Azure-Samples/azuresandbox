@@ -219,7 +219,7 @@ variable "vm_adds_image_publisher" {
 variable "vm_adds_image_sku" {
   type        = string
   description = "The sku of the virtual machine image used to create the VM"
-  default     = "2025-datacenter-azure-edition-core"
+  default     = "2025-datacenter-core-g2"
 
   validation {
     condition     = can(regex("^[a-zA-Z0-9-._]{1,64}$", var.vm_adds_image_sku))

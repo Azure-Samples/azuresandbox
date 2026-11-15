@@ -941,8 +941,8 @@ The following operating systems are used for the various virtual machines in the
 
 Virtual Machine | Role | Module | Operating System
 --- | --- | --- | ---
-adds1 | AD DS Domain Controller / DNS Server | vnet-shared | Windows Server 2025 Datacenter Azure Edition Core
-jumpwin1 | Windows Jumpbox VM | vnet-app | Windows Server 2025 Datacenter Azure Edition
+adds1 | AD DS Domain Controller / DNS Server | vnet-shared | Windows Server 2025 Datacenter (Server Core)
+jumpwin1 | Windows Jumpbox VM | vnet-app | Windows Server 2025 Datacenter
 mssqlwin1 | Windows SQL Server VM | vm-mssql-win | Windows Server 2025 / SQL Server 2025 Enterprise Developer Edition
 jumplinux1 | Linux Jumpbox VM | vm-jumpbox-linux | Ubuntu Server LTS 24.04 (Noble Numbat)
 
@@ -973,7 +973,7 @@ Product coverage | Microsoft Update enabled, so SQL Server and other Microsoft p
 
 Scheduled patching skips VMs that are deallocated during the window, so start the sandbox VMs (`./scripts/manage-vms.sh start`) for the window or patch them on demand from Update Manager. Scheduled reboots can restart the domain controller `adds1`.
 
-**Trade-off:** Azure's [automatic VM guest patching](https://learn.microsoft.com/azure/virtual-machines/automatic-vm-guest-patching) doesn't support [custom images](https://learn.microsoft.com/azure/update-manager/manage-updates-customized-images), so the sandbox uses the schedule everywhere instead of only for custom images. For VMs that use supported platform images, this gives up catch-up patching after downtime, availability-first phased rollout, zero-configuration off-peak timing, the path to hotpatching, and daily Ubuntu security updates. In return, every VM has one documented and tested behavior with control over the window, update types and reboots.
+**Trade-off:** Azure's [automatic VM guest patching](https://learn.microsoft.com/azure/virtual-machines/automatic-vm-guest-patching) doesn't support [custom images](https://learn.microsoft.com/azure/update-manager/manage-updates-customized-images), so the sandbox uses the schedule everywhere instead of only for custom images. For VMs that use supported platform images, this gives up catch-up patching after downtime, availability-first phased rollout, zero-configuration off-peak timing, and daily Ubuntu security updates. In return, every VM has one documented and tested behavior with control over the window, update types and reboots. For the same reason, `adds1` and `jumpwin1` use Windows Server 2025 Datacenter instead of Azure Edition: [hotpatching](https://learn.microsoft.com/windows-server/get-started/hotpatch), its main benefit here, isn't supported on custom images.
 
 ---
 

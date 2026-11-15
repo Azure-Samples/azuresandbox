@@ -180,7 +180,7 @@ virtual_network_shared_name | | The name of the shared services virtual network.
 vm_image_gallery_id | `null` | Resource ID of the Azure Compute Gallery with custom images, or `null` for platform images. Defined by the root module's `vm_image_gallery_id` variable and checked there. When set, the `*_image_*` variables are ignored.
 vm_jumpbox_win_image_offer | `WindowsServer` | The offer type of the virtual machine image used to create the VM.
 vm_jumpbox_win_image_publisher | `MicrosoftWindowsServer` | The publisher for the virtual machine image used to create VM.
-vm_jumpbox_win_image_sku | `2025-datacenter-azure-edition` | The SKU for the virtual machine image used to create the VM.
+vm_jumpbox_win_image_sku | `2025-datacenter-g2` | The SKU for the virtual machine image used to create the VM.
 vm_jumpbox_win_image_version | `Latest` | The version of the virtual machine image used to create the VM.
 vm_jumpbox_win_name | jumpwin1 | The name of the VM.
 vm_jumpbox_win_size | `Standard_D2ls_v6` | The size of the VM. Defined by the root module's `vm_jumpbox_size` variable.

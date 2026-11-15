@@ -401,7 +401,7 @@ variable "vm_jumpbox_win_image_publisher" {
 variable "vm_jumpbox_win_image_sku" {
   type        = string
   description = "The sku of the virtual machine image used to create the VM"
-  default     = "2025-datacenter-azure-edition"
+  default     = "2025-datacenter-g2"
 
   validation {
     condition     = can(regex("^[a-zA-Z0-9-._]{1,64}$", var.vm_jumpbox_win_image_sku))
