@@ -397,7 +397,26 @@ try {
     $profileZipPath = Join-Path $tempDir 'vpnprofile.zip'
     $profileExtractPath = Join-Path $tempDir 'vpnprofile'
     Invoke-WebRequest -Uri $profileUrl -OutFile $profileZipPath -ErrorAction Stop
-    Expand-Archive -Path $profileZipPath -DestinationPath $profileExtractPath -Force
+
+    # The profile's entry names use '\' separators. Expand-Archive keeps them as part of flat file names on
+    # Linux, which Test-Path can't resolve, so extract each entry with '\' mapped to a directory separator.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $extractRoot = [System.IO.Path]::GetFullPath($profileExtractPath) + [System.IO.Path]::DirectorySeparatorChar
+    $profileZip = [System.IO.Compression.ZipFile]::OpenRead($profileZipPath)
+    try {
+        foreach ($entry in $profileZip.Entries) {
+            if ($entry.FullName -match '[\\/]$') { continue }
+            $entryPath = [System.IO.Path]::GetFullPath((Join-Path $profileExtractPath ($entry.FullName -replace '[\\/]', [System.IO.Path]::DirectorySeparatorChar)))
+            if (-not $entryPath.StartsWith($extractRoot, [System.StringComparison]::Ordinal)) {
+                throw "VPN profile entry '$($entry.FullName)' is outside the extraction directory"
+            }
+            New-Item -ItemType Directory -Path (Split-Path $entryPath -Parent) -Force | Out-Null
+            [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $entryPath, $true)
+        }
+    }
+    finally {
+        $profileZip.Dispose()
+    }
 
     # Parse the OpenVPN config from the downloaded profile
     $genericOvpnPath = Join-Path $profileExtractPath 'OpenVPN' 'vpnconfig.ovpn'
