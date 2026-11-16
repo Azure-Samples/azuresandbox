@@ -13,7 +13,7 @@
 # is read from required_version in the root terraform.tf, which ci-terraform.yml
 # also derives its CLI version from (it has no pin of its own). The same check
 # also covers the GitHub Actions runner agent installed on jumplinux2 (the
-# github_runner_version default in the rg-devops-iac vm-jumpbox-linux module),
+# github_runner_version default in the rg-devops-iac github-runner module),
 # which is a Terraform variable default that Dependabot's terraform ecosystem
 # doesn't inspect either.
 #
@@ -51,7 +51,7 @@ tools=(
   'markdownlint-cli2|markdownlint-cli2|npm:markdownlint-cli2|.github/workflows/ci-docs.yml::markdownlint-cli2@\K[0-9.]+|.github/workflows/ci-docs.yml,scripts/Invoke-CIChecks.sh'
   'tflint|tflint|gh:terraform-linters/tflint|.github/workflows/ci-terraform.yml::tflint_version:\s*v?\K[0-9.]+|.github/workflows/ci-terraform.yml,scripts/Invoke-CIChecks.sh'
   'tflint-azurerm|tflint azurerm ruleset|gh:terraform-linters/tflint-ruleset-azurerm|.tflint.hcl::version\s*=\s*"\K[0-9.]+|.tflint.hcl,extras/configurations/rg-devops-iac/.tflint.hcl'
-  'github-runner|GitHub Actions runner (jumplinux2)|gh:actions/runner|extras/configurations/rg-devops-iac/modules/vm-jumpbox-linux/variables.tf::variable "github_runner_version"[^}]*?default\s*=\s*"\K[0-9.]+|extras/configurations/rg-devops-iac/modules/vm-jumpbox-linux/variables.tf (github_runner_version default),extras/configurations/rg-devops-iac/modules/vm-jumpbox-linux/README.md (inputs table)'
+  'github-runner|GitHub Actions runner (jumplinux2)|gh:actions/runner|extras/configurations/rg-devops-iac/modules/github-runner/variables.tf::variable "github_runner_version"[^}]*?default\s*=\s*"\K[0-9.]+|extras/configurations/rg-devops-iac/modules/github-runner/variables.tf (github_runner_version default),extras/configurations/rg-devops-iac/modules/github-runner/README.md (inputs table)'
   'terraform|Terraform CLI|gh:hashicorp/terraform|terraform.tf::required_version\s*=\s*"[^0-9]*\K[0-9.]+|terraform.tf (required_version; ci-terraform.yml derives its CLI version from it),modules/*/terraform.tf,extras/configurations/rg-devops-iac/terraform.tf,extras/configurations/rg-devops-iac/modules/*/terraform.tf,extras/modules/*/terraform.tf (except retired/)'
 )
 

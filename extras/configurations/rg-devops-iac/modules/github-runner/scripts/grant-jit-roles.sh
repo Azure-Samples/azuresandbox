@@ -14,7 +14,7 @@
 # The identity, subscription and condition come from this configuration's terraform outputs, so run it after
 # 'terraform apply'. It works from any directory.
 #
-# Usage: ./scripts/grant-jit-roles.sh [options]
+# Usage: ./modules/github-runner/scripts/grant-jit-roles.sh [options]
 #   -H, --hours N             Duration of the time-bound assignments in hours (default 8, range 1-24).
 #   -j, --justification TEXT  Justification recorded with PIM requests (default "Azure Sandbox apply").
 #   -f, --force               Replace assignments that are already active instead of keeping them.
@@ -29,7 +29,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TERRAFORM_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+TERRAFORM_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 API_VERSION="2020-10-01"
 # Built-in Azure role definition IDs are public, not secrets.

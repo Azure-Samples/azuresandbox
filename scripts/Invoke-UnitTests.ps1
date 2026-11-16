@@ -80,6 +80,16 @@
 #     retry is also interrupted by a reboot, the suite fails with a 'VM rebooted during test
 #     execution' harness error. Passing suites incur no extra probes. Local suites are not retried.
 #
+# Local (control-plane) suites:
+#   - Some suites run in this script's Az session instead of on a VM (RunLocal). Each lives in its
+#     module's scripts folder as Test-<Module>Local.ps1 and reports with suite target 'local'.
+#   - Each base VM's module checks the VM's scheduled patching in its local suite: patch mode
+#     AutomaticByPlatform, the bypass-platform-safety-checks flag, assessment mode, and the VM's
+#     assignment to the sandbox maintenance configuration. Test-VnetSharedLocal.ps1 also checks
+#     the maintenance configuration itself. Guest-side patching checks (Microsoft Update on
+#     Windows, unattended-upgrades on Linux) are in each VM's own test script.
+#   - A local suite is skipped when a required parameter is missing from the Terraform outputs.
+#
 # Prerequisites:
 #   - PowerShell 7.x (pwsh) with Az.Accounts, Az.Compute, Az.Resources, Az.Sql, Az.Network,
 #     Az.PrivateDns, Az.MySql, and Az.DesktopVirtualization installed (missing modules exit 2)
@@ -999,9 +1009,47 @@ $testConfigs = [ordered]@{
         RunLocal   = $true
         ScriptPath = Join-Path $repoRoot 'modules' 'vnet-shared' 'scripts' 'Test-VnetSharedLocal.ps1'
         Parameters = @{
-            ResourceGroupName = $resourceGroupName
-            FirewallName      = $resourceNames['firewall']
-            BastionName       = $resourceNames['bastion_host']
+            ResourceGroupName            = $resourceGroupName
+            FirewallName                 = $resourceNames['firewall']
+            BastionName                  = $resourceNames['bastion_host']
+            VmName                       = $resourceNames['virtual_machine_adds1']
+            MaintenanceConfigurationName = $resourceNames['maintenance_configuration']
+        }
+    }
+    # Control-plane checks for the vnet_app module (jumpwin1 patch settings and maintenance assignment).
+    '$local_vnet_app' = @{
+        Module     = 'vnet-app'
+        ModuleName = 'vnet_app'
+        RunLocal   = $true
+        ScriptPath = Join-Path $repoRoot 'modules' 'vnet-app' 'scripts' 'Test-VnetAppLocal.ps1'
+        Parameters = @{
+            ResourceGroupName            = $resourceGroupName
+            VmName                       = $resourceNames['virtual_machine_jumpwin1']
+            MaintenanceConfigurationName = $resourceNames['maintenance_configuration']
+        }
+    }
+    # Control-plane checks for the vm_jumpbox_linux module (jumplinux1 patch settings and maintenance assignment).
+    '$local_vm_jumpbox_linux' = @{
+        Module     = 'vm-jumpbox-linux'
+        ModuleName = 'vm_jumpbox_linux'
+        RunLocal   = $true
+        ScriptPath = Join-Path $repoRoot 'modules' 'vm-jumpbox-linux' 'scripts' 'Test-VmJumpboxLinuxLocal.ps1'
+        Parameters = @{
+            ResourceGroupName            = $resourceGroupName
+            VmName                       = $resourceNames['virtual_machine_jumplinux1']
+            MaintenanceConfigurationName = $resourceNames['maintenance_configuration']
+        }
+    }
+    # Control-plane checks for the vm_mssql_win module (mssqlwin1 patch settings and maintenance assignment).
+    '$local_vm_mssql_win' = @{
+        Module     = 'vm-mssql-win'
+        ModuleName = 'vm_mssql_win'
+        RunLocal   = $true
+        ScriptPath = Join-Path $repoRoot 'modules' 'vm-mssql-win' 'scripts' 'Test-VmMssqlWinLocal.ps1'
+        Parameters = @{
+            ResourceGroupName            = $resourceGroupName
+            VmName                       = $resourceNames['virtual_machine_mssqlwin1']
+            MaintenanceConfigurationName = $resourceNames['maintenance_configuration']
         }
     }
     '$local_petstore' = @{

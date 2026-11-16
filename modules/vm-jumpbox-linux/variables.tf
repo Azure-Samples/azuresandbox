@@ -78,6 +78,16 @@ variable "location" {
   }
 }
 
+variable "maintenance_configuration_id" {
+  type        = string
+  description = "The ID of the Azure Update Manager maintenance configuration owned by vnet-shared. The VM is assigned to it as the module's last deployment step, so it's patched on the sandbox schedule."
+
+  validation {
+    condition     = can(regex("(?i)^/subscriptions/[0-9a-f-]+/resourceGroups/[^/]+/providers/Microsoft\\.Maintenance/maintenanceConfigurations/[^/]+$", var.maintenance_configuration_id))
+    error_message = "Must be a maintenance configuration resource ID: '/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Maintenance/maintenanceConfigurations/{name}'."
+  }
+}
+
 variable "resource_group_name" {
   type        = string
   description = "The name of the existing resource group for provisioning resources."
@@ -137,6 +147,12 @@ variable "tags" {
     ])
     error_message = "Each tag key must be 1-512 characters long and consist of alphanumeric characters, periods (.), underscores (_), or hyphens (-). Each tag value must be 0-256 characters long and consist of alphanumeric characters, periods (.), underscores (_), spaces, or hyphens (-)."
   }
+}
+
+variable "vm_image_gallery_id" {
+  type        = string
+  description = "Optional resource ID of an Azure Compute Gallery with custom images. When set, jumplinux1 uses the latest version of the 'jumplinux' image definition and the 'vm_jumpbox_linux_image_*' variables are ignored. Checked by the root module."
+  default     = null
 }
 
 variable "vm_jumpbox_linux_image_offer" {

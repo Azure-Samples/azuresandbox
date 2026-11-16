@@ -652,7 +652,7 @@ function Invoke-SandboxPreflight {
     Write-SandboxJson (Join-Path $script:directory 'profile.json') $deploymentProfile
     Connect-SandboxProvider $deploymentProfile ([int]$jitMinimum) 300
     Invoke-SandboxCommand @('pwsh', '-NoLogo', '-NoProfile', '-File',
-        'extras/configurations/rg-devops-iac/scripts/Connect-SandboxRunner.ps1',
+        'extras/configurations/rg-devops-iac/modules/github-runner/scripts/Connect-SandboxRunner.ps1',
         '-ProfilePath', (Join-Path $script:directory 'profile.json'))
     Invoke-SandboxCommand @('terraform', 'plan', '-input=false', '-no-color', "-out=$script:plan")
     $planJson = Join-Path $script:directory 'plan.json'
@@ -715,7 +715,7 @@ function Invoke-SandboxUnitTest {
     }
     try {
         Invoke-SandboxCommand @('pwsh', '-NoLogo', '-NoProfile', '-File',
-            'extras/configurations/rg-devops-iac/scripts/Connect-SandboxRunner.ps1',
+            'extras/configurations/rg-devops-iac/modules/github-runner/scripts/Connect-SandboxRunner.ps1',
             '-ProfilePath', (Join-Path $script:directory 'profile.json'), '-RunTests',
             '-ResultsJsonPath', (Join-Path $script:directory 'unit-test-results.json'))
     }

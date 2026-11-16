@@ -6,7 +6,10 @@ provider "azurerm" {
   tenant_id                       = var.entra_tenant_id
   use_cli                         = true
   resource_provider_registrations = "extended"
-  storage_use_azuread             = true
+  # Azure VM Image Builder isn't in the extended set (which includes Microsoft.ContainerInstance), so register it
+  # when the optional image gallery is enabled.
+  resource_providers_to_register = var.enable_image_gallery ? ["Microsoft.VirtualMachineImages"] : []
+  storage_use_azuread            = true
 
   features {
     resource_group {

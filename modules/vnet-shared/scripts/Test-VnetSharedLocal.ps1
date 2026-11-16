@@ -8,6 +8,12 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$BastionName,
 
+    [Parameter(Mandatory = $true)]
+    [string]$VmName,
+
+    [Parameter(Mandatory = $true)]
+    [string]$MaintenanceConfigurationName,
+
     [ValidateSet('true', 'false')]
     [string]$VerboseResults = 'false'
 )
@@ -36,14 +42,14 @@ function Write-TestResult {
 # Client-side (orchestrator) unit tests for control-plane resources in the vnet-shared module.
 # These run in the orchestrator's authenticated Az session (RunLocal = $true in
 # Invoke-UnitTests.ps1) rather than VM-side on adds1, so no role assignment on the domain
-# controller is required. VM-side checks (AD DS, AMA, DNS, AMPLS) stay in Test-VnetShared.ps1.
+# controller is required. VM-side checks (AD DS, AMA, DNS, AMPLS, Windows Update) stay in Test-VnetShared.ps1.
 $WarningPreference = 'SilentlyContinue'
 $ProgressPreference = 'SilentlyContinue'
 
 $moduleName = 'vnet-shared'
 
 Write-Log "Starting local (control-plane) unit tests for module '$moduleName'..."
-Write-Log ("Parameters: ResourceGroupName='$ResourceGroupName' FirewallName='$FirewallName' BastionName='$BastionName'")
+Write-Log ("Parameters: ResourceGroupName='$ResourceGroupName' FirewallName='$FirewallName' BastionName='$BastionName' VmName='$VmName' MaintenanceConfigurationName='$MaintenanceConfigurationName'")
 
 $passed = 0
 $failed = 0
@@ -145,6 +151,121 @@ try {
 }
 catch {
     Write-TestResult $moduleName 'FAIL' "Failed to verify diagnostic setting for Azure Bastion '$BastionName'" -SanitizedMessage 'Failed to verify diagnostic setting for Azure Bastion ''<value>'''
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
+    $failed++
+}
+
+# Test 3: The Azure Update Manager maintenance configuration that patches every sandbox VM on a schedule.
+# Asserts the design invariants (in-guest patching, user-managed schedule, Windows and Linux patch settings,
+# reboot setting). The configurable schedule values (patch_schedule_* variables) are logged for information only;
+# Terraform plan already detects drift from the configuration.
+try {
+    $maintenanceConfiguration = Get-AzResource -ResourceGroupName $ResourceGroupName -ResourceType 'Microsoft.Maintenance/maintenanceConfigurations' -Name $MaintenanceConfigurationName -ErrorAction Stop
+    $response = Invoke-AzRestMethod -Method GET -Path "$($maintenanceConfiguration.ResourceId)?api-version=2023-04-01" -ErrorAction Stop
+    if ($response.StatusCode -ne 200) {
+        throw "GET maintenance configuration returned HTTP $($response.StatusCode)"
+    }
+
+    $properties = ($response.Content | ConvertFrom-Json).properties
+    $scheduleIssues = @()
+
+    if ($properties.maintenanceScope -ne 'InGuestPatch') {
+        $scheduleIssues += "maintenanceScope is '$($properties.maintenanceScope)', expected 'InGuestPatch'"
+    }
+    if ($properties.extensionProperties.InGuestPatchMode -ne 'User') {
+        $scheduleIssues += "InGuestPatchMode is '$($properties.extensionProperties.InGuestPatchMode)', expected 'User'"
+    }
+    if (@($properties.installPatches.windowsParameters.classificationsToInclude).Count -eq 0) {
+        $scheduleIssues += 'no Windows classifications are included'
+    }
+    if (@($properties.installPatches.linuxParameters.classificationsToInclude).Count -eq 0) {
+        $scheduleIssues += 'no Linux classifications are included'
+    }
+    if (-not $properties.installPatches.rebootSetting) {
+        $scheduleIssues += 'no reboot setting'
+    }
+
+    Write-Log ("Patch schedule: start '$($properties.maintenanceWindow.startDateTime)' ($($properties.maintenanceWindow.timeZone)), recurrence '$($properties.maintenanceWindow.recurEvery)', duration '$($properties.maintenanceWindow.duration)', reboot '$($properties.installPatches.rebootSetting)'")
+    Write-Log ("Patch classifications: Windows '" + (@($properties.installPatches.windowsParameters.classificationsToInclude) -join ', ') + "'; Linux '" + (@($properties.installPatches.linuxParameters.classificationsToInclude) -join ', ') + "'")
+
+    if ($scheduleIssues.Count -eq 0) {
+        Write-TestResult $moduleName 'PASS' "Patch schedule: maintenance configuration '$MaintenanceConfigurationName' is an InGuestPatch schedule with Windows and Linux patch settings" -SanitizedMessage 'Patch schedule: maintenance configuration is an InGuestPatch schedule with Windows and Linux patch settings'
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' ("Patch schedule: " + ($scheduleIssues -join '; ')) -SanitizedMessage 'Patch schedule: <value>'
+        $failed++
+    }
+}
+catch {
+    Write-TestResult $moduleName 'FAIL' "Failed to verify maintenance configuration '$MaintenanceConfigurationName'" -SanitizedMessage 'Failed to verify the maintenance configuration'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
+    $failed++
+}
+
+# Test 4: adds1 uses AutomaticByPlatform patching with Customer Managed Schedules and periodic assessment.
+# With the bypass flag on, an unassigned VM is never patched by Azure, so Test 5 checks the assignment too.
+$vm = $null
+try {
+    $vm = Get-AzResource -ResourceGroupName $ResourceGroupName -ResourceType 'Microsoft.Compute/virtualMachines' -Name $VmName -ErrorAction Stop
+    $response = Invoke-AzRestMethod -Method GET -Path "$($vm.ResourceId)?api-version=2024-07-01" -ErrorAction Stop
+    if ($response.StatusCode -ne 200) {
+        throw "GET virtual machine returned HTTP $($response.StatusCode)"
+    }
+
+    $osProfile = ($response.Content | ConvertFrom-Json).properties.osProfile
+    $patchSettings = if ($osProfile.windowsConfiguration) { $osProfile.windowsConfiguration.patchSettings } else { $osProfile.linuxConfiguration.patchSettings }
+
+    $patchIssues = @()
+    if ($patchSettings.patchMode -ne 'AutomaticByPlatform') {
+        $patchIssues += "patchMode is '$($patchSettings.patchMode)', expected 'AutomaticByPlatform'"
+    }
+    if ($patchSettings.automaticByPlatformSettings.bypassPlatformSafetyChecksOnUserSchedule -ne $true) {
+        $patchIssues += "bypassPlatformSafetyChecksOnUserSchedule is '$($patchSettings.automaticByPlatformSettings.bypassPlatformSafetyChecksOnUserSchedule)', expected 'True'"
+    }
+    if ($patchSettings.assessmentMode -ne 'AutomaticByPlatform') {
+        $patchIssues += "assessmentMode is '$($patchSettings.assessmentMode)', expected 'AutomaticByPlatform'"
+    }
+
+    if ($patchIssues.Count -eq 0) {
+        Write-TestResult $moduleName 'PASS' "VM '$VmName' patch settings: AutomaticByPlatform with Customer Managed Schedules and AutomaticByPlatform assessment" -SanitizedMessage 'VM patch settings: AutomaticByPlatform with Customer Managed Schedules and AutomaticByPlatform assessment'
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' ("VM '$VmName' patch settings: " + ($patchIssues -join '; ')) -SanitizedMessage 'VM patch settings: <value>'
+        $failed++
+    }
+}
+catch {
+    Write-TestResult $moduleName 'FAIL' "Failed to verify patch settings for VM '$VmName'" -SanitizedMessage 'Failed to verify VM patch settings'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
+    $failed++
+}
+
+# Test 5: adds1 is assigned to the sandbox maintenance configuration.
+try {
+    if (-not $vm) {
+        throw "VM '$VmName' wasn't found"
+    }
+
+    $response = Invoke-AzRestMethod -Method GET -Path "$($vm.ResourceId)/providers/Microsoft.Maintenance/configurationAssignments?api-version=2023-04-01" -ErrorAction Stop
+    if ($response.StatusCode -ne 200) {
+        throw "GET configuration assignments returned HTTP $($response.StatusCode)"
+    }
+
+    $assignedConfigurationNames = @(($response.Content | ConvertFrom-Json).value | ForEach-Object { ($_.properties.maintenanceConfigurationId -split '/')[-1] })
+
+    if ($assignedConfigurationNames -contains $MaintenanceConfigurationName) {
+        Write-TestResult $moduleName 'PASS' "VM '$VmName' is assigned to maintenance configuration '$MaintenanceConfigurationName'" -SanitizedMessage 'VM is assigned to the sandbox maintenance configuration'
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' ("VM '$VmName' isn't assigned to maintenance configuration '$MaintenanceConfigurationName' (assigned: '" + ($assignedConfigurationNames -join "', '") + "')") -SanitizedMessage 'VM is not assigned to the sandbox maintenance configuration'
+        $failed++
+    }
+}
+catch {
+    Write-TestResult $moduleName 'FAIL' "Failed to verify maintenance assignment for VM '$VmName'" -SanitizedMessage 'Failed to verify the VM maintenance assignment'
     Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
     $failed++
 }

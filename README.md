@@ -629,6 +629,8 @@ This section provides documentation regarding the overall structure of the repos
 * [Authorization](#authorization)
 * [Virtual Network Design](#virtual-network-design)
 * [Dependencies](#dependencies)
+* [Custom images](#custom-images)
+* [Patching](#patching)
 * [Unit Testing](#unit-testing)
 * [Additional Resources](#additional-resources)
 
@@ -696,9 +698,17 @@ enable_module_vwan | false | Set to true to enable the vwan module, false to ski
 entra_tenant_id | | The Microsoft Entra tenant id.
 location | | The name of the Azure Region where resources will be provisioned.
 operator_object_id | | The Microsoft Entra object id of the operator: the signed-in user who provisions this configuration. The operator is granted data-plane role assignments on the resources it creates.
+patch_schedule_duration | `03:55` | Length of the scheduled patching window (`HH:mm`, `01:30` to `03:55`). See [Patching](#patching).
+patch_schedule_linux_classifications | `["Critical", "Security"]` | Update classifications installed on Linux VMs: `Critical`, `Security`, `Other`.
+patch_schedule_reboot | `IfRequired` | Reboot setting for scheduled patching: `IfRequired`, `Never` or `Always`.
+patch_schedule_recurrence | `1Week Sunday` | How often scheduled patching runs, in maintenance configuration recurrence syntax, e.g. `1Week Sunday`, `1Day` or `1Month Second Tuesday Offset4`.
+patch_schedule_start_time | `03:00` | Time of day scheduled patching starts (`HH:mm`, 24-hour), in `patch_schedule_time_zone`.
+patch_schedule_time_zone | `UTC` | Windows time zone ID for `patch_schedule_start_time`, e.g. `UTC` or `Pacific Standard Time`.
+patch_schedule_windows_classifications | `["Critical", "Security", "UpdateRollup", "Definition", "Updates"]` | Update classifications installed on Windows VMs: `Critical`, `Security`, `UpdateRollup`, `FeaturePack`, `ServicePack`, `Definition`, `Tools`, `Updates`.
 subscription_id | | The Azure subscription id used to provision sandbox resources.
 tags | { costcenter = "mycostcenter", environment = "dev", project = "sand" } | Tags in map format to be applied to the sandbox resource group and used for resource naming.
 vm_avd_size | `Standard_D4s_v6` | The size of the Azure Virtual Desktop session host virtual machines: `sessionhost1` and `sessionhost2`.
+vm_image_gallery_id | `null` | Optional resource ID of an Azure Compute Gallery with custom images built by the rg-devops-iac image-gallery module. `null` uses platform images. See [Custom images](#custom-images).
 vm_jumpbox_size | `Standard_D2ls_v6` | The size of the jumpbox and domain controller virtual machines: `jumpwin1`, `jumplinux1`, and `adds1`, as well as `jumpwin2` and `adds2` when the `vnet_onprem` module is enabled.
 vm_mssql_win_size | `Standard_D4ds_v6` | The size of the database server virtual machine `mssqlwin1`. Must be a Diskful Ddsv6 (general purpose) or Edsv6 (memory optimized) size with local NVMe temp disks and a minimum of 4 vCPUs.
 vm_mssql_win_zone | `2` | The availability zone for the database server virtual machine `mssqlwin1`. Required because the module's SQL Server data and log disks use Premium SSD v2 (`PremiumV2_LRS`), which is a zonal-only disk type.
@@ -756,8 +766,8 @@ Terraform authenticates the `azurerm`, `azapi` and `azuread` providers as the de
 `auth_mode` | Use for | Deployment identity | Credential | Used from | More information
 --- | --- | --- | --- | --- | ---
 `client_secret` (default) | Manual deployments by sandbox users | Service principal | Service principal secret from the `TF_VAR_client_secret` environment variable, so it never lands in `terraform.tfvars` | Any Terraform execution environment | [Service Principal](#service-principal)
-`managed_identity` | Automated deployments | User-assigned managed identity | Host's managed identity (secretless) | An Azure VM with a managed identity, from a terminal or a GitHub Actions self-hosted runner | [rg-devops-iac](./extras/configurations/rg-devops-iac/)
-`oidc` | Automated deployments integrated with GitHub | User-assigned managed identity with a GitHub federated credential | GitHub Actions OIDC token (secretless) | A GitHub Actions workflow | [rg-devops-iac](./extras/configurations/rg-devops-iac/)
+`managed_identity` | Automated deployments | User-assigned managed identity | Host's managed identity (secretless) | An Azure VM with a managed identity, from a terminal or a GitHub Actions self-hosted runner | [rg-devops-iac](./extras/configurations/rg-devops-iac/modules/github-runner/README.md#deployment-identity)
+`oidc` | Automated deployments integrated with GitHub | User-assigned managed identity with a GitHub federated credential | GitHub Actions OIDC token (secretless) | A GitHub Actions workflow | [rg-devops-iac](./extras/configurations/rg-devops-iac/modules/github-runner/README.md#deployment-identity)
 
 In every mode, `client_id` identifies the deployment identity. The sandbox user is identified separately by `operator_object_id`, which the configuration uses to grant that user data-plane access to the sandbox. The Terraform state backend, when one is configured, authenticates independently of `auth_mode`.
 
@@ -931,10 +941,39 @@ The following operating systems are used for the various virtual machines in the
 
 Virtual Machine | Role | Module | Operating System
 --- | --- | --- | ---
-adds1 | AD DS Domain Controller / DNS Server | vnet-shared | Windows Server 2025 Datacenter Azure Edition Core
-jumpwin1 | Windows Jumpbox VM | vnet-app | Windows Server 2025 Datacenter Azure Edition
+adds1 | AD DS Domain Controller / DNS Server | vnet-shared | Windows Server 2025 Datacenter (Server Core)
+jumpwin1 | Windows Jumpbox VM | vnet-app | Windows Server 2025 Datacenter
 mssqlwin1 | Windows SQL Server VM | vm-mssql-win | Windows Server 2025 / SQL Server 2025 Enterprise Developer Edition
 jumplinux1 | Linux Jumpbox VM | vm-jumpbox-linux | Ubuntu Server LTS 24.04 (Noble Numbat)
+
+---
+
+### Custom images
+
+By default the sandbox VMs (`adds1`, `jumpwin1`, `jumplinux1`, `mssqlwin1`) use **platform images** from Azure Marketplace and install their software and patches at deployment time. To shorten deployments, set `vm_image_gallery_id` in `terraform.tfvars` to an Azure Compute Gallery with **custom images** built by the [image-gallery](./extras/configurations/rg-devops-iac/modules/image-gallery/README.md) module of rg-devops-iac. Each enabled module then uses the latest version of its custom image: `adds` (vnet_shared), `jumpwin` (vnet_app), `jumplinux` (vm_jumpbox_linux) and `mssqlwin` (vm_mssql_win).
+
+* The gallery must be in the same subscription and region as the sandbox, and each required image definition needs a version that is replicated to that region and not excluded from latest. `terraform plan` checks this and fails with an error naming the missing image or module.
+* The platform image variables of each module are ignored for custom images.
+* Steps already done in the image are skipped: on `jumpwin1`, Windows features and software (VS Code, SSMS and MySQL Workbench are always present, so `install_ssms` and `install_mysql_workbench` have no effect); on `jumplinux1`, the package install part of cloud-init. Deployment-specific steps (AD DS promotion, domain join, SQL Server configuration, Azure Files) still run at deployment time.
+* Patching, including deployment-time patching, works the same for platform images and custom images. See [Patching](#patching).
+
+---
+
+### Patching
+
+All sandbox VMs (Windows and Linux, platform images and custom images) are patched the same way, by [Azure Update Manager scheduled patching](https://learn.microsoft.com/azure/update-manager/scheduled-patching):
+
+Behavior | Windows | Linux
+--- | --- | ---
+Patch orchestration | Patch mode `AutomaticByPlatform` with Customer Managed Schedules (`bypass_platform_safety_checks_on_user_schedule_enabled = true`) | Same
+Schedule | One maintenance configuration in the vnet-shared module, assigned to each VM as the last step of its deployment, so a scheduled window can't interrupt deployment. Default weekly on Sunday at 03:00 UTC, reboot if required; set with the `patch_schedule_*` variables | Same
+Assessment | Every 24 hours (`AutomaticByPlatform`); results in Update Manager | Same
+Deployment-time patching | `installPatches` action before any run command or extension, so an update reboot can't interrupt configuration. Short on a current custom image | None. Platform images get current packages from cloud-init; custom images keep the image's packages until the first scheduled window
+Product coverage | Microsoft Update enabled, so SQL Server and other Microsoft products are patched; native Automatic Updates are disabled by Azure | Configured apt repositories; Ubuntu's `unattended-upgrades` is disabled by Azure
+
+Scheduled patching skips VMs that are deallocated during the window, so start the sandbox VMs (`./scripts/manage-vms.sh start`) for the window or patch them on demand from Update Manager. Scheduled reboots can restart the domain controller `adds1`.
+
+**Trade-off:** Azure's [automatic VM guest patching](https://learn.microsoft.com/azure/virtual-machines/automatic-vm-guest-patching) doesn't support [custom images](https://learn.microsoft.com/azure/update-manager/manage-updates-customized-images), so the sandbox uses the schedule everywhere instead of only for custom images. For VMs that use supported platform images, this gives up catch-up patching after downtime, availability-first phased rollout, zero-configuration off-peak timing, and daily Ubuntu security updates. In return, every VM has one documented and tested behavior with control over the window, update types and reboots. For the same reason, `adds1` and `jumpwin1` use Windows Server 2025 Datacenter instead of Azure Edition: [hotpatching](https://learn.microsoft.com/windows-server/get-started/hotpatch), its main benefit here, isn't supported on custom images.
 
 ---
 
@@ -958,7 +997,7 @@ On Linux and macOS, the `vwan` integration test in [Test-Integration-VwanConnect
   sudo ./scripts/install-vwan-tunnel.sh --user "$USER"
   ```
 
-  Re-run the installer after pulling changes to `vwan-tunnel.sh`. If the installed copy is out of date, the test fails and tells you to re-run it. The [self-hosted runner](./extras/configurations/rg-devops-iac/) uses the same installer at deployment time.
+  Re-run the installer after pulling changes to `vwan-tunnel.sh`. If the installed copy is out of date, the test fails and tells you to re-run it. The [self-hosted runner](./extras/configurations/rg-devops-iac/modules/github-runner/README.md#elevated-permissions-for-integration-tests) uses the same installer at deployment time.
 
 The test pulls the VPN client certificate and the VPN profile from the target sandbox each time it runs, so one machine can test any number of sandboxes, one at a time. Linux, including WSL, is supported. macOS is best effort and untested. Windows uses its own OpenVPN path and doesn't need the wrapper.
 
