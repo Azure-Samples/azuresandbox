@@ -491,23 +491,42 @@ jobs:
           ref: ${{ needs.selection.outputs.source_ref }}
           persist-credentials: false
 
+      # The deployment helper moved into the github-runner module (#1053). Release-gate runs use
+      # main's workflow with the release candidate checked out, so either location is accepted.
+      - name: Locate deployment helper
+        id: helper
+        run: |
+          for dir in extras/configurations/rg-devops-iac/modules/github-runner/scripts extras/configurations/rg-devops-iac/scripts; do
+            if [[ -f "$dir/Invoke-SandboxDeployment.sh" ]]; then
+              echo "path=$dir/Invoke-SandboxDeployment.sh" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          echo '::error::Source checkout did not provide the deployment helper (Invoke-SandboxDeployment.sh).'
+          exit 1
+
       - name: Preflight
         id: preflight
         env:
           SANDBOX_BACKEND_HCL: ${{ secrets.SANDBOX_BACKEND_HCL }}
           SANDBOX_TFVARS_HCL: ${{ secrets.SANDBOX_TFVARS_HCL }}
-        run: bash extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.sh preflight
+          SANDBOX_HELPER: ${{ steps.helper.outputs.path }}
+        run: bash "$SANDBOX_HELPER" preflight
 
       # With more than one sandbox, apply runs only if every sandbox's preflight passed.
       - name: Apply
         id: apply
         if: ${{ success() && env.SANDBOX_RUN_THROUGH != 'preflight' }}
-        run: bash extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.sh apply
+        env:
+          SANDBOX_HELPER: ${{ steps.helper.outputs.path }}
+        run: bash "$SANDBOX_HELPER" apply
 
       - name: Unit-test
         id: unit_test
         if: ${{ success() && env.SANDBOX_RUN_THROUGH == 'unit-test' }}
-        run: bash extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.sh unit-test
+        env:
+          SANDBOX_HELPER: ${{ steps.helper.outputs.path }}
+        run: bash "$SANDBOX_HELPER" unit-test
 
       # An artifact service outage must not fail an otherwise good deployment; the
       # structured results stay on the runner and the job summary notes the failure.
@@ -530,9 +549,10 @@ jobs:
           UNIT_TEST_OUTCOME: ${{ steps.unit_test.outcome }}
           UNIT_TEST_ARTIFACT_OUTCOME: ${{ steps.upload_evidence.outcome }}
           UNIT_TEST_ARTIFACT_URL: ${{ steps.upload_evidence.outputs.artifact-url }}
+          SANDBOX_HELPER: ${{ steps.helper.outputs.path }}
         run: |
-          if [[ -f extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.sh ]]; then
-            bash extras/configurations/rg-devops-iac/scripts/Invoke-SandboxDeployment.sh summary
+          if [[ -n "$SANDBOX_HELPER" && -f "$SANDBOX_HELPER" ]]; then
+            bash "$SANDBOX_HELPER" summary
           else
             printf '## Sandbox deployment\n\nSource checkout did not provide the deployment helper. No completed stages are confirmed.\n' >> "$GITHUB_STEP_SUMMARY"
             exit 1
@@ -569,12 +589,29 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-          sparse-checkout: extras/configurations/rg-devops-iac/scripts/Invoke-RunnerPowerState.sh
+          sparse-checkout: |
+            extras/configurations/rg-devops-iac/modules/github-runner/scripts/Invoke-RunnerPowerState.sh
+            extras/configurations/rg-devops-iac/scripts/Invoke-RunnerPowerState.sh
           sparse-checkout-cone-mode: false
+
+      # The script moved into the github-runner module (#1053); either location is accepted.
+      - name: Locate power state script
+        id: helper
+        run: |
+          for path in extras/configurations/rg-devops-iac/modules/github-runner/scripts/Invoke-RunnerPowerState.sh extras/configurations/rg-devops-iac/scripts/Invoke-RunnerPowerState.sh; do
+            if [[ -f "$path" ]]; then
+              echo "path=$path" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          echo '::error::The workflow commit did not provide Invoke-RunnerPowerState.sh.'
+          exit 1
 
       - name: Wait for deployment approval
         id: approval
-        run: bash extras/configurations/rg-devops-iac/scripts/Invoke-RunnerPowerState.sh wait-approval
+        env:
+          POWER_STATE_SCRIPT: ${{ steps.helper.outputs.path }}
+        run: bash "$POWER_STATE_SCRIPT" wait-approval
 
       - name: Start runner VM
         id: start
@@ -583,11 +620,14 @@ jobs:
           RUNNER_POWER_STATE_CLIENT_ID: ${{ secrets.RUNNER_POWER_STATE_CLIENT_ID }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           RUNNER_VM_ID: ${{ secrets.RUNNER_VM_ID }}
-        run: bash extras/configurations/rg-devops-iac/scripts/Invoke-RunnerPowerState.sh start
+          POWER_STATE_SCRIPT: ${{ steps.helper.outputs.path }}
+        run: bash "$POWER_STATE_SCRIPT" start
 
       - name: Wait for runner pickup
         if: ${{ steps.approval.outputs.approved == 'true' }}
-        run: bash extras/configurations/rg-devops-iac/scripts/Invoke-RunnerPowerState.sh wait-pickup
+        env:
+          POWER_STATE_SCRIPT: ${{ steps.helper.outputs.path }}
+        run: bash "$POWER_STATE_SCRIPT" wait-pickup
 
   # Deallocates the runner VM only if start_runner started it, however the run ended.
   stop_runner:
@@ -606,15 +646,31 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-          sparse-checkout: extras/configurations/rg-devops-iac/scripts/Invoke-RunnerPowerState.sh
+          sparse-checkout: |
+            extras/configurations/rg-devops-iac/modules/github-runner/scripts/Invoke-RunnerPowerState.sh
+            extras/configurations/rg-devops-iac/scripts/Invoke-RunnerPowerState.sh
           sparse-checkout-cone-mode: false
+
+      # The script moved into the github-runner module (#1053); either location is accepted.
+      - name: Locate power state script
+        id: helper
+        run: |
+          for path in extras/configurations/rg-devops-iac/modules/github-runner/scripts/Invoke-RunnerPowerState.sh extras/configurations/rg-devops-iac/scripts/Invoke-RunnerPowerState.sh; do
+            if [[ -f "$path" ]]; then
+              echo "path=$path" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          echo '::error::The workflow commit did not provide Invoke-RunnerPowerState.sh.'
+          exit 1
 
       - name: Deallocate runner VM
         env:
           RUNNER_POWER_STATE_CLIENT_ID: ${{ secrets.RUNNER_POWER_STATE_CLIENT_ID }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           RUNNER_VM_ID: ${{ secrets.RUNNER_VM_ID }}
-        run: bash extras/configurations/rg-devops-iac/scripts/Invoke-RunnerPowerState.sh stop
+          POWER_STATE_SCRIPT: ${{ steps.helper.outputs.path }}
+        run: bash "$POWER_STATE_SCRIPT" stop
 
   deployment_status:
     name: Publish release deployment status
