@@ -279,6 +279,27 @@ catch {
     $failed++
 }
 
+# Test 10: Windows Update - Microsoft Update is registered, so Windows Update and Azure Update Manager also offer
+# updates for other Microsoft products such as SQL Server. Set by the EnableMicrosoftUpdate run command.
+try {
+    $serviceManager = New-Object -ComObject 'Microsoft.Update.ServiceManager'
+    $microsoftUpdate = $serviceManager.Services | Where-Object { $_.ServiceID -eq '7971f918-a847-4430-9279-4a52d1efe18d' }
+
+    if ($microsoftUpdate) {
+        Write-TestResult $moduleName 'PASS' "Windows Update: Microsoft Update is registered (IsDefaultAUService: $($microsoftUpdate.IsDefaultAUService))" -SanitizedMessage 'Windows Update: Microsoft Update is registered'
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' "Windows Update: Microsoft Update is not registered" -SanitizedMessage 'Windows Update: Microsoft Update is not registered'
+        $failed++
+    }
+}
+catch {
+    Write-TestResult $moduleName 'FAIL' "Windows Update: Failed to query the Windows Update service manager" -SanitizedMessage 'Windows Update: Failed to query the Windows Update service manager'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
+    $failed++
+}
+
 # Summary
 $total = $passed + $failed
 Write-Log ("[MODULE:$moduleName] [SUMMARY] Passed: $passed Failed: $failed Total: $total")

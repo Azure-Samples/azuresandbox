@@ -1,14 +1,19 @@
-# Validates a Windows image on the Azure VM Image Builder build VM, after customization and before the image is
-# generalized and distributed. Any failed check exits with a non-zero code, which stops the build, because the image
-# templates set continueDistributeOnFailure = false. Runs elevated, as SYSTEM, under the AIB PowerShell validator.
+# Validates a Windows image before it's distributed. Azure VM Image Builder runs this on a validation VM that Packer
+# deploys from the generalized image, not on the build VM. Any failed check exits with a non-zero code, which stops the
+# build, because the image templates set continueDistributeOnFailure = false. Runs elevated, as SYSTEM, under the AIB
+# PowerShell validator.
+#
+# Don't check the Windows Update policy key (SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU). Azure writes it
+# when it provisions a VM, based on the VM's patch mode. The validation VM uses the default mode, AutomaticByOS, which
+# sets AUOptions = 4, so the key shows how the validation VM was provisioned, not what is in the image.
 #
 # Checks for every image:
 #   * No Critical or Security updates are pending (using the same search criteria as the WindowsUpdate customizers).
+#   * Microsoft Update is registered, so updates for other Microsoft products such as SQL Server are offered.
 # Image-specific checks:
 #   * adds:     The AD-Domain-Services feature is NOT installed (Sysprep doesn't support the AD DS role).
-#   * jumpwin:  RSAT-ADDS and RSAT-DNS-Server are installed, VS Code, SSMS and MySQL Workbench are present, and
-#               Configure Automatic Updates is 4.
-#   * mssqlwin: The SQL Server (MSSQLSERVER) service and binaries are present, and Configure Automatic Updates is 4.
+#   * jumpwin:  RSAT-ADDS and RSAT-DNS-Server are installed, and VS Code, SSMS and MySQL Workbench are present.
+#   * mssqlwin: The SQL Server (MSSQLSERVER) service and binaries are present.
 
 param(
     [Parameter(Mandatory = $true)]
@@ -48,10 +53,15 @@ function Test-FeatureInstalled {
     return ($null -ne $feature -and $feature.InstallState -eq 'Installed')
 }
 
-function Test-AutomaticUpdate {
-    $settings = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' -ErrorAction SilentlyContinue
-    Write-CheckResult ($null -ne $settings -and $settings.NoAutoUpdate -eq 0 -and $settings.AUOptions -eq 4) `
-        "Configure Automatic Updates: NoAutoUpdate = $($settings.NoAutoUpdate), AUOptions = $($settings.AUOptions) (expected 0 and 4)"
+function Test-MicrosoftUpdate {
+    try {
+        $serviceManager = New-Object -ComObject 'Microsoft.Update.ServiceManager'
+        $registered = $serviceManager.Services | Where-Object { $_.ServiceID -eq '7971f918-a847-4430-9279-4a52d1efe18d' }
+        Write-CheckResult ($null -ne $registered) 'Microsoft Update is registered'
+    }
+    catch {
+        Write-CheckResult $false "Couldn't query the Windows Update service manager: $_"
+    }
 }
 
 function Test-FilePresent {
@@ -83,6 +93,8 @@ catch {
     Write-CheckResult $false "Couldn't search for pending updates: $_"
 }
 
+Test-MicrosoftUpdate
+
 switch ($ImageName) {
     'adds' {
         Write-CheckResult (-not (Test-FeatureInstalled 'AD-Domain-Services')) 'Windows feature AD-Domain-Services is not installed'
@@ -96,14 +108,12 @@ switch ($ImageName) {
         Test-FilePresent 'Visual Studio Code' 'C:\Program Files\Microsoft VS Code\Code.exe'
         Test-FilePresent 'SQL Server Management Studio' 'C:\Program Files\Microsoft SQL Server Management Studio*\Release\Common7\IDE\Ssms.exe'
         Test-FilePresent 'MySQL Workbench' 'C:\Program Files\MySQL\MySQL Workbench*\MySQL*Workbench.exe'
-        Test-AutomaticUpdate
     }
 
     'mssqlwin' {
         $service = Get-Service -Name 'MSSQLSERVER' -ErrorAction SilentlyContinue
         Write-CheckResult ($null -ne $service) 'SQL Server (MSSQLSERVER) service is present'
         Test-FilePresent 'SQL Server database engine' 'C:\Program Files\Microsoft SQL Server\MSSQL*.MSSQLSERVER\MSSQL\Binn\sqlservr.exe'
-        Test-AutomaticUpdate
     }
 }
 

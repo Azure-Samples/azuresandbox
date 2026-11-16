@@ -1,5 +1,5 @@
 # Opts the build VM into Microsoft Update, so Windows Update also offers updates for other Microsoft products such as
-# SQL Server. Used by the mssqlwin image template before its WindowsUpdate passes. Runs elevated, as SYSTEM, under the
+# SQL Server. Used by every Windows image template before its WindowsUpdate passes. Runs elevated, as SYSTEM, under the
 # Azure VM Image Builder PowerShell customizer, and is idempotent.
 
 #region functions

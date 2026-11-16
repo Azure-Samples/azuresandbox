@@ -6,21 +6,29 @@ resource "azurerm_windows_virtual_machine" "this" {
   admin_username             = var.admin_username
   admin_password             = local.admin_password
   network_interface_ids      = [azurerm_network_interface.this.id]
-  patch_assessment_mode      = "AutomaticByPlatform"
-  patch_mode                 = "AutomaticByPlatform"
   provision_vm_agent         = true
   encryption_at_host_enabled = true
+  source_image_id            = var.vm_image_gallery_id == null ? null : "${var.vm_image_gallery_id}/images/adds"
+
+  # Scheduled patching (Customer Managed Schedules): see azurerm_maintenance_configuration.this.
+  bypass_platform_safety_checks_on_user_schedule_enabled = true
+  patch_assessment_mode                                  = "AutomaticByPlatform"
+  patch_mode                                             = "AutomaticByPlatform"
 
   os_disk {
     caching              = "ReadWrite"
     storage_account_type = var.vm_adds_storage_account_type
   }
 
-  source_image_reference {
-    publisher = var.vm_adds_image_publisher
-    offer     = var.vm_adds_image_offer
-    sku       = var.vm_adds_image_sku
-    version   = var.vm_adds_image_version
+  dynamic "source_image_reference" {
+    for_each = var.vm_image_gallery_id == null ? [1] : []
+
+    content {
+      publisher = var.vm_adds_image_publisher
+      offer     = var.vm_adds_image_offer
+      sku       = var.vm_adds_image_sku
+      version   = var.vm_adds_image_version
+    }
   }
 
   identity {
@@ -47,9 +55,21 @@ resource "azurerm_virtual_machine_run_command" "wait_for_guest_agent" {
   }
 }
 
+# Opt in to Microsoft Update before patching, so deploy-time and scheduled patching also cover other Microsoft products.
+resource "azurerm_virtual_machine_run_command" "enable_microsoft_update" {
+  name               = "EnableMicrosoftUpdate"
+  location           = var.location
+  virtual_machine_id = azurerm_windows_virtual_machine.this.id
+  depends_on         = [azurerm_virtual_machine_run_command.wait_for_guest_agent]
+
+  source {
+    script = file("${path.module}/scripts/Enable-MicrosoftUpdate.ps1")
+  }
+}
+
 # Patch first: install pending Critical/Security updates (and reboot if required) before any run
 # command or extension runs, so update-driven reboots don't interrupt guest configuration.
-# Runs after the guest agent readiness gate.
+# Runs after the guest agent readiness gate and the Microsoft Update opt-in.
 # The apply fails if the patch run reports status "Failed" (e.g. a patch failed to install or the
 # maximumDuration window ran out with patches outstanding), so configuration never runs on a
 # partially patched VM. The patch result is also exported.
@@ -58,7 +78,7 @@ resource "azapi_resource_action" "install_patches" {
   resource_id = azurerm_windows_virtual_machine.this.id
   action      = "installPatches"
   method      = "POST"
-  depends_on  = [azurerm_virtual_machine_run_command.wait_for_guest_agent]
+  depends_on  = [azurerm_virtual_machine_run_command.enable_microsoft_update]
 
   body = {
     maximumDuration = "PT2H"
@@ -173,5 +193,53 @@ resource "azurerm_monitor_data_collection_rule_association" "adds1_dce" {
   data_collection_endpoint_id = azurerm_monitor_data_collection_endpoint.this.id
 
   depends_on = [azurerm_virtual_machine_extension.ama]
+}
+
+# Assigned last, so scheduled installs and reboots can't interrupt deploy-time configuration.
+resource "azurerm_maintenance_assignment_virtual_machine" "this" {
+  location                     = var.location
+  maintenance_configuration_id = azurerm_maintenance_configuration.this.id
+  virtual_machine_id           = azurerm_windows_virtual_machine.this.id
+
+  depends_on = [
+    azurerm_monitor_data_collection_rule_association.adds1_dce,
+    azurerm_monitor_data_collection_rule_association.adds1_dcr,
+  ]
+}
+#endregion
+
+#region patching
+# One Azure Update Manager schedule patches every sandbox VM (Windows and Linux, platform images and custom images).
+# Each VM module assigns its VMs as its last deployment step. See the root README "Patching" section.
+resource "time_static" "patch_schedule" {}
+
+resource "azurerm_maintenance_configuration" "this" {
+  name                     = module.naming.names["maintenance_configuration"].name
+  resource_group_name      = var.resource_group_name
+  location                 = var.location
+  scope                    = "InGuestPatch"
+  in_guest_user_patch_mode = "User"
+  visibility               = "Custom"
+
+  # The first run is on or after two days from creation, which keeps the start at least 15 minutes in the future in
+  # any time zone. time_static keeps the start date stable on later applies.
+  window {
+    start_date_time = "${formatdate("YYYY-MM-DD", timeadd(time_static.patch_schedule.rfc3339, "48h"))} ${var.patch_schedule.start_time}"
+    time_zone       = var.patch_schedule.time_zone
+    duration        = var.patch_schedule.duration
+    recur_every     = var.patch_schedule.recurrence
+  }
+
+  install_patches {
+    reboot = var.patch_schedule.reboot
+
+    linux {
+      classifications_to_include = var.patch_schedule.linux_classifications
+    }
+
+    windows {
+      classifications_to_include = var.patch_schedule.windows_classifications
+    }
+  }
 }
 #endregion

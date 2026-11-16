@@ -7,21 +7,29 @@ resource "azurerm_windows_virtual_machine" "this" {
   admin_username             = var.admin_username
   admin_password             = var.admin_password
   network_interface_ids      = [azurerm_network_interface.this.id]
-  patch_assessment_mode      = "AutomaticByPlatform"
-  patch_mode                 = "AutomaticByPlatform"
   provision_vm_agent         = true
   encryption_at_host_enabled = true
+  source_image_id            = var.vm_image_gallery_id == null ? null : "${var.vm_image_gallery_id}/images/jumpwin"
+
+  # Scheduled patching (Customer Managed Schedules): see the vnet-shared maintenance configuration.
+  bypass_platform_safety_checks_on_user_schedule_enabled = true
+  patch_assessment_mode                                  = "AutomaticByPlatform"
+  patch_mode                                             = "AutomaticByPlatform"
 
   os_disk {
     caching              = "ReadWrite"
     storage_account_type = var.vm_jumpbox_win_storage_account_type
   }
 
-  source_image_reference {
-    publisher = var.vm_jumpbox_win_image_publisher
-    offer     = var.vm_jumpbox_win_image_offer
-    sku       = var.vm_jumpbox_win_image_sku
-    version   = var.vm_jumpbox_win_image_version
+  dynamic "source_image_reference" {
+    for_each = var.vm_image_gallery_id == null ? [1] : []
+
+    content {
+      publisher = var.vm_jumpbox_win_image_publisher
+      offer     = var.vm_jumpbox_win_image_offer
+      sku       = var.vm_jumpbox_win_image_sku
+      version   = var.vm_jumpbox_win_image_version
+    }
   }
 
   # The system-assigned identity is always present. The SQL admin UAMI is added only when the
@@ -66,9 +74,21 @@ resource "azurerm_virtual_machine_run_command" "wait_for_guest_agent" {
   }
 }
 
+# Opt in to Microsoft Update before patching, so deploy-time and scheduled patching also cover other Microsoft products.
+resource "azurerm_virtual_machine_run_command" "enable_microsoft_update" {
+  name               = "${module.naming.names["virtual_machine_extension"].name}-${var.vm_jumpbox_win_name}-EnableMicrosoftUpdate"
+  location           = var.location
+  virtual_machine_id = azurerm_windows_virtual_machine.this.id
+  depends_on         = [azurerm_virtual_machine_run_command.wait_for_guest_agent]
+
+  source {
+    script = file("${path.module}/scripts/Enable-MicrosoftUpdate.ps1")
+  }
+}
+
 # Patch first: install pending Critical/Security updates (and reboot if required) before any run
 # command or extension runs, so update-driven reboots don't interrupt guest configuration.
-# Runs after the guest agent readiness gate.
+# Runs after the guest agent readiness gate and the Microsoft Update opt-in.
 # The apply fails if the patch run reports status "Failed" (e.g. a patch failed to install or the
 # maximumDuration window ran out with patches outstanding), so configuration never runs on a
 # partially patched VM. The patch result is also exported.
@@ -77,7 +97,7 @@ resource "azapi_resource_action" "install_patches" {
   resource_id = azurerm_windows_virtual_machine.this.id
   action      = "installPatches"
   method      = "POST"
-  depends_on  = [azurerm_virtual_machine_run_command.wait_for_guest_agent]
+  depends_on  = [azurerm_virtual_machine_run_command.enable_microsoft_update]
 
   body = {
     maximumDuration = "PT2H"
@@ -101,7 +121,10 @@ resource "azapi_resource_action" "install_patches" {
   }
 }
 
+# Custom images already include the Windows features and software, so these steps run only on platform images.
 resource "azurerm_virtual_machine_run_command" "install_windows_features" {
+  count = var.vm_image_gallery_id == null ? 1 : 0
+
   name               = "${module.naming.names["virtual_machine_extension"].name}-${var.vm_jumpbox_win_name}-InstallWindowsFeatures"
   location           = var.location
   virtual_machine_id = azurerm_windows_virtual_machine.this.id
@@ -119,7 +142,10 @@ resource "azurerm_virtual_machine_extension" "join_domain" {
   type                       = "JsonADDomainExtension"
   type_handler_version       = "1.3"
   auto_upgrade_minor_version = true
-  depends_on                 = [azurerm_virtual_machine_run_command.install_windows_features]
+  depends_on = [
+    azapi_resource_action.install_patches,
+    azurerm_virtual_machine_run_command.install_windows_features,
+  ]
 
   settings = jsonencode({
     Name    = var.adds_domain_name
@@ -154,6 +180,8 @@ resource "time_sleep" "wait_for_domain_join_restart" {
 }
 
 resource "azurerm_virtual_machine_run_command" "install_software" {
+  count = var.vm_image_gallery_id == null ? 1 : 0
+
   name               = "${module.naming.names["virtual_machine_extension"].name}-${var.vm_jumpbox_win_name}-InstallSoftware"
   location           = var.location
   virtual_machine_id = azurerm_windows_virtual_machine.this.id
@@ -239,5 +267,20 @@ resource "azurerm_monitor_data_collection_rule_association" "jumpwin1_dce" {
   data_collection_endpoint_id = var.data_collection_endpoint_id
 
   depends_on = [azurerm_virtual_machine_extension.ama]
+}
+#endregion
+
+#region patching
+# Assigned last, so scheduled installs and reboots can't interrupt deploy-time configuration.
+resource "azurerm_maintenance_assignment_virtual_machine" "this" {
+  location                     = var.location
+  maintenance_configuration_id = var.maintenance_configuration_id
+  virtual_machine_id           = azurerm_windows_virtual_machine.this.id
+
+  depends_on = [
+    azurerm_monitor_data_collection_rule_association.jumpwin1_dce,
+    azurerm_monitor_data_collection_rule_association.jumpwin1_dcr,
+    azurerm_virtual_machine_run_command.install_software,
+  ]
 }
 #endregion

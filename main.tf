@@ -1,3 +1,44 @@
+#region custom-images
+# Custom image checks run at plan time, so a missing gallery, image definition or replicated image version fails the
+# plan before any resource changes. VM modules receive var.vm_image_gallery_id and assume these checks have passed.
+data "azurerm_shared_image_gallery" "vm_images" {
+  count = var.vm_image_gallery_id == null ? 0 : 1
+
+  name                = local.vm_image_gallery.name
+  resource_group_name = local.vm_image_gallery.resource_group_name
+
+  lifecycle {
+    postcondition {
+      condition     = replace(lower(self.location), " ", "") == lower(var.location)
+      error_message = "The gallery '${self.name}' is in '${self.location}', but the sandbox is in '${var.location}'. Custom images must be in the same region as the sandbox."
+    }
+
+    postcondition {
+      condition     = alltrue([for name in keys(local.vm_image_definitions) : contains(self.image_names, name)])
+      error_message = "The gallery '${self.name}' is missing image definitions required by the enabled modules: ${join(", ", [for name, module in local.vm_image_definitions : "'${name}' (${module})" if !contains(self.image_names, name)])}."
+    }
+  }
+}
+
+# tflint-ignore: terraform_unused_declarations # Read only for its postcondition, which checks image versions at plan time.
+data "azurerm_shared_image_versions" "vm_images" {
+  for_each = local.vm_image_definitions
+
+  gallery_name        = data.azurerm_shared_image_gallery.vm_images[0].name
+  image_name          = each.key
+  resource_group_name = local.vm_image_gallery.resource_group_name
+
+  lifecycle {
+    postcondition {
+      condition = anytrue([
+        for version in self.images : !version.exclude_from_latest && contains([for region in version.target_region : replace(lower(region.name), " ", "")], lower(var.location))
+      ])
+      error_message = "The image definition '${each.key}' (${each.value}) has no version that is eligible as latest and replicated to '${var.location}'. Build the image in rg-devops-iac first."
+    }
+  }
+}
+#endregion
+
 #region resources
 resource "azuread_group" "sql_admins" {
   count            = var.enable_module_mssql ? 1 : 0
@@ -210,6 +251,17 @@ module "vnet_shared" {
   unique_seed         = module.naming.names["resource_group"].unique_seed
   operator_object_id  = var.operator_object_id
   vm_adds_size        = var.vm_jumpbox_size
+  vm_image_gallery_id = var.vm_image_gallery_id
+
+  patch_schedule = {
+    duration                = var.patch_schedule_duration
+    linux_classifications   = var.patch_schedule_linux_classifications
+    reboot                  = var.patch_schedule_reboot
+    recurrence              = var.patch_schedule_recurrence
+    start_time              = var.patch_schedule_start_time
+    time_zone               = var.patch_schedule_time_zone
+    windows_classifications = var.patch_schedule_windows_classifications
+  }
 }
 #endregion
 
@@ -234,6 +286,7 @@ module "vnet_app" {
   key_vault_name                  = module.vnet_shared.resource_names["key_vault"]
   location                        = azurerm_resource_group.this.location
   log_analytics_workspace_id      = module.vnet_shared.resource_ids["log_analytics_workspace"]
+  maintenance_configuration_id    = module.vnet_shared.resource_ids["maintenance_configuration"]
   monitor_private_link_scope_id   = module.vnet_shared.resource_ids["monitor_private_link_scope"]
   monitor_private_link_scope_name = module.vnet_shared.resource_names["monitor_private_link_scope"]
   private_dns_zone_links_complete = module.vnet_shared.private_dns_zone_links_complete
@@ -246,6 +299,7 @@ module "vnet_app" {
   operator_object_id              = var.operator_object_id
   virtual_network_shared_id       = module.vnet_shared.resource_ids["virtual_network_shared"]
   virtual_network_shared_name     = module.vnet_shared.resource_names["virtual_network_shared"]
+  vm_image_gallery_id             = var.vm_image_gallery_id
   vm_jumpbox_win_size             = var.vm_jumpbox_size
 
   depends_on = [module.vnet_shared.log_analytics_operations_complete] # Transitively waits for AD DS config + all vnet-shared AMPLS-touching writes (PE, scoped services, DNS links, adds1 DCR/DCE). Eliminates 409 race on vnet-app's AMPLS scoped service. Limits taint blast radius. See AMPLS_IMPLEMENTATION_PLAN.md Phase 2a.
@@ -264,11 +318,13 @@ module "vm_jumpbox_linux" {
   key_vault_id                  = module.vnet_shared.resource_ids["key_vault"]
   key_vault_name                = module.vnet_shared.resource_names["key_vault"]
   location                      = azurerm_resource_group.this.location
+  maintenance_configuration_id  = module.vnet_shared.resource_ids["maintenance_configuration"]
   resource_group_name           = azurerm_resource_group.this.name
   storage_account_name          = module.vnet_app[0].resource_names["storage_account"]
   storage_share_name            = module.vnet_app[0].resource_names["storage_share"]
   subnet_id                     = module.vnet_app[0].subnets["snet-app-01"].id
   tags                          = local.tags
+  vm_image_gallery_id           = var.vm_image_gallery_id
   vm_jumpbox_linux_size         = var.vm_jumpbox_size
 
   depends_on = [module.vnet_app[0].configure_azure_files_id] # Ensures that Azure Files is configured
@@ -289,6 +345,7 @@ module "vm_mssql_win" {
   key_vault_id                    = module.vnet_shared.resource_ids["key_vault"]
   key_vault_name                  = module.vnet_shared.resource_names["key_vault"]
   location                        = azurerm_resource_group.this.location
+  maintenance_configuration_id    = module.vnet_shared.resource_ids["maintenance_configuration"]
   resource_group_name             = azurerm_resource_group.this.name
   storage_account_id              = module.vnet_app[0].resource_ids["storage_account"]
   storage_blob_endpoint           = module.vnet_app[0].storage_endpoints["blob"]
@@ -296,6 +353,7 @@ module "vm_mssql_win" {
   storage_container_name          = module.vnet_app[0].storage_container_name
   subnet_id                       = module.vnet_app[0].subnets["snet-db-01"].id
   tags                            = local.tags
+  vm_image_gallery_id             = var.vm_image_gallery_id
   vm_mssql_win_size               = var.vm_mssql_win_size
   vm_mssql_win_zone               = var.vm_mssql_win_zone
 

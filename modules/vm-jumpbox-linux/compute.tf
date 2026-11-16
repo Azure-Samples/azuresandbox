@@ -6,8 +6,13 @@ resource "azurerm_linux_virtual_machine" "this" {
   admin_username             = "${var.admin_username}local"
   network_interface_ids      = [azurerm_network_interface.this.id]
   encryption_at_host_enabled = true
-  patch_assessment_mode      = "AutomaticByPlatform"
   provision_vm_agent         = true
+  source_image_id            = var.vm_image_gallery_id == null ? null : "${var.vm_image_gallery_id}/images/jumplinux"
+
+  # Scheduled patching (Customer Managed Schedules): see the vnet-shared maintenance configuration.
+  bypass_platform_safety_checks_on_user_schedule_enabled = true
+  patch_assessment_mode                                  = "AutomaticByPlatform"
+  patch_mode                                             = "AutomaticByPlatform"
 
   admin_ssh_key {
     username   = "${var.admin_username}local"
@@ -19,11 +24,15 @@ resource "azurerm_linux_virtual_machine" "this" {
     storage_account_type = var.vm_jumpbox_linux_storage_account_type
   }
 
-  source_image_reference {
-    publisher = var.vm_jumpbox_linux_image_publisher
-    offer     = var.vm_jumpbox_linux_image_offer
-    sku       = var.vm_jumpbox_linux_image_sku
-    version   = var.vm_jumpbox_linux_image_version
+  dynamic "source_image_reference" {
+    for_each = var.vm_image_gallery_id == null ? [1] : []
+
+    content {
+      publisher = var.vm_jumpbox_linux_image_publisher
+      offer     = var.vm_jumpbox_linux_image_offer
+      sku       = var.vm_jumpbox_linux_image_sku
+      version   = var.vm_jumpbox_linux_image_version
+    }
   }
 
   identity {
@@ -82,5 +91,19 @@ resource "azurerm_monitor_data_collection_rule_association" "jumplinux1_dce" {
   data_collection_endpoint_id = var.data_collection_endpoint_id
 
   depends_on = [azurerm_virtual_machine_extension.ama]
+}
+#endregion
+
+#region patching
+# Assigned last, so scheduled installs and reboots can't interrupt deploy-time configuration.
+resource "azurerm_maintenance_assignment_virtual_machine" "this" {
+  location                     = var.location
+  maintenance_configuration_id = var.maintenance_configuration_id
+  virtual_machine_id           = azurerm_linux_virtual_machine.this.id
+
+  depends_on = [
+    azurerm_monitor_data_collection_rule_association.jumplinux1_dce,
+    azurerm_monitor_data_collection_rule_association.jumplinux1_dcr,
+  ]
 }
 #endregion
