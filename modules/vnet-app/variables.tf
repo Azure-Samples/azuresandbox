@@ -81,6 +81,17 @@ variable "data_collection_rule_windows_id" {
   }
 }
 
+variable "deployment_identity_principal_type" {
+  type        = string
+  description = "The principal type of the identity Terraform authenticates as: User when auth_mode is azure_cli, otherwise ServicePrincipal. Defined in the root module."
+  default     = "ServicePrincipal"
+
+  validation {
+    condition     = contains(["ServicePrincipal", "User"], var.deployment_identity_principal_type)
+    error_message = "Must be ServicePrincipal or User."
+  }
+}
+
 variable "dns_server" {
   type        = string
   description = "The IP address of the DNS server. This should be the first non-reserved IP address in the subnet where the AD DS domain controller is hosted."

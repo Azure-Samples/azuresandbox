@@ -20,28 +20,36 @@ locals {
     }
   }
 
-  storage_roles = {
-    blob_contributor_spn = {
-      principal_id         = data.azurerm_client_config.current.object_id
-      principal_type       = "ServicePrincipal"
-      role_definition_name = "Storage Blob Data Contributor"
+  # When Terraform authenticates as the operator (auth_mode azure_cli), the operator assignments also cover the
+  # deployment identity, so second assignments of the same roles to the same principal are skipped.
+  deployment_identity_is_operator = lower(data.azurerm_client_config.current.object_id) == lower(var.operator_object_id)
+
+  storage_roles = merge(
+    local.deployment_identity_is_operator ? {} : {
+      blob_contributor_spn = {
+        principal_id         = data.azurerm_client_config.current.object_id
+        principal_type       = var.deployment_identity_principal_type
+        role_definition_name = "Storage Blob Data Contributor"
+      }
+      file_contributor_spn = {
+        principal_id         = data.azurerm_client_config.current.object_id
+        principal_type       = var.deployment_identity_principal_type
+        role_definition_name = "Storage File Data Privileged Contributor"
+      }
+    },
+    {
+      blob_contributor_user = {
+        principal_id         = var.operator_object_id
+        principal_type       = "User"
+        role_definition_name = "Storage Blob Data Contributor"
+      }
+      file_contributor_user = {
+        principal_id         = var.operator_object_id
+        principal_type       = "User"
+        role_definition_name = "Storage File Data Privileged Contributor"
+      }
     }
-    blob_contributor_user = {
-      principal_id         = var.operator_object_id
-      principal_type       = "User"
-      role_definition_name = "Storage Blob Data Contributor"
-    }
-    file_contributor_spn = {
-      principal_id         = data.azurerm_client_config.current.object_id
-      principal_type       = "ServicePrincipal"
-      role_definition_name = "Storage File Data Privileged Contributor"
-    }
-    file_contributor_user = {
-      principal_id         = var.operator_object_id
-      principal_type       = "User"
-      role_definition_name = "Storage File Data Privileged Contributor"
-    }
-  }
+  )
 
   network_security_group_rules = flatten([
     for subnet_key, subnet in local.subnets : [
