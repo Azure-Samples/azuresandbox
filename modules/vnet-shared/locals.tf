@@ -27,15 +27,14 @@ locals {
       "privatelink.${var.location}.azurecontainerapps.io" # Azure Container Apps, petstore configuration
     ]
   )
+
   # When Terraform authenticates as the operator (auth_mode azure_cli), the operator assignment also covers the
   # deployment identity, so a second assignment of the same role to the same principal is skipped.
-  deployment_identity_is_operator = lower(data.azurerm_client_config.current.object_id) == lower(var.operator_object_id)
-
   key_vault_roles = merge(
-    local.deployment_identity_is_operator ? {} : {
+    var.deployment_identity_is_operator ? {} : {
       kv_secrets_officer_spn = {
         principal_id         = data.azurerm_client_config.current.object_id
-        principal_type       = var.deployment_identity_principal_type
+        principal_type       = "ServicePrincipal"
         role_definition_name = "Key Vault Secrets Officer"
       }
     },

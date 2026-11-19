@@ -24,6 +24,13 @@ resource "azurerm_role_assignment" "roles" {
   principal_type       = each.value.principal_type
   role_definition_name = each.value.role_definition_name
   scope                = azurerm_key_vault.this.id
+
+  lifecycle {
+    precondition {
+      condition     = !var.deployment_identity_is_operator || lower(data.azurerm_client_config.current.object_id) == lower(var.operator_object_id)
+      error_message = "operator_object_id must be the object id of the signed-in Azure CLI user when auth_mode = azure_cli."
+    }
+  }
 }
 
 resource "azurerm_key_vault_secret" "adminpassword" {

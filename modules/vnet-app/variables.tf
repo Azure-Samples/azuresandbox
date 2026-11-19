@@ -81,15 +81,10 @@ variable "data_collection_rule_windows_id" {
   }
 }
 
-variable "deployment_identity_principal_type" {
-  type        = string
-  description = "The principal type of the identity Terraform authenticates as: User when auth_mode is azure_cli, otherwise ServicePrincipal. Defined in the root module."
-  default     = "ServicePrincipal"
-
-  validation {
-    condition     = contains(["ServicePrincipal", "User"], var.deployment_identity_principal_type)
-    error_message = "Must be ServicePrincipal or User."
-  }
+variable "deployment_identity_is_operator" {
+  type        = bool
+  description = "True when Terraform authenticates as the operator (auth_mode = azure_cli). Skips the deployment identity role assignments that would duplicate the operator's. Defined in the root module."
+  default     = false
 }
 
 variable "dns_server" {

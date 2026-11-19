@@ -13,9 +13,6 @@ locals {
     use_oidc      = var.auth_mode == "oidc"
   }
 
-  # Principal type of the identity Terraform authenticates as, used for its data-plane role assignments.
-  deployment_identity_principal_type = var.auth_mode == "azure_cli" ? "User" : "ServicePrincipal"
-
   tags = merge(var.tags, var.additional_tags)
 
   # Custom images (var.vm_image_gallery_id set): image definitions required by the enabled modules.

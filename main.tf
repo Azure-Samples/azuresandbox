@@ -245,15 +245,15 @@ module "naming" {
 module "vnet_shared" {
   source = "./modules/vnet-shared"
 
-  deployment_identity_principal_type = local.deployment_identity_principal_type
-  location                           = azurerm_resource_group.this.location
-  resource_group_name                = azurerm_resource_group.this.name
-  tags                               = local.tags
-  unique_seed                        = module.naming.names["resource_group"].unique_seed
-  operator_object_id                 = var.operator_object_id
-  vm_adds_size                       = var.vm_jumpbox_size
-  vm_image_gallery_id                = var.vm_image_gallery_id
+  location            = azurerm_resource_group.this.location
+  resource_group_name = azurerm_resource_group.this.name
+  tags                = local.tags
+  unique_seed         = module.naming.names["resource_group"].unique_seed
+  operator_object_id  = var.operator_object_id
+  vm_adds_size        = var.vm_jumpbox_size
+  vm_image_gallery_id = var.vm_image_gallery_id
 
+  deployment_identity_is_operator = var.auth_mode == "azure_cli"
 
   patch_schedule = {
     duration                = var.patch_schedule_duration
@@ -273,38 +273,38 @@ module "vnet_app" {
 
   count = var.enable_module_vnet_app ? 1 : 0
 
-  adds_domain_name                   = module.vnet_shared.adds_domain_name
-  admin_password                     = module.vnet_shared.admin_password
-  admin_password_secret              = module.vnet_shared.admin_password_secret
-  admin_username                     = module.vnet_shared.admin_username
-  admin_username_secret              = module.vnet_shared.admin_username_secret
-  deployment_identity_principal_type = local.deployment_identity_principal_type
-  data_collection_endpoint_id        = module.vnet_shared.resource_ids["data_collection_endpoint"]
-  data_collection_rule_windows_id    = module.vnet_shared.resource_ids["data_collection_rule_windows"]
-  dns_server                         = module.vnet_shared.dns_server
-  firewall_route_table_id            = module.vnet_shared.resource_ids["firewall_route_table"]
-  install_mysql_workbench            = var.enable_module_mysql
-  install_ssms                       = var.enable_module_mssql || var.enable_module_vm_mssql_win
-  key_vault_id                       = module.vnet_shared.resource_ids["key_vault"]
-  key_vault_name                     = module.vnet_shared.resource_names["key_vault"]
-  location                           = azurerm_resource_group.this.location
-  log_analytics_workspace_id         = module.vnet_shared.resource_ids["log_analytics_workspace"]
-  maintenance_configuration_id       = module.vnet_shared.resource_ids["maintenance_configuration"]
-  monitor_private_link_scope_id      = module.vnet_shared.resource_ids["monitor_private_link_scope"]
-  monitor_private_link_scope_name    = module.vnet_shared.resource_names["monitor_private_link_scope"]
-  private_dns_zone_links_complete    = module.vnet_shared.private_dns_zone_links_complete
-  private_dns_zones                  = module.vnet_shared.private_dns_zones
-  private_endpoint_subnet_id         = module.vnet_shared.resource_ids["subnet_privatelink"]
-  resource_group_name                = azurerm_resource_group.this.name
-  sql_admin_uami_id                  = var.enable_module_mssql ? azurerm_user_assigned_identity.sql_admin[0].id : null
-  tags                               = local.tags
-  unique_seed                        = module.naming.names["resource_group"].unique_seed
-  operator_object_id                 = var.operator_object_id
-  virtual_network_shared_id          = module.vnet_shared.resource_ids["virtual_network_shared"]
-  virtual_network_shared_name        = module.vnet_shared.resource_names["virtual_network_shared"]
-  vm_image_gallery_id                = var.vm_image_gallery_id
-  vm_jumpbox_win_size                = var.vm_jumpbox_size
+  adds_domain_name                = module.vnet_shared.adds_domain_name
+  admin_password                  = module.vnet_shared.admin_password
+  admin_password_secret           = module.vnet_shared.admin_password_secret
+  admin_username                  = module.vnet_shared.admin_username
+  admin_username_secret           = module.vnet_shared.admin_username_secret
+  data_collection_endpoint_id     = module.vnet_shared.resource_ids["data_collection_endpoint"]
+  data_collection_rule_windows_id = module.vnet_shared.resource_ids["data_collection_rule_windows"]
+  dns_server                      = module.vnet_shared.dns_server
+  firewall_route_table_id         = module.vnet_shared.resource_ids["firewall_route_table"]
+  install_mysql_workbench         = var.enable_module_mysql
+  install_ssms                    = var.enable_module_mssql || var.enable_module_vm_mssql_win
+  key_vault_id                    = module.vnet_shared.resource_ids["key_vault"]
+  key_vault_name                  = module.vnet_shared.resource_names["key_vault"]
+  location                        = azurerm_resource_group.this.location
+  log_analytics_workspace_id      = module.vnet_shared.resource_ids["log_analytics_workspace"]
+  maintenance_configuration_id    = module.vnet_shared.resource_ids["maintenance_configuration"]
+  monitor_private_link_scope_id   = module.vnet_shared.resource_ids["monitor_private_link_scope"]
+  monitor_private_link_scope_name = module.vnet_shared.resource_names["monitor_private_link_scope"]
+  private_dns_zone_links_complete = module.vnet_shared.private_dns_zone_links_complete
+  private_dns_zones               = module.vnet_shared.private_dns_zones
+  private_endpoint_subnet_id      = module.vnet_shared.resource_ids["subnet_privatelink"]
+  resource_group_name             = azurerm_resource_group.this.name
+  sql_admin_uami_id               = var.enable_module_mssql ? azurerm_user_assigned_identity.sql_admin[0].id : null
+  tags                            = local.tags
+  unique_seed                     = module.naming.names["resource_group"].unique_seed
+  operator_object_id              = var.operator_object_id
+  virtual_network_shared_id       = module.vnet_shared.resource_ids["virtual_network_shared"]
+  virtual_network_shared_name     = module.vnet_shared.resource_names["virtual_network_shared"]
+  vm_image_gallery_id             = var.vm_image_gallery_id
+  vm_jumpbox_win_size             = var.vm_jumpbox_size
 
+  deployment_identity_is_operator = var.auth_mode == "azure_cli"
 
   depends_on = [module.vnet_shared.log_analytics_operations_complete] # Transitively waits for AD DS config + all vnet-shared AMPLS-touching writes (PE, scoped services, DNS links, adds1 DCR/DCE). Eliminates 409 race on vnet-app's AMPLS scoped service. Limits taint blast radius. See AMPLS_IMPLEMENTATION_PLAN.md Phase 2a.
 }
