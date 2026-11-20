@@ -241,7 +241,7 @@ vm_jumpbox_linux_image_publisher | `Canonical` | The publisher for the virtual m
 vm_jumpbox_linux_image_sku | `server` | The SKU of the virtual machine image used to create the VM.
 vm_jumpbox_linux_image_version | `Latest` | The version of the virtual machine image used to create the VM.
 vm_jumpbox_linux_name | jumplinux1 | The name of the VM.
-vm_jumpbox_linux_size | `Standard_D2ls_v6` | The size of the virtual machine. Defined by the root module's `vm_jumpbox_size` variable.
+vm_jumpbox_linux_size | `Standard_D2ls_v6` | The size of the virtual machine. Defined by the root module's `vm_jumpbox_size` variable. Must be a v6 D-series size (`Standard_D<vCPU>[a][l][d]s_v6`), which supports Trusted Launch, the NVMe disk controller and Accelerated Networking.
 vm_jumpbox_linux_storage_account_type | `StandardSSD_LRS` | The storage type to be used for the VM's OS disk. Standard HDD (`Standard_LRS`) is not permitted because Azure is retiring Standard HDD OS disks on September 8, 2028.
 
 ### Module Resources
@@ -251,9 +251,9 @@ This section lists the resources included in this configuration.
 Address | Name | Notes
 --- | --- | ---
 module.vm_jumpbox_linux[0].azurerm_key_vault_secret.ssh_private_key | jumplinux1&#8209;ssh&#8209;private&#8209;key | The private SSH key stored in Azure Key Vault.
-module.vm_jumpbox_linux[0].azurerm_linux_virtual_machine.this | jumplinux1 | The Linux virtual machine resource.
+module.vm_jumpbox_linux[0].azurerm_linux_virtual_machine.this | jumplinux1 | The Linux virtual machine resource. Configured with NVMe disk controller, encryption at host, secure boot and vTPM (Trusted Launch).
 module.vm_jumpbox_linux[0].azurerm_maintenance_assignment_virtual_machine.this | | Assigns *jumplinux1* to the sandbox maintenance configuration for scheduled patching. Created as the last step of the VM's deployment so scheduled installs and reboots can't interrupt configuration.
-module.vm_jumpbox_linux[0].azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;jumplinux1 | The network interface associated with the Linux virtual machine.
+module.vm_jumpbox_linux[0].azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;jumplinux1 | The network interface associated with the Linux virtual machine. Configured with accelerated networking enabled.
 module.vm_jumpbox_linux[0].azurerm_role_assignment.kv_secrets_user_vm_linux | | Role assignment for accessing Key Vault secrets from the Linux virtual machine.
 module.vm_jumpbox_linux[0].azurerm_virtual_machine_run_command.wait_for_cloud_init | vmx&#8209;sand&#8209;dev&#8209;jumplinux1&#8209;WaitForCloudInit | Waits for cloud-init and the dpkg/apt locks to be released before the Azure Monitor Agent extension is installed.
 module.vm_jumpbox_linux[0].tls_private_key.ssh_key | | The TLS private key used for SSH authentication.

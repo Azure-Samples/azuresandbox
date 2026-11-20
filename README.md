@@ -539,7 +539,7 @@ subscription_id | | Azure subscription ID for sandbox resources.
 tags | `{ costcenter = "mycostcenter", environment = "dev", project = "sand" }` | Tags applied to all sandbox resources. The `project` and `environment` keys are required and used in resource names.
 vm_avd_size | `Standard_D4s_v6` | VM size for AVD session hosts `sessionhost1` and `sessionhost2`.
 vm_image_gallery_id | `null` | Resource ID of an Azure Compute Gallery with custom images, in the sandbox subscription and region. `null` uses platform images. See [Custom images](#custom-images).
-vm_jumpbox_size | `Standard_D2ls_v6` | VM size for `jumpwin1`, `jumplinux1` and `adds1`, plus `jumpwin2` and `adds2` with vnet-onprem.
+vm_jumpbox_size | `Standard_D2ls_v6` | VM size for `jumpwin1`, `jumplinux1` and `adds1`, plus `jumpwin2` and `adds2` with vnet-onprem. Must be a v6 D-series size (`Standard_D<vCPU>[a][l][d]s_v6`), which supports Trusted Launch, the NVMe disk controller and Accelerated Networking.
 vm_mssql_win_size | `Standard_D4ds_v6` | VM size for `mssqlwin1`. Must be a Ddsv6 or Edsv6 size with at least 4 vCPUs.
 vm_mssql_win_zone | `2` | Availability zone for `mssqlwin1`, required by its Premium SSD v2 disks.
 

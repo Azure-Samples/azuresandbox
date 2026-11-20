@@ -5,10 +5,12 @@ resource "azurerm_windows_virtual_machine" "this" {
   size                       = var.vm_adds_size
   admin_username             = var.admin_username
   admin_password             = local.admin_password
-  network_interface_ids      = [azurerm_network_interface.this.id]
-  provision_vm_agent         = true
+  disk_controller_type       = "NVMe"
   encryption_at_host_enabled = true
+  network_interface_ids      = [azurerm_network_interface.this.id]
+  secure_boot_enabled        = true
   source_image_id            = var.vm_image_gallery_id == null ? null : "${var.vm_image_gallery_id}/images/adds"
+  vtpm_enabled               = true
 
   # Scheduled patching (Customer Managed Schedules): see azurerm_maintenance_configuration.this.
   bypass_platform_safety_checks_on_user_schedule_enabled = true

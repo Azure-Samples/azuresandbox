@@ -1,8 +1,9 @@
 #region resources
 resource "azurerm_network_interface" "this" {
-  name                = "${module.naming.names["network_interface"].name}-${var.vm_jumpbox_linux_name}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
+  name                           = "${module.naming.names["network_interface"].name}-${var.vm_jumpbox_linux_name}"
+  location                       = var.location
+  resource_group_name            = var.resource_group_name
+  accelerated_networking_enabled = true
 
   ip_configuration {
     name                          = "Primary"

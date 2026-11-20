@@ -115,7 +115,7 @@ vm_adds_image_publisher | MicrosoftWindowsServer | The publisher for the virtual
 vm_adds_image_sku | 2025-datacenter-core-g2 | The SKU of the virtual machine image used to create the VM.
 vm_adds_image_version | Latest | The version of the virtual machine image used to create the VM.
 vm_adds_name | adds1 | The name of the VM.
-vm_adds_size | `Standard_D2ls_v6` | The size of the virtual machine. Defined by the root module's `vm_jumpbox_size` variable.
+vm_adds_size | `Standard_D2ls_v6` | The size of the virtual machine. Defined by the root module's `vm_jumpbox_size` variable. Must be a v6 D-series size (`Standard_D<vCPU>[a][l][d]s_v6`), which supports Trusted Launch, the NVMe disk controller and Accelerated Networking.
 vm_adds_storage_account_type | `StandardSSD_LRS` | The storage type to be used for the VM's OS disk. Standard HDD (`Standard_LRS`) is not permitted because Azure is retiring Standard HDD OS disks on September 8, 2028.
 vm_image_gallery_id | `null` | Resource ID of the Azure Compute Gallery with custom images, or `null` for platform images. Defined by the root module's `vm_image_gallery_id` variable and checked there. When set, the `*_image_*` variables are ignored.
 vnet_address_space | 10.1.0.0/16 | The address range for the virtual network.
@@ -147,7 +147,7 @@ module.vnet_shared.azurerm_monitor_diagnostic_setting.this | Audit Logs | The Az
 module.vnet_shared.azurerm_monitor_private_link_scope.this | ampls&#8209;sand&#8209;dev | The Azure Monitor Private Link Scope (AMPLS) resource.
 module.vnet_shared.azurerm_monitor_private_link_scoped_service.dce | ampls&#8209;scope&#8209;dce | Associates the AMPLS with the DCE.
 module.vnet_shared.azurerm_monitor_private_link_scoped_service.log_analytics | ampls&#8209;scope&#8209;log&#8209;analytics | Associates the AMPLS with the shared log analytics workspace.
-module.vnet_shared.azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;adds1 | Nic for *adds1* VM.
+module.vnet_shared.azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;adds1 | Nic for *adds1* VM. Configured with accelerated networking enabled.
 module.vnet_shared.azurerm_network_security_group.groups[*] | | NSGs for each subnet except *AzureFirewallSubnet*.
 module.vnet_shared.azurerm_network_security_rule.rules[*] | | NSG rules for each NSG. See *locals.tf* for rule definitions.
 module.vnet_shared.azurerm_private_dns_zone.zones["privatelink.agentsvc.azure-automation.net"] | | Private DNS zone for Azure Monitor Agent.
@@ -179,7 +179,7 @@ module.vnet_shared.azurerm_subnet_route_table_association.associations[*] | | Th
 module.vnet_shared.azurerm_virtual_machine_run_command.enable_microsoft_update | EnableMicrosoftUpdate | Registers Microsoft Update on *adds1* so Windows Update and Azure Update Manager also patch other Microsoft products. Runs after the guest agent readiness wait and before `install_patches`.
 module.vnet_shared.azurerm_virtual_machine_run_command.wait_for_guest_agent | WaitForGuestAgent | Waits until the guest agent on *adds1* has finished any self-update and is processing goal states, logging the agent version, before `install_patches` runs.
 module.vnet_shared.azurerm_virtual_network.this | vnet&#8209;sand&#8209;dev&#8209;shared | The shared services virtual network.
-module.vnet_shared.azurerm_windows_virtual_machine.this | adds1 | The AD DS Domain Controller / DNS Server VM.
+module.vnet_shared.azurerm_windows_virtual_machine.this | adds1 | The AD DS Domain Controller / DNS Server VM. Configured with NVMe disk controller, encryption at host, secure boot and vTPM (Trusted Launch).
 module.vnet_shared.time_static.patch_schedule | | Records the creation time used to set the maintenance window's first start date (48 hours later, so it is always in the future).
 
 ### Output Variables

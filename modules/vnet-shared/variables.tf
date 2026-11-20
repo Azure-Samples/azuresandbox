@@ -263,12 +263,12 @@ variable "vm_adds_name" {
 
 variable "vm_adds_size" {
   type        = string
-  description = "The size of the virtual machine."
-  # default     = "Standard_B2ls_v2" # Now sourced from root variable 'vm_jumpbox_size'; see main.tf.
+  description = "The size of the virtual machine. Must be a v6 D-series size, which supports Trusted Launch, the NVMe disk controller and Accelerated Networking."
+  # default     = "Standard_D2ls_v6" # Now sourced from root variable 'vm_jumpbox_size'; see main.tf.
 
   validation {
-    condition     = can(regex("^[a-zA-Z0-9_]+$", var.vm_adds_size))
-    error_message = "Must conform to Azure virtual machine size naming conventions: it can only contain alphanumeric characters and underscores (_). Examples include 'Standard_DS1_v2' or 'Standard_B2ms'."
+    condition     = can(regex("^Standard_D[0-9]+a?l?d?s_v6$", var.vm_adds_size))
+    error_message = "Must be a v6 D-series size matching the pattern 'Standard_D<vCPU>[a][l][d]s_v6' (e.g. 'Standard_D2ls_v6', 'Standard_D2s_v6', 'Standard_D2ds_v6', 'Standard_D2als_v6')."
   }
 }
 

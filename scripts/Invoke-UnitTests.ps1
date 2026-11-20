@@ -1016,7 +1016,7 @@ $testConfigs = [ordered]@{
             MaintenanceConfigurationName = $resourceNames['maintenance_configuration']
         }
     }
-    # Control-plane checks for the vnet_app module (jumpwin1 patch settings and maintenance assignment).
+    # Control-plane checks for the vnet_app module (jumpwin1 patch settings, maintenance assignment and VM/NIC baseline).
     '$local_vnet_app' = @{
         Module     = 'vnet-app'
         ModuleName = 'vnet_app'
@@ -1028,7 +1028,7 @@ $testConfigs = [ordered]@{
             MaintenanceConfigurationName = $resourceNames['maintenance_configuration']
         }
     }
-    # Control-plane checks for the vm_jumpbox_linux module (jumplinux1 patch settings and maintenance assignment).
+    # Control-plane checks for the vm_jumpbox_linux module (jumplinux1 patch settings, maintenance assignment and VM/NIC baseline).
     '$local_vm_jumpbox_linux' = @{
         Module     = 'vm-jumpbox-linux'
         ModuleName = 'vm_jumpbox_linux'
@@ -1040,7 +1040,7 @@ $testConfigs = [ordered]@{
             MaintenanceConfigurationName = $resourceNames['maintenance_configuration']
         }
     }
-    # Control-plane checks for the vm_mssql_win module (mssqlwin1 patch settings and maintenance assignment).
+    # Control-plane checks for the vm_mssql_win module (mssqlwin1 patch settings, maintenance assignment and VM/NIC baseline).
     '$local_vm_mssql_win' = @{
         Module     = 'vm-mssql-win'
         ModuleName = 'vm_mssql_win'
