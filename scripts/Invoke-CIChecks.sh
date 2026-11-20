@@ -19,7 +19,7 @@
 # Available checks (map 1:1 to a CI workflow):
 #   bash        ShellCheck                  (ci-bash.yml)        pin 0.11.0
 #   powershell  PSScriptAnalyzer            (ci-powershell.yml)  pin 1.25.0
-#   markdown    markdownlint-cli2           (ci-docs.yml)        pin 0.24.0, requires Node.js 20 (ci-docs.yml actions/setup-node)
+#   markdown    markdownlint-cli2           (ci-docs.yml)        pin 0.24.1, requires Node.js 22 (ci-docs.yml actions/setup-node)
 #   links       lychee (offline/internal)   (ci-docs.yml)
 #   actions     actionlint                  (ci-actions.yml)     pin 1.7.12
 #   secrets     gitleaks                    (ci-secrets.yml)     pin 8.30.1
@@ -125,15 +125,31 @@ check_powershell() {
 check_markdown() {
     have npx || { skip markdown "install Node.js/npm (provides npx)"; return; }
     # ci-docs.yml runs markdownlint-cli2 under actions/setup-node@v7 pinned to
-    # Node 20. This isn't a hard requirement (markdownlint-cli2 runs fine on
+    # Node 22. This isn't a hard requirement (markdownlint-cli2 runs fine on
     # other Node majors), but a mismatch is a plausible source of local-vs-CI
     # false negatives, so warn rather than silently diverge.
+    #
+    # markdownlint-cli2 itself needs no install or upgrade: npx fetches the
+    # pinned version below on demand. Only Node.js/npm must be installed.
+    #
+    # Check the installed Node.js version first:
+    #   node --version
+    #
+    # Ubuntu install (apt via the NodeSource repo; Ubuntu's own nodejs package
+    # is too old). Replace 22 with the Node major pinned in ci-docs.yml:
+    #   curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+    #   sudo apt-get install -y nodejs
+    # Ubuntu upgrade, same major (patch/minor releases):
+    #   sudo apt-get update && sudo apt-get install --only-upgrade -y nodejs
+    # Ubuntu upgrade, new major (rerun the setup script for that major):
+    #   curl -fsSL https://deb.nodesource.com/setup_<major>.x | sudo -E bash -
+    #   sudo apt-get install -y nodejs
     local node_major
     node_major="$(node --version 2> /dev/null | grep -oP '^v\K[0-9]+')"
-    if [ -n "$node_major" ] && [ "$node_major" != "20" ]; then
-        printf '\n=== markdown ===\nWARNING: Node.js v%s detected; ci-docs.yml pins Node 20 (actions/setup-node@v7). Install Node 20.x for full CI parity.\n' "$node_major"
+    if [ -n "$node_major" ] && [ "$node_major" != "22" ]; then
+        printf '\n=== markdown ===\nWARNING: Node.js v%s detected; ci-docs.yml pins Node 22 (actions/setup-node@v7). Install Node 22.x for full CI parity.\n' "$node_major"
     fi
-    run_check markdown npx --yes markdownlint-cli2@0.24.0
+    run_check markdown npx --yes markdownlint-cli2@0.24.1
 }
 
 check_links() {
