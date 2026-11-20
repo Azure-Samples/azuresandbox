@@ -81,6 +81,12 @@ variable "data_collection_rule_windows_id" {
   }
 }
 
+variable "deployment_identity_is_operator" {
+  type        = bool
+  description = "True when Terraform authenticates as the operator (auth_mode = azure_cli). Skips the deployment identity role assignments that would duplicate the operator's. Defined in the root module."
+  default     = false
+}
+
 variable "dns_server" {
   type        = string
   description = "The IP address of the DNS server. This should be the first non-reserved IP address in the subnet where the AD DS domain controller is hosted."

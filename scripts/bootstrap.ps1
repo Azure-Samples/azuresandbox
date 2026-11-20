@@ -1,7 +1,8 @@
 #!/usr/bin/env pwsh
 
-# Creates a terraform.tfvars file for Azure Sandbox
-# Requires Azure PowerShell module
+# Creates a terraform.tfvars file for Azure Sandbox that authenticates Terraform as the user
+# signed in with Azure CLI (auth_mode = "azure_cli", the default).
+# Requires Azure PowerShell module and Azure CLI
 
 #region functions
 function Show-Usage {
@@ -63,9 +64,15 @@ $defaultProject = "sand"
 
 #region main
 
-# Check if environment variables are set
-if (-not $env:TF_VAR_client_secret) {
-    Write-Host "Environment variable 'TF_VAR_client_secret' must be set." -ForegroundColor Red
+# Terraform authenticates with Azure CLI, so it must be installed and signed in
+if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
+    Write-Host "Azure CLI could not be found. Please install Azure CLI." -ForegroundColor Red
+    Show-Usage
+}
+
+az account show --only-show-errors --output none 2>$null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "You are not logged into Azure CLI. Please run 'az login' first." -ForegroundColor Red
     Show-Usage
 }
 
@@ -97,16 +104,7 @@ $defaultOperatorObjectId = (Show-JWTtoken -token (Get-AzAccessToken -AsSecureStr
 # Set default Microsoft Entra tenant id from currently logged in Azure PowerShell session
 $defaultEntraTenantId = (Get-AzContext).Tenant.Id
 
-# Set default service principal appId from TF_VAR_client_id environment variable
-$defaultClientId = $env:TF_VAR_client_id
-
 # Get user input
-$clientId = Read-Host "Service principal appId (client_id) default '$defaultClientId'"
-
-if (-not $clientId) {
-    $clientId = $defaultClientId
-}
-
 $entraTenantId = Read-Host "Microsoft Entra tenant id (entra_tenant_id) default '$defaultEntraTenantId'"
 
 if (-not $entraTenantId) {
@@ -149,21 +147,6 @@ if (-not $project) {
     $project = $defaultProject
 }
 
-# Validate user input
-if (-not $clientId) {
-    Write-Host "client_id is required." -ForegroundColor Red
-    Show-Usage
-}
-
-# Validate service principal
-$armClientDisplayName = (Get-AzADServicePrincipal -AppId $clientId).DisplayName
-if ($armClientDisplayName) {
-    Write-Host "Found service principal '$armClientDisplayName'..."
-} else {
-    Write-Host "Invalid service principal AppId '$clientId'." -ForegroundColor Red
-    Show-Usage
-}
-
 # Validate subscription
 $subscriptionName = (Get-AzSubscription -SubscriptionId $subscriptionId).Name
 if ($subscriptionName) {
@@ -193,7 +176,6 @@ $tags = @{
 Write-Host "`nGenerating terraform.tfvars file...`n"
 
 @"
-client_id          = "$clientId"
 entra_tenant_id    = "$entraTenantId"
 location           = "$location"
 operator_object_id = "$operatorObjectId"

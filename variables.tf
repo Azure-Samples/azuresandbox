@@ -6,22 +6,33 @@ variable "additional_tags" {
 
 variable "auth_mode" {
   type        = string
-  description = "How Terraform authenticates the azurerm, azapi and azuread providers: client_secret (service principal and secret), managed_identity (user-assigned managed identity on the Terraform execution host) or oidc (GitHub Actions OIDC token federated to a user-assigned managed identity or app registration)."
-  default     = "client_secret"
+  description = "How Terraform authenticates the azurerm, azapi and azuread providers: azure_cli (the user signed in with Azure CLI, the default), client_secret (service principal and secret), managed_identity (user-assigned managed identity on the Terraform execution host) or oidc (GitHub Actions OIDC token federated to a user-assigned managed identity or app registration)."
+  default     = "azure_cli"
 
   validation {
-    condition     = contains(["client_secret", "managed_identity", "oidc"], var.auth_mode)
-    error_message = "auth_mode must be one of: client_secret, managed_identity or oidc."
+    condition     = contains(["azure_cli", "client_secret", "managed_identity", "oidc"], var.auth_mode)
+    error_message = "auth_mode must be one of: azure_cli, client_secret, managed_identity or oidc."
   }
 }
 
 variable "client_id" {
   type        = string
-  description = "The client id of the identity Terraform authenticates as: the service principal appId when auth_mode is client_secret, the user-assigned managed identity client id when auth_mode is managed_identity, or the client id of the identity with the GitHub federated identity credentials when auth_mode is oidc."
+  description = "The client id of the identity Terraform authenticates as: the service principal appId when auth_mode is client_secret, the user-assigned managed identity client id when auth_mode is managed_identity, or the client id of the identity with the GitHub federated identity credentials when auth_mode is oidc. Must not be set when auth_mode is azure_cli."
+  default     = null
 
   validation {
-    condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.client_id))
+    condition     = var.client_id == null || can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.client_id))
     error_message = "client_id must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
+  }
+
+  validation {
+    condition     = var.auth_mode != "azure_cli" || var.client_id == null
+    error_message = "client_id should not be set when auth_mode = azure_cli."
+  }
+
+  validation {
+    condition     = var.auth_mode == "azure_cli" || var.client_id != null
+    error_message = "client_id must be set when auth_mode = client_secret, managed_identity or oidc."
   }
 }
 

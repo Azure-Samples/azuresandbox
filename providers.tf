@@ -3,16 +3,18 @@
 #
 # auth_mode        | client_id                          | credential
 # ---------------- | ---------------------------------- | -------------------------------------------
+# azure_cli        | Not set (the signed-in user)       | Azure CLI token cache (az login)
 # client_secret    | Service principal appId            | var.client_secret (TF_VAR_client_secret)
 # managed_identity | User-assigned managed identity id  | Managed identity endpoint of the host
 # oidc             | Federated identity client id       | GitHub Actions ID token (ACTIONS_ID_TOKEN_REQUEST_URL/TOKEN)
 #
-# use_msi and use_oidc are always set explicitly, so the providers don't fall back to ARM_USE_MSI, which the state
-# backend on jumplinux2 uses.
+# use_cli, use_msi and use_oidc are always set explicitly, so the providers don't fall back to ARM_USE_MSI, which the
+# state backend on jumplinux2 uses, or to Azure CLI in the other modes.
 provider "azuread" {
   tenant_id     = local.provider_auth.tenant_id
   client_id     = local.provider_auth.client_id
   client_secret = local.provider_auth.client_secret
+  use_cli       = local.provider_auth.use_cli
   use_msi       = local.provider_auth.use_msi
   use_oidc      = local.provider_auth.use_oidc
 }
@@ -22,6 +24,7 @@ provider "azapi" {
   tenant_id       = local.provider_auth.tenant_id
   client_id       = local.provider_auth.client_id
   client_secret   = local.provider_auth.client_secret
+  use_cli         = local.provider_auth.use_cli
   use_msi         = local.provider_auth.use_msi
   use_oidc        = local.provider_auth.use_oidc
 }
@@ -31,6 +34,7 @@ provider "azurerm" {
   tenant_id                       = local.provider_auth.tenant_id
   client_id                       = local.provider_auth.client_id
   client_secret                   = local.provider_auth.client_secret
+  use_cli                         = local.provider_auth.use_cli
   use_msi                         = local.provider_auth.use_msi
   use_oidc                        = local.provider_auth.use_oidc
   resource_provider_registrations = "extended"

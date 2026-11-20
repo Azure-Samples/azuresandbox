@@ -48,6 +48,12 @@ variable "admin_username_secret" {
   }
 }
 
+variable "deployment_identity_is_operator" {
+  type        = bool
+  description = "True when Terraform authenticates as the operator (auth_mode = azure_cli). Skips the deployment identity role assignments that would duplicate the operator's. Defined in the root module."
+  default     = false
+}
+
 variable "location" {
   type        = string
   description = "The name of the Azure Region where resources will be provisioned."
