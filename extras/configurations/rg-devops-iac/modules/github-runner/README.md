@@ -303,8 +303,8 @@ GitHub repository administrator | Runner registration token; environments, secre
 GitHub repository administrator | OIDC subject claim template, unless the repository already uses it | `oidc` | Once, after the federated credentials exist
 Microsoft Entra Privileged Role Administrator | Microsoft Graph permissions. The least privileged role that can grant them; Global Administrator also works. `Owner`, Cloud Application Administrator and Global Reader can't. | Both, `mssql` only | Once, after the identity is created
 Microsoft Entra ID P2 or Microsoft Entra ID Governance | Time-bound role assignments | Both | Before the first run
-Subscription `Owner`, ideally PIM eligible | Applying this configuration | Both | Each apply
-Subscription `Role Based Access Control Administrator`, ideally PIM eligible | Granting the time-bound roles | Both | Each run
+Subscription `Contributor`, ideally PIM eligible | Applying this configuration | Both | Each apply
+Subscription `Role Based Access Control Administrator`, ideally PIM eligible | Applying this configuration, and granting the time-bound roles | Both | Each apply and each run
 
 #### Workflow Configuration
 
@@ -361,7 +361,7 @@ Setting | Value
 Step | Task | Who | Modes | Details
 --- | --- | --- | --- | ---
 1 | Create a runner registration token | Operator, as a repository administrator | Both | [Self-Hosted Runner Registration](#self-hosted-runner-registration)
-2 | Apply this configuration with the [workflow configuration](#workflow-configuration) | Operator, with `Owner` | Both | [Getting Started](../../README.md#getting-started)
+2 | Apply this configuration with the [workflow configuration](#workflow-configuration) | Operator, with `Contributor` and `Role Based Access Control Administrator` | Both | [Getting Started](../../README.md#getting-started)
 3 | Grant Microsoft Graph permissions | Privileged Role Administrator | Both, `mssql` only | `./modules/github-runner/scripts/grant-graph-permissions.sh`, below
 4 | Check or set the OIDC subject claim template | Repository administrator | `oidc` | Below
 5 | Add the power state secrets to `sandbox-runner-power-state` | Repository administrator | `oidc` | [Runner Power State Identity](#runner-power-state-identity)
@@ -629,18 +629,18 @@ The operator is the signed-in user who provisions a configuration. It is separat
 
 Configuration | How the operator is used
 --- | ---
-rg-devops-iac | Terraform authenticates as the operator signed in to Azure CLI (`use_cli = true` in [`providers.tf`](../../providers.tf)). Needs `Owner`, or `Contributor` plus an unconditioned role-assignment role such as `User Access Administrator`, during the apply. The operator is granted `Key Vault Secrets Officer`, `Storage Blob Data Contributor` and `Virtual Machine Administrator Login` on `jumplinux2`.
+rg-devops-iac | Terraform authenticates as the operator signed in to Azure CLI (`use_cli = true` in [`providers.tf`](../../providers.tf)). Needs `Contributor` and an unconditioned `Role Based Access Control Administrator` on the subscription during the apply. `Owner` isn't required. The operator is granted `Key Vault Secrets Officer`, `Storage Blob Data Contributor` and `Virtual Machine Administrator Login` on `jumplinux2`.
 Azure Sandbox | `operator_object_id` is granted data-plane roles, such as Key Vault and Storage roles, on the sandbox resources. The bootstrap scripts default it to the signed-in user.
 
 ##### Least-Privilege Operator Access with Privileged Identity Management
 
-Day-to-day use of `jumplinux2` needs only `Reader` on the VM, its network interface and the Bastion host, plus `Virtual Machine Administrator Login`. Use [Microsoft Entra Privileged Identity Management](https://learn.microsoft.com/entra/id-governance/privileged-identity-management/pim-configure) (PIM) so the operator holds `Owner` only when needed:
+Day-to-day use of `jumplinux2` needs only `Reader` on the VM, its network interface and the Bastion host, plus `Virtual Machine Administrator Login`. Use [Microsoft Entra Privileged Identity Management](https://learn.microsoft.com/entra/id-governance/privileged-identity-management/pim-configure) (PIM) so the operator holds `Contributor` and `Role Based Access Control Administrator` only when needed:
 
 Access | How it's granted
 --- | ---
 Azure RBAC `Reader` on the subscription | Standing
-Azure RBAC `Owner` on the subscription | PIM eligible, activated for `terraform plan` and `terraform apply`
-Azure RBAC `Role Based Access Control Administrator` on the subscription | PIM eligible, activated for `grant-jit-roles.sh`. Narrower than `Owner`: it can manage role assignments but not resources.
+Azure RBAC `Contributor` on the subscription | PIM eligible, activated for `terraform plan` and `terraform apply`
+Azure RBAC `Role Based Access Control Administrator` on the subscription | PIM eligible, activated for `terraform plan`, `terraform apply` and `grant-jit-roles.sh`. It can manage role assignments but not resources.
 Microsoft Entra Privileged Role Administrator | PIM eligible, activated for `grant-graph-permissions.sh`
 Other Microsoft Entra directory roles, such as Global Administrator | PIM eligible, activated only when needed
 `User Access Administrator` at root scope (`/`) | Removed
@@ -648,12 +648,12 @@ Other Microsoft Entra directory roles, such as Global Administrator | PIM eligib
 Apply it in the Azure portal in this order, so you don't lock yourself out:
 
 1. Confirm the prerequisites: Microsoft Entra ID P2, at least two multifactor authentication methods, and an [emergency access account](https://learn.microsoft.com/entra/identity/role-based-access-control/security-emergency-access) with permanent Global Administrator.
-1. Go to *PIM* > *Azure resources* > your subscription > *Settings* > *Owner*. Set the activation duration to 4-8 hours, require multifactor authentication and a justification, don't require approval, and allow permanent eligible assignments.
-1. Add **eligible** `Owner` and `Role Based Access Control Administrator` assignments for the operator on the subscription, and a standing `Reader` assignment. Configure the `Role Based Access Control Administrator` role settings the same way as `Owner`.
+1. Go to *PIM* > *Azure resources* > your subscription > *Settings* > *Contributor*. Set the activation duration to 4-8 hours, require multifactor authentication and a justification, don't require approval, and allow permanent eligible assignments.
+1. Add **eligible** `Contributor` and `Role Based Access Control Administrator` assignments for the operator on the subscription, and a standing `Reader` assignment. Configure the `Role Based Access Control Administrator` role settings the same way as `Contributor`.
 1. Test activation and deactivation **before** removing any standing access.
-1. Remove the operator's standing `Owner` assignment, including any inherited from a management group such as the Tenant Root Group.
+1. Remove the operator's standing `Owner`, `Contributor` and `Role Based Access Control Administrator` assignments, including any inherited from a management group such as the Tenant Root Group.
 1. Remove the standing root-scope `User Access Administrator`: activate Global Administrator, then go to *Microsoft Entra ID* > *Properties* > *Access management for Azure resources* and select *No*. This grant persists after Global Administrator is deactivated.
-1. Verify with read-only checks. With `Owner` active, the permissions output includes `"actions": ["*"]`; with only standing access, the only entry is `*/read`:
+1. Verify with read-only checks. With both roles active, the permissions output includes `"actions": ["*"]` (from `Contributor`) and `Microsoft.Authorization/roleAssignments/write` (from `Role Based Access Control Administrator`); with only standing access, the only entry is `*/read`:
 
    ```bash
    OID=$(az ad signed-in-user show --query id -o tsv)

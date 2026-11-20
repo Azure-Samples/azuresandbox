@@ -118,6 +118,69 @@ catch {
     $failed++
 }
 
+# Test 3: The VM matches the sandbox VM baseline (mssqlwin1 is the reference): Trusted Launch with Secure Boot
+# and vTPM, the NVMe disk controller, encryption at host, and Accelerated Networking on its network interface.
+try {
+    if (-not $vm) {
+        throw "VM '$VmName' wasn't found"
+    }
+
+    $response = Invoke-AzRestMethod -Method GET -Path "$($vm.ResourceId)?api-version=2024-07-01" -ErrorAction Stop
+    if ($response.StatusCode -ne 200) {
+        throw "GET virtual machine returned HTTP $($response.StatusCode)"
+    }
+
+    $vmProperties = ($response.Content | ConvertFrom-Json).properties
+    $securityProfile = $vmProperties.securityProfile
+
+    $baselineIssues = @()
+    if ($securityProfile.securityType -ne 'TrustedLaunch') {
+        $baselineIssues += "securityType is '$($securityProfile.securityType)', expected 'TrustedLaunch'"
+    }
+    if ($securityProfile.uefiSettings.secureBootEnabled -ne $true) {
+        $baselineIssues += "secureBootEnabled is '$($securityProfile.uefiSettings.secureBootEnabled)', expected 'True'"
+    }
+    if ($securityProfile.uefiSettings.vTpmEnabled -ne $true) {
+        $baselineIssues += "vTpmEnabled is '$($securityProfile.uefiSettings.vTpmEnabled)', expected 'True'"
+    }
+    if ($securityProfile.encryptionAtHost -ne $true) {
+        $baselineIssues += "encryptionAtHost is '$($securityProfile.encryptionAtHost)', expected 'True'"
+    }
+    if ($vmProperties.storageProfile.diskControllerType -ne 'NVMe') {
+        $baselineIssues += "diskControllerType is '$($vmProperties.storageProfile.diskControllerType)', expected 'NVMe'"
+    }
+
+    $nicIds = @($vmProperties.networkProfile.networkInterfaces | ForEach-Object { $_.id })
+    if ($nicIds.Count -eq 0) {
+        $baselineIssues += 'no network interfaces found'
+    }
+    foreach ($nicId in $nicIds) {
+        $nicResponse = Invoke-AzRestMethod -Method GET -Path "$($nicId)?api-version=2024-05-01" -ErrorAction Stop
+        if ($nicResponse.StatusCode -ne 200) {
+            throw "GET network interface returned HTTP $($nicResponse.StatusCode)"
+        }
+
+        $nic = $nicResponse.Content | ConvertFrom-Json
+        if ($nic.properties.enableAcceleratedNetworking -ne $true) {
+            $baselineIssues += "network interface '$($nic.name)' enableAcceleratedNetworking is '$($nic.properties.enableAcceleratedNetworking)', expected 'True'"
+        }
+    }
+
+    if ($baselineIssues.Count -eq 0) {
+        Write-TestResult $moduleName 'PASS' "VM '$VmName' baseline: Trusted Launch (Secure Boot, vTPM), NVMe disk controller, encryption at host and Accelerated Networking" -SanitizedMessage 'VM baseline: Trusted Launch (Secure Boot, vTPM), NVMe disk controller, encryption at host and Accelerated Networking'
+        $passed++
+    }
+    else {
+        Write-TestResult $moduleName 'FAIL' ("VM '$VmName' baseline: " + ($baselineIssues -join '; ')) -SanitizedMessage 'VM baseline: <value>'
+        $failed++
+    }
+}
+catch {
+    Write-TestResult $moduleName 'FAIL' "Failed to verify baseline settings for VM '$VmName'" -SanitizedMessage 'Failed to verify VM baseline settings'
+    Write-TestResult $moduleName 'FAIL' "Exception: $_" -SanitizedMessage 'Exception: <value>'
+    $failed++
+}
+
 # Summary
 $total = $passed + $failed
 Write-TestResult $moduleName 'SUMMARY' ("Passed: $passed Failed: $failed Total: $total")

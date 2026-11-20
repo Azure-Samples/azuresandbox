@@ -345,10 +345,11 @@ resource "azurerm_private_endpoint" "ampls" {
 
 #region network-interfaces
 resource "azurerm_network_interface" "this" {
-  name                = "${module.naming.names["network_interface"].name}-${var.vm_adds_name}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  depends_on          = [azurerm_subnet_route_table_association.associations]
+  name                           = "${module.naming.names["network_interface"].name}-${var.vm_adds_name}"
+  location                       = var.location
+  resource_group_name            = var.resource_group_name
+  accelerated_networking_enabled = true
+  depends_on                     = [azurerm_subnet_route_table_association.associations]
 
   ip_configuration {
     name                          = "Primary"

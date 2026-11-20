@@ -194,9 +194,10 @@ resource "azurerm_private_endpoint" "storage_file" {
 
 #region network-interfaces
 resource "azurerm_network_interface" "this" {
-  name                = "${module.naming.names["network_interface"].name}-${var.vm_jumpbox_win_name}"
-  location            = var.location
-  resource_group_name = var.resource_group_name
+  name                           = "${module.naming.names["network_interface"].name}-${var.vm_jumpbox_win_name}"
+  location                       = var.location
+  resource_group_name            = var.resource_group_name
+  accelerated_networking_enabled = true
 
   depends_on = [
     azurerm_virtual_network_peering.app_to_shared,

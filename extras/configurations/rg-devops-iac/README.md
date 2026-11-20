@@ -126,7 +126,9 @@ Before you can provision this configuration interactively, you need to log in to
   ```
 
 * Open a browser and navigate to the URL provided in the terminal. Enter the code displayed in the terminal to authenticate your Azure account.
-* Sign in with an account that has an Azure RBAC `Owner` role assignment on the subscription you will be using to provision this configuration.
+* Sign in with an account that has the following minimum Azure RBAC role assignments on the subscription (standing or PIM-activated):
+  * `Contributor`
+  * `Role Based Access Control Administrator`
 * Depending upon how your Entra ID tenant is configured, you may be prompted to enter your password and/or approve a sign-in request on your mobile device.
 * Click **Continue** when asked if you are trying to sign in to Azure.
 * Check the terminal for a prompt like this:
@@ -329,7 +331,7 @@ subnet_privatelink_address_prefix | 10.0.2.0/27 | The address prefix for the pri
 subnet_privatelink_name | snet-privatelink-03 | The name of the private link subnet.
 subscription_id | | The Azure subscription id used to provision resources.
 tags | | The tags in map format to be used when creating new resources.
-vm_jumpbox_linux_size | `Standard_D2ls_v6` | The size of the Linux virtual machine (`jumplinux2`).
+vm_jumpbox_linux_size | `Standard_D2ls_v6` | The size of the Linux virtual machine (`jumplinux2`). Must be a v6 D-series size (`Standard_D<vCPU>[a][l][d]s_v6`), which supports Trusted Launch, the NVMe disk controller and Accelerated Networking.
 vnet_address_space | 10.0.0.0/16 | The address space in CIDR notation for the virtual network.
 
 There are additional input variables used for optional use cases. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration) and [Optional: Pre-built Images](#optional-pre-built-images).
