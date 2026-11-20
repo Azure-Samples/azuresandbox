@@ -277,6 +277,14 @@ variable "tags" {
     ])
     error_message = "Each tag key must be 1-512 characters long and consist of alphanumeric characters, periods (.), underscores (_), or hyphens (-). Each tag value must be 0-256 characters long and consist of alphanumeric characters, periods (.), underscores (_), spaces, or hyphens (-)."
   }
+
+  validation {
+    condition = alltrue([
+      for key in ["project", "environment"] :
+      trimspace(tostring(lookup(var.tags, key, ""))) != ""
+    ])
+    error_message = "The 'tags' variable must include non-empty 'project' and 'environment' keys, which are used in resource names."
+  }
 }
 
 variable "vm_avd_size" {
