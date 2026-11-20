@@ -5,7 +5,7 @@ Terraform IaC project that provisions a modular Azure sandbox environment. Not f
 ## Tech stack
 
 - **Terraform** (version pinned in `terraform.tf` — check there for the current required version)
-- **Providers**: `azurerm >= 5.1.0, < 6.0.0`, `azapi ~> 2.9`, `azuread ~> 3.8`, plus `cloudinit`, `null`, `random`, `time`, `tls`
+- **Providers**: `azurerm >= 5.1.0, < 6.0.0`, `azapi ~> 2.9`, `azuread ~> 3.8`, plus `cloudinit`, `random`, `time`, `tls`
 - **Resource naming**: the `Azure/avm-utl-naming/azure` module (`module.naming`) — never hand-write resource names; use its `names` map keyed by catalog key, e.g. `module.naming.names["key_vault_vault"].name_unique`. The root naming block generates the random seed; child modules receive it as `unique_seed` and must not pass it to the naming module's `unique_seed` input (it is unknown at plan time, which breaks the module's `count`). Instead they add it to the `suffix` of a second `naming_unique` block and use `module.naming_unique.names["<key>"].name` for globally unique names
 - **Scripts**: PowerShell 7.x (Az modules) and Bash (Azure CLI). VM-side config uses PowerShell + `azurerm_virtual_machine_run_command` (Windows) and `cloud-init` (Linux)
 - Active development branch is `vnext` (not `main`)
