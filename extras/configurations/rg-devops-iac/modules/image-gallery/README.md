@@ -8,7 +8,7 @@
 
 ## Overview
 
-This optional module creates an [Azure Compute Gallery](https://learn.microsoft.com/azure/virtual-machines/azure-compute-gallery) and [Azure VM Image Builder](https://learn.microsoft.com/azure/virtual-machines/image-builder-overview) (AIB) templates that pre-build fully patched images for the Azure Sandbox VMs, so sandbox deployments spend less time installing software and updates. The root module creates it when `enable_image_gallery` is true. Builds run in the root module's image build subnets with no public IP addresses, and reach the internet through the root module's NAT gateway. Like the other root subnets, the image build subnets exist whether or not this module is enabled. To deploy sandbox VMs from these images, set `vm_image_gallery_id` in the Azure Sandbox `terraform.tfvars` to the gallery's resource ID. See [Custom images](../../../../../README.md#custom-images).
+This optional module creates an [Azure Compute Gallery](https://learn.microsoft.com/azure/virtual-machines/azure-compute-gallery) and [Azure VM Image Builder](https://learn.microsoft.com/azure/virtual-machines/image-builder-overview) (AIB) templates that build patched **custom images** for the Azure Sandbox VMs, so sandbox deployments spend less time installing software and updates. The root module creates it when `enable_image_gallery` is true. Builds run in the root module's image build subnets with no public IP addresses, and reach the internet through the root module's NAT gateway. Like the other root subnets, the image build subnets exist whether or not this module is enabled. To deploy sandbox VMs from these images, set `vm_image_gallery_id` in the Azure Sandbox `terraform.tfvars` to the gallery's resource ID. See [Custom Images](../../../../../README.md#custom-images).
 
 The module creates:
 
@@ -44,7 +44,7 @@ This section provides additional information on various aspects of this module.
 * [Image Build Costs](#image-build-costs)
 * [Building Images](#building-images)
 * [Disabling the Image Gallery](#disabling-the-image-gallery)
-* [Deleting the rg-devops-iac Resource Group](#deleting-the-rg-devops-iac-resource-group)
+* [Staging Resource Groups](#staging-resource-groups)
 
 ### Dependencies
 
@@ -59,9 +59,9 @@ The root module also registers the `Microsoft.VirtualMachineImages` resource pro
 This module is organized as follows:
 
 ```plaintext
-├── scripts/                              # Build VM and operator scripts
+├── scripts/                              # Build VM and administrator scripts
 │   ├── Enable-MicrosoftUpdate.ps1        # PowerShell: opts Windows build VMs into Microsoft Update
-│   ├── invoke-image-build.sh             # Bash (operator): runs image builds and tags new image versions
+│   ├── invoke-image-build.sh             # Bash (administrator): runs image builds and tags new image versions
 │   ├── Test-ImageWindows.ps1             # PowerShell: validates the adds, jumpwin and mssqlwin images
 │   └── test-image-jumplinux.sh           # Bash: validates the jumplinux image
 ├── compute.tf                            # Compute gallery, image definitions and image templates
@@ -72,7 +72,7 @@ This module is organized as follows:
 └── variables.tf                          # Input variables
 ```
 
-The image templates run the PowerShell and `test-image-jumplinux.sh` scripts on the build VM. Run the operator script from the rg-devops-iac directory, e.g. `./modules/image-gallery/scripts/invoke-image-build.sh`. It reads the root module's outputs.
+The image templates run the PowerShell and `test-image-jumplinux.sh` scripts on the build VM. Run the administrator script from the rg-devops-iac directory, e.g. `./modules/image-gallery/scripts/invoke-image-build.sh`. It reads the root module's outputs.
 
 The image templates also run the install scripts the Azure Sandbox modules run at deploy time, so both stay identical: [Install-WindowsFeatures.ps1](../../../../../modules/vnet-app/scripts/Install-WindowsFeatures.ps1), [Install-Software.ps1](../../../../../modules/vnet-app/scripts/Install-Software.ps1) and [install-vm-jumpbox-linux-packages.sh](../../../../../modules/vm-jumpbox-linux/scripts/install-vm-jumpbox-linux-packages.sh).
 
@@ -160,7 +160,7 @@ The gallery, image definitions and templates cost nothing while idle. Each build
 
 ### Building Images
 
-Terraform creates the templates but doesn't run builds. Run them as the operator with Azure CLI from the root module directory after `terraform apply`, using [invoke-image-build.sh](./scripts/invoke-image-build.sh). It reads the `image_template_<image>` names from the root `resource_names` output.
+Terraform creates the templates but doesn't run builds. Run them as the **devops administrator** (see [Personas and Role Assignments](../../README.md#personas-and-role-assignments)) with Azure CLI from the root module directory after `terraform apply`, using [invoke-image-build.sh](./scripts/invoke-image-build.sh). It reads the `image_template_<image>` names from the root `resource_names` output.
 
 ```bash
 ./modules/image-gallery/scripts/invoke-image-build.sh                     # all four images
@@ -187,14 +187,8 @@ done
 
 Then apply with `enable_image_gallery = false`. Deleting each image template also deletes its `IT_*` staging resource group.
 
-### Deleting the rg-devops-iac Resource Group
+### Staging Resource Groups
 
-If you deprovision rg-devops-iac by deleting its resource group (`az group delete`) instead of `terraform destroy`, the image templates' `IT_*` staging resource groups are left behind. They're outside the rg-devops-iac resource group and are only cleaned up when their template is deleted. Delete them too:
-
-```bash
-RG=<rg-devops-iac resource group>
-az group list --query "[?starts_with(name, 'IT_${RG}_')].name" -o tsv |
-  xargs -r -n1 az group delete --yes --no-wait -n
-```
+Each image template has an `IT_*` staging resource group outside the rg-devops-iac resource group. The platform deletes it when the template is deleted, including when the rg-devops-iac resource group is deleted.
 
 Don't delete a staging resource group while its template still exists. The template keeps its build artifacts there, and AIB doesn't recreate it, so later builds of that image can fail. To recover, recreate the template from the root module directory, e.g. `terraform apply -replace='module.image_gallery[0].azapi_resource.image_templates["jumpwin"]'`.
