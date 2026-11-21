@@ -19,7 +19,7 @@ Code and content in this section may be incomplete, outdated or not fully functi
 
 This section describes additional Terraform configurations that can be added to Azure Sandbox. These configurations are not required to use Azure Sandbox, but may be useful for learning or testing purposes.
 
-* [rg-devops-iac](./configurations/rg-devops-iac/) provides a secure, isolated Terraform execution environment for DevOps / Infrastructure-as-Code (IaC) projects: a Linux VM with no public IP, accessed through Azure Bastion with Microsoft Entra ID sign-in, plus a Terraform state backend and optional GitHub Actions self-hosted runner registration.
+* [rg-devops-iac](./configurations/rg-devops-iac/) provides a secure, isolated Terraform execution environment for DevOps / Infrastructure-as-Code (IaC) projects: a Linux VM with no public IP, accessed through Azure Bastion with Microsoft Entra ID sign-in, plus a private Terraform state backend. Optional Azure Sandbox extensions add a GitHub Actions self-hosted runner with a deployment identity, and an image gallery that builds custom images.
 
 ## Modules
 

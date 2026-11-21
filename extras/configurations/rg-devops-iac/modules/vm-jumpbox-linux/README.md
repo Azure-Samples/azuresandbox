@@ -25,10 +25,10 @@ This module implements a stand-alone Linux virtual machine for use as a general 
   * python3-pip
   * terraform
 * Pre-configured environment variables for using Azure Blob Storage as a Terraform state backend.
-* Pre-configured platform patch assesssment.
+* Self-managed patching. See [Patching](#patching).
 * `AzureMonitorLinuxAgent` VM extension is pre-installed and pre-configured.
 * `AADSSHLoginForLinux` VM extension is pre-installed and pre-configured.
-* A system-assigned managed identity with role assignents to an Azure Blob Storage container to be used as a Terraform state backend.
+* A system-assigned managed identity with role assignments to an Azure Blob Storage container to be used as a Terraform state backend.
 
 The optional [github-runner](../github-runner/README.md) module installs the GitHub Actions self-hosted runner agent on the VM. With its `managed_identity` deployment identity, the root module attaches that identity to the VM through `user_assigned_identity_ids`.
 
@@ -58,6 +58,7 @@ This section provides additional information on various aspects of this module.
 * [Input Variables](#input-variables)
 * [Module Resources](#module-resources)
 * [Output Variables](#output-variables)
+* [Patching](#patching)
 
 ### Dependencies
 
@@ -123,7 +124,7 @@ module.vm_jumpbox_linux.azurerm_linux_virtual_machine.this | jumplinux2 | The Li
 module.vm_jumpbox_linux.azurerm_network_interface.this | nic&#8209;devops&#8209;dev&#8209;jumplinux2 | The network interface associated with the Linux virtual machine. Configured with accelerated networking enabled.
 module.vm_jumpbox_linux.azurerm_monitor_data_collection_rule_association.dce | configurationAccessEndpoint | Associates the VM with the data collection endpoint so the Azure Monitor Agent retrieves its configuration through the AMPLS private endpoint.
 module.vm_jumpbox_linux.azurerm_monitor_data_collection_rule_association.dcr | dcradevopsdev&#8209;jumplinux2 | Associates the VM with the Linux data collection rule.
-module.vm_jumpbox_linux.azurerm_role_assignment.operator_vm_admin_login | | Grants `Virtual Machine Administrator Login` role on jumplinux2 to the operator applying the configuration, enabling Microsoft Entra ID SSH sign-in with passwordless `sudo`.
+module.vm_jumpbox_linux.azurerm_role_assignment.operator_vm_admin_login | | Grants `Virtual Machine Administrator Login` role on jumplinux2 to the devops administrator applying the configuration, enabling Microsoft Entra ID SSH sign-in with passwordless `sudo`.
 module.vm_jumpbox_linux.azurerm_role_assignment.this | | Grants `Storage Blob Data Contributor` role to the managed identity of jumplinux2. This is intended to be used for accessing a Terraform state backend hosted in Azure Blob Storage.
 module.vm_jumpbox_linux.azurerm_virtual_machine_extension.aad_ssh_login | | The `AADSSHLoginForLinux` extension that enables Microsoft Entra ID SSH sign-in. Installed after `wait_for_cloud_init` to avoid apt lock contention.
 module.vm_jumpbox_linux.azurerm_virtual_machine_extension.ama | AzureMonitorLinuxAgent | The Azure Monitor Agent. Installed after `aad_ssh_login` to avoid apt lock contention.
@@ -140,3 +141,12 @@ Name | Description
 resource_ids | A map of resource IDs for key resources in the module.
 resource_names | A map of resource names for key resources in the module.
 virtual_machine_extensions_complete | Dependency signal: the VM id, available only after cloud-init and the VM extensions are complete. The root module passes it to the optional [github-runner](../github-runner/README.md) module, so installing the runner doesn't contend with the extensions for the apt locks.
+
+### Patching
+
+`jumplinux2` doesn't follow the Azure Sandbox [Patching](../../../../../README.md#patching) model, and isn't assigned to a maintenance configuration:
+
+* **Updates:** Ubuntu's `unattended-upgrades`, enabled by default, installs security updates daily. Updates that need a restart, such as a new kernel, take effect at the next restart.
+* **Assessment:** Azure Update Manager assesses the VM every 24 hours (`patch_assessment_mode = "AutomaticByPlatform"`), so missing updates show in Update Manager.
+
+This is intentional. rg-devops-iac is the Terraform execution environment that deploys other configurations, including Azure Sandbox and its maintenance configuration, so `jumplinux2` patches itself rather than depending on infrastructure it deploys.

@@ -15,142 +15,79 @@
 
 ## Overview
 
-This configuration provides a minimal set of resources to function as a Terraform execution environment, which is often a critical part of a DevOps pipeline. It is a useful starting point for DevOps / Infrastructure-As-Code (IaC) projects that require a secure and isolated environment for deploying and managing infrastructure using Terraform. The root module creates network, storage and security prerequisites. The virtual machine used as a Terraform execution environment is implemented in a child module which can be repurposed in other environments (such as a platform landing zone) where the resources defined in the root module already exist. The virtual machine has no public IP address: operators reach it only through Azure Bastion and sign in with their Microsoft Entra ID identity, so access is governed by Azure RBAC and Conditional Access rather than long-lived SSH keys.
+This configuration provides a secure, isolated Terraform execution environment for DevOps and Infrastructure-as-Code (IaC) scenarios. It works for any Terraform project, not just Azure Sandbox. The root module creates network, storage and security prerequisites, including a private Terraform state backend. The virtual machine used as a Terraform execution environment, `jumplinux2`, is implemented in a child module that can be reused in other environments, such as a platform landing zone, where the root module's resources already exist. The virtual machine has no public IP address. Users reach it only through Azure Bastion and sign in with their Microsoft Entra ID identity, so access is governed by Azure RBAC and Conditional Access rather than long-lived SSH keys.
 
 ## Features
 
 * **Pre-configured DevOps VM for IaC** (Terraform)
   * Pre-installed and pre-configured environment for Terraform init / plan / apply operations.
-  * Managed-identity access to a pre-configured Terraform state backend (Azure Blob Storage).
-  * Pre-installed Azure CLI and PowerShell + Azure PowerShell for custom automation.
+  * Managed identity access to a pre-configured Terraform state backend (Azure Blob Storage).
+  * Pre-installed Azure CLI, PowerShell and Azure PowerShell for custom automation.
 * **Network isolation**
-  * Virtual network and subnets and NSGs for bastion, VMs, private endpoints and image builds.
+  * Virtual network, subnets and NSGs for Bastion, VMs, private endpoints and image builds.
   * NAT gateway for outbound internet access.
   * Private endpoints and private DNS zones for blob storage, key vault and Azure Monitor. Public network access is disabled.
 * **Secure access**
   * Azure Bastion (Standard SKU) is the only inbound path to the virtual machine.
   * Microsoft Entra ID sign-in with Azure RBAC (passwordless).
-  * Break-glass local admin credentials stored in Key Vault.
-  * Role separation follows principle of least privilege for Azure RBAC role assignments.
+  * Break-glass local administrator account (`devopsbootstrapadmin`), with its user name and SSH private key stored in Key Vault.
+  * Role separation follows the principle of least privilege for Azure RBAC role assignments. See [Personas and Role Assignments](#personas-and-role-assignments).
 * **Observability**
   * Log Analytics workspace reachable only through AMPLS.
-  * AMA pre-configured on VM for logging syslog and performance counters.
+  * AMA pre-configured on the VM for logging syslog and performance counters.
   * Pre-configured diagnostic settings for security-sensitive resources (Bastion, Key Vault and Storage).
-* **Optional features** (disabled by default)
-  * GitHub Actions self-hosted runner on the virtual machine, and a deployment identity for sandbox applies, either attached to the virtual machine (`managed_identity`) or federated with GitHub Actions (`oidc`), with time-bound deployment roles granted before each apply. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration).
-  * Azure Compute Gallery and Azure VM Image Builder templates that pre-build fully patched Azure Sandbox VM images. See [Optional: Pre-built Images](#optional-pre-built-images).
+* **Optional Azure Sandbox extensions** (disabled by default)
+  * **GitHub self-hosted runner:** runs the Sandbox deployment workflow on `jumplinux2`, using a deployment identity with time-bound roles, for two use cases: a release gate that deploys and tests the sandbox on each release pull request, and automated deployment of one or more sandboxes on demand. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration).
+  * **Image gallery:** an Azure Compute Gallery and Azure VM Image Builder templates that build patched **custom images** for the Azure Sandbox VMs, to shorten deployments. See [Optional: Custom Images](#optional-custom-images).
 
 ## Prerequisites
 
-This section describes the prerequisites required in order to provision this configuration.
+This section describes the prerequisites required to provision this configuration. They're the same as the Azure Sandbox [Prerequisites](../../../README.md#prerequisites), except for the differences below. The optional features have more; see [Workflow Prerequisites](./modules/github-runner/README.md#workflow-prerequisites) and [Image Build Prerequisites](./modules/image-gallery/README.md#image-build-prerequisites).
 
-* [Microsoft Entra ID Tenant and Azure Subscription](#microsoft-entra-id-tenant-and-azure-subscription)
-* [Other Prerequisites](#other-prerequisites)
+* [Personas and Role Assignments](#personas-and-role-assignments)
 * [Terraform Execution Environment](#terraform-execution-environment)
 
-### Microsoft Entra ID Tenant and Azure Subscription
+### Personas and Role Assignments
 
-* Identify the [Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/fundamentals/whatis) tenant to be used for identity and access management, or create a new tenant using [Quickstart: Set up a tenant](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-create-new-tenant).
-* Identify a single Azure [subscription](https://learn.microsoft.com/azure/cloud-adoption-framework/ready/considerations/fundamental-concepts#azure-terminology) or create a new Azure subscription. See [Azure Offer Details](https://azure.microsoft.com/support/legal/offer-details/) and [Associate or add an Azure subscription to your Microsoft Entra tenant](https://learn.microsoft.com/entra/fundamentals/how-subscriptions-associated-directory) for more information.
-* Identify the operator who will provision this configuration. The operator needs the following Azure RBAC role assignments scoped to the subscription. See [Steps to assign an Azure role](https://learn.microsoft.com/azure/role-based-access-control/role-assignments-steps) for more information.
-  * [Contributor](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles#contributor).
-  * [Role Based Access Control Administrator](https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/privileged#role-based-access-control-administrator).
+This configuration works for any Terraform project, so it uses its own personas. A single user can assume multiple personas if they have the appropriate role assignments.
 
-### Other Prerequisites
+Persona | Intent | Minimum Azure Role Required
+--- | --- | ---
+**devops administrator** | Applies this configuration and manages its optional features. | `Contributor` and `Role Based Access Control Administrator` on the subscription \*
+**devops engineer** | Signs in to `jumplinux2` to run Terraform. | `Reader` on the rg-devops-iac resource group and `Virtual Machine User Login` on `jumplinux2`, plus the roles the Terraform configuration needs \*\*
 
-* Some Azure subscriptions may have low quota limits for specific Azure resources which may cause failures. See [Resolve errors for resource quotas](https://learn.microsoft.com/azure/azure-resource-manager/templates/error-resource-quota) for more information.
-* Some Azure subscriptions may not have the required resource providers registered. Terraform is configured to automatically register the required resource providers, but this may take some time on first use.
-* Some Azure subscriptions may not have the required features enabled which may cause failures. Monitor your plan application for errors related to specific subscription features and enable them as needed.
-* Some organizations may institute [Azure policy](https://learn.microsoft.com/azure/governance/policy/overview) which may cause failures. This can be addressed by using custom settings which pass the policy checks, or by disabling the policies on the Azure subscription being used for the configurations.
-* Additional prerequisites are required when using the [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration).
+\* `Owner` also works. To hold these roles only when needed, see [Least-Privilege Access with Privileged Identity Management](./modules/github-runner/README.md#least-privilege-access-with-privileged-identity-management).
+
+\*\* Grant the roles the configuration's resources need, either to the devops engineer, who signs in to Azure CLI, or to the identity the configuration's providers authenticate as. For example, see the Azure Sandbox [Deployment Identity](../../../README.md#deployment-identity). Terraform state needs no extra roles, because `jumplinux2`'s managed identity accesses the state backend.
+
+The **devops administrator** who applies this configuration is granted `Key Vault Secrets Officer` on the key vault, `Storage Blob Data Contributor` on the storage account and `Virtual Machine Administrator Login` on `jumplinux2`. The optional GitHub runner adds two more personas; see [Personas](./modules/github-runner/README.md#personas).
 
 ### Terraform Execution Environment
 
-A variety of Terraform execution environments can be used to provision this configuration interactively, including:
-
-* **Windows-Only Client**: A Windows-only client can be used to run Terraform. The following software should be installed:
-  * git
-  * PowerShell 7.x
-  * Azure CLI
-  * Terraform
-  * Visual Studio Code
-
-* **Windows Subsystem for Linux (WSL) Client**: WSL offers the best of Windows and Linux in the same client environment and was used to develop this project. The following software should be installed:
-  * Linux (WSL) software
-    * Linux Distro: Ubuntu 24.04 LTS (Noble Numbat)
-    * git
-    * Azure CLI
-    * Terraform
-  * Windows software
-    * Visual Studio Code configured for [Remote development in WSL](https://code.visualstudio.com/docs/remote/wsl-tutorial)
-
-* **Linux / MacOs Client**: A Linux or MacOS client can be used to run Terraform. The following software should be installed:
-  * git
-  * Azure CLI
-  * Terraform
-  * Visual Studio Code
+Use any of the Azure Sandbox [Terraform Execution Environments](../../../README.md#terraform-execution-environment) except an Azure virtual machine, because this configuration creates the virtual machine. The bootstrap scripts and Terraform need git, Azure CLI and Terraform. PowerShell 7.x and the Az PowerShell module are needed only for `bootstrap.ps1`.
 
 ## Getting Started
 
 This section covers the steps to get started with this configuration using an interactive Terraform execution environment.
 
-* [Step 0: Login](#step-0-login)
-* [Step 1: Clone the Repository](#step-1-clone-the-repository)
-* [Step 2: Initialize Terraform](#step-2-initialize-terraform)
-* [Step 3: Configure Variables](#step-3-configure-variables)
-* [Step 4: Validate and Apply Configuration](#step-4-validate-and-apply-configuration)
-* [Step 5: Complete Smoke Testing](#step-5-complete-smoke-testing)
-* [Step 6: Use The Environment](#step-6-use-the-environment)
-* [Step 7: Clean Up](#step-7-clean-up)
+* [Step 1: Log In](#step-1-log-in)
+* [Step 2: Clone the Repository](#step-2-clone-the-repository)
+* [Step 3: Initialize Terraform](#step-3-initialize-terraform)
+* [Step 4: Configure Variables](#step-4-configure-variables)
+* [Step 5: Validate and Apply Configuration](#step-5-validate-and-apply-configuration)
+* [Step 6: Complete Smoke Testing](#step-6-complete-smoke-testing)
+* [Step 7: Use The Environment](#step-7-use-the-environment)
+* [Step 8: Clean Up](#step-8-clean-up)
 
-### Step 0: Login
+### Step 1: Log In
 
-Before you can provision this configuration interactively, you need to log in to your Azure account.
+Sign in to Azure CLI as the **devops administrator** and select the subscription, as in the Azure Sandbox [Step 1: Log In](../../../README.md#step-1-log-in). If your roles are PIM eligible, activate them first. See [Personas and Role Assignments](#personas-and-role-assignments).
 
-* Open a terminal window and run the following command to log in to Azure CLI:
+```bash
+az login --use-device-code
+```
 
-  ```bash
-  az login --use-device-code
-  ```
-
-  If you will use the PowerShell bootstrap script, also run:
-
-  ```pwsh
-  Connect-AzAccount -UseDeviceAuthentication
-  ```
-
-* Check the terminal for a message like this:
-
-  ```text
-  To sign in, use a web browser to open the page https://microsoft.com/devicelogin and enter the code XXXXXXXXX to authenticate.
-  ```
-
-* Open a browser and navigate to the URL provided in the terminal. Enter the code displayed in the terminal to authenticate your Azure account.
-* Sign in with an account that has the following minimum Azure RBAC role assignments on the subscription (standing or PIM-activated):
-  * `Contributor`
-  * `Role Based Access Control Administrator`
-* Depending upon how your Entra ID tenant is configured, you may be prompted to enter your password and/or approve a sign-in request on your mobile device.
-* Click **Continue** when asked if you are trying to sign in to Azure.
-* Check the terminal for a prompt like this:
-
-  ```text
-  Retrieving tenants and subscriptions for the selection...
-
-  [Tenant and subscription selection]
-
-  No     Subscription name               Subscription ID                       Tenant
-  -----  ------------------------------  ------------------------------------  ----------------
-  [1] *  SUBSCRIPTION1-NAME-HERE         SUBSCRIPTION1-ID-HERE                 TENANT-NAME-HERE
-  [2]    SUBSCRIPTION2-NAME-HERE         SUBSCRIPTION2-ID-HERE                 TENANT-NAME-HERE
-
-  The default is marked with an *; the default tenant is 'TENANT-NAME-HERE' and subscription is 'SUBSCRIPTION1-NAME-HERE' (SUBSCRIPTION1-ID-HERE).
-
-  Select a subscription and tenant (Type a number or Enter for no changes):
-  ```
-
-* Select the subscription you will be using to provision this configuration by entering the number next to it. If you only have one subscription, just press Enter.
-
-### Step 1: Clone the Repository
+### Step 2: Clone the Repository
 
 Clone the Azure Sandbox repository to the Terraform execution environment using the following command:
 
@@ -158,7 +95,7 @@ Clone the Azure Sandbox repository to the Terraform execution environment using 
 git clone https://github.com/Azure-Samples/azuresandbox
 ```
 
-### Step 2: Initialize Terraform
+### Step 3: Initialize Terraform
 
 After cloning the repository, navigate to the `rg-devops-iac` directory and initialize Terraform. This step downloads the necessary provider plugins and modules.
 
@@ -169,59 +106,45 @@ terraform init
 
 **WARNING:** By default this configuration assumes you will be using a local Terraform state file which includes sensitive information. This is by design since the configuration creates the storage account to be used as a Terraform state backend for other configurations.
 
-### Step 3: Configure Variables
+### Step 4: Configure Variables
 
-Follow these steps to configure the variables for this configuration:
+Configure the variables for this configuration by creating a `terraform.tfvars` file. Helper scripts are provided to generate this file:
 
-* Create a `terraform.tfvars` file in the root directory of the project. This file should set the necessary variables for your deployment. Here is an example of what the `terraform.tfvars` file might look like:
+```bash
+# Bash bootstrap script, run from the rg-devops-iac directory
+./scripts/bootstrap.sh
+```
 
-  ```hcl
-  entra_tenant_id = "<entra-tenant-id-here>"
-  location        = "<azure-region-here>"
-  subscription_id = "<subscription-id-here>"
+```pwsh
+# PowerShell bootstrap script, run from the rg-devops-iac directory
+./scripts/bootstrap.ps1
+```
 
-  tags = {
-    project     = "devops",
-    costcenter  = "mycostcenter",
-    environment = "dev"
-  }
-  ```
-
-  Helper scripts are provided to generate the `terraform.tfvars` file:
-
-  ```bash
-  # Bash bootstrap script, run from the root directory of the project
-  ./scripts/bootstrap.sh
-  ```
-
-  ```pwsh
-  # PowerShell bootstrap script, run from the root directory of the project
-  ./scripts/bootstrap.ps1
-  ```
-
-#### **Overriding Defaults**
-
-The variable defaults set in this configuration can be overridden by customizing the `terraform.tfvars` file or modifying the module block in `main.tf`. For example, the default value for the `vm_jumpbox_linux_name` variable in the vm-jumpbox-linux module is `jumplinux2`. You can override this value by adding the following to the vnet-shared module block in `main.tf`:
+Alternatively, you can create `terraform.tfvars` manually in the rg-devops-iac directory. Here is an example of what the `terraform.tfvars` file might look like:
 
 ```hcl
-module "vm_jumpbox_linux" {
-  source = "./modules/vm-jumpbox-linux"
+# terraform.tfvars
 
-  key_vault_id        = azurerm_key_vault.this.id
-  location            = azurerm_resource_group.this.location
-  resource_group_name = azurerm_resource_group.this.name
-  storage_account_id  = azurerm_storage_account.this.id
-  subnet_id           = azurerm_subnet.subnets[var.subnet_devops_name].id
-  tags                = var.tags
+entra_tenant_id = "<entra-tenant-id-here>"
+location        = "<azure-region-here>"
+subscription_id = "<subscription-id-here>"
 
-  depends_on = [time_sleep.wait_for_roles]
-
-  # Override defaults here
-  vm_jumpbox_linux_name = "devopsagent1"
+tags = {
+  project     = "devops",
+  costcenter  = "mycostcenter",
+  environment = "dev"
 }
 ```
 
-### Step 4: Validate and Apply Configuration
+#### Overriding Defaults
+
+Set root module variables in `terraform.tfvars`. To override a child module default that the root module doesn't expose, add the argument to the module block in `main.tf`. For example, to rename `jumplinux2`, the default of the vm-jumpbox-linux module's `vm_jumpbox_linux_name` variable, add this line to the `module "vm_jumpbox_linux"` block:
+
+```hcl
+  vm_jumpbox_linux_name = "devopsagent1"
+```
+
+### Step 5: Validate and Apply Configuration
 
 Follow these steps to validate and apply the configuration:
 
@@ -234,13 +157,13 @@ Follow these steps to validate and apply the configuration:
 * Next, create a plan to see what resources will be created:
 
   ```bash
-  terraform plan
+  terraform plan -out=freshapply.tfplan
   ```
 
 * Finally, apply the configuration to create the resources:
 
   ```bash
-  terraform apply
+  terraform apply freshapply.tfplan
   ```
 
 * Monitor the progress of the apply operation in the console. If errors occur, that may not be reflected in the console immediately. Terraform will try to apply as much of the plan as possible first, then will show the errors when it is done. It can take up to 15 minutes to provision this configuration. If everything goes well you should see a message like this:
@@ -249,19 +172,24 @@ Follow these steps to validate and apply the configuration:
   Apply complete! Resources: XX added, XX changed, XX destroyed.
   ```
 
-### Step 5: Complete Smoke Testing
+### Step 6: Complete Smoke Testing
 
 See [Smoke Testing](./modules/vm-jumpbox-linux/README.md#smoke-testing) in the `vm-jumpbox-linux` module.
 
-### Step 6: Use The Environment
+### Step 7: Use The Environment
 
-You now have a fully provisioned Terraform execution environment you can use to interactively deploy the [Azure Sandbox](https://github.com/Azure-Samples/azuresandbox) Terraform configuration, or other Terraform configurations of your choosing.
+You now have a Terraform execution environment you can use to deploy Azure Sandbox or other Terraform configurations of your choosing:
 
-If you are interested in enabling automated deployments of the Azure Sandbox configuration, see [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration).
+* **Interactive:** connect to `jumplinux2` through Azure Bastion with your Microsoft Entra ID credentials, then follow the Azure Sandbox [tutorial](../../../README.md#tutorial-deploy-a-sandbox-using-your-azure-cli-sign-in). Use this configuration's storage account as the state backend; see [Terraform State](./modules/github-runner/README.md#terraform-state).
+* **Automated:** see [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration).
 
-### Step 7: Clean Up
+### Step 8: Clean Up
 
-Don't forget to delete your DevOps IaC environment when you're done. You don't want to have to explain to your boss why you left an unused resources laying around that costs your company money. The quickest way to clean up is to delete the DevOps IaC resource group. Do this with care because data loss will occur, including any Terraform state files in the Azure Blob Storage container.
+Stop (deallocate) `jumplinux2` when you aren't using it, so you don't pay for compute while it's idle.
+
+If you use the optional GitHub self-hosted runner with `deployment_identity = "oidc"`, the workflow starts and deallocates `jumplinux2` for each run. With `managed_identity`, start `jumplinux2` before each run. See [Runner Power State Identity](./modules/github-runner/README.md#runner-power-state-identity).
+
+Delete your DevOps IaC environment when you no longer need it, so unused resources don't keep costing money. Run `terraform destroy`, or delete the DevOps IaC resource group. Do this with care, because data loss will occur, including any Terraform state files in the storage container.
 
 ## Documentation
 
@@ -275,7 +203,7 @@ This section provides documentation regarding the overall structure of the root 
 * [Virtual Network Design](#virtual-network-design)
 * [Dependencies](#dependencies)
 * [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration)
-* [Optional: Pre-built Images](#optional-pre-built-images)
+* [Optional: Custom Images](#optional-custom-images)
 
 ### Root Module Structure
 
@@ -286,16 +214,14 @@ This configuration is organized into the following structure:
 │   └── rg-devops-iac-diagram.drawio.svg  # Architecture diagram
 ├── modules/                              # Child modules
 │   ├── github-runner/                    # GitHub Actions runner and deployment identity module (optional)
-│   ├── image-gallery/                    # Compute gallery and image builder module (optional pre-built images)
+│   ├── image-gallery/                    # Compute gallery and image builder module (optional custom images)
 │   └── vm-jumpbox-linux/                 # Linux jumpbox virtual machine module (jumplinux2)
-├── scripts/                              # Helper scripts
+├── scripts/                              # Partial list: user-facing scripts only
 │   ├── bootstrap.ps1                     # PowerShell: generates terraform.tfvars
 │   ├── bootstrap.sh                      # Bash: generates terraform.tfvars
 │   ├── cleanterraformtemp.sh             # Bash: removes Terraform temp/local files
-│   ├── Connect-Jumplinux2.ps1            # PowerShell: connects to jumplinux2 through a Bastion tunnel with Entra ID
-│   ├── connect-jumplinux2.sh             # Bash: connects to jumplinux2 through a Bastion tunnel with Entra ID
 │   ├── delete-tfstate.sh                 # Bash: deletes Terraform state blob(s) from the storage backend
-│   └── enable-public-access.sh           # Bash: re-enables public access on the key vault and storage account (not the AMPLS or workspace)
+│   └── enable-public-access.sh           # Bash: re-enables key vault and storage account public access
 ├── locals.tf                             # Local variables
 ├── main.tf                               # Resource configurations
 ├── network.tf                            # Network resource blocks
@@ -306,7 +232,7 @@ This configuration is organized into the following structure:
 └── variables.tf                          # Variable definitions
 ```
 
-There are additional scripts used for optional use cases. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration) and [Optional: Pre-built Images](#optional-pre-built-images).
+There are additional scripts used for optional use cases. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration) and [Optional: Custom Images](#optional-custom-images).
 
 ### Root Module Input Variables
 
@@ -334,11 +260,11 @@ tags | | The tags in map format to be used when creating new resources.
 vm_jumpbox_linux_size | `Standard_D2ls_v6` | The size of the Linux virtual machine (`jumplinux2`). Must be a v6 D-series size (`Standard_D<vCPU>[a][l][d]s_v6`), which supports Trusted Launch, the NVMe disk controller and Accelerated Networking.
 vnet_address_space | 10.0.0.0/16 | The address space in CIDR notation for the virtual network.
 
-There are additional input variables used for optional use cases. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration) and [Optional: Pre-built Images](#optional-pre-built-images).
+There are additional input variables used for optional use cases. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration) and [Optional: Custom Images](#optional-custom-images).
 
 ### Root Module Resources
 
-The root module includes a resource group, key vault and storage account used by the child modules. It also grants the operator who runs Terraform data-plane roles on the key vault and storage account.
+The root module includes a resource group, key vault and storage account used by the child modules. It also grants the devops administrator who runs Terraform data-plane roles on the key vault and storage account.
 
 Address | Name | Notes
 --- | --- | ---
@@ -371,8 +297,8 @@ azurerm_private_endpoint.storage_blob | pep-devops-dev-storage-blob | Private en
 azurerm_public_ip.bastion | pip-devops-dev-bastion | Public IP address for the Bastion host.
 azurerm_public_ip.this | pip-devops-dev-nat | Public IP address for the NAT gateway.
 azurerm_resource_group.this | rg-devops-dev-xxx | Resource group for all resources in this configuration.
-azurerm_role_assignment.key_vault_secrets_officer | | Assigns `Key Vault Secrets Officer` on the key vault to the operator signed in to Azure CLI.
-azurerm_role_assignment.storage_blob_data_contributor | | Assigns `Storage Blob Data Contributor` on the storage account to the operator signed in to Azure CLI.
+azurerm_role_assignment.key_vault_secrets_officer | | Assigns `Key Vault Secrets Officer` on the key vault to the devops administrator signed in to Azure CLI.
+azurerm_role_assignment.storage_blob_data_contributor | | Assigns `Storage Blob Data Contributor` on the storage account to the devops administrator signed in to Azure CLI.
 azurerm_storage_account.this | stdevopsdevxxx | Storage account for storing Terraform state files.
 azurerm_storage_container.this | tfstate | Storage container for storing Terraform state files.
 azurerm_subnet.subnets[*] | | Subnets from `local.subnets`. Each must be inside `vnet_address_space` and must not overlap another subnet. See [Virtual Network Design](#virtual-network-design).
@@ -380,7 +306,7 @@ azurerm_subnet_nat_gateway_association.associations[*] | | Associates the NAT ga
 azurerm_subnet_network_security_group_association.associations[*] | | Associates each NSG with its subnet.
 azurerm_virtual_network.this | vnet-devops-dev | Virtual network for the Linux virtual machine.
 
-There are additional resources used for optional use cases. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration) and [Optional: Pre-built Images](#optional-pre-built-images).
+There are additional resources used for optional use cases. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration) and [Optional: Custom Images](#optional-custom-images).
 
 ### Root Module Output Variables
 
@@ -391,7 +317,7 @@ Name | Comments
 resource_ids | A map of resource IDs for key resources in the configuration.
 resource_names | A map of resource names for key resources in the configuration.
 
-There are additional output variables for optional use cases. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration) and [Optional: Pre-built Images](#optional-pre-built-images).
+There are additional output variables for optional use cases. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration) and [Optional: Custom Images](#optional-custom-images).
 
 ### Child Modules
 
@@ -399,13 +325,13 @@ The following [modules](./modules/) are included in this configuration:
 
 Name | Required | Depends On | Description
 --- | --- | --- | ---
-[github-runner](./modules/github-runner/) | No | Root module, vm-jumpbox-linux | Installs and registers the GitHub Actions self-hosted runner on `jumplinux2`, and creates the deployment identity and GitHub Actions federated identity credentials for the Sandbox deployment workflow. Enabled by `enable_github_runner` or `deployment_identity`.
-[image-gallery](./modules/image-gallery/) | No | Root module | Creates an Azure Compute Gallery and Azure VM Image Builder templates for pre-built Azure Sandbox VM images. Enabled by `enable_image_gallery`.
-[vm-jumpbox-linux](./modules/vm-jumpbox-linux/) | No | Root module | Creates a preconfigured Linux jumpbox VM in the DevOps virtual network.
+[github-runner](./modules/github-runner/) | No | Root module, vm-jumpbox-linux | Installs and registers the GitHub Actions self-hosted runner on `jumplinux2`, and creates the deployment identity and GitHub Actions federated identity credentials for the Sandbox deployment workflow. Enabled when `enable_github_runner` is `true` or `deployment_identity` isn't "none".
+[image-gallery](./modules/image-gallery/) | No | Root module | Creates an Azure Compute Gallery and Azure VM Image Builder templates that build custom images for the Azure Sandbox VMs. Enabled by `enable_image_gallery`.
+[vm-jumpbox-linux](./modules/vm-jumpbox-linux/) | Yes | Root module | Creates `jumplinux2`, a preconfigured Linux jumpbox VM in the DevOps virtual network, used as the Terraform execution environment.
 
 ### Virtual Network Design
 
-This configuration implements a virtual network and network-isolated Azure services. A barrier pattern is used to ensure public access is disabled for key vault, blob storate and AMPLS when deployment completes. AMPLS is used to ensure Azure Monitor-related traffic is network isolated. Default address ranges are set artificially high for readability and can be overridden with smaller ranges to meet specific requirements.
+This configuration implements a virtual network and network-isolated Azure services. A barrier pattern is used to ensure public access is disabled for key vault, blob storage and AMPLS when deployment completes. AMPLS is used to ensure Azure Monitor-related traffic is network isolated. Default address ranges are set artificially high for readability and can be overridden with smaller ranges to meet specific requirements.
 
 VNet Property | Default Value | Notes
 --- | --- | ---
@@ -444,73 +370,77 @@ This section covers the dependencies in this configuration.
 * [Configuration Management Technologies](#configuration-management-technologies)
 * [Operating Systems](#operating-systems)
 
-#### **Source Control**
+#### Source Control
 
-The configuration is hosted on GitHub and uses Git for source control. The repository is organized into configurations and modules, making it easy to navigate and understand the structure of the project. The [vm-jumpbox-linux] module can be repurposed for use in other configurations.
+The configuration is hosted on GitHub. The *.gitignore* file keeps secrets, state and temporary files out of Git. The [vm-jumpbox-linux](./modules/vm-jumpbox-linux/) module can be reused in other configurations.
 
-#### **Terraform**
+#### Terraform
 
-This project is built built using Terraform, a cross platform, open-source Infrastructure as Code (IaC) tool that allows users to define, provision and version cloud infrastructure using a declarative configuration language called HCL (HashiCorp Configuration Language).
+This configuration is built with Terraform. See *terraform.tf* for the pinned Terraform and provider versions.
 
-* **Providers**: The following Terraform providers are used in the project:
-  * **azurerm**: Used to manage Azure resources.
-  * **cloudinit**: Used to configure Linux virtual machines.
-  * **random**: Used to generate random values for resource attributes.
-  * **time**: Used to implement wait cycles and other time based operations.
-  * **tls**: Used to generate the break-glass SSH key pair for the Linux virtual machine's local admin account.
-* **Modules**: The following Terraform modules are used in this project:
-  * **Azure/avm-utl-naming**: The Azure Verified Module naming utility, used to generate consistent and compliant Azure resource names from its `names` output (replaces the archived `Azure/naming/azurerm` module).
+* **Providers**:
+  * **azapi**: Manages Azure resources and settings the azurerm provider doesn't support, such as AIB image templates and Run Commands.
+  * **azurerm**: Manages Azure resources.
+  * **cloudinit**: Configures Linux virtual machines.
+  * **http**: Looks up GitHub repository ids for the optional `oidc` deployment identity.
+  * **random**: Generates random values for resource attributes.
+  * **time**: Implements waits and other time-based operations.
+  * **tls**: Generates the break-glass SSH key pair for the Linux virtual machine's local admin account.
+* **Modules**:
+  * **Azure/avm-utl-naming**: The Azure Verified Module naming utility, used to generate consistent and compliant Azure resource names from its `names` output.
 
-#### **Scripting Technologies**
+#### Scripting Technologies
 
 The following cross-platform scripting technologies are used in this project:
 
-* **PowerShell**:  Used for general purpose scripting and to implement Terraform provisioners and Azure custom script extensions.
+* **PowerShell**: Used by *bootstrap.ps1*, the optional workflow scripts and the Windows custom image builds.
 * **Az PowerShell Module**: Used to connect to and configure Azure resources from PowerShell scripts.
-* **Bash**: Used for general purpose scripting.
-* **Azure CLI**: Used for connecting to Azure resources from Bash scripts.
+* **Bash**: Used for general-purpose scripting.
+* **Azure CLI**: Used by Terraform to sign in as the devops administrator, and to connect to Azure resources from Bash scripts.
 
-#### **Configuration Management Technologies**
+#### Configuration Management Technologies
 
 The following configuration management technologies are used in this project to configure virtual machines:
 
-* **cloud-init**: Used to configure Linux virtual machines.
+* **cloud-init**: Configures `jumplinux2`.
+* **Azure VM run commands**: Wait for cloud-init and install the optional GitHub Actions runner on `jumplinux2`.
+* **Azure VM Image Builder**: Builds the optional custom images.
 
-#### **Operating Systems**
+#### Operating Systems
 
 The following operating systems are used for the various virtual machines in the sandbox:
 
 Virtual Machine | Role | Module | Operating System
 --- | --- | --- | ---
-jumplinux2 | Jumpbox / DevOps agent | `vm-jumpbox-linux` | Ubuntu Server LTS 24.04 (Nobel Numbat)
+jumplinux2 | Jumpbox / DevOps agent | `vm-jumpbox-linux` | Ubuntu Server LTS 24.04 (Noble Numbat)
 
 ### Optional: GitHub Self-Hosted Runner Configuration
 
-`rg-devops-iac` can optionally be configured as a self-hosted runner for [Azure Sandbox](https://github.com/Azure-Samples/azuresandbox) GitHub Actions deployment workflows, with a deployment identity for Azure Sandbox applies. Set `enable_github_runner = true` and `deployment_identity` in `terraform.tfvars` to create them with the [github-runner](./modules/github-runner/README.md) module. Its README documents the [GitHub Actions Workflow Design](./modules/github-runner/README.md#github-actions-workflow-design), including the [Workflow Prerequisites](./modules/github-runner/README.md#workflow-prerequisites), [Workflow Setup](./modules/github-runner/README.md#workflow-setup), [Self-Hosted Runner Registration](./modules/github-runner/README.md#self-hosted-runner-registration), [Just-in-Time Deployment Roles](./modules/github-runner/README.md#just-in-time-deployment-roles) and [Removing the Runner](./modules/github-runner/README.md#removing-the-runner). Both are disabled by default, and the module isn't created unless one of them is enabled.
+`rg-devops-iac` can optionally be configured as a self-hosted runner for the Azure Sandbox [Sandbox deployment workflow](../../../.github/workflows/sandbox-deployment.yml), with a deployment identity for Azure Sandbox applies. The workflow has two use cases: a **release gate** that deploys and tests the sandbox on each release pull request before it merges, and **automated deployment** of one or more sandboxes on demand. Set `enable_github_runner = true` and `deployment_identity` in `terraform.tfvars` to create them with the [github-runner](./modules/github-runner/README.md) module. Its README documents the [GitHub Actions Workflow Design](./modules/github-runner/README.md#github-actions-workflow-design), including the [Workflow Prerequisites](./modules/github-runner/README.md#workflow-prerequisites), [Workflow Setup](./modules/github-runner/README.md#workflow-setup), [Self-Hosted Runner Registration](./modules/github-runner/README.md#self-hosted-runner-registration), [Just-in-Time Deployment Roles](./modules/github-runner/README.md#just-in-time-deployment-roles) and [Removing the Runner](./modules/github-runner/README.md#removing-the-runner). Both are disabled by default, and the module isn't created unless one of them is enabled.
 
 Variable | Default | Description
 --- | --- | ---
 deployment_identity | `none` | Deployment identity for Azure Sandbox applies: `none`, `managed_identity` (attached to `jumplinux2`) or `oidc` (federated with GitHub Actions). See [Deployment Identity](./modules/github-runner/README.md#deployment-identity).
-deployment_identity_github_environments | `["sandbox-deployment", "sandbox-release-gate"]` | The GitHub Actions environments whose jobs can sign in as the deployment identity. One federated identity credential is created per environment. Only used when `deployment_identity` is `oidc`.
+deployment_identity_github_environments | `["sandbox-deployment", "sandbox-release-gate"]` | The GitHub Actions environments whose jobs can sign in as the deployment identity. One federated identity credential is created per environment. Only used when `deployment_identity` is `"oidc"`.
 enable_github_runner | false | Set to true to install and register the GitHub Actions self-hosted runner agent on `jumplinux2`. See [Self-Hosted Runner Registration](./modules/github-runner/README.md#self-hosted-runner-registration).
-github_repository_id | | The numeric id of the GitHub repository, e.g. from `gh api repos/OWNER/NAME --jq .id`. Only used when `deployment_identity` is `oidc`. When empty, it is looked up from the repository in `github_runner_url`, which works only for public repositories.
-github_repository_owner_id | | The numeric id of the user or organization that owns the GitHub repository, e.g. from `gh api repos/OWNER/NAME --jq .owner.id`. Only used when `deployment_identity` is `oidc`. When empty, it is looked up from the repository in `github_runner_url`, which works only for public repositories.
+github_repository_id | | The numeric id of the GitHub repository, e.g. from `gh api repos/OWNER/NAME --jq .id`. Only used when `deployment_identity` is `"oidc"`. When empty, it is looked up from the repository in `github_runner_url`, which works only for public repositories.
+github_repository_owner_id | | The numeric id of the user or organization that owns the GitHub repository, e.g. from `gh api repos/OWNER/NAME --jq .owner.id`. Only used when `deployment_identity` is `"oidc"`. When empty, it is looked up from the repository in `github_runner_url`, which works only for public repositories.
 github_runner_labels | `["azuresandbox"]` | Additional labels to apply to the GitHub Actions self-hosted runner. Only used when `enable_github_runner` is true.
-github_runner_power_state_environment | `sandbox-runner-power-state` | The GitHub Actions environment whose jobs can sign in as the runner power state identity, which starts and deallocates `jumplinux2` for workflow runs. Must not be one of `deployment_identity_github_environments`. Only used when `deployment_identity` is `oidc`.
+github_runner_power_state_environment | `sandbox-runner-power-state` | The GitHub Actions environment whose jobs can sign in as the runner power state identity, which starts and deallocates `jumplinux2` for workflow runs. Must not be one of `deployment_identity_github_environments`. Only used when `deployment_identity` is `"oidc"`.
 github_runner_token | | Ephemeral. The runner registration token used to register the self-hosted runner (expires after 1 hour), e.g. from `modules/github-runner/scripts/new-runner-registration-token.sh`. Set using the environment variable `TF_VAR_github_runner_token` for both `terraform plan` and `terraform apply`. Never stored in Terraform state or the saved plan. Required only when the runner is registered (on first deployment or when `github_runner_token_version` changes).
 github_runner_token_version | 1 | Increment to send a new `github_runner_token` to the VM and re-run runner registration, e.g. after a failed registration. Only used when `enable_github_runner` is true.
-github_runner_url | `https://github.com/Azure-Samples/azuresandbox` | The GitHub repository URL to register the self-hosted runner with. Defaults to the Azure Sandbox repository. Used when `enable_github_runner` is true, or when `deployment_identity` is `oidc` and the repository ids are not set.
+github_runner_url | `https://github.com/Azure-Samples/azuresandbox` | The GitHub repository URL to register the self-hosted runner with. Defaults to the Azure Sandbox repository. Used when `enable_github_runner` is true, or when `deployment_identity` is `"oidc"` and the repository ids are not set.
 
-When `deployment_identity` isn't `none`, the `resource_ids` and `resource_names` outputs also include `deployment_identity`, and `runner_power_state_identity` when it is `oidc`. These output variables are also returned:
+When `deployment_identity` isn't "none", the `resource_ids` and `resource_names` outputs also include `deployment_identity`, and `runner_power_state_identity` when it is `oidc`. These output variables are also returned:
 
 Name | Comments
 --- | ---
-deployment_identity | The deployment identity, or `null` when `deployment_identity` is `none`. An object with `client_id` (used as `client_id` for Azure Sandbox applies with `auth_mode = "managed_identity"` or `"oidc"`), `github_subjects` (the GitHub OIDC subjects accepted by its federated identity credentials, keyed by environment, or an empty map unless `deployment_identity` is `oidc`), `jit_condition` (the condition, version 2.0, to apply to its time-bound `Role Based Access Control Administrator` assignment before each apply) and `principal_id` (the principal (object) id, used to grant Microsoft Graph application permissions).
-github_runner | The GitHub Actions self-hosted runner, or `null` when `enable_github_runner` is false. An object with `name` (the name the runner is registered with), `power_state_identity_client_id` (the client id of the runner power state identity, which the Sandbox deployment workflow uses to start and deallocate `jumplinux2`, or `null` unless `deployment_identity` is `oidc`) and `power_state_identity_github_subject` (the GitHub OIDC subject accepted by the runner power state identity's federated identity credential, or `null` unless `deployment_identity` is `oidc`).
+deployment_identity | The deployment identity, or `null` when `deployment_identity` is "none". An object with `client_id` (used as `client_id` for Azure Sandbox applies with `auth_mode = "managed_identity"` or `"oidc"`), `github_subjects` (the GitHub OIDC subjects accepted by its federated identity credentials, keyed by environment, or an empty map unless `deployment_identity` is `"oidc"`), `jit_condition` (the condition, version 2.0, to apply to its time-bound `Role Based Access Control Administrator` assignment before each apply) and `principal_id` (the principal (object) id, used to grant Microsoft Graph application permissions).
+github_runner | The GitHub Actions self-hosted runner, or `null` when `enable_github_runner` is false. An object with `name` (the name the runner is registered with), `power_state_identity_client_id` (the client id of the runner power state identity, which the Sandbox deployment workflow uses to start and deallocate `jumplinux2`, or `null` unless `deployment_identity` is `"oidc"`) and `power_state_identity_github_subject` (the GitHub OIDC subject accepted by the runner power state identity's federated identity credential, or `null` unless `deployment_identity` is `"oidc"`).
 
-### Optional: Pre-built Images
+### Optional: Custom Images
 
-`rg-devops-iac` can optionally host an Azure Compute Gallery and Azure VM Image Builder templates that pre-build fully patched images for the Azure Sandbox VMs. Set `enable_image_gallery = true` in `terraform.tfvars` to create them with the [image-gallery](./modules/image-gallery/README.md) module. Its README documents the image design, build networking, identity, prerequisites and costs, and how to [build images](./modules/image-gallery/README.md#building-images) and [disable the image gallery](./modules/image-gallery/README.md#disabling-the-image-gallery).
+`rg-devops-iac` can optionally host an Azure Compute Gallery and Azure VM Image Builder templates that build patched **custom images** for the Azure Sandbox VMs. Sandbox VMs use **platform images** from Azure Marketplace by default; see [Custom Images](../../../README.md#custom-images) in the Azure Sandbox README for how to use the custom images instead. Set `enable_image_gallery = true` in `terraform.tfvars` to create them with the [image-gallery](./modules/image-gallery/README.md) module. Its README documents the image design, build networking, identity, prerequisites and costs, and how to [build images](./modules/image-gallery/README.md#building-images) and [disable the image gallery](./modules/image-gallery/README.md#disabling-the-image-gallery).
 
 Variable | Default | Description
 --- | --- | ---
