@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# This script generates a terraform.tfvars file for use with Azure Sandbox
+# This script generates a terraform.tfvars file for use with Azure Sandbox that authenticates
+# Terraform as the user signed in with Azure CLI (auth_mode = "azure_cli", the default).
 #
 # Package dependencies:
 #   - Azure CLI 
@@ -48,13 +49,6 @@ fi
 # Get runtime defaults
 printf "Retrieving runtime defaults ...\n"
 
-# Validate TF_VAR_client_secret
-if [ -z "$TF_VAR_client_secret" ]
-then
-  printf "Environment variable 'TF_VAR_client_secret' must be set.\n"
-  usage
-fi
-
 # Set default subscription from currently logged in Azure CLI user.
 default_subscription_id=$(az account list --only-show-errors --query "[? isDefault]|[0].id" --output tsv)
 
@@ -71,8 +65,6 @@ default_operator_object_id=$(az account get-access-token --query accessToken --o
 default_entra_tenant_id=$(az account show --query tenantId --output tsv)
 
 # Get user input
-# shellcheck disable=SC2154  # TF_VAR_client_id is an external Terraform env var, optionally exported by the caller.
-read -e -i "$TF_VAR_client_id"          -p "Service principal appId (client_id) ----------: " client_id
 read -e -i $default_entra_tenant_id     -p "Microsoft Entra tenant id (entra_tenant_id) --: " entra_tenant_id
 read -e -i $default_operator_object_id  -p "Operator object id (operator_object_id) ------: " operator_object_id
 read -e -i $default_subscription_id     -p "Azure subscription id (subscription_id) ------: " subscription_id
@@ -89,31 +81,6 @@ location=${location:-$default_location}
 operator_object_id=${operator_object_id:-$default_operator_object_id}
 project=${project:-$default_project}
 subscription_id=${subscription_id:-$default_subscription_id}
-
-# Validate client_id
-if [ -z "$client_id" ]
-then
-  printf "client_id is required.\n"
-  usage
-fi
-
-# Validate TF_VAR_client_secret
-if [ -z "$TF_VAR_client_secret" ]
-then
-  printf "Environment variable 'TF_VAR_client_secret' must be set.\n"
-  usage
-fi
-
-# Validate service principal
-client_display_name=$(az ad sp show --id $client_id --query "appDisplayName" --output tsv)
-
-if [ -n "$client_display_name" ]
-then 
-  printf "Found service principal '$client_display_name'...\n"
-else
-  printf "Invalid service principal AppId '$client_id'...\n"
-  usage
-fi
 
 # Validate subscription
 subscription_name=$(az account list --query "[?id=='$subscription_id'].name" --output tsv)
@@ -155,8 +122,7 @@ EOF
 # Generate terraform.tfvars file
 printf "\nGenerating terraform.tfvars file...\n\n"
 
-printf "client_id          = \"$client_id\"\n"        >  ./terraform.tfvars
-printf "entra_tenant_id    = \"$entra_tenant_id\"\n"   >> ./terraform.tfvars
+printf "entra_tenant_id    = \"$entra_tenant_id\"\n"   >  ./terraform.tfvars
 printf "location           = \"$location\"\n"          >> ./terraform.tfvars
 printf "operator_object_id = \"$operator_object_id\"\n" >> ./terraform.tfvars
 printf "subscription_id    = \"$subscription_id\"\n"   >> ./terraform.tfvars

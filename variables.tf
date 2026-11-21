@@ -6,22 +6,33 @@ variable "additional_tags" {
 
 variable "auth_mode" {
   type        = string
-  description = "How Terraform authenticates the azurerm, azapi and azuread providers: client_secret (service principal and secret), managed_identity (user-assigned managed identity on the Terraform execution host) or oidc (GitHub Actions OIDC token federated to a user-assigned managed identity or app registration)."
-  default     = "client_secret"
+  description = "How Terraform authenticates the azurerm, azapi and azuread providers: azure_cli (the user signed in with Azure CLI, the default), client_secret (service principal and secret), managed_identity (user-assigned managed identity on the Terraform execution host) or oidc (GitHub Actions OIDC token federated to a user-assigned managed identity or app registration)."
+  default     = "azure_cli"
 
   validation {
-    condition     = contains(["client_secret", "managed_identity", "oidc"], var.auth_mode)
-    error_message = "auth_mode must be one of: client_secret, managed_identity or oidc."
+    condition     = contains(["azure_cli", "client_secret", "managed_identity", "oidc"], var.auth_mode)
+    error_message = "auth_mode must be one of: azure_cli, client_secret, managed_identity or oidc."
   }
 }
 
 variable "client_id" {
   type        = string
-  description = "The client id of the identity Terraform authenticates as: the service principal appId when auth_mode is client_secret, the user-assigned managed identity client id when auth_mode is managed_identity, or the client id of the identity with the GitHub federated identity credentials when auth_mode is oidc."
+  description = "The client id of the identity Terraform authenticates as: the service principal appId when auth_mode is client_secret, the user-assigned managed identity client id when auth_mode is managed_identity, or the client id of the identity with the GitHub federated identity credentials when auth_mode is oidc. Must not be set when auth_mode is azure_cli."
+  default     = null
 
   validation {
-    condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.client_id))
+    condition     = var.client_id == null || can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.client_id))
     error_message = "client_id must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
+  }
+
+  validation {
+    condition     = var.auth_mode != "azure_cli" || var.client_id == null
+    error_message = "client_id should not be set when auth_mode = azure_cli."
+  }
+
+  validation {
+    condition     = var.auth_mode == "azure_cli" || var.client_id != null
+    error_message = "client_id must be set when auth_mode = client_secret, managed_identity or oidc."
   }
 }
 
@@ -266,6 +277,14 @@ variable "tags" {
     ])
     error_message = "Each tag key must be 1-512 characters long and consist of alphanumeric characters, periods (.), underscores (_), or hyphens (-). Each tag value must be 0-256 characters long and consist of alphanumeric characters, periods (.), underscores (_), spaces, or hyphens (-)."
   }
+
+  validation {
+    condition = alltrue([
+      for key in ["project", "environment"] :
+      trimspace(tostring(lookup(var.tags, key, ""))) != ""
+    ])
+    error_message = "The 'tags' variable must include non-empty 'project' and 'environment' keys, which are used in resource names."
+  }
 }
 
 variable "vm_avd_size" {
@@ -297,12 +316,12 @@ variable "vm_image_gallery_id" {
 
 variable "vm_jumpbox_size" {
   type        = string
-  description = "The size of the jumpbox and domain controller virtual machines: 'jumpwin1', 'jumplinux1', and 'adds1', as well as 'jumpwin2' and 'adds2' when the vnet_onprem module is enabled."
+  description = "The size of the jumpbox and domain controller virtual machines: 'jumpwin1', 'jumplinux1', and 'adds1', as well as 'jumpwin2' and 'adds2' when the vnet_onprem module is enabled. Must be a v6 D-series size (Dsv6, Dlsv6, Ddsv6, Dldsv6 or the AMD 'a' variants), which support Trusted Launch, the NVMe disk controller and Accelerated Networking."
   default     = "Standard_D2ls_v6"
 
   validation {
-    condition     = can(regex("^[a-zA-Z0-9_]+$", var.vm_jumpbox_size))
-    error_message = "The 'vm_jumpbox_size' must conform to Azure virtual machine size naming conventions: it can only contain alphanumeric characters and underscores (_). Examples include 'Standard_DS1_v2' or 'Standard_B2ms'."
+    condition     = can(regex("^Standard_D[0-9]+a?l?d?s_v6$", var.vm_jumpbox_size))
+    error_message = "The 'vm_jumpbox_size' must be a v6 D-series size matching the pattern 'Standard_D<vCPU>[a][l][d]s_v6' (e.g. 'Standard_D2ls_v6', 'Standard_D2s_v6', 'Standard_D2ds_v6', 'Standard_D2als_v6'). These sizes support Trusted Launch, the NVMe disk controller and Accelerated Networking."
   }
 }
 

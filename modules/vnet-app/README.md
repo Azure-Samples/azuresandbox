@@ -183,7 +183,7 @@ vm_jumpbox_win_image_publisher | `MicrosoftWindowsServer` | The publisher for th
 vm_jumpbox_win_image_sku | `2025-datacenter-g2` | The SKU for the virtual machine image used to create the VM.
 vm_jumpbox_win_image_version | `Latest` | The version of the virtual machine image used to create the VM.
 vm_jumpbox_win_name | jumpwin1 | The name of the VM.
-vm_jumpbox_win_size | `Standard_D2ls_v6` | The size of the VM. Defined by the root module's `vm_jumpbox_size` variable.
+vm_jumpbox_win_size | `Standard_D2ls_v6` | The size of the VM. Defined by the root module's `vm_jumpbox_size` variable. Must be a v6 D-series size (`Standard_D<vCPU>[a][l][d]s_v6`), which supports Trusted Launch, the NVMe disk controller and Accelerated Networking.
 vm_jumpbox_win_storage_account_type | `StandardSSD_LRS` | The storage type to be used for the VM's OS disk. Standard HDD (`Standard_LRS`) is not permitted because Azure is retiring Standard HDD OS disks on September 8, 2028.
 vnet_address_space | 10.2.0.0/16 | The address space for the application virtual network.
 vnet_name | app | The name of the application virtual network.
@@ -205,7 +205,7 @@ module.vnet_app[0].azurerm_monitor_diagnostic_setting.container_registry | | Dia
 module.vnet_app[0].azurerm_monitor_diagnostic_setting.storage_blob | Diagnostic Logs | Diagnostic settings streaming blob service StorageWrite/StorageDelete logs and Transaction metrics to the shared Log Analytics workspace. StorageRead is omitted by default to control ingestion cost on high-volume accounts.
 module.vnet_app[0].azurerm_monitor_diagnostic_setting.storage_file | Diagnostic Logs | Diagnostic settings streaming file service StorageWrite/StorageDelete logs and Transaction metrics to the shared Log Analytics workspace. StorageRead is omitted by default to control ingestion cost on high-volume accounts.
 module.vnet_app[0].azurerm_monitor_private_link_scoped_service.app_insights | | Adds app insights to the AMPLS scoped services.
-module.vnet_app[0].azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;jumpwin1 | Network interface for the VM.
+module.vnet_app[0].azurerm_network_interface.this | nic&#8209;sand&#8209;dev&#8209;jumpwin1 | Network interface for the VM. Configured with accelerated networking enabled.
 module.vnet_app[0].azurerm_network_security_group.groups[*] | | NSGs for each subnet.
 module.vnet_app[0].azurerm_network_security_rule.rules[*] | | NSG rules for each NSG. See *locals.tf* for rule definitions.
 module.vnet_app[0].azurerm_private_endpoint.container_registry | pep&#8209;sand&#8209;dev&#8209;cr | Private endpoint for the container registry. Provisioned in the centralized private endpoint subnet in *vnet-shared*.
@@ -230,7 +230,7 @@ module.vnet_app[0].azurerm_virtual_machine_run_command.wait_for_guest_agent | vm
 module.vnet_app[0].azurerm_virtual_network.this | vnet&#8209;sand&#8209;dev&#8209;app | Virtual network for application workloads in the sandbox environment.
 module.vnet_app[0].azurerm_virtual_network_peering.app_to_shared | | Virtual network peering from the application virtual network to the shared services virtual network (vnet-shared).
 module.vnet_app[0].azurerm_virtual_network_peering.shared_to_app | | Virtual network peering from the *vnet-shared* virtual network to the application virtual network.
-module.vnet_app[0].azurerm_windows_virtual_machine.this | jumpwin1 | Domain joined Windows jumpbox VM. Required to establish Azure Files AD integration.
+module.vnet_app[0].azurerm_windows_virtual_machine.this | jumpwin1 | Domain joined Windows jumpbox VM. Required to establish Azure Files AD integration. Configured with NVMe disk controller, encryption at host, secure boot and vTPM (Trusted Launch).
 module.vnet_app[0].time_sleep.wait_for_domain_join_restart | | Waits 2 minutes after the post-domain-join restart so the guest agent and WMI are ready before configuration runs on *jumpwin1*.
 
 ### Output Variables

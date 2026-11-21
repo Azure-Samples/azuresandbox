@@ -253,6 +253,8 @@ module "vnet_shared" {
   vm_adds_size        = var.vm_jumpbox_size
   vm_image_gallery_id = var.vm_image_gallery_id
 
+  deployment_identity_is_operator = var.auth_mode == "azure_cli"
+
   patch_schedule = {
     duration                = var.patch_schedule_duration
     linux_classifications   = var.patch_schedule_linux_classifications
@@ -301,6 +303,8 @@ module "vnet_app" {
   virtual_network_shared_name     = module.vnet_shared.resource_names["virtual_network_shared"]
   vm_image_gallery_id             = var.vm_image_gallery_id
   vm_jumpbox_win_size             = var.vm_jumpbox_size
+
+  deployment_identity_is_operator = var.auth_mode == "azure_cli"
 
   depends_on = [module.vnet_shared.log_analytics_operations_complete] # Transitively waits for AD DS config + all vnet-shared AMPLS-touching writes (PE, scoped services, DNS links, adds1 DCR/DCE). Eliminates 409 race on vnet-app's AMPLS scoped service. Limits taint blast radius. See AMPLS_IMPLEMENTATION_PLAN.md Phase 2a.
 }

@@ -1,5 +1,5 @@
 terraform {
-  required_version = "~> 1.17.1"
+  required_version = "~> 1.17.2"
 
   required_providers {
     azuread = {
@@ -20,11 +20,6 @@ terraform {
     cloudinit = {
       source  = "hashicorp/cloudinit"
       version = "~> 2.4.1"
-    }
-
-    null = {
-      source  = "hashicorp/null"
-      version = "~> 3.3.2"
     }
 
     random = {

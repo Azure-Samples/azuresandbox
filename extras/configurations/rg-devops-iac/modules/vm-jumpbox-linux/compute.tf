@@ -28,10 +28,12 @@ resource "azurerm_linux_virtual_machine" "this" {
   location                   = var.location
   size                       = var.vm_jumpbox_linux_size
   admin_username             = var.admin_username
+  disk_controller_type       = "NVMe"
   encryption_at_host_enabled = true
   network_interface_ids      = [azurerm_network_interface.this.id]
   patch_assessment_mode      = "AutomaticByPlatform"
-  provision_vm_agent         = true
+  secure_boot_enabled        = true
+  vtpm_enabled               = true
   admin_ssh_key {
     username   = var.admin_username
     public_key = tls_private_key.ssh_key.public_key_openssh

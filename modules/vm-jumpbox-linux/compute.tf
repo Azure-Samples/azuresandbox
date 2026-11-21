@@ -4,10 +4,12 @@ resource "azurerm_linux_virtual_machine" "this" {
   location                   = var.location
   size                       = var.vm_jumpbox_linux_size
   admin_username             = "${var.admin_username}local"
-  network_interface_ids      = [azurerm_network_interface.this.id]
+  disk_controller_type       = "NVMe"
   encryption_at_host_enabled = true
-  provision_vm_agent         = true
+  network_interface_ids      = [azurerm_network_interface.this.id]
+  secure_boot_enabled        = true
   source_image_id            = var.vm_image_gallery_id == null ? null : "${var.vm_image_gallery_id}/images/jumplinux"
+  vtpm_enabled               = true
 
   # Scheduled patching (Customer Managed Schedules): see the vnet-shared maintenance configuration.
   bypass_platform_safety_checks_on_user_schedule_enabled = true

@@ -67,7 +67,7 @@ jobs:
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 20
+          node-version: 22
           # No dependency cache: npx fetches one pinned tool, so a cache adds
           # little and would be shared with the release PR's checks.
           package-manager-cache: false
@@ -76,7 +76,7 @@ jobs:
       # validated against. Globs and ignores come from .markdownlint-cli2.jsonc;
       # rule configuration comes from .markdownlint.jsonc.
       - name: Run markdownlint-cli2
-        run: npx --yes markdownlint-cli2@0.24.0
+        run: npx --yes markdownlint-cli2@0.24.1
 
   lychee:
     name: lychee (internal links)

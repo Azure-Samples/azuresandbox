@@ -1,6 +1,6 @@
 variable "deployment_identity" {
   type        = string
-  description = "The deployment identity to create for Azure Sandbox applies. Use none for no identity; managed_identity for an identity attached to the Linux virtual machine, with time-bound roles the operator grants before each apply (auth_mode = \"managed_identity\"); or oidc for an identity that GitHub Actions workflows sign in as, with time-bound roles the operator grants before each run (auth_mode = \"oidc\")."
+  description = "The deployment identity to create for Azure Sandbox applies. Use none for no identity; managed_identity for an identity attached to the Linux virtual machine, with time-bound roles the devops administrator grants before each apply (auth_mode = \"managed_identity\"); or oidc for an identity that GitHub Actions workflows sign in as, with time-bound roles the devops administrator grants before each run (auth_mode = \"oidc\")."
   default     = "none"
 
   validation {
@@ -317,12 +317,12 @@ variable "tags" {
 
 variable "vm_jumpbox_linux_size" {
   type        = string
-  description = "The size of the Linux virtual machine."
+  description = "The size of the Linux virtual machine. Must be a v6 D-series size (Dsv6, Dlsv6, Ddsv6, Dldsv6 or the AMD 'a' variants), which supports Trusted Launch, the NVMe disk controller and Accelerated Networking."
   default     = "Standard_D2ls_v6"
 
   validation {
-    condition     = can(regex("^[a-zA-Z0-9_]+$", var.vm_jumpbox_linux_size))
-    error_message = "The 'vm_jumpbox_linux_size' must conform to Azure virtual machine size naming conventions: it can only contain alphanumeric characters and underscores (_). Examples include 'Standard_DS1_v2' or 'Standard_B2ms'."
+    condition     = can(regex("^Standard_D[0-9]+a?l?d?s_v6$", var.vm_jumpbox_linux_size))
+    error_message = "The 'vm_jumpbox_linux_size' must be a v6 D-series size matching the pattern 'Standard_D<vCPU>[a][l][d]s_v6' (e.g. 'Standard_D2ls_v6', 'Standard_D4s_v6', 'Standard_D2ds_v6', 'Standard_D2als_v6'). These sizes support Trusted Launch, the NVMe disk controller and Accelerated Networking."
   }
 }
 
