@@ -5,9 +5,10 @@
 # the image template sets continueDistributeOnFailure = false. Must run as root.
 #
 # Checks:
+#   * The captured guest runs Ubuntu 26.04 LTS.
 #   * Every package passed as an argument is installed. The image template passes the 'packages' array from the shared
 #     install script (modules/vm-jumpbox-linux/scripts/install-vm-jumpbox-linux-packages.sh).
-#   * The main jumpbox tools are on the PATH.
+#   * The main jumpbox tools execute successfully, including a stable PowerShell runtime.
 #   * No security upgrades are pending.
 #
 # Usage: test-image-jumplinux.sh PACKAGE [PACKAGE...]
@@ -42,6 +43,18 @@ check() {
 
 log "Running '$0'..."
 
+if [ -r /etc/os-release ]; then
+  # shellcheck disable=SC1091
+  . /etc/os-release
+  if [ "${ID:-}" = ubuntu ] && [ "${VERSION_ID:-}" = 26.04 ]; then
+    check true 'Guest OS is Ubuntu 26.04 LTS'
+  else
+    check false "Expected Ubuntu 26.04 LTS; found '${PRETTY_NAME:-unknown}'"
+  fi
+else
+  check false 'Guest OS release information is unavailable'
+fi
+
 # Packages
 for package in "$@"; do
   if [ "$(dpkg-query -W -f='${Status}' "$package" 2>/dev/null || true)" = 'install ok installed' ]; then
@@ -53,10 +66,22 @@ done
 
 # Tools
 for tool in az docker helm pwsh terraform; do
-  if command -v "$tool" >/dev/null 2>&1; then
-    check true "'$tool' is on the PATH"
-  else
+  if ! command -v "$tool" >/dev/null 2>&1; then
     check false "'$tool' is not on the PATH"
+    continue
+  fi
+
+  # shellcheck disable=SC2016 # PowerShell, not Bash, expands the runtime check.
+  case "$tool" in
+    helm) args=(version --short) ;;
+    pwsh) args=(-NoProfile -NonInteractive -Command 'if ($PSVersionTable.PSVersion.PreReleaseLabel) { exit 1 }; $PSVersionTable.PSVersion.ToString()') ;;
+    *) args=(--version) ;;
+  esac
+
+  if "$tool" "${args[@]}"; then
+    check true "'$tool' executes successfully"
+  else
+    check false "'$tool' failed its runtime check"
   fi
 done
 

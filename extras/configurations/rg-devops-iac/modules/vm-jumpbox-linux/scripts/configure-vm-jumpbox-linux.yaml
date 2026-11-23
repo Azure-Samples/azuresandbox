@@ -1,6 +1,6 @@
 #cloud-config
 
-# Note: This code has been tested on Ubuntu 24.04 LTS (Nobel Numbat) and will not work on other Linux distros
+# Targets Ubuntu 26.04 LTS (Resolute Raccoon).
 
 cloud_config_modules:
   - apt_configure
@@ -11,6 +11,8 @@ bootcmd:
   - test -d /etc/apt/keyrings || install -m 0755 -d /etc/apt/keyrings
   - test -f /etc/apt/keyrings/hashicorp-archive-keyring.gpg || (wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /etc/apt/keyrings/hashicorp-archive-keyring.gpg && chmod a+r /etc/apt/keyrings/hashicorp-archive-keyring.gpg)
   - test -f /etc/apt/keyrings/microsoft.gpg || (curl -sLS https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | sudo tee /etc/apt/keyrings/microsoft.gpg && chmod go+r /etc/apt/keyrings/microsoft.gpg)
+  # The Ubuntu 26.04 Microsoft product repository (powershell) is signed with Microsoft's 2025 key.
+  - test -f /etc/apt/keyrings/microsoft-2025.gpg || (curl -sLS https://packages.microsoft.com/keys/microsoft-2025.asc | gpg --dearmor | sudo tee /etc/apt/keyrings/microsoft-2025.gpg && chmod go+r /etc/apt/keyrings/microsoft-2025.gpg)
 
 apt:
   # Use the Canonical archive and security servers directly instead of the Azure regional mirror
@@ -26,7 +28,7 @@ apt:
       source: 'deb [arch=amd64 signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ $RELEASE main'
       filename: azure-cli.list
     powershell:
-      source: 'deb [arch=amd64 signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/ubuntu/24.04/prod $RELEASE main'
+      source: 'deb [arch=amd64 signed-by=/etc/apt/keyrings/microsoft-2025.gpg] https://packages.microsoft.com/ubuntu/26.04/prod $RELEASE main'
       filename: microsoft-prod.list
     terraform:
       source: 'deb [arch=amd64 signed-by=/etc/apt/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $RELEASE main'
@@ -36,7 +38,7 @@ package_update: true
 
 packages:
   - azure-cli
-  - dnsutils
+  - bind9-dnsutils
   - jp
   - openvpn
   - powershell
