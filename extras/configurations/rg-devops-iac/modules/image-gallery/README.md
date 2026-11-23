@@ -48,7 +48,7 @@ This section provides additional information on various aspects of this module.
 
 This module depends upon resources provisioned in the following modules:
 
-* Root module (rg-devops-iac): resource group, VNet, and the image build subnets with their NSGs and NAT gateway associations.
+* Root module (rg-devops-iac): resource group, VNet, and the devops and image build Container Instances subnets with their NSGs and NAT gateway associations.
 
 The root module also registers the `Microsoft.VirtualMachineImages` resource provider when `enable_image_gallery` is true, because a module can't configure its provider. The azurerm provider's `extended` registration set covers the other providers builds need, including `Microsoft.ContainerInstance`.
 
@@ -84,8 +84,8 @@ image_build_vm_size | | The size of the temporary build VM AIB uses for every bu
 location | | The Azure region where the resources will be created.
 resource_group_id | | The id of the resource group. The parent of the image templates.
 resource_group_name | | The name of the resource group.
+subnet_devops_id | | The id of the root module's devops subnet, which hosts the build and validation VMs.
 subnet_image_build_aci_id | | The id of the root module's image build Container Instances subnet.
-subnet_image_build_id | | The id of the root module's image build VM subnet.
 tags | | The tags from the root module.
 unique_seed | | A seed from the root module's naming module, used for the gallery name.
 virtual_network_id | | The id of the VNet. The scope of the image builder Network Contributor role assignment.
@@ -143,7 +143,7 @@ Image | Sandbox VM | Source platform image | Customization
 
 ### Image Build Networking
 
-Builds use private networking in the `rg-devops-iac` virtual network, with no public IP addresses. AIB puts the build and validation VMs in the image build VM subnet and a Container Instance in the image build Container Instances subnet, which reaches the build VM over the private network. Outbound traffic, such as Windows Update, package repositories and software downloads, uses the NAT gateway. See [Virtual Network Design](../../README.md#virtual-network-design) and [Azure VM Image Builder networking options](https://learn.microsoft.com/azure/virtual-machines/linux/image-builder-vnet).
+Builds use private networking in the `rg-devops-iac` virtual network, with no public IP addresses. AIB puts the build and validation VMs in the devops subnet and a Container Instance in the image build Container Instances subnet, which reaches the build and validation VMs over the private network. Outbound traffic, such as Windows Update, package repositories and software downloads, uses the NAT gateway. See [Virtual Network Design](../../README.md#virtual-network-design) and [Azure VM Image Builder networking options](https://learn.microsoft.com/azure/virtual-machines/linux/image-builder-vnet).
 
 ### Image Builder Identity
 
@@ -154,7 +154,7 @@ The image templates run as a user-assigned managed identity with the roles below
 Role | Scope | Used for
 --- | --- | ---
 [Compute Gallery Artifacts Publisher](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/compute#compute-gallery-artifacts-publisher) | Compute gallery | Publishing image versions to the image definitions.
-[Network Contributor](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/networking#network-contributor) | Virtual network | Putting the build VM and its Container Instance in the image build subnets.
+[Network Contributor](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/networking#network-contributor) | Virtual network | Connecting build resources to the virtual network.
 [Contributor](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/privileged#contributor) | Staging resource groups (`IT_<resource group>_*`) \* | Creating the temporary build resources.
 
 \* AIB creates a staging resource group for each template, assigns this role itself and deletes the group with its template. See [Configure Azure VM Image Builder permissions](https://learn.microsoft.com/azure/virtual-machines/linux/image-builder-permissions-cli).

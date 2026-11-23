@@ -38,22 +38,22 @@ variable "resource_group_name" {
   }
 }
 
+variable "subnet_devops_id" {
+  type        = string
+  description = "The id of the devops subnet, which hosts the temporary Azure VM Image Builder build and validation VMs."
+
+  validation {
+    condition     = can(regex("^/subscriptions/[^/]+/resourceGroups/[^/]+/providers/Microsoft.Network/virtualNetworks/[^/]+/subnets/[^/]+$", var.subnet_devops_id))
+    error_message = "Must be a valid Azure subnet resource id."
+  }
+}
+
 variable "subnet_image_build_aci_id" {
   type        = string
   description = "The id of the subnet for the Azure VM Image Builder container, delegated to Microsoft.ContainerInstance/containerGroups."
 
   validation {
     condition     = can(regex("^/subscriptions/[^/]+/resourceGroups/[^/]+/providers/Microsoft.Network/virtualNetworks/[^/]+/subnets/[^/]+$", var.subnet_image_build_aci_id))
-    error_message = "Must be a valid Azure subnet resource id."
-  }
-}
-
-variable "subnet_image_build_id" {
-  type        = string
-  description = "The id of the subnet for the temporary Azure VM Image Builder build VMs."
-
-  validation {
-    condition     = can(regex("^/subscriptions/[^/]+/resourceGroups/[^/]+/providers/Microsoft.Network/virtualNetworks/[^/]+/subnets/[^/]+$", var.subnet_image_build_id))
     error_message = "Must be a valid Azure subnet resource id."
   }
 }
@@ -84,7 +84,7 @@ variable "unique_seed" {
 
 variable "virtual_network_id" {
   type        = string
-  description = "The id of the existing VNet for the image build subnets. Used as the scope of the image builder Network Contributor role assignment."
+  description = "The id of the existing VNet that contains the devops and image build Container Instances subnets. Used as the scope of the image builder Network Contributor role assignment."
 
   validation {
     condition     = can(regex("^/subscriptions/[0-9a-fA-F-]+/resourceGroups/[^/]+/providers/Microsoft.Network/virtualNetworks/[^/]+$", var.virtual_network_id))

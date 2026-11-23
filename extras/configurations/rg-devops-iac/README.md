@@ -244,14 +244,12 @@ storage_access_tier | Hot | The access tier for the storage account.
 storage_container_name | tfstate | The name of the blob storage container used by Terraform state backend.
 storage_replication_type | LRS | The type of replication for the storage account.
 subnet_bastion_address_prefix | 10.0.0.0/26 | The address prefix for the `AzureBastionSubnet`.
-subnet_devops_address_prefix | 10.0.1.0/29 | The address prefix for the devops subnet.
+subnet_devops_address_prefix | 10.0.1.0/28 | The address prefix for the devops subnet.
 subnet_devops_name | snet-devops-01 | The name of the devops subnet, which hosts `jumplinux2`.
-subnet_image_build_aci_address_prefix | 10.0.4.0/28 | The address prefix for the image build Container Instances subnet, which Azure VM Image Builder uses to reach the build VM. Used by the optional [image-gallery](./modules/image-gallery/) module.
-subnet_image_build_aci_name | snet-imagebuild-aci-05 | The name of the image build Container Instances subnet. Used by the optional [image-gallery](./modules/image-gallery/) module.
-subnet_image_build_address_prefix | 10.0.3.0/27 | The address prefix for the image build VM subnet, which hosts the temporary Azure VM Image Builder build VMs. Used by the optional [image-gallery](./modules/image-gallery/) module.
-subnet_image_build_name | snet-imagebuild-04 | The name of the image build VM subnet. Used by the optional [image-gallery](./modules/image-gallery/) module.
+subnet_image_build_aci_address_prefix | 10.0.4.0/28 | The address prefix for the image build Container Instances subnet, which Azure VM Image Builder uses to reach the build and validation VMs. Used by the optional [image-gallery](./modules/image-gallery/) module.
+subnet_image_build_aci_name | snet-imagebuild-aci-01 | The name of the image build Container Instances subnet. Used by the optional [image-gallery](./modules/image-gallery/) module.
 subnet_privatelink_address_prefix | 10.0.2.0/27 | The address prefix for the private link subnet, which hosts the private endpoints.
-subnet_privatelink_name | snet-privatelink-03 | The name of the private link subnet.
+subnet_privatelink_name | snet-privatelink-02 | The name of the private link subnet.
 subscription_id | *(required)* | The Azure subscription id used to provision resources.
 tags | { costcenter = "mycostcenter", environment = "dev", project = "devops" } | The tags in map format to be used when creating new resources. Must include `project` and `environment`, which are used in resource names.
 vm_jumpbox_linux_size | Standard_D2ls_v6 | The size of the Linux virtual machine (`jumplinux2`). Must be a v6 D-series size (`Standard_D<vCPU>[a][l][d]s_v6`), which supports Trusted Launch, the NVMe disk controller and Accelerated Networking.
@@ -299,9 +297,9 @@ azurerm_role_assignment.storage_blob_data_contributor | | Assigns `Storage Blob 
 azurerm_storage_account.this | stdevopsdevxxx | Storage account for storing Terraform state files.
 azurerm_storage_container.this | tfstate | Storage container for storing Terraform state files.
 azurerm_subnet.subnets[*] | | Subnets from `local.subnets`. See [Virtual Network Design](#virtual-network-design).
-azurerm_subnet_nat_gateway_association.associations[*] | | Associates the NAT gateway with the devops and image build subnets.
+azurerm_subnet_nat_gateway_association.associations[*] | | Associates the NAT gateway with each subnet in `local.subnets` that needs outbound internet access. See [Virtual Network Design](#virtual-network-design).
 azurerm_subnet_network_security_group_association.associations[*] | | Associates each NSG with its subnet.
-azurerm_virtual_network.this | vnet-devops-dev | Virtual network for `jumplinux2`, Bastion, the private endpoints and the optional image build subnets.
+azurerm_virtual_network.this | vnet-devops-dev | Virtual network for `jumplinux2`, Bastion, the private endpoints and the optional image builds.
 terraform_data.ampls_access_barrier | | Waits for all Azure Monitor operations and private DNS zone links before AMPLS and the Log Analytics workspace are made private.
 terraform_data.key_vault_access_barrier | | Waits for all key vault writes before the key vault is made private.
 terraform_data.private_dns_zone_links_complete | | Waits for every private DNS zone virtual network link before the private endpoints are created.
@@ -346,10 +344,9 @@ The virtual network contains the following subnets.
 Subnet | Address Prefix | IP Addresses | Notes
 --- | --- | :-: | ---
 `AzureBastionSubnet` (name required) | `10.0.0.0/26` | 64 | Requires a `/26` minimum. NSG attached as per [Secure your Azure Bastion deployment](https://learn.microsoft.com/azure/bastion/secure-bastion#network-security).
-`snet-devops-01` (default name) | `10.0.1.0/29` | 8 | Requires a `/29` minimum. NSG attached allowing inbound SSH only. Egress via NAT gateway.
-`snet-privatelink-03` (default name) | `10.0.2.0/27` | 32 | Requires a `/27` minimum for AMPLS. No NSG is attached. Hosts private endpoints for key vault, blob storage and AMPLS.
-`snet-imagebuild-04` (default name) | `10.0.3.0/27` | 32 | Requires a `/28` minimum for four simultaneous builds (a build VM and a validation VM per build). Temporary Azure VM Image Builder build VMs for the optional [image-gallery](./modules/image-gallery/) module. NSG allows only TCP 22 and 5986 from the image build Container Instances subnet and denies other virtual network inbound traffic. Egress via NAT gateway.
-`snet-imagebuild-aci-05` (default name) | `10.0.4.0/28` | 16 | Requires a `/28` minimum for four simultaneous builds (one container group per build). The Azure VM Image Builder container. Delegated to `Microsoft.ContainerInstance/containerGroups`. NSG denies virtual network inbound traffic. Egress via NAT gateway.
+`snet-devops-01` (default name) | `10.0.1.0/28` | 16 | Requires a `/28` minimum: `jumplinux2` plus four simultaneous builds of the optional [image-gallery](./modules/image-gallery/) module (a build VM and a validation VM per build). Hosts `jumplinux2` and the temporary Azure VM Image Builder build and validation VMs. NSG attached allowing inbound SSH from the `AzureBastionSubnet` and TCP 22 and 5986 from the image build Container Instances subnet. Egress via NAT gateway.
+`snet-privatelink-02` (default name) | `10.0.2.0/27` | 32 | Requires a `/27` minimum for AMPLS. No NSG is attached. Hosts private endpoints for key vault, blob storage and AMPLS.
+`snet-imagebuild-aci-01` (default name) | `10.0.4.0/28` | 16 | Requires a `/28` minimum for four simultaneous builds (one container group per build). The Azure VM Image Builder container. Delegated to `Microsoft.ContainerInstance/containerGroups`. NSG denies virtual network inbound traffic. Egress via NAT gateway.
 
 The following private DNS zones are linked to the virtual network and are configured for internet fallback (`NxDomainRedirect`).
 

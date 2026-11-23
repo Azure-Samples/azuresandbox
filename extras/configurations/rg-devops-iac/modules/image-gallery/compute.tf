@@ -104,7 +104,7 @@ resource "azapi_resource" "image_templates" {
         vmSize = var.image_build_vm_size
 
         vnetConfig = {
-          subnetId                  = var.subnet_image_build_id
+          subnetId                  = var.subnet_devops_id
           containerInstanceSubnetId = var.subnet_image_build_aci_id
         }
       }
