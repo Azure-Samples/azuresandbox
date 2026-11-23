@@ -292,13 +292,12 @@ module "image_gallery" {
   location                  = azurerm_resource_group.this.location
   resource_group_id         = azurerm_resource_group.this.id
   resource_group_name       = azurerm_resource_group.this.name
+  subnet_devops_id          = azurerm_subnet.subnets[var.subnet_devops_name].id
   subnet_image_build_aci_id = azurerm_subnet.subnets[var.subnet_image_build_aci_name].id
-  subnet_image_build_id     = azurerm_subnet.subnets[var.subnet_image_build_name].id
   tags                      = var.tags
   unique_seed               = module.naming.names["resource_group"].unique_seed
   virtual_network_id        = azurerm_virtual_network.this.id
 
-  # Builds need the NSGs and the NAT gateway on the image build subnets.
   depends_on = [
     azurerm_subnet_nat_gateway_association.associations,
     azurerm_subnet_network_security_group_association.associations,
