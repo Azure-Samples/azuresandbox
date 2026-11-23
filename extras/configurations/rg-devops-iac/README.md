@@ -197,7 +197,7 @@ This section provides documentation regarding the overall structure of the root 
 * [Root Module Structure](#root-module-structure)
 * [Root Module Input Variables](#root-module-input-variables)
 * [Root Module Resources](#root-module-resources)
-* [Root Module Output Variables](#root-module-output-variables)
+* [Root Module Outputs](#root-module-outputs)
 * [Child Modules](#child-modules)
 * [Virtual Network Design](#virtual-network-design)
 * [Dependencies](#dependencies)
@@ -224,7 +224,7 @@ This configuration is organized into the following structure:
 ├── locals.tf                             # Local variables
 ├── main.tf                               # Other service resource and module blocks
 ├── network.tf                            # Network resource blocks
-├── outputs.tf                            # Output variables
+├── outputs.tf                            # Output values
 ├── providers.tf                          # Provider configuration blocks
 ├── storage.tf                            # Storage resource blocks
 ├── terraform.tf                          # Terraform configuration block
@@ -310,16 +310,16 @@ time_sleep.wait_for_roles | | Waits 2 minutes for the `Key Vault Secrets Officer
 
 The optional features add more resources. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration) and [Optional: Custom Images](#optional-custom-images).
 
-### Root Module Output Variables
+### Root Module Outputs
 
-This section includes a list of output variables returned by the root module.
+This section includes a list of output values returned by the root module.
 
 Name | Comments
 --- | ---
 resource_ids | A map of resource IDs for key resources in the configuration.
 resource_names | A map of resource names for key resources in the configuration.
 
-There are additional output variables for optional use cases. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration) and [Optional: Custom Images](#optional-custom-images).
+There are additional output values for optional use cases. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration) and [Optional: Custom Images](#optional-custom-images).
 
 ### Child Modules
 

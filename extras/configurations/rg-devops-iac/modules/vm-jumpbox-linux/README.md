@@ -57,7 +57,7 @@ This section provides additional information on various aspects of this module.
 * [Module Structure](#module-structure)
 * [Input Variables](#input-variables)
 * [Module Resources](#module-resources)
-* [Output Variables](#output-variables)
+* [Outputs](#outputs)
 * [Patching](#patching)
 
 ### Dependencies
@@ -80,7 +80,7 @@ This module is organized as follows:
 ├── compute.tf                              # Compute resource configurations
 ├── main.tf                                 # Resource configurations
 ├── network.tf                              # Network resource configurations
-├── outputs.tf                              # Output variables
+├── outputs.tf                              # Output values
 ├── terraform.tf                            # Terraform configuration block
 └── variables.tf                            # Input variables
 ```
@@ -132,9 +132,9 @@ module.vm_jumpbox_linux.azurerm_virtual_machine_run_command.wait_for_cloud_init 
 module.vm_jumpbox_linux.terraform_data.log_analytics_operations_complete | | Dependency signal for the root module's AMPLS barrier.
 module.vm_jumpbox_linux.tls_private_key.ssh_key | | The break-glass SSH key pair for the admin account.
 
-### Output Variables
+### Outputs
 
-This section includes a list of output variables returned by the module.
+This section includes a list of output values returned by the module.
 
 Name | Description
 --- | ---
