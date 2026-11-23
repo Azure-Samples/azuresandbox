@@ -2,9 +2,14 @@
 
 ## Contents
 
+* [Architecture](#architecture)
 * [Overview](#overview)
 * [Smoke Testing](#smoke-testing)
 * [Documentation](#documentation)
+
+## Architecture
+
+![diagram](./images/image-gallery-diagram.drawio.svg)
 
 ## Overview
 
