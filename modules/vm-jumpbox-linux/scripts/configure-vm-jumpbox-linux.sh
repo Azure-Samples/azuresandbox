@@ -8,7 +8,7 @@
 # redirect is the desired behavior. Rewriting these as 'sudo tee' would wrongly
 # elevate the log write and change '&>>' stream-capture semantics.
 
-# Note: This code has been tested on Ubuntu 24.04 LTS (Noble Numbat) and will not work on other Linux distros
+# Note: This code has been tested on Ubuntu 26.04 LTS (Resolute Raccoon) and will not work on other Linux distros
 
 # Initialize constants
 log_file='/var/log/configure-vm-jumpbox-linux.log'
@@ -261,7 +261,7 @@ sudo cp -f "$filename" "$filename.bak"
 printf "Modifying '$filename'...\n" >> $log_file
 sudo sed -i "s/server ntp.ubuntu.com/server $adds_domain_name/" $filename
 diff "$filename.bak" "$filename" >> $log_file
-servicename='ntp'
+servicename='ntpsec'
 printf "Restarting '$servicename'...\n" >> $log_file
 sudo systemctl restart $servicename &>> $log_file
 sudo systemctl status $servicename &>> $log_file
