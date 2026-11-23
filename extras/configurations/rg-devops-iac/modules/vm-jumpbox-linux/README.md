@@ -18,7 +18,7 @@ This module implements a stand-alone Linux virtual machine for use as a general 
 * Automatic swapfile provisioning sized to the VM's memory (larger VMs get no swap).
 * Pre-installed software packages, including:
   * azure-cli
-  * dnsutils
+  * bind9-dnsutils
   * jp
   * openvpn
   * powershell (and Azure PowerShell)
@@ -37,17 +37,21 @@ The optional [github-runner](../github-runner/README.md) module installs the Git
 Use Bastion to connect to *jumplinux2* with your Microsoft Entra ID credentials. After connecting, verify the VM is fully configured for use as a Terraform execution environment:
 
 ```bash
+# Check provisioning and the Ubuntu release
+cloud-init status --long
+
 # Check software versions
 lsb_release -a
 az --version
 terraform --version
-pwsh --version
-pwsh -c "Get-InstalledPSResource Az -Scope AllUsers"
+pwsh -NoProfile -NonInteractive -Command 'Get-InstalledPSResource -Name Az, Az.* -Scope AllUsers | Sort-Object Name | Format-Table Name, Version'
 
 # Check Terraform environment variables
 echo $ARM_USE_MSI
 echo $ARM_TENANT_ID
 ```
+
+Confirm that cloud-init reports `done` with no errors, the OS is Ubuntu 26.04 LTS, and PowerShell and the Az modules are installed.
 
 ## Documentation
 
@@ -104,7 +108,7 @@ storage_account_id | | The resource ID of the storage account defined in the roo
 subnet_id | | The resource ID of the subnet where the VM will be deployed. Defined in the root module.
 tags | | The tags from the root module.
 user_assigned_identity_ids | `[]` | The resource ids of user-assigned managed identities to attach to the VM in addition to its system-assigned identity, which remains the default identity on the VM.
-vm_jumpbox_linux_image_offer | `ubuntu-24_04-lts` | The offer type of the virtual machine image used to create the VM.
+vm_jumpbox_linux_image_offer | `ubuntu-26_04-lts` | The offer type of the virtual machine image used to create the VM.
 vm_jumpbox_linux_image_publisher | `Canonical` | The publisher for the virtual machine image used to create the VM.
 vm_jumpbox_linux_image_sku | `server` | The SKU of the virtual machine image used to create the VM.
 vm_jumpbox_linux_image_version | `Latest` | The version of the virtual machine image used to create the VM.

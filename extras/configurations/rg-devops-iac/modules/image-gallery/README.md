@@ -115,7 +115,7 @@ Image | Sandbox VM | Source platform image | Customization
 --- | --- | --- | ---
 `adds` | `adds1` | `MicrosoftWindowsServer:WindowsServer:2025-datacenter-core-g2` | Microsoft Update opt-in and patching only. AD DS is installed at deploy time, because [Sysprep doesn't support the AD DS role](https://learn.microsoft.com/windows-hardware/manufacture/desktop/sysprep-support-for-server-roles).
 `jumpwin` | `jumpwin1` | `MicrosoftWindowsServer:WindowsServer:2025-datacenter-g2` | RSAT, VS Code, SSMS and MySQL Workbench, then Microsoft Update opt-in and patching.
-`jumplinux` | `jumplinux1` | `Canonical:ubuntu-24_04-lts:server` | The jumpbox packages and a full `dist-upgrade`.
+`jumplinux` | `jumplinux1` | `Canonical:ubuntu-26_04-lts:server` | The jumpbox packages and a full `dist-upgrade`.
 `mssqlwin` | `mssqlwin1` | `MicrosoftSQLServer:sql2025-ws2025:entdev-gen2` | Microsoft Update opt-in, so SQL Server is patched too, then patching.
 
 * **Image definitions:** Generation 2, generalized, with accelerated networking. Every definition supports the SCSI and NVMe disk controllers and the Standard and Trusted Launch security types, so the images run on the NVMe-only v6 sizes the sandbox VMs use, as Standard or Trusted Launch VMs.
@@ -131,15 +131,18 @@ Image | Sandbox VM | Source platform image | Customization
     * `mssqlwin`: SQL Server, pre-installed on the source platform image, is present.
     * The Windows Update policy key is skipped, because Azure sets it from each VM's patch mode at provisioning.
   * **Linux:**
+    * `jumplinux`: the captured guest runs Ubuntu 26.04 LTS, and `az`, `docker`, `helm`, stable `pwsh`, and `terraform` execute successfully.
     * All images: all security upgrades are installed.
     * `jumplinux`: the packages in [install-vm-jumpbox-linux-packages.sh](../../../../../modules/vm-jumpbox-linux/scripts/install-vm-jumpbox-linux-packages.sh) are installed, including:
       * DevOps tools: `azure-cli`, `helm`, `jp`, `powershell`, `python3-pip` and `terraform`.
       * Containers: `containerd.io`, `docker-buildx-plugin`, `docker-ce`, `docker-ce-cli`, `docker-compose-plugin` and `notary`.
-      * Active Directory integration: `krb5-config`, `krb5-user`, `libnss-winbind`, `libpam-winbind`, `ntp`, `samba` and `winbind`.
+      * Active Directory integration: `krb5-config`, `krb5-user`, `libnss-winbind`, `libpam-winbind`, `ntpsec`, `samba` and `winbind`.
       * File shares: `autofs`, `cifs-utils` and `keyutils`.
 * **Distribution:** One replica in `location` on `Standard_LRS`, with automatic version numbering.
 * **Build VM size:** `image_build_vm_size` defaults to `Standard_D4s_v6`, the same generation as the sandbox VMs.
 * **Template updates:** AIB image templates are immutable, so Terraform replaces a template whenever it or a script it runs changes.
+
+The Ubuntu 26.04 custom image is the rg-devops-iac portion of [#426](https://github.com/Azure-Samples/azuresandbox/issues/426); the root sandbox's platform image default remains Ubuntu 24.04 pending its separate upgrade. Replacing the template does not rebuild or delete existing image versions. Run a successful `jumplinux` build to publish a 26.04 version before expecting deployments from the gallery to use the new release.
 
 ### Image Build Networking
 

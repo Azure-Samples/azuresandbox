@@ -38,7 +38,7 @@ This configuration implements a Linux virtual machine for use as a jumpbox. The 
   * libnss-winbind
   * libpam-winbind
   * notary
-  * ntp
+  * ntpsec
   * powershell
   * python3-pip
   * samba
@@ -236,7 +236,7 @@ storage_share_name | | The Azure Files share name from the vnet-app module.
 subnet_id | | The subnet ID from the vnet-app module.
 tags | | The tags from the root module.
 vm_image_gallery_id | `null` | Resource ID of the Azure Compute Gallery with custom images, or `null` for platform images. Defined by the root module's `vm_image_gallery_id` variable and checked there. When set, the `*_image_*` variables are ignored.
-vm_jumpbox_linux_image_offer | `ubuntu-24_04-lts` | The offer type of the virtual machine image used to create the VM.
+vm_jumpbox_linux_image_offer | `ubuntu-26_04-lts` | The offer type of the virtual machine image used to create the VM.
 vm_jumpbox_linux_image_publisher | `Canonical` | The publisher for the virtual machine image used to create the VM.
 vm_jumpbox_linux_image_sku | `server` | The SKU of the virtual machine image used to create the VM.
 vm_jumpbox_linux_image_version | `Latest` | The version of the virtual machine image used to create the VM.

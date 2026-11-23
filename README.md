@@ -171,9 +171,9 @@ A variety of Terraform execution environments can be used to provision Azure San
 
 * **Windows Subsystem for Linux (WSL) Client**: WSL offers the best of Windows and Linux in the same client environment and was used to develop this project. The following software should be installed:
   * Linux (WSL) software
-    * Linux Distro: Ubuntu 24.04 LTS (Noble Numbat)
-    * pip3 Python library package manager and the PyJWT Python library (pre-installed on Ubuntu 24.04)
-    * git (pre-installed on Ubuntu 24.04)
+    * Linux Distro: Ubuntu 26.04 LTS (Resolute Raccoon)
+    * pip3 Python library package manager and the PyJWT Python library (pre-installed on Ubuntu 26.04)
+    * git (pre-installed on Ubuntu 26.04)
     * Azure CLI
     * PowerShell 7.x
     * Az PowerShell Module
@@ -909,7 +909,7 @@ Virtual Machine | Role | Module | Operating System
 adds1 | AD DS Domain Controller / DNS Server | vnet-shared | Windows Server 2025 Datacenter (Server Core)
 jumpwin1 | Windows Jumpbox VM | vnet-app | Windows Server 2025 Datacenter
 mssqlwin1 | Windows SQL Server VM | vm-mssql-win | Windows Server 2025 / SQL Server 2025 Enterprise Developer Edition
-jumplinux1 | Linux Jumpbox VM | vm-jumpbox-linux | Ubuntu Server LTS 24.04 (Noble Numbat)
+jumplinux1 | Linux Jumpbox VM | vm-jumpbox-linux | Ubuntu Server LTS 26.04 (Resolute Raccoon)
 
 ### Custom Images
 

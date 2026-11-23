@@ -367,7 +367,7 @@ Private DNS Zone | Notes
   * Modules: `Azure/avm-utl-naming` for resource names.
 * **Scripting:** Bash and Azure CLI; PowerShell and the Az PowerShell module for *bootstrap.ps1*, the optional workflow scripts and Windows custom image builds.
 * **Configuration management:** cloud-init and Azure VM run commands for `jumplinux2`; Azure VM Image Builder for the optional custom images.
-* **Operating system:** `jumplinux2` runs Ubuntu Server 24.04 LTS (Noble Numbat).
+* **Operating system:** `jumplinux2` runs Ubuntu Server 26.04 LTS (Resolute Raccoon).
 
 ### Optional: GitHub Self-Hosted Runner Configuration
 

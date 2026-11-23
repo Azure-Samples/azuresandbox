@@ -1,6 +1,6 @@
 #cloud-config
 
-# Note: This code has been tested on Ubuntu 24.04 LTS (Nobel Numbat) and will not work on other Linux distros
+# Note: This code has been tested on Ubuntu 26.04 LTS (Resolute Raccoon) and will not work on other Linux distros
 
 cloud_config_modules:
   - apt_configure
