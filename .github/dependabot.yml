@@ -132,6 +132,32 @@ updates:
           - "*"
 
   - package-ecosystem: terraform
+    directory: "/extras/configurations/rg-devops-iac/modules/github-runner"
+    target-branch: "vnext"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:14"
+      timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
+
+  - package-ecosystem: terraform
+    directory: "/extras/configurations/rg-devops-iac/modules/image-gallery"
+    target-branch: "vnext"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:14"
+      timezone: "UTC"
+    groups:
+      terraform-all:
+        patterns:
+          - "*"
+
+  - package-ecosystem: terraform
     directory: "/extras/modules/avd"
     target-branch: "vnext"
     schedule:
