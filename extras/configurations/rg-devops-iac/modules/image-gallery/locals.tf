@@ -92,7 +92,7 @@ locals {
   ]
 
   # The images to build, keyed by image definition name. The names are the contract with the Azure Sandbox
-  # configuration, so don't change them. Source images match the root modules' platform image defaults.
+  # configuration, so don't change them. The Ubuntu 26.04 source precedes the root platform image upgrade in #426.
   images = {
     adds = {
       description = "Domain controller (adds1): Windows Server 2025 Datacenter Server Core, fully patched. AD DS is installed at deploy time because Sysprep doesn't support the AD DS role."
@@ -139,11 +139,11 @@ locals {
     }
 
     jumplinux = {
-      description = "Linux jumpbox (jumplinux1): Ubuntu Server 24.04 LTS with the jumpbox packages, fully upgraded."
+      description = "Linux jumpbox (jumplinux1): Ubuntu Server 26.04 LTS with the jumpbox packages, fully upgraded."
       os_type     = "Linux"
       source = {
         publisher = "Canonical"
-        offer     = "ubuntu-24_04-lts"
+        offer     = "ubuntu-26_04-lts"
         sku       = "server"
       }
 

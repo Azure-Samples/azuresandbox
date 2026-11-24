@@ -114,7 +114,7 @@ variable "user_assigned_identity_ids" {
 variable "vm_jumpbox_linux_image_offer" {
   type        = string
   description = "The offer type of the virtual machine image used to create the VM"
-  default     = "ubuntu-24_04-lts"
+  default     = "ubuntu-26_04-lts"
 
   validation {
     condition     = can(regex("^[a-zA-Z0-9-._]{1,64}$", var.vm_jumpbox_linux_image_offer))

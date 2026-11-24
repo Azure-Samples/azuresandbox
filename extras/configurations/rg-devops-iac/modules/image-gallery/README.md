@@ -2,13 +2,20 @@
 
 ## Contents
 
+* [Architecture](#architecture)
 * [Overview](#overview)
 * [Smoke Testing](#smoke-testing)
 * [Documentation](#documentation)
 
+## Architecture
+
+![diagram](./images/image-gallery-diagram.drawio.svg)
+
 ## Overview
 
-This optional module creates an [Azure Compute Gallery](https://learn.microsoft.com/azure/virtual-machines/azure-compute-gallery) and [Azure VM Image Builder](https://learn.microsoft.com/azure/virtual-machines/image-builder-overview) (AIB) templates that build patched **custom images** for the Azure Sandbox VMs, so sandbox deployments spend less time installing software and updates. The root module creates it when `enable_image_gallery` is true. Builds run in the root module's image build subnets with no public IP addresses, and reach the internet through the root module's NAT gateway. Like the other root subnets, the image build subnets exist whether or not this module is enabled. To deploy sandbox VMs from these images, set `vm_image_gallery_id` in the Azure Sandbox `terraform.tfvars` to the gallery's resource ID. See [Custom Images](../../../../../README.md#custom-images).
+This optional module creates an [Azure Compute Gallery](https://learn.microsoft.com/azure/virtual-machines/azure-compute-gallery) and [Azure VM Image Builder](https://learn.microsoft.com/azure/virtual-machines/image-builder-overview) (AIB) templates that build patched **custom images** for the Azure Sandbox VMs, so sandbox deployments spend less time installing software and updates. Set the `enable_image_gallery` variable in `rg-devops-iac` to enable this module.
+
+Builds for **custom images** run in pre-configured subnets in `rg-devop-iac`. There are no public IP addresses, and egress is through the NAT gateway. To deploy sandbox VMs from these images, set `vm_image_gallery_id` in the Azure Sandbox `terraform.tfvars` to the gallery's resource ID. See [Custom Images](../../../../../README.md#custom-images).
 
 The module creates:
 
@@ -18,15 +25,13 @@ The module creates:
 
 ## Smoke Testing
 
-See [Building Images](#building-images) for how to run builds.
+In the Azure portal, open the `rg-devops-iac` resource group and verify:
 
-Use this checklist to validate changes to the image gallery or templates:
+* The Azure Compute Gallery has an image definition for each image.
+* Each image definition has a matching Azure VM Image Builder template.
+* The image builder user-assigned managed identity exists.
 
-1. With `enable_image_gallery = false`, `terraform apply` creates the image build subnets but no `module.image_gallery` resources.
-2. With `enable_image_gallery = true`, `terraform apply` succeeds.
-3. `./modules/image-gallery/scripts/invoke-image-build.sh` builds all four images, validation passes, and each image definition has a new version tagged with `source_image`, `source_image_version` and `build_time`.
-4. No public IP address is created in the staging resource groups during a build.
-5. A test VM deployed from each image on a v6 size (Standard and, for `mssqlwin`, Trusted Launch) has the expected software and patches.
+After running a build (see [Building Images](#building-images)), verify that each image definition has a new image version.
 
 ## Documentation
 
@@ -36,23 +41,21 @@ This section provides additional information on various aspects of this module.
 * [Module Structure](#module-structure)
 * [Input Variables](#input-variables)
 * [Module Resources](#module-resources)
-* [Output Variables](#output-variables)
+* [Outputs](#outputs)
 * [Image Design](#image-design)
 * [Image Build Networking](#image-build-networking)
 * [Image Builder Identity](#image-builder-identity)
 * [Image Build Prerequisites](#image-build-prerequisites)
 * [Image Build Costs](#image-build-costs)
 * [Building Images](#building-images)
-* [Disabling the Image Gallery](#disabling-the-image-gallery)
-* [Staging Resource Groups](#staging-resource-groups)
 
 ### Dependencies
 
 This module depends upon resources provisioned in the following modules:
 
-* Root module (rg-devops-iac): resource group, VNet, and the image build subnets with their NSGs and NAT gateway associations.
+* Root module (rg-devops-iac): resource group, VNet, and the devops and image build Container Instances subnets with their NSGs and NAT gateway associations.
 
-The root module also registers the `Microsoft.VirtualMachineImages` resource provider when `enable_image_gallery` is true, because a module can't configure its provider.
+The root module also registers the `Microsoft.VirtualMachineImages` resource provider when `enable_image_gallery` is true, because a module can't configure its provider. The azurerm provider's `extended` registration set covers the other providers builds need, including `Microsoft.ContainerInstance`.
 
 ### Module Structure
 
@@ -67,7 +70,7 @@ This module is organized as follows:
 ├── compute.tf                            # Compute gallery, image definitions and image templates
 ├── locals.tf                             # Local values, including the image definitions and customization steps
 ├── main.tf                               # Naming, image builder identity and role assignments
-├── outputs.tf                            # Output variables
+├── outputs.tf                            # Output values
 ├── terraform.tf                          # Terraform configuration block
 └── variables.tf                          # Input variables
 ```
@@ -86,8 +89,8 @@ image_build_vm_size | | The size of the temporary build VM AIB uses for every bu
 location | | The Azure region where the resources will be created.
 resource_group_id | | The id of the resource group. The parent of the image templates.
 resource_group_name | | The name of the resource group.
+subnet_devops_id | | The id of the root module's devops subnet, which hosts the build and validation VMs.
 subnet_image_build_aci_id | | The id of the root module's image build Container Instances subnet.
-subnet_image_build_id | | The id of the root module's image build VM subnet.
 tags | | The tags from the root module.
 unique_seed | | A seed from the root module's naming module, used for the gallery name.
 virtual_network_id | | The id of the VNet. The scope of the image builder Network Contributor role assignment.
@@ -104,7 +107,7 @@ module.image_gallery[0].azurerm_shared_image_gallery.this | galdevopsdevxxxxxxxx
 module.image_gallery[0].azurerm_user_assigned_identity.image_builder | id-devops-dev-image-builder | Identity the image templates run as.
 module.image_gallery[0].time_sleep.wait_for_image_builder_roles | | Waits for the image builder role assignments to propagate before the image templates are created.
 
-### Output Variables
+### Outputs
 
 Name | Description
 --- | ---
@@ -117,42 +120,57 @@ Image | Sandbox VM | Source platform image | Customization
 --- | --- | --- | ---
 `adds` | `adds1` | `MicrosoftWindowsServer:WindowsServer:2025-datacenter-core-g2` | Microsoft Update opt-in and patching only. AD DS is installed at deploy time, because [Sysprep doesn't support the AD DS role](https://learn.microsoft.com/windows-hardware/manufacture/desktop/sysprep-support-for-server-roles).
 `jumpwin` | `jumpwin1` | `MicrosoftWindowsServer:WindowsServer:2025-datacenter-g2` | RSAT, VS Code, SSMS and MySQL Workbench, then Microsoft Update opt-in and patching.
-`jumplinux` | `jumplinux1` | `Canonical:ubuntu-24_04-lts:server` | The jumpbox packages and a full `dist-upgrade`.
+`jumplinux` | `jumplinux1` | `Canonical:ubuntu-26_04-lts:server` | The jumpbox packages and a full `dist-upgrade`.
 `mssqlwin` | `mssqlwin1` | `MicrosoftSQLServer:sql2025-ws2025:entdev-gen2` | Microsoft Update opt-in, so SQL Server is patched too, then patching.
 
 * **Image definitions:** Generation 2, generalized, with accelerated networking. Every definition supports the SCSI and NVMe disk controllers and the Standard and Trusted Launch security types, so the images run on the NVMe-only v6 sizes the sandbox VMs use, as Standard or Trusted Launch VMs.
-* **Source images:** The templates use the `latest` source image version when a build runs. The template tags each image version with `source_image` (publisher:offer:sku), and `scripts/invoke-image-build.sh` adds `source_image_version` and `build_time` after the build.
+* **Source images:** The templates use the `latest` source platform image version when a build runs. The template tags each image version with `source_image` (publisher:offer:sku), and `scripts/invoke-image-build.sh` adds `source_image_version` and `build_time` after the build.
 * **Windows patching:** Every Windows image opts into Microsoft Update, then runs two passes of Windows Update (Critical and Security updates, excluding previews), each followed by a restart. Patching runs after software installs, so updates also cover what was installed.
-* **Patching after deployment:** The images don't set a Configure Automatic Updates policy, which would conflict with Azure orchestration. Sandbox VMs deployed from these images are patched by the sandbox's Azure Update Manager schedule, the same as VMs from platform images. See [Patching](../../../../../README.md#patching).
-* **Linux restart:** AIB has no Linux restart customizer, so `jumplinux` isn't restarted during the build. A kernel installed by the upgrade takes effect when a VM is first deployed from the image.
-* **Validation:** Each template runs a validation script on a validation VM that AIB deploys from the captured image, not on the build VM. A failed check stops the build before anything is published (`continueDistributeOnFailure = false`).
-  * Windows: no pending Critical or Security updates; for `adds`, AD-Domain-Services isn't installed; for `jumpwin`, RSAT-ADDS and RSAT-DNS-Server are installed and VS Code, SSMS and MySQL Workbench are present; for `mssqlwin`, the SQL Server service and binaries are present; for every Windows image, Microsoft Update is registered. Validation doesn't check the Windows Update policy key, because Azure writes it when it provisions a VM, based on the VM's patch mode. The validation VM uses the default mode, `AutomaticByOS`, so the key would show how the validation VM was provisioned rather than what is in the image.
-  * Linux: every package from the install script is installed, `az`, `docker`, `helm`, `pwsh` and `terraform` are on the PATH, and no security upgrades are pending.
+* **Linux patching:** `jumplinux` installs the jumpbox packages, then runs a full `apt-get dist-upgrade`, so updates also cover what was installed. AIB has no Linux restart customizer, so the build VM isn't restarted. A kernel installed by the upgrade takes effect when a VM is first deployed from the image.
+* **Patching after deployment:** Sandbox VMs deployed from these images are patched by the sandbox's Azure Update Manager schedule, the same as VMs from platform images. The images leave Windows automatic updates and Linux `unattended-upgrades` at their defaults, so Azure can turn them off and Update Manager is the only source of updates. See [Patching](../../../../../README.md#patching).
+* **Validation:** After AIB captures the image from the build VM, it deploys a validation VM from the captured image and runs the template's validation script on it. AIB publishes the image only if every check passes (`continueDistributeOnFailure = false`).
+  * **Windows:**
+    * All images: Microsoft Update is registered and all Critical and Security updates are installed.
+    * `adds`: the image is patch-only, leaving AD-Domain-Services for installation at deploy time.
+    * `jumpwin`: RSAT-ADDS, RSAT-DNS-Server, VS Code, SSMS and MySQL Workbench are installed.
+    * `mssqlwin`: SQL Server, pre-installed on the source platform image, is present.
+    * The Windows Update policy key is skipped, because Azure sets it from each VM's patch mode at provisioning.
+  * **Linux:**
+    * `jumplinux`: the captured guest runs Ubuntu 26.04 LTS, and `az`, `docker`, `helm`, stable `pwsh`, and `terraform` execute successfully.
+    * All images: all security upgrades are installed.
+    * `jumplinux`: the packages in [install-vm-jumpbox-linux-packages.sh](../../../../../modules/vm-jumpbox-linux/scripts/install-vm-jumpbox-linux-packages.sh) are installed, including:
+      * DevOps tools: `azure-cli`, `helm`, `jp`, `powershell`, `python3-pip` and `terraform`.
+      * Containers: `containerd.io`, `docker-buildx-plugin`, `docker-ce`, `docker-ce-cli`, `docker-compose-plugin` and `notary`.
+      * Active Directory integration: `krb5-config`, `krb5-user`, `libnss-winbind`, `libpam-winbind`, `ntpsec`, `samba` and `winbind`.
+      * File shares: `autofs`, `cifs-utils` and `keyutils`.
 * **Distribution:** One replica in `location` on `Standard_LRS`, with automatic version numbering.
-* **Build VM size:** `image_build_vm_size` defaults to `Standard_D4s_v6`, the same generation as the sandbox VMs. If AIB can't build on a v6 size in your region or subscription, set it to an older generation, e.g. `Standard_D4s_v5`. The build VM size doesn't affect the image or the sizes VMs deployed from it can use.
-* **Template updates:** AIB image templates can't be updated, so any change to a template, including a change to a script it runs, makes Terraform replace it.
+* **Build VM size:** `image_build_vm_size` defaults to `Standard_D4s_v6`, the same generation as the sandbox VMs.
+* **Template updates:** AIB image templates are immutable, so Terraform replaces a template whenever it or a script it runs changes.
+
+The Ubuntu 26.04 custom image is the rg-devops-iac portion of [#426](https://github.com/Azure-Samples/azuresandbox/issues/426); the root sandbox's platform image default remains Ubuntu 24.04 pending its separate upgrade. Replacing the template does not rebuild or delete existing image versions. Run a successful `jumplinux` build to publish a 26.04 version before expecting deployments from the gallery to use the new release.
 
 ### Image Build Networking
 
-Builds run in the root module's virtual network with no public IP addresses. The root module creates these subnets, their NSGs and their NAT gateway associations, whether or not this module is enabled. See [Virtual Network Design](../../README.md#virtual-network-design). AIB puts the build VM in the image build VM subnet, and an [Azure Container Instance](https://learn.microsoft.com/azure/virtual-machines/linux/image-builder-vnet) in the Container Instances subnet that reaches the build VM over the private network. Both subnets reach the internet through the NAT gateway, for platform images, Windows Update, package repositories and AIB.
+Builds use private networking in the `rg-devops-iac` virtual network, with no public IP addresses. AIB puts the build and validation VMs in the devops subnet and a Container Instance in the image build Container Instances subnet, which reaches the build and validation VMs over the private network. Outbound traffic, such as Windows Update, package repositories and software downloads, uses the NAT gateway. See [Virtual Network Design](../../README.md#virtual-network-design) and [Azure VM Image Builder networking options](https://learn.microsoft.com/azure/virtual-machines/linux/image-builder-vnet).
 
 ### Image Builder Identity
 
-The image templates run as a user-assigned managed identity with two built-in roles. Each covers the [permissions AIB needs](https://learn.microsoft.com/azure/virtual-machines/linux/image-builder-permissions-cli) but grants more, so each is scoped to a single resource:
+The image gallery adds no human personas to the rg-devops-iac [Personas and Role Assignments](../../README.md#personas-and-role-assignments). The **devops administrator** applies the configuration and runs `invoke-image-build.sh`, which `Contributor` covers. The image builder identity is created by this configuration and used only by AIB.
+
+The image templates run as a user-assigned managed identity with the roles below. Each role includes the [permissions AIB needs](https://learn.microsoft.com/azure/virtual-machines/linux/image-builder-permissions-cli) plus some extra permissions, so each is scoped narrowly to limit its reach:
 
 Role | Scope | Used for
 --- | --- | ---
 [Compute Gallery Artifacts Publisher](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/compute#compute-gallery-artifacts-publisher) | Compute gallery | Publishing image versions to the image definitions.
-[Network Contributor](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/networking#network-contributor) | Virtual network | Putting the build VM and its Container Instance in the image build subnets.
+[Network Contributor](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/networking#network-contributor) | Virtual network | Connecting build resources to the virtual network.
+[Contributor](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/privileged#contributor) | Staging resource groups (`IT_<resource group>_*`) \* | Creating the temporary build resources.
 
-AIB creates a staging resource group (`IT_<resource group>_<template>_<id>`) for each template, and gives the identity `Contributor` on it for the temporary build resources. The staging resource group is deleted with its template. See [Configure Azure VM Image Builder permissions](https://learn.microsoft.com/azure/virtual-machines/linux/image-builder-permissions-cli).
+\* AIB creates a staging resource group for each template, assigns this role itself and deletes the group with its template. See [Configure Azure VM Image Builder permissions](https://learn.microsoft.com/azure/virtual-machines/linux/image-builder-permissions-cli).
 
 ### Image Build Prerequisites
 
-* **Container Instances quota:** Each build runs one Container Instance in the subscription. Check the Container Instances quota in `location` if you run several builds at once.
-* **Build VM quota:** Each build runs one `image_build_vm_size` VM. Check the vCPU quota for its family in `location`.
-* **Azure Policy:** Policies that apply to the staging resource groups, e.g. required tags or denied public IPs, can block builds. Builds don't create public IPs. The templates apply `tags` to the staging resource groups and the build resources in them, so add any tags your policies use for exemptions to `tags`.
-* **Resource providers:** The configuration registers `Microsoft.VirtualMachineImages`, and the azurerm provider's `extended` registration set covers the others builds need, including `Microsoft.ContainerInstance`.
+* **Quota:** `scripts/invoke-image-build.sh` starts all four builds at once. Each build runs one Container Instance and up to two `image_build_vm_size` VMs, a build VM and a validation VM. Before building, check that `location` has quota for four Container Instances and eight VMs: 32 vCPUs at the default `Standard_D4s_v6`, in both the VM family's vCPU quota and the Total Regional vCPUs quota. This is burst usage while builds run, not steady state: AIB deletes the build resources when each build finishes.
+* **Azure Policy:** See the Azure Policy note in [Other Prerequisites](../../../../../README.md#other-prerequisites). The templates apply `tags` to the staging resource groups and their build resources, so tags you add for policy exemptions also apply to builds.
 
 ### Image Build Costs
 
@@ -170,25 +188,3 @@ Terraform creates the templates but doesn't run builds. Run them as the **devops
 The script starts the builds in parallel, reports their status until they finish, then tags each new image version with `source_image_version` and `build_time`. Builds take from about 30 minutes (`jumplinux`) to a few hours (Windows images with several Windows Update passes). If a build fails, check `customization.log` in the template's staging resource group.
 
 Automating builds and deleting old image versions are outside this configuration.
-
-### Disabling the Image Gallery
-
-A gallery or image definition that still has image versions can't be deleted. Before setting `enable_image_gallery` to false, delete every image version from the root module directory:
-
-```bash
-RG=$(terraform output -json resource_names | jq -r .resource_group)
-GALLERY=$(terraform output -json resource_names | jq -r .image_gallery)
-for image in adds jumpwin jumplinux mssqlwin; do
-  for version in $(az sig image-version list -g "$RG" -r "$GALLERY" -i "$image" --query "[].name" -o tsv); do
-    az sig image-version delete -g "$RG" -r "$GALLERY" -i "$image" -e "$version"
-  done
-done
-```
-
-Then apply with `enable_image_gallery = false`. Deleting each image template also deletes its `IT_*` staging resource group.
-
-### Staging Resource Groups
-
-Each image template has an `IT_*` staging resource group outside the rg-devops-iac resource group. The platform deletes it when the template is deleted, including when the rg-devops-iac resource group is deleted.
-
-Don't delete a staging resource group while its template still exists. The template keeps its build artifacts there, and AIB doesn't recreate it, so later builds of that image can fail. To recover, recreate the template from the root module directory, e.g. `terraform apply -replace='module.image_gallery[0].azapi_resource.image_templates["jumpwin"]'`.

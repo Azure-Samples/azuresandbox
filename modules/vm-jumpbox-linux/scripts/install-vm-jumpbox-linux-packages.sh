@@ -7,7 +7,7 @@
 #     apt-get dist-upgrade so the image ships fully patched.
 # The script is idempotent and must run as root.
 
-# Note: This code has been tested on Ubuntu 24.04 LTS (Noble Numbat) and will not work on other Linux distros
+# Targets Ubuntu 26.04 LTS (Resolute Raccoon).
 
 set -euo pipefail
 
@@ -57,7 +57,7 @@ packages=(
   libnss-winbind
   libpam-winbind
   notary
-  ntp
+  ntpsec
   powershell
   python3-pip
   samba
@@ -69,6 +69,8 @@ log "Running '$0' (image build: $image_build)..."
 
 # shellcheck disable=SC1091
 release=$(. /etc/os-release && printf '%s' "$VERSION_CODENAME")
+# shellcheck disable=SC1091
+release_version=$(. /etc/os-release && printf '%s' "$VERSION_ID")
 
 #region keyrings
 log "Installing apt keyrings..."
@@ -95,6 +97,8 @@ install_keyring https://download.docker.com/linux/ubuntu/gpg /etc/apt/keyrings/d
 install_keyring https://apt.releases.hashicorp.com/gpg /etc/apt/keyrings/hashicorp-archive-keyring.gpg true
 install_keyring https://packages.buildkite.com/helm-linux/helm-debian/gpgkey /etc/apt/keyrings/helm.gpg true
 install_keyring https://packages.microsoft.com/keys/microsoft.asc /etc/apt/keyrings/microsoft.gpg true
+# The Ubuntu 26.04 Microsoft product repository is signed with Microsoft's 2025 key.
+install_keyring https://packages.microsoft.com/keys/microsoft-2025.asc /etc/apt/keyrings/microsoft-2025.gpg true
 #endregion
 
 #region repositories
@@ -109,7 +113,7 @@ write_source() {
 write_source azure-cli.list "deb [arch=amd64 signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ $release main"
 write_source docker.list "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $release stable"
 write_source helm-stable-debian.list "deb [arch=amd64 signed-by=/etc/apt/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main"
-write_source microsoft-prod.list "deb [arch=amd64 signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/ubuntu/24.04/prod $release main"
+write_source microsoft-prod.list "deb [arch=amd64 signed-by=/etc/apt/keyrings/microsoft-2025.gpg] https://packages.microsoft.com/ubuntu/$release_version/prod $release main"
 write_source hashicorp.list "deb [arch=amd64 signed-by=/etc/apt/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $release main"
 #endregion
 

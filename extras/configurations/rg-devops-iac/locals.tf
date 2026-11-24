@@ -116,10 +116,11 @@ locals {
       source_port_ranges         = ["*"]
     }
 
-    # Lets the Azure VM Image Builder container reach the build VM over SSH (Linux) and WinRM over HTTPS (Windows).
+    # Lets the Azure VM Image Builder container reach the build and validation VMs over SSH (Linux) and WinRM over
+    # HTTPS (Windows).
     AllowImageBuilderInbound = {
       access                     = "Allow"
-      destination_address_prefix = var.subnet_image_build_address_prefix
+      destination_address_prefix = var.subnet_devops_address_prefix
       destination_port_ranges    = ["22", "5986"]
       direction                  = "Inbound"
       protocol                   = "Tcp"
@@ -137,7 +138,6 @@ locals {
       source_port_ranges         = ["*"]
     }
 
-    # Overrides the default AllowVnetInBound rule, so nothing else in the VNet can reach the image build subnets.
     DenyVirtualNetworkInbound = {
       access                     = "Deny"
       destination_address_prefix = "*"
@@ -183,6 +183,8 @@ locals {
       ]
     }
 
+    # Hosts the Linux virtual machine and the optional image-gallery module's build and validation VMs.
+    # See https://learn.microsoft.com/azure/virtual-machines/security-isolated-image-builds-image-builder
     (var.subnet_devops_name) = {
       address_prefix                    = var.subnet_devops_address_prefix
       delegation                        = ""
@@ -190,7 +192,8 @@ locals {
       private_endpoint_network_policies = "Disabled" # Default
 
       nsg_rules = [
-        "AllowBastionSshInbound"
+        "AllowBastionSshInbound",
+        "AllowImageBuilderInbound"
       ]
     }
 
@@ -202,30 +205,14 @@ locals {
       nsg_rules                         = []
     }
 
-    # The image build subnets are used by the optional image-gallery module (var.enable_image_gallery). Azure VM Image
-    # Builder puts its temporary build VM in the build subnet, and a container in the Container Instances subnet that
-    # connects to the build VM. Both reach the internet only through the NAT gateway.
-    # See https://learn.microsoft.com/azure/virtual-machines/security-isolated-image-builds-image-builder
-    (var.subnet_image_build_name) = {
-      address_prefix                    = var.subnet_image_build_address_prefix
-      delegation                        = ""
-      nat_gateway                       = true
-      private_endpoint_network_policies = "Disabled" # Default
-
-      nsg_rules = [
-        "AllowImageBuilderInbound",
-        "DenyVirtualNetworkInbound"
-      ]
-    }
-
+    # The image build Container Instances subnet is used by the optional image-gallery module.
     (var.subnet_image_build_aci_name) = {
       address_prefix                    = var.subnet_image_build_aci_address_prefix
       delegation                        = "Microsoft.ContainerInstance/containerGroups"
       nat_gateway                       = true
       private_endpoint_network_policies = "Disabled" # Default
 
-      # The default outbound rules let the container reach the build subnet on 22 and 5986, and the internet through
-      # the NAT gateway. Nothing needs to connect to the container.
+      # Nothing needs to connect to the container, so block inbound traffic from the VNet.
       nsg_rules = [
         "DenyVirtualNetworkInbound"
       ]

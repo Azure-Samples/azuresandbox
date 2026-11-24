@@ -204,12 +204,12 @@ variable "subnet_bastion_address_prefix" {
 
 variable "subnet_devops_address_prefix" {
   type        = string
-  description = "The address prefix for the devops subnet."
-  default     = "10.0.1.0/29"
+  description = "The address prefix for the devops subnet, which hosts the Linux virtual machine and the temporary Azure VM Image Builder build and validation VMs used by the optional image-gallery module. Requires a /28 or larger for four simultaneous image builds."
+  default     = "10.0.1.0/28"
 
   validation {
-    condition     = can(cidrhost(var.subnet_devops_address_prefix, 0))
-    error_message = "Must be valid IPv4 CIDR."
+    condition     = can(cidrhost(var.subnet_devops_address_prefix, 0)) && try(tonumber(split("/", var.subnet_devops_address_prefix)[1]) <= 28, false)
+    error_message = "Must be valid IPv4 CIDR with a prefix length of /28 or larger (e.g. /28, /27)."
   }
 }
 
@@ -226,7 +226,7 @@ variable "subnet_devops_name" {
 
 variable "subnet_image_build_aci_address_prefix" {
   type        = string
-  description = "The address prefix for the image build Container Instances subnet, which Azure VM Image Builder uses to reach the build VM. Used by the optional image-gallery module."
+  description = "The address prefix for the image build Container Instances subnet, which Azure VM Image Builder uses to reach the build and validation VMs. Used by the optional image-gallery module."
   default     = "10.0.4.0/28"
 
   validation {
@@ -238,32 +238,10 @@ variable "subnet_image_build_aci_address_prefix" {
 variable "subnet_image_build_aci_name" {
   type        = string
   description = "The name of the image build Container Instances subnet. Used by the optional image-gallery module."
-  default     = "snet-imagebuild-aci-05"
+  default     = "snet-imagebuild-aci-01"
 
   validation {
     condition     = can(regex("^[a-zA-Z0-9-]{1,64}$", var.subnet_image_build_aci_name))
-    error_message = "Must conform to Azure subnet naming standards: it can only contain alphanumeric characters and hyphens (-), must start and end with an alphanumeric character, and must be between 1 and 64 characters long."
-  }
-}
-
-variable "subnet_image_build_address_prefix" {
-  type        = string
-  description = "The address prefix for the image build VM subnet, which hosts the temporary Azure VM Image Builder build VMs. Used by the optional image-gallery module."
-  default     = "10.0.3.0/27"
-
-  validation {
-    condition     = can(cidrhost(var.subnet_image_build_address_prefix, 0))
-    error_message = "Must be valid IPv4 CIDR."
-  }
-}
-
-variable "subnet_image_build_name" {
-  type        = string
-  description = "The name of the image build VM subnet. Used by the optional image-gallery module."
-  default     = "snet-imagebuild-04"
-
-  validation {
-    condition     = can(regex("^[a-zA-Z0-9-]{1,64}$", var.subnet_image_build_name))
     error_message = "Must conform to Azure subnet naming standards: it can only contain alphanumeric characters and hyphens (-), must start and end with an alphanumeric character, and must be between 1 and 64 characters long."
   }
 }
@@ -282,7 +260,7 @@ variable "subnet_privatelink_address_prefix" {
 variable "subnet_privatelink_name" {
   type        = string
   description = "The name of the private link subnet."
-  default     = "snet-privatelink-03"
+  default     = "snet-privatelink-02"
 
   validation {
     condition     = can(regex("^[a-zA-Z0-9-]{1,64}$", var.subnet_privatelink_name))

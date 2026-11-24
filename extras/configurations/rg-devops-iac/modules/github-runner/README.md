@@ -33,7 +33,7 @@ This section provides additional information on various aspects of this module.
 * [Module Structure](#module-structure)
 * [Input Variables](#input-variables)
 * [Module Resources](#module-resources)
-* [Output Variables](#output-variables)
+* [Outputs](#outputs)
 * [Runner Installation](#runner-installation)
 * [Elevated Permissions for Integration Tests](#elevated-permissions-for-integration-tests)
 * [Terraform Version on the Runner](#terraform-version-on-the-runner)
@@ -70,7 +70,7 @@ This module is organized as follows:
 ├── compute.tf                            # Runner Run Command
 ├── locals.tf                             # Deployment identity role allow-list and condition, GitHub OIDC subjects
 ├── main.tf                               # Data sources, naming, identities, federated identity credentials and checks
-├── outputs.tf                            # Output variables
+├── outputs.tf                            # Output values
 ├── terraform.tf                          # Terraform configuration block
 └── variables.tf                          # Input variables
 ```
@@ -112,7 +112,7 @@ module.github_runner[0].azurerm_role_assignment.runner_power_state[0] | | Assign
 module.github_runner[0].azurerm_user_assigned_identity.deployment[0] | id-devops-dev-deployment | Deployment identity for Azure Sandbox applies. Attached to `jumplinux2` when `deployment_identity` is `"managed_identity"`; unattached and federated with GitHub Actions when it is `oidc`. Not created when `deployment_identity` is "none".
 module.github_runner[0].azurerm_user_assigned_identity.runner_power_state[0] | id-devops-dev-runner | Runner power state identity that starts and deallocates `jumplinux2` for workflow runs. Unattached and federated with GitHub Actions. Created only when `deployment_identity` is `"oidc"`.
 
-### Output Variables
+### Outputs
 
 The root module returns `deployment_identity` and `github_runner` unchanged, and merges `resource_ids` and `resource_names` into its own.
 
