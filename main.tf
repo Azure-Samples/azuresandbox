@@ -41,7 +41,7 @@ data "azurerm_shared_image_versions" "vm_images" {
 
 #region resources
 resource "azuread_group" "sql_admins" {
-  count            = var.enable_module_mssql ? 1 : 0
+  count            = var.enable_module_mssql || var.enable_module_mysql ? 1 : 0
   display_name     = "grp-sql-admins-${var.tags["project"]}-${var.tags["environment"]}-${element(split("-", azurerm_resource_group.this.name), length(split("-", azurerm_resource_group.this.name)) - 1)}"
   security_enabled = true
   members          = [var.operator_object_id, azurerm_user_assigned_identity.sql_admin[0].principal_id]
@@ -98,7 +98,7 @@ resource "azurerm_virtual_machine_run_command" "create_mssql_db_user" {
 # It is created and destroyed with the mssql module, like sql_admins, so each re-enable gets a
 # new identity with no cached tokens carrying a stale groups claim (#772).
 resource "azurerm_user_assigned_identity" "sql_admin" {
-  count               = var.enable_module_mssql ? 1 : 0
+  count               = var.enable_module_mssql || var.enable_module_mysql ? 1 : 0
   name                = "${module.naming.names["user_assigned_identity"].name}-sqladmin"
   resource_group_name = azurerm_resource_group.this.name
   location            = azurerm_resource_group.this.location
@@ -391,6 +391,9 @@ module "mysql" {
   admin_username             = module.vnet_shared.admin_username
   location                   = azurerm_resource_group.this.location
   log_analytics_workspace_id = module.vnet_shared.resource_ids["log_analytics_workspace"]
+  mysql_admin_login_name     = azuread_group.sql_admins[0].display_name
+  mysql_admin_object_id      = azuread_group.sql_admins[0].object_id
+  mysql_entra_identity_id    = var.mysql_entra_identity_id
   private_dns_zone_id        = module.vnet_shared.private_dns_zones["privatelink.mysql.database.azure.com"].id
   resource_group_name        = azurerm_resource_group.this.name
   subnet_id                  = module.vnet_shared.resource_ids["subnet_privatelink"]

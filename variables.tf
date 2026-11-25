@@ -163,6 +163,17 @@ variable "location" {
   }
 }
 
+variable "mysql_entra_identity_id" {
+  type        = string
+  description = "Optional resource ID of a pre-authorized user-assigned managed identity for Azure Database for MySQL Microsoft Entra authentication. When null (the default), the mysql module creates a new user-assigned managed identity."
+  default     = null
+
+  validation {
+    condition     = var.mysql_entra_identity_id == null || can(regex("(?i)^/subscriptions/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/resourceGroups/[^/]+/providers/Microsoft\\.ManagedIdentity/userAssignedIdentities/[^/]+$", var.mysql_entra_identity_id))
+    error_message = "Must be null or a valid Azure Resource ID for a user-assigned managed identity."
+  }
+}
+
 variable "operator_object_id" {
   type        = string
   description = "The Microsoft Entra object id of the operator: the signed-in user who provisions this configuration. The operator is granted data-plane role assignments on the resources it creates."

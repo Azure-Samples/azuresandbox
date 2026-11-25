@@ -105,7 +105,7 @@ Azure Sandbox demonstrates layered security controls across identity, authorizat
 
 * **Identity and Access Management (IAM)**:
   * **Authentication**:
-    * Integration with Microsoft Entra ID for control-plane, data-plane and service-specific authentication (e.g. Azure SQL Database).
+    * Integration with Microsoft Entra ID for control-plane, data-plane and service-specific authentication (e.g. Azure SQL Database and Azure Database for MySQL).
     * Integration with Active Directory Domain Services (AD DS) for domain-joining Windows and Linux servers and use of Windows integrated authentication (e.g. SQL Server).
   * **Authorization**:
     * Integration with Azure RBAC role assignments according to the principle of least privilege.
@@ -527,6 +527,7 @@ enable_module_vnet_onprem | `false` | Enables the `vnet-onprem` extra module.
 enable_module_vwan | `false` | Enables the `vwan` module.
 entra_tenant_id | | Microsoft Entra tenant ID.
 location | | Azure region for sandbox resources, e.g. `southcentralus`.
+mysql_entra_identity_id | `null` | Optional resource ID of a pre-authorized user-assigned managed identity for Azure Database for MySQL Microsoft Entra authentication. Requires `Directory Readers` or Graph `User.Read.All`, `GroupMember.Read.All`, and `Application.Read.All`.
 operator_object_id | | Microsoft Entra object ID of the operator, granted data-plane access to sandbox resources. Must be the signed-in user when `auth_mode` is `azure_cli`. Set by the bootstrap scripts.
 patch_schedule_duration | `03:55` | Patching window length (`HH:mm`, `01:30` to `03:55`). See [Patching](#patching).
 patch_schedule_linux_classifications | `["Critical", "Security"]` | Linux update classifications: `Critical`, `Security`, `Other` (unused).
@@ -554,7 +555,7 @@ azapi_update_resource.app_insights_disable_public_access[0] | appisanddevxxx | D
 azapi_update_resource.key_vault_disable_public_access | kv&#8209;sand&#8209;dev | Disables public network access on Key Vault.
 azapi_update_resource.log_analytics_disable_public_ingestion | log&#8209;sand&#8209;dev&#8209;xxxx | Disables public ingestion and query on the Log Analytics workspace.
 azapi_update_resource.storage_disable_public_access[0] | stsanddevxxxxxxxx | Disables public network access on the storage account.
-azuread_group.sql_admins[0] | grp&#8209;sql&#8209;admins&#8209;sand&#8209;dev&#8209;xxxxxxxx | Entra ID group for Azure SQL Database admin authorization. Members are the operator and the SQL admin user-assigned identity.
+azuread_group.sql_admins[0] | grp&#8209;sql&#8209;admins&#8209;sand&#8209;dev&#8209;xxxxxxxx | Entra ID group for Azure SQL Database and Azure Database for MySQL admin authorization. Members are the operator and the SQL admin user-assigned identity.
 azurerm_resource_group.this | rg&#8209;sand&#8209;dev&#8209;xxxxxxxx | Resource group for the sandbox environment.
 azurerm_user_assigned_identity.sql_admin[0] | id&#8209;sand&#8209;dev&#8209;sqladmin | SQL admin user-assigned identity, attached to jumpwin1 and used by the CreateMssqlDbUser run command.
 azurerm_virtual_machine_run_command.create_mssql_db_user[0] | vmx&#8209;sand&#8209;dev&#8209;jumpwin1&#8209;CreateMssqlDbUser | Signs in to Azure SQL Database as the SQL admin user-assigned identity and adds jumpwin1's system-assigned identity as `db_datareader` on the sandbox database.
@@ -874,7 +875,7 @@ Sandbox environments are built with Terraform. See *terraform.tf* for the pinned
 
 * **Providers**:
   * **azapi**: Manages Azure resources and settings the azurerm provider doesn't support.
-  * **azuread**: Manages Microsoft Entra ID objects, such as the *mssql* module's security group.
+  * **azuread**: Manages Microsoft Entra ID objects, such as the *mssql* and *mysql* modules' admin security group.
   * **azurerm**: Manages Azure resources.
   * **cloudinit**: Configures Linux virtual machines.
   * **random**: Generates random values for resource attributes.

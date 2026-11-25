@@ -39,6 +39,26 @@ variable "log_analytics_workspace_id" {
   }
 }
 
+variable "mysql_admin_login_name" {
+  type        = string
+  description = "The display name of the Entra ID group to be set as the MySQL Flexible Server administrator."
+
+  validation {
+    condition     = length(var.mysql_admin_login_name) > 0 && length(var.mysql_admin_login_name) <= 256
+    error_message = "Must be a non-empty string with a maximum length of 256 characters."
+  }
+}
+
+variable "mysql_admin_object_id" {
+  type        = string
+  description = "The object ID of the Entra ID group to be set as the MySQL Flexible Server administrator."
+
+  validation {
+    condition     = can(regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", var.mysql_admin_object_id))
+    error_message = "Must be a valid GUID in the format 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
+  }
+}
+
 variable "mysql_database_name" {
   type        = string
   description = "The name of the Azure MySQL Database to be provisioned."
@@ -47,6 +67,17 @@ variable "mysql_database_name" {
   validation {
     condition     = can(regex("^[a-zA-Z0-9_]{1,64}$", var.mysql_database_name))
     error_message = "Must conform to Azure MySQL Flexible Server database naming requirements: it can only contain alphanumeric characters and underscores (_), and must be between 1 and 64 characters long."
+  }
+}
+
+variable "mysql_entra_identity_id" {
+  type        = string
+  description = "Optional resource ID of a pre-authorized user-assigned managed identity for Microsoft Entra authentication. When null, the module creates a user-assigned managed identity."
+  default     = null
+
+  validation {
+    condition     = var.mysql_entra_identity_id == null || can(regex("(?i)^/subscriptions/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/resourceGroups/[^/]+/providers/Microsoft\\.ManagedIdentity/userAssignedIdentities/[^/]+$", var.mysql_entra_identity_id))
+    error_message = "Must be null or a valid Azure Resource ID for a user-assigned managed identity."
   }
 }
 
