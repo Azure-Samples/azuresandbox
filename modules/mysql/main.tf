@@ -1,4 +1,22 @@
+#region data
+data "azurerm_client_config" "current" {}
+#endregion
+
+#region locals
+locals {
+  server_identity_id = var.mysql_entra_identity_id != null ? var.mysql_entra_identity_id : azurerm_user_assigned_identity.this[0].id
+}
+#endregion
+
 #region resources
+resource "azurerm_user_assigned_identity" "this" {
+  count               = var.mysql_entra_identity_id == null ? 1 : 0
+  name                = "${module.naming.names["user_assigned_identity"].name}-mysql"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  tags                = var.tags
+}
+
 resource "azurerm_mysql_flexible_server" "this" {
   name                   = module.naming_unique.names["db_for_my_sql_server"].name
   resource_group_name    = var.resource_group_name
@@ -7,6 +25,29 @@ resource "azurerm_mysql_flexible_server" "this" {
   administrator_password = var.admin_password
   sku_name               = var.mysql_sku_name
   public_network_access  = "Disabled"
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [local.server_identity_id]
+  }
+}
+
+resource "azurerm_mysql_flexible_server_active_directory_administrator" "this" {
+  server_id   = azurerm_mysql_flexible_server.this.id
+  identity_id = local.server_identity_id
+  login       = var.mysql_admin_login_name
+  object_id   = var.mysql_admin_object_id
+  tenant_id   = data.azurerm_client_config.current.tenant_id
+}
+
+# aad_auth_only is read-only until an Entra administrator is configured on the server.
+resource "azurerm_mysql_flexible_server_configuration" "aad_auth_only" {
+  name                = "aad_auth_only"
+  resource_group_name = var.resource_group_name
+  server_name         = azurerm_mysql_flexible_server.this.name
+  value               = "ON"
+
+  depends_on = [azurerm_mysql_flexible_server_active_directory_administrator.this]
 }
 
 resource "azurerm_mysql_flexible_database" "this" {
