@@ -23,6 +23,7 @@ This configuration provides a secure, isolated Terraform execution environment f
   * Pre-installed and pre-configured environment for Terraform init / plan / apply operations.
   * Managed identity access to a pre-configured Terraform state backend (Azure Blob Storage).
   * Pre-installed Azure CLI, PowerShell and Azure PowerShell for custom automation.
+  * Optional deployment identity for secretless, least-privilege Terraform applies, such as Azure Sandbox. See [Optional: Deployment Identity](#optional-deployment-identity).
 * **Network isolation**
   * Virtual network, subnets and NSGs for Bastion, VMs, private endpoints and image builds.
   * NAT gateway for outbound internet access.
@@ -50,30 +51,38 @@ This section describes the prerequisites required to deploy this configuration. 
 * [Personas and Role Assignments](#personas-and-role-assignments)
 * [Terraform Execution Environment](#terraform-execution-environment)
 
-**Note:** There are additional prerequisites for the optional modules. See [Workflow Prerequisites](./modules/github-runner/README.md#workflow-prerequisites) and [Image Build Prerequisites](./modules/image-gallery/README.md#image-build-prerequisites) for more information.
+**Note:** There are additional prerequisites for the optional modules. See [Workflow prerequisites](../../../CONTRIBUTING.md#workflow-prerequisites) and [Image Build Prerequisites](./modules/image-gallery/README.md#image-build-prerequisites) for more information.
 
 ### Personas and Role Assignments
 
-There are two personas associated with this configuration to support role separation when required. A single user can assume multiple personas if they have the appropriate role assignments.
+There are three separate personas associated with this configuration to support role separation when required. The **entra administrator** is needed only for the optional [deployment identity](#optional-deployment-identity). A single user can assume multiple personas if they have the appropriate role assignments.
 
-Persona | Intent | Minimum Azure Role Required
---- | --- | ---
-**devops administrator** | Deploys this configuration and manages its optional features. | `Contributor` and `Role Based Access Control Administrator` on the subscription \*
-**devops engineer** | Signs in to `jumplinux2` to run Terraform. | `Reader` on the rg-devops-iac resource group and `Virtual Machine User Login` on `jumplinux2` \*\*
+Persona | Intent | Minimum Entra Role Required | Minimum Azure Role Required
+--- | --- | --- | ---
+**entra administrator** | Grants Microsoft Graph permissions to the deployment identity with `grant-graph-permissions.sh`. Needed only for sandboxes that enable `mssql`. | `Privileged Role Administrator` | N/A
+**devops administrator** | Deploys this configuration and manages its optional features. | N/A | `Contributor` and `Role Based Access Control Administrator` on the subscription \*
+**devops engineer** | Signs in to `jumplinux2` to run Terraform, optionally as the [deployment identity](#optional-deployment-identity). | N/A | `Reader` on the rg-devops-iac resource group and `Virtual Machine User Login` on `jumplinux2` \*\*
 
-\* Privileged role assignments such as these can be further restricted. See [Least-Privilege Access with Privileged Identity Management](./modules/github-runner/README.md#least-privilege-access-with-privileged-identity-management) and [Delegate Azure access management to others with conditions (ABAC)](https://learn.microsoft.com/azure/role-based-access-control/delegate-role-assignments-overview).
+\* These role assignments can be standing or PIM activated. See [Assign Azure resource roles in Privileged Identity Management](https://learn.microsoft.com/entra/id-governance/privileged-identity-management/pim-resource-roles-assign-roles). Azure `Role Based Access Control Administrator` can be further constrained using Azure ABAC. See [A more secure method: Delegate role assignment management with conditions](https://learn.microsoft.com/azure/role-based-access-control/delegate-role-assignments-overview#a-more-secure-method-delegate-role-assignment-management-with-conditions).
 
-\*\* Depending upon the [deployment identity](../../../README.md#deployment-identity) used for the Terraform configuration being deployed, additional role assignments may be required either for the **devops engineer** or a runner.
+\*\* If the Terraform configuration being deployed uses Azure CLI sign-in, such as Azure Sandbox with `auth_mode = "azure_cli"`, the **devops engineer** is its [deployment identity](../../../README.md#deployment-identity) and needs its roles. Otherwise, the deployment identity holds them instead.
 
-The **devops administrator** who applies this configuration is granted `Key Vault Secrets Officer` on the key vault, `Storage Blob Data Contributor` on the storage account and `Virtual Machine Administrator Login` on `jumplinux2`. The optional GitHub runner adds two more personas; see [Personas](./modules/github-runner/README.md#personas).
+The **devops administrator** who applies this configuration:
+
+* Is granted these roles by the configuration:
+  * `Key Vault Secrets Officer` on the key vault.
+  * `Storage Blob Data Contributor` on the storage account.
+  * `Virtual Machine Administrator Login` on `jumplinux2`.
+* Grants the optional deployment identity its time-bound roles with `grant-jit-roles.sh` before each apply.
+* Needs the GitHub **Admin** role on the target repository to register the optional GitHub runner.
 
 ### Terraform Execution Environment
 
-Use any of the Azure Sandbox [Terraform Execution Environments](../../../README.md#terraform-execution-environment). The bootstrap scripts and Terraform need git, Azure CLI and Terraform.
+Use any of the Azure Sandbox [Terraform Execution Environments](../../../README.md#terraform-execution-environment) to deploy this configuration. The bootstrap scripts and Terraform need git, Azure CLI and Terraform.
 
 ## Getting Started
 
-This section covers the steps to get started with this configuration using an interactive Terraform execution environment.
+Deploy this configuration from an interactive Terraform execution environment:
 
 * [Step 1: Log In](#step-1-log-in)
 * [Step 2: Clone the Repository](#step-2-clone-the-repository)
@@ -201,6 +210,7 @@ This section provides documentation regarding the overall structure of the root 
 * [Child Modules](#child-modules)
 * [Virtual Network Design](#virtual-network-design)
 * [Dependencies](#dependencies)
+* [Optional: Deployment Identity](#optional-deployment-identity)
 * [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration)
 * [Optional: Custom Images](#optional-custom-images)
 
@@ -220,7 +230,9 @@ This configuration is organized into the following structure:
 │   ├── bootstrap.sh                      # Bash: generates terraform.tfvars
 │   ├── cleanterraformtemp.sh             # Bash: removes Terraform temp/local files
 │   ├── delete-tfstate.sh                 # Bash: deletes Terraform state blob(s) from the storage backend
-│   └── enable-public-access.sh           # Bash: re-enables key vault and storage account public access
+│   ├── enable-public-access.sh           # Bash: re-enables key vault and storage account public access
+│   ├── grant-graph-permissions.sh        # Bash: entra administrator grants the deployment identity Graph permissions
+│   └── grant-jit-roles.sh                # Bash: devops administrator grants the deployment identity JIT roles
 ├── locals.tf                             # Local variables
 ├── main.tf                               # Other service resource and module blocks
 ├── network.tf                            # Network resource blocks
@@ -255,7 +267,7 @@ tags | { costcenter = "mycostcenter", environment = "dev", project = "devops" } 
 vm_jumpbox_linux_size | Standard_D2ls_v6 | The size of the Linux virtual machine (`jumplinux2`). Must be a v6 D-series size (`Standard_D<vCPU>[a][l][d]s_v6`), which supports Trusted Launch, the NVMe disk controller and Accelerated Networking.
 vnet_address_space | 10.0.0.0/16 | The address space in CIDR notation for the virtual network.
 
-There are additional input variables used for optional use cases. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration) and [Optional: Custom Images](#optional-custom-images).
+There are additional input variables used for optional use cases. See [Optional: Deployment Identity](#optional-deployment-identity), [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration) and [Optional: Custom Images](#optional-custom-images).
 
 ### Root Module Resources
 
@@ -306,7 +318,7 @@ terraform_data.private_dns_zone_links_complete | | Waits for every private DNS z
 terraform_data.storage_access_barrier | | Waits for all storage writes before the storage account is made private.
 time_sleep.wait_for_roles | | Waits 2 minutes for the `Key Vault Secrets Officer` role assignment to propagate before the `jumplinux2` module writes its key vault secrets.
 
-The optional features add more resources. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration) and [Optional: Custom Images](#optional-custom-images).
+The optional features add more resources. See [Optional: Deployment Identity](#optional-deployment-identity), [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration) and [Optional: Custom Images](#optional-custom-images).
 
 ### Root Module Outputs
 
@@ -317,7 +329,7 @@ Name | Comments
 resource_ids | A map of resource IDs for key resources in the configuration.
 resource_names | A map of resource names for key resources in the configuration.
 
-There are additional output values for optional use cases. See [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration) and [Optional: Custom Images](#optional-custom-images).
+There are additional output values for optional use cases. See [Optional: Deployment Identity](#optional-deployment-identity), [Optional: GitHub Self-Hosted Runner Configuration](#optional-github-self-hosted-runner-configuration) and [Optional: Custom Images](#optional-custom-images).
 
 ### Child Modules
 
@@ -326,12 +338,12 @@ The following [modules](./modules/) are included in this configuration:
 Name | Optional | Depends On | Description
 --- | --- | --- | ---
 [vm-jumpbox-linux](./modules/vm-jumpbox-linux/) | No | Root module | Creates `jumplinux2`, a preconfigured Linux jumpbox VM in the DevOps virtual network, used as the Terraform execution environment.
-[github-runner](./modules/github-runner/) | Yes | Root module, vm-jumpbox-linux | Installs and registers the GitHub Actions self-hosted runner on `jumplinux2`, and creates the deployment identity and GitHub Actions federated identity credentials for the Sandbox deployment workflow. Enabled when `enable_github_runner` is `true` or `deployment_identity` isn't "none".
+[github-runner](./modules/github-runner/) | Yes | Root module, vm-jumpbox-linux | Installs and registers the GitHub Actions self-hosted runner on `jumplinux2`, and with `deployment_identity = "oidc"`, adds GitHub Actions federated identity credentials to the deployment identity and creates the runner power state identity. Enabled by `enable_github_runner`.
 [image-gallery](./modules/image-gallery/) | Yes | Root module | Creates an Azure Compute Gallery and Azure VM Image Builder templates that build custom images for the Azure Sandbox VMs. Enabled by `enable_image_gallery`.
 
 ### Virtual Network Design
 
-This configuration implements a virtual network and network-isolated Azure services. A barrier pattern is used to ensure public access is disabled for key vault, blob storage and AMPLS when deployment completes. AMPLS is used to ensure Azure Monitor-related traffic is network isolated. Default address ranges are set artificially high for readability and can be overridden with smaller ranges to meet specific requirements. Each subnet must be inside the virtual network address space and must not overlap another subnet.
+This configuration implements a dedicated virtual network and network-isolated Azure services. A barrier pattern is used to ensure public access is disabled for key vault, blob storage and AMPLS when deployment completes. AMPLS is used to ensure Azure Monitor-related traffic is network isolated. Default address ranges are set artificially high for readability and can be overridden with smaller ranges to meet specific requirements. Each subnet must be inside the virtual network address space and must not overlap another subnet.
 
 VNet Property | Default Value | Notes
 --- | --- | ---
@@ -363,36 +375,113 @@ Private DNS Zone | Notes
 
 * **Source control:** GitHub. *.gitignore* keeps secrets, state and temporary files out of Git.
 * **Terraform:** see *terraform.tf* for pinned versions.
-  * Providers: `azapi` (AIB image templates, Run Commands and other settings `azurerm` doesn't support), `azurerm`, `cloudinit`, `http` (GitHub repository ids for the `oidc` [deployment identity](./modules/github-runner/README.md#deployment-identity)), `random`, `time` and `tls` (break-glass SSH key pair).
+  * Providers: `azapi` (AIB image templates, Run Commands and other settings `azurerm` doesn't support), `azurerm`, `cloudinit`, `http` (GitHub repository ids for the `oidc` [federated identity credentials](./modules/github-runner/README.md#oidc-federated-identity-credentials)), `random`, `time` and `tls` (break-glass SSH key pair).
   * Modules: `Azure/avm-utl-naming` for resource names.
 * **Scripting:** Bash and Azure CLI; PowerShell and the Az PowerShell module for *bootstrap.ps1*, the optional workflow scripts and Windows custom image builds.
 * **Configuration management:** cloud-init and Azure VM run commands for `jumplinux2`; Azure VM Image Builder for the optional custom images.
 * **Operating system:** `jumplinux2` runs Ubuntu Server 26.04 LTS (Resolute Raccoon).
 
+### Optional: Deployment Identity
+
+The optional deployment identity lets you apply Terraform configurations from `jumplinux2`, in a terminal or a GitHub Actions workflow, with:
+
+* **No secrets:** there is no service principal password to create, store or rotate.
+* **No standing privileged access:** the identity holds its Azure roles only for the time a devops administrator grants before each apply.
+* **Least privilege:** it can assign only the roles the configuration needs. See [Deployment Identity Permissions](#deployment-identity-permissions).
+
+When enabled, this feature adds the following:
+
+* **Variable:** `deployment_identity`, which defaults to `none`. See [Deployment Identity Options](#deployment-identity-options).
+  * `none`: no deployment identity.
+  * `managed_identity`: attached to `jumplinux2`.
+  * `oidc`: federated with GitHub Actions. Requires `enable_github_runner = true`.
+* **Resource:** `azurerm_user_assigned_identity.deployment[0]` (`id-devops-dev-deployment`).
+  * With `managed_identity`, it's attached to `jumplinux2`.
+  * With `oidc`, it's unattached and federated with GitHub Actions by the [github-runner](./modules/github-runner/README.md#oidc-federated-identity-credentials) module.
+* **Outputs:**
+  * `deployment_identity`: the identity's `client_id`, `principal_id` and GitHub OIDC subjects, or `null` when it isn't enabled.
+  * `resource_ids` and `resource_names` also include `deployment_identity`.
+
+#### Deployment Identity Options
+
+`deployment_identity` supports two options (`managed_identity` and `oidc`). Terraform configurations sign in as the deployment identity using its `client_id`. For example, Azure Sandbox sets its `client_id` to this value, with its [`auth_mode`](../../../README.md#deployment-identity) aligned to the same option.
+
+Aspect | `managed_identity` | `oidc`
+--- | --- | ---
+Identity | User-assigned managed identity attached to `jumplinux2` \* | Not attached to a VM. Federated with GitHub Actions by the [github-runner](./modules/github-runner/README.md#oidc-federated-identity-credentials) module
+Who can use it | A **devops engineer** signed in to `jumplinux2` \*\* | Only workflow jobs in `deployment_identity_github_environments`
+Extra GitHub setup | None | [OIDC subject claim template](./modules/github-runner/README.md#oidc-subject-claim-template) and [GitHub environments](../../../CONTRIBUTING.md#deployment-environments-and-identities)
+
+\* `jumplinux2` sets `ARM_USE_MSI=true`, so a configuration with no `client_id` uses `jumplinux2`'s system-assigned identity, which can only access Terraform state by default. The **devops engineer** must set `client_id` to the deployment identity's.
+
+\*\* Also any job on the optional [GitHub self-hosted runner](#optional-github-self-hosted-runner-configuration).
+
+#### Deployment Identity Permissions
+
+The deployment identity needs the permissions of the Terraform configurations it applies:
+
+* **Azure roles:** standing or just in time. For example, Azure Sandbox uses `Contributor` and `Role Based Access Control Administrator`, granted just in time. See [Deployment Roles](#deployment-roles).
+  * A condition can limit role assignments to specific roles. For example, Azure Sandbox limits them to the roles in [`scripts/deployment-identity-roles.yaml`](../../../scripts/deployment-identity-roles.yaml).
+* **Microsoft Graph:** needed only by configurations that use the `azuread` provider to create Microsoft Entra ID groups and manage their membership. For example, Azure Sandbox uses standing Microsoft Graph permissions. See [Microsoft Graph Permissions](#microsoft-graph-permissions).
+
+#### Deployment Roles
+
+The **devops administrator** can grant the deployment identity its Azure roles as standing or limited-time role assignments. For example, Azure Sandbox uses limited-time assignments, granted before each apply:
+
+```bash
+./scripts/grant-jit-roles.sh             # grant Contributor and RBAC Administrator for 8 hours
+./scripts/grant-jit-roles.sh --hours 10  # grant a different window (1-24 hours)
+./scripts/grant-jit-roles.sh --force     # replace assignments that are already active
+./scripts/grant-jit-roles.sh --revoke    # remove both assignments after the run
+```
+
+Things to know:
+
+* The script activates the **devops administrator**'s eligible `Role Based Access Control Administrator` through PIM if needed. If that fails, activate it in the portal and run the script again.
+* Assignments can take about 5 minutes to take effect. Wait before applying.
+
+#### Microsoft Graph Permissions
+
+Needed only if the configuration uses Microsoft Graph, for example to create security groups. For Azure Sandbox, the **entra administrator** grants `Group.Create`, `GroupMember.Read.All`, `User.Read.All` and `Application.Read.All` once the identity exists:
+
+```bash
+./scripts/grant-graph-permissions.sh
+```
+
+#### Security Considerations
+
+Risk | Mode | Mitigation
+--- | --- | ---
+Anything on `jumplinux2` can use the identity while a grant is active | `managed_identity` | Keep grants short and revoke them after each run, or use `oidc`.
+Any GitHub Actions workflow in an allowed GitHub environment can federate | `oidc` | Restrict the environments with deployment branch rules and required reviewers. For example, Azure Sandbox allows only `main`, with owner approval. See [CONTRIBUTING.md](../../../CONTRIBUTING.md#deployment-environments-and-identities).
+Another deployment in the same grant window can use the roles | Both | Run one deployment at a time. For example, the Azure Sandbox deployment workflow uses a GitHub Actions [concurrency group](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
+Microsoft Graph permissions are standing | Both | Grant only the least-privileged permissions the configuration needs, such as creating groups and managing their membership, rather than broader user or group write permissions. For example, Azure Sandbox uses `Group.Create` instead of `Group.ReadWrite.All`.
+The job's federated token request credentials are visible to root on `jumplinux2` while the job runs | `oidc` | Limit who holds **Virtual Machine Administrator Login** on `jumplinux2`, which grants root.
+
 ### Optional: GitHub Self-Hosted Runner Configuration
 
-`rg-devops-iac` can optionally be configured as a GitHub self-hosted runner for the [Sandbox deployment workflow](../../../.github/workflows/sandbox-deployment.yml), with a [deployment identity](./modules/github-runner/README.md#deployment-identity) for sandbox deployments. The workflow supports the **release gate** and **on-demand deployment** use cases. The runner and deployment identity are disabled by default. To enable them, set `enable_github_runner = true` and `deployment_identity` in `terraform.tfvars`. The [github-runner](./modules/github-runner/README.md) module README covers workflow design, prerequisites, setup, runner registration, just-in-time roles and runner removal.
+GitHub-hosted runners are preferable, but some workflows need a self-hosted runner. For example, the Azure Sandbox deployment workflow needs access to a network-isolated Terraform state backend.
+
+`rg-devops-iac` can optionally be configured as a GitHub self-hosted runner for the [Sandbox deployment workflow](../../../.github/workflows/sandbox-deployment.yml), which uses the [deployment identity](#optional-deployment-identity) for sandbox deployments. The workflow supports the **release gate** and **on-demand deployment** use cases. The runner is disabled by default. To enable it, set `enable_github_runner = true` and `deployment_identity` in `terraform.tfvars`. The [github-runner](./modules/github-runner/README.md) module README covers runner installation and registration, the `oidc` federated identity credentials and the runner power state identity. The workflow's design, prerequisites, configuration and setup are in [Sandbox deployment workflow](../../../CONTRIBUTING.md#sandbox-deployment-workflow).
 
 The github-runner module adds these variables:
 
 Variable | Default | Description
 --- | --- | ---
-deployment_identity | `none` | Deployment identity for Azure Sandbox applies: `none`, `managed_identity` (attached to `jumplinux2`) or `oidc` (federated with GitHub Actions). See [Deployment Identity](./modules/github-runner/README.md#deployment-identity).
 deployment_identity_github_environments | `["sandbox-deployment", "sandbox-release-gate"]` | The GitHub Actions environments whose jobs can sign in as the deployment identity. One federated identity credential is created per environment. Only used when `deployment_identity` is `"oidc"`.
 enable_github_runner | false | Set to true to install and register the GitHub Actions self-hosted runner agent on `jumplinux2`. See [Self-Hosted Runner Registration](./modules/github-runner/README.md#self-hosted-runner-registration).
 github_repository_id | *(looked up)* | The numeric id of the GitHub repository, e.g. from `gh api repos/OWNER/NAME --jq .id`. Only used when `deployment_identity` is `"oidc"`. When empty, it is looked up from the repository in `github_runner_url`, which works only for public repositories.
 github_repository_owner_id | *(looked up)* | The numeric id of the user or organization that owns the GitHub repository, e.g. from `gh api repos/OWNER/NAME --jq .owner.id`. Only used when `deployment_identity` is `"oidc"`. When empty, it is looked up from the repository in `github_runner_url`, which works only for public repositories.
-github_runner_labels | `["azuresandbox"]` | Additional labels to apply to the GitHub Actions self-hosted runner. Only used when `enable_github_runner` is true.
-github_runner_power_state_environment | `sandbox-runner-power-state` | The GitHub Actions environment whose jobs can sign in as the runner power state identity, which starts and deallocates `jumplinux2` for workflow runs. Must not be one of `deployment_identity_github_environments`. Only used when `deployment_identity` is `"oidc"`.
-github_runner_token | | Ephemeral. The runner registration token used to register the self-hosted runner (expires after 1 hour), e.g. from `modules/github-runner/scripts/new-runner-registration-token.sh`. Set using the environment variable `TF_VAR_github_runner_token` for both `terraform plan` and `terraform apply`. Never stored in Terraform state or the saved plan. Required only when the runner is registered (on first deployment or when `github_runner_token_version` changes).
-github_runner_token_version | 1 | The version of the write-only `github_runner_token`, required because Terraform can't detect changes to write-only values. Only used when `enable_github_runner` is true.
+github_runner_labels | `["azuresandbox"]` | Additional [labels](https://docs.github.com/en/actions/how-tos/manage-runners/self-hosted-runners/apply-labels) to apply to the GitHub Actions self-hosted runner. Labels route workflow jobs to self-hosted runners.
+github_runner_power_state_environment | `sandbox-runner-power-state` | The GitHub Actions environment whose jobs can sign in as the runner power state identity, which starts and stops `jumplinux2` for workflow runs. Only used when `deployment_identity` is `"oidc"`.
+github_runner_token | | Ephemeral. The runner registration token used to register the self-hosted runner (expires after 1 hour), e.g. from `modules/github-runner/scripts/new-runner-registration-token.sh`. Set using the environment variable `TF_VAR_github_runner_token` for both `terraform plan` and `terraform apply`. Never stored in Terraform state or the saved plan. Needed only to register the runner.
+github_runner_token_version | 1 | The version of the write-only `github_runner_token`, required because Terraform can't detect changes to write-only values.
 github_runner_url | `https://github.com/Azure-Samples/azuresandbox` | The GitHub repository URL the self-hosted runner registers with.
 
-When `deployment_identity` is set, the `resource_ids` and `resource_names` outputs also include `deployment_identity`, plus `runner_power_state_identity` for `oidc`. These outputs are also added:
+When `deployment_identity` is `oidc`, the `resource_ids` and `resource_names` outputs also include `runner_power_state_identity`. This output is also added:
 
 Name | Comments
 --- | ---
-deployment_identity | The deployment identity's `client_id`, `principal_id`, GitHub OIDC subjects and just-in-time role condition, or `null` when `deployment_identity` is `none`. See [Deployment Identity](./modules/github-runner/README.md#deployment-identity).
 github_runner | The runner's registered name and, for `oidc`, its power state identity's client id and GitHub OIDC subject, or `null` when `enable_github_runner` is false.
 
 ### Optional: Custom Images

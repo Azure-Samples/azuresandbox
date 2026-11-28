@@ -24,13 +24,14 @@ This module implements a stand-alone Linux virtual machine for use as a general 
   * powershell (and Azure PowerShell)
   * python3-pip
   * terraform
+  * yq
 * Pre-configured environment variables for using Azure Blob Storage as a Terraform state backend.
 * Self-managed patching. See [Patching](#patching).
 * `AzureMonitorLinuxAgent` VM extension is pre-installed and pre-configured.
 * `AADSSHLoginForLinux` VM extension is pre-installed and pre-configured.
 * A system-assigned managed identity with role assignments to an Azure Blob Storage container to be used as a Terraform state backend.
 
-The optional [github-runner](../github-runner/README.md) module installs the GitHub Actions self-hosted runner agent on the VM. With its `managed_identity` deployment identity, the root module attaches that identity to the VM through `user_assigned_identity_ids`.
+The optional [github-runner](../github-runner/README.md) module installs the GitHub Actions self-hosted runner agent on the VM. With the `managed_identity` [deployment identity](../../README.md#optional-deployment-identity), the root module attaches that identity to the VM through `user_assigned_identity_ids`.
 
 ## Smoke Testing
 

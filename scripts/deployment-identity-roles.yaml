@@ -1,0 +1,54 @@
+# Built-in Azure roles each Azure Sandbox module assigns. The deployment identity may assign or remove only these
+# roles: they become the condition on its "Role Based Access Control Administrator" assignment, so it can't grant
+# privileged roles such as Owner.
+#
+# Update this file whenever you add a module or change the role assignments (azurerm_role_assignment) in an existing
+# module:
+#   * List every role the module assigns, using the exact built-in role name, even if another module lists it too.
+#     Duplicates are removed when the file is read.
+#   * Use an empty list ([]) for a module that assigns no roles.
+# A missing role makes applies fail with an authorization error.
+#
+# After a change, re-grant the deployment identity:
+#   * client_secret:              re-run the README "Service Principal" commands.
+#   * managed_identity, oidc:     extras/configurations/rg-devops-iac/scripts/grant-jit-roles.sh --force
+#
+# Read with the jq-based yq (sudo apt install yq): yq -r '.[][]' scripts/deployment-identity-roles.yaml
+
+vnet_shared:
+  - Key Vault Secrets Officer
+
+vnet_app:
+  - Key Vault Secrets User
+  - Monitoring Reader
+  - Storage Account Contributor
+  - Storage Blob Data Contributor
+  - Storage Blob Data Reader
+  - Storage File Data Privileged Contributor
+
+vm_jumpbox_linux:
+  - Key Vault Secrets User
+
+vm_mssql_win:
+  - Key Vault Secrets User
+  - Storage Blob Data Reader
+
+mssql: []
+
+mysql: []
+
+vwan: []
+
+# Extra modules (extras/modules)
+
+avd:
+  - Key Vault Secrets User
+  - Desktop Virtualization User
+  - Virtual Machine User Login
+
+petstore:
+  - AcrPull
+  - AcrPush
+  - Monitoring Metrics Publisher
+
+vnet_onprem: []

@@ -1,16 +1,17 @@
 variable "deployment_identity" {
   type        = string
-  description = "The deployment identity to create for Azure Sandbox applies: none, managed_identity or oidc. The root module validates the value."
+  description = "The root module's deployment_identity setting: none, managed_identity or oidc. The deployment identity's federated identity credentials and the runner power state identity are created only for oidc. The root module validates the value."
+}
+
+variable "deployment_identity_id" {
+  type        = string
+  description = "The resource id of the deployment identity created by the root module, or null when var.deployment_identity is none. Its federated identity credentials are created when var.deployment_identity is oidc."
+  default     = null
 }
 
 variable "deployment_identity_github_environments" {
   type        = list(string)
   description = "The GitHub Actions environments whose jobs can sign in as the deployment identity. One federated identity credential is created per environment. Only used when var.deployment_identity is oidc."
-}
-
-variable "enable_github_runner" {
-  type        = bool
-  description = "Set to true to install and register the GitHub Actions self-hosted runner agent on the VM, false to skip it."
 }
 
 variable "github_repository_id" {
@@ -25,7 +26,7 @@ variable "github_repository_owner_id" {
 
 variable "github_runner_labels" {
   type        = list(string)
-  description = "Additional labels to apply to the GitHub Actions self-hosted runner. Only used when var.enable_github_runner is true."
+  description = "Additional labels to apply to the GitHub Actions self-hosted runner."
 
   validation {
     condition     = alltrue([for label in var.github_runner_labels : can(regex("^[a-zA-Z0-9._-]{1,64}$", label))])
@@ -59,7 +60,7 @@ variable "github_runner_token_version" {
 
 variable "github_runner_url" {
   type        = string
-  description = "The GitHub repository URL to register the self-hosted runner with, e.g. 'https://github.com/myorg/myrepo'. Required when var.enable_github_runner is true, or when var.deployment_identity is oidc and the repository ids are not set."
+  description = "The GitHub repository URL to register the self-hosted runner with, e.g. 'https://github.com/myorg/myrepo'. Required."
   default     = ""
 
   validation {
@@ -70,7 +71,7 @@ variable "github_runner_url" {
 
 variable "github_runner_version" {
   type        = string
-  description = "The version of the GitHub Actions runner agent to install, without the leading 'v'. Only used when var.enable_github_runner is true."
+  description = "The version of the GitHub Actions runner agent to install, without the leading 'v'."
   default     = "2.338.2"
 
   validation {
@@ -87,11 +88,6 @@ variable "location" {
 variable "resource_group_name" {
   type        = string
   description = "The name of the existing resource group."
-}
-
-variable "subscription_id" {
-  type        = string
-  description = "The Azure subscription id. The scope used to look up the role definition ids in the deployment identity's ABAC condition."
 }
 
 variable "tags" {

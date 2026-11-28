@@ -1,13 +1,11 @@
 #region resources
 
-# Optional: installs and registers the GitHub Actions self-hosted runner.
+# Installs and registers the GitHub Actions self-hosted runner.
 # Runs after cloud-init and the VM extensions, so the base VM is identical with or without the runner.
 # The token goes through write-only sensitive_body, so it never lands in state, the plan, custom data or Key Vault.
 # It is sent only on create or when var.github_runner_token_version changes.
 # Other updates re-run the script without it, and the script leaves a registered runner as-is.
 resource "azapi_resource" "github_runner" {
-  count = var.enable_github_runner ? 1 : 0
-
   type      = "Microsoft.Compute/virtualMachines/runCommands@2025-04-01"
   name      = "${module.naming.names["virtual_machine_extension"].name}-${var.virtual_machine_name}-ConfigureGitHubRunner"
   parent_id = var.virtual_machine_id # Available only after the VM's last apt-based extension, so installing the runner dependencies doesn't contend for the apt locks.
@@ -57,7 +55,7 @@ resource "azapi_resource" "github_runner" {
   lifecycle {
     precondition {
       condition     = var.github_runner_url != ""
-      error_message = "var.github_runner_url must be set when var.enable_github_runner is true."
+      error_message = "var.github_runner_url must be set."
     }
   }
 }

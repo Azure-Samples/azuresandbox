@@ -110,7 +110,7 @@ Only owners open and merge the `vnext` → `main` release PR:
 4. A fresh sandbox is deployed and the unit and integration tests run.
 5. If everything passes, merge with a **merge commit**.
 
-Every push, and every time the PR is marked ready again, starts a fresh run; results from an earlier commit are never reused. **Re-run failed jobs** isn't supported. To retry, convert the PR to a draft and mark it ready again, or close and reopen it. The workflow's design and configuration are in the [rg-devops-iac deployment guide](extras/configurations/rg-devops-iac/modules/github-runner/README.md#github-actions-workflow-design).
+Every push, and every time the PR is marked ready again, starts a fresh run; results from an earlier commit are never reused. **Re-run failed jobs** isn't supported. To retry, convert the PR to a draft and mark it ready again, or close and reopen it. The workflow's design and configuration are in [Sandbox deployment workflow](#sandbox-deployment-workflow).
 
 #### Release deployment gate
 
@@ -127,6 +127,260 @@ The release PR's required statuses are all published by GitHub-hosted jobs in th
 - **Pending first.** Both release statuses are published as pending on the head SHA before static CI starts. Missing evidence, skipped stages, failures and cancellations never produce success; an API outage can leave a status pending.
 - **Recheck after approval.** Before checkout or any Azure access, the deployment job confirms the PR is unchanged and this attempt owns a passing `release-static-ci`.
 - **No overwrites.** Status writers use a per-SHA lock and attempt-specific run links, so an older attempt can't overwrite a newer one. No workflow closes or merges a PR.
+
+### Sandbox deployment workflow
+
+The [deployment workflow](.github/workflows/sandbox-deployment.yml) deploys a new sandbox and runs its unit and integration tests. It runs on `jumplinux2`, the [rg-devops-iac](extras/configurations/rg-devops-iac/README.md) virtual machine registered as a GitHub self-hosted runner. It has two uses:
+
+- **Release gate:** deploys and tests the release candidate on every [release PR](#releasing-to-main).
+- **On-demand deployment:** deploys up to 20 sandboxes in parallel from `main` or `vnext`, for example for testing or a class.
+
+The runner and the runner power state identity are created by the rg-devops-iac [github-runner module](extras/configurations/rg-devops-iac/modules/github-runner/README.md), and the deployment identity by rg-devops-iac itself (see [Optional: Deployment Identity](extras/configurations/rg-devops-iac/README.md#optional-deployment-identity)). This section covers the workflow and its configuration.
+
+- [Workflow overview](#workflow-overview)
+- [Workflow prerequisites](#workflow-prerequisites)
+- [Workflow configuration](#workflow-configuration)
+- [Workflow setup](#workflow-setup)
+- [Workflow runs](#workflow-runs)
+- [Deploying several sandboxes](#deploying-several-sandboxes)
+- [Runner power state jobs](#runner-power-state-jobs)
+- [Runner records](#runner-records)
+
+#### Workflow overview
+
+```mermaid
+flowchart LR
+    subgraph rgdevops["rg-devops-iac"]
+        vm["jumplinux2<br/>self-hosted runner"]
+        did["Deployment identity<br/>no standing roles"]
+        pid["Runner power state identity<br/>oidc only"]
+        st["Storage account<br/>tfstate container"]
+    end
+    subgraph gh["GitHub repository"]
+        wf["Sandbox deployment workflow"]
+        env["Environments, secrets<br/>and SANDBOX_AUTH_MODE"]
+    end
+    op["DevOps administrator"] -- "grant-jit-roles.sh<br/>before each run" --> did
+    op -- "approves run" --> wf
+    env --> wf
+    wf -- "start / deallocate" --> pid
+    pid --> vm
+    wf -- "sandbox job" --> vm
+    vm -- "signs in as" --> did
+    vm -- "state, system-assigned identity" --> st
+    did -- "Contributor, conditioned<br/>RBAC Administrator" --> sb["New Azure Sandbox"]
+```
+
+| Component | Provided by | Purpose |
+| --- | --- | --- |
+| `jumplinux2` runner | rg-devops-iac (`enable_github_runner = true`) | Runs the `sandbox` job with the pre-installed IaC toolchain, inside the private network. |
+| Deployment identity | rg-devops-iac (`deployment_identity`) | The identity the Azure Sandbox providers authenticate as. No standing Azure RBAC roles, only time-bound deployment roles granted per run. |
+| Runner power state identity | rg-devops-iac, `oidc` only | Starts and deallocates `jumplinux2` around a run, from GitHub-hosted jobs. |
+| Storage account | rg-devops-iac | Holds each sandbox's Terraform state, reached with `jumplinux2`'s system-assigned identity. |
+| Environments, secrets and variables | GitHub repository settings | Supply the sandbox's `backend.tf` and `terraform.tfvars`, require owner approval, and select the authentication mode. |
+
+The workflow supports the two [deployment identity options](extras/configurations/rg-devops-iac/README.md#deployment-identity-options) that need no secret, `managed_identity` and `oidc`. The personas involved are the rg-devops-iac **devops administrator** and **entra administrator**. See [Personas and Role Assignments](extras/configurations/rg-devops-iac/README.md#personas-and-role-assignments).
+
+#### Workflow prerequisites
+
+Arrange these **before** provisioning rg-devops-iac. Some need privileged roles the **devops administrator** may not hold.
+
+| Requirement | Needed for | Modes | When |
+| --- | --- | --- | --- |
+| GitHub repository administrator | Runner registration token; environments, secrets and variables | Both | Before the rg-devops-iac apply |
+| GitHub repository administrator | OIDC subject claim template, unless the repository already uses it | `oidc` | Once, after the federated credentials exist |
+| Microsoft Entra Privileged Role Administrator (**entra administrator**) | Microsoft Graph permissions. The least privileged role that can grant them; Global Administrator also works. `Owner`, Cloud Application Administrator and Global Reader can't. | Both, `mssql` only | Once, after the identity is created |
+| Microsoft Entra ID P2 or Microsoft Entra ID Governance | Time-bound role assignments | Both | Before the first run |
+| Subscription `Contributor` (**devops administrator**), ideally PIM eligible | Applying rg-devops-iac | Both | Each apply |
+| Subscription `Role Based Access Control Administrator` without a condition (**devops administrator**), ideally PIM eligible | Applying rg-devops-iac, and granting the time-bound roles | Both | Each apply and each run |
+
+#### Workflow configuration
+
+rg-devops-iac `terraform.tfvars` (see [Optional: GitHub Self-Hosted Runner Configuration](extras/configurations/rg-devops-iac/README.md#optional-github-self-hosted-runner-configuration)):
+
+| Variable | `managed_identity` | `oidc` |
+| --- | --- | --- |
+| `enable_github_runner` | `true` | `true` |
+| `deployment_identity` | `"managed_identity"` | `"oidc"` |
+| `deployment_identity_github_environments` | Not used | Default |
+| `github_runner_power_state_environment` | Not used | Default |
+| `github_repository_id`, `github_repository_owner_id` | Not used | Set for a private repository |
+| `github_runner_url`, `github_runner_labels` | Default | Default |
+
+GitHub repository settings. The environments' protection rules are in [Deployment environments and identities](#deployment-environments-and-identities):
+
+| Setting | Type | Value | Modes |
+| --- | --- | --- | --- |
+| `SANDBOX_AUTH_MODE` | Repository variable | `managed_identity` or `oidc`. Must match `auth_mode` in `SANDBOX_TFVARS_HCL`. Runs fail without it, and the [runner power state jobs](#runner-power-state-jobs) run only with `oidc`. | Both |
+| `SANDBOX_JOB_TIMEOUT_MINUTES` | Repository variable, optional | Timeout of the `sandbox` job, which runs preflight, apply and unit tests. Preflight also requires the just-in-time grant to have at least this many minutes left. Default `360`, range `60`-`1440`. | Both |
+| `SANDBOX_RETAINED_DEPLOYMENTS` | Repository or environment variable, optional | Previous runs whose private records stay on the runner, besides the current run. Default `3`, range `1`-`10`. Preflight purges older runs' records and state blobs; see [Runner records](#runner-records). | Both |
+| `SANDBOX_BACKEND_HCL` | Secret in `sandbox-deployment` and `sandbox-release-gate` | Azure Sandbox `backend.tf`, as below | Both |
+| `SANDBOX_TFVARS_HCL` | Secret in `sandbox-deployment` and `sandbox-release-gate` | Azure Sandbox `terraform.tfvars`, as below | Both |
+| `RUNNER_POWER_STATE_CLIENT_ID`, `AZURE_TENANT_ID`, `RUNNER_VM_ID` | Secrets in `sandbox-runner-power-state` | See [Runner power state jobs](#runner-power-state-jobs) | `oidc` |
+| OIDC subject claim template | Repository setting | `use_default: false`, `include_claim_keys` `repository_owner_id`, `repository_id`, `context`. See [OIDC Subject Claim Template](extras/configurations/rg-devops-iac/modules/github-runner/README.md#oidc-subject-claim-template) | `oidc` |
+
+`SANDBOX_BACKEND_HCL` uses the rg-devops-iac storage account and `jumplinux2`'s system-assigned identity (see [Terraform State](extras/configurations/rg-devops-iac/modules/github-runner/README.md#terraform-state)). Preflight requires each value as a literal, and rejects `key` and any credential, because each run sets its own state key:
+
+```hcl
+terraform {
+  backend "azurerm" {
+    use_azuread_auth     = true
+    use_msi              = true
+    tenant_id            = "YOUR-ENTRA-TENANT-ID-HERE"
+    subscription_id      = "YOUR-AZURE-SUBSCRIPTION-ID-HERE"
+    storage_account_name = "YOUR-STORAGE-ACCOUNT-NAME-HERE"
+    container_name       = "tfstate"
+  }
+}
+```
+
+`SANDBOX_TFVARS_HCL` is a normal Azure Sandbox `terraform.tfvars` with:
+
+| Setting | Value |
+| --- | --- |
+| `auth_mode` | `"managed_identity"` or `"oidc"`, matching `SANDBOX_AUTH_MODE` |
+| `client_id` | `client_id` from the rg-devops-iac `deployment_identity` output |
+| `entra_tenant_id`, `subscription_id` | The same values as in `SANDBOX_BACKEND_HCL` |
+| `operator_object_id` | The sandbox's [operator](README.md#personas-and-role-assignments), who is granted data-plane roles on the sandbox's key vault and storage account |
+| `enable_module_*` (base) | Release runs: all six `true`. Manual runs: any, with `enable_module_vnet_app = true`. |
+| `enable_module_*` (extras) | All disabled |
+
+#### Workflow setup
+
+| Step | Task | Who | Modes | Details |
+| --- | --- | --- | --- | --- |
+| 1 | Create a runner registration token | DevOps administrator, as a repository administrator | Both | [Self-Hosted Runner Registration](extras/configurations/rg-devops-iac/modules/github-runner/README.md#self-hosted-runner-registration) |
+| 2 | Apply rg-devops-iac with the [workflow configuration](#workflow-configuration) | DevOps administrator, with `Contributor` and `Role Based Access Control Administrator` | Both | [Getting Started](extras/configurations/rg-devops-iac/README.md#getting-started) |
+| 3 | Grant Microsoft Graph permissions | Entra administrator, with Privileged Role Administrator | Both, `mssql` only | [Microsoft Graph Permissions](extras/configurations/rg-devops-iac/README.md#microsoft-graph-permissions) |
+| 4 | Check or set the OIDC subject claim template | Repository administrator | `oidc` | [OIDC Subject Claim Template](extras/configurations/rg-devops-iac/modules/github-runner/README.md#oidc-subject-claim-template) |
+| 5 | Add the power state secrets to `sandbox-runner-power-state` | Repository administrator | `oidc` | [Runner power state jobs](#runner-power-state-jobs) |
+| 6 | Set `SANDBOX_BACKEND_HCL`, `SANDBOX_TFVARS_HCL` and `SANDBOX_AUTH_MODE` | Repository administrator | Both | [Workflow configuration](#workflow-configuration) |
+| 7 | Before each run, grant the time-bound roles | DevOps administrator, with `Role Based Access Control Administrator` | Both | [Deployment Roles](extras/configurations/rg-devops-iac/README.md#deployment-roles) |
+| 8 | Start a manual run or mark a release PR ready, then approve | Repository owner (environment reviewer) | Both | [Workflow runs](#workflow-runs) |
+
+#### Workflow runs
+
+```mermaid
+flowchart TD
+    manual["Manual dispatch<br/>workflow_dispatch"] --> sel
+    release["Ready vnext to main release PR<br/>pull_request_target"] --> sel
+    sel["selection<br/>validates the entry and SANDBOX_AUTH_MODE"]
+    sel -- release --> ci["pending statuses, then wait for<br/>six static CI workflows on the PR"]
+    ci --> appr
+    sel -- manual --> appr{"Owner approval<br/>environment"}
+    appr --> start["start_runner<br/>oidc only"]
+    appr --> sb["sandbox job on jumplinux2<br/>preflight, apply, unit-test"]
+    start -. starts jumplinux2 .-> sb
+    sb --> stop["stop_runner<br/>oidc only"]
+    sb -- release --> status["Publish release deployment status"]
+```
+
+| Entry path | Manual dispatch | Release PR |
+| --- | --- | --- |
+| Trigger | `workflow_dispatch` | `pull_request_target` for a ready, same-repository `vnext` → `main` PR |
+| Environment | `sandbox-deployment` | `sandbox-release-gate` |
+| Source | Tip of `source_branch`: `main` (default) or `vnext` | Exact PR head SHA |
+| Stages | `run_through`: `preflight`, `apply` (default) or `unit-test` | All three |
+| Sandboxes | `sandbox_count`: 1 (default) to 20, deployed in parallel; above 1, `preflight` or `apply` only. See [Deploying several sandboxes](#deploying-several-sandboxes) | 1 |
+| Base modules | Any, with `vnet_app` enabled | All six |
+| Static CI | Not run | The six static CI workflows run on the PR as `pull_request` CI and must pass on the exact head SHA before approval is requested |
+| PR statuses | Not published | `release-static-ci` and `sandbox-deployment-gate`; see [Release deployment gate](#release-deployment-gate) |
+
+| Stage | What it does |
+| --- | --- |
+| `preflight` | Confirms the trusted `main` workflow context and `jumplinux2`. Checks the backend and tfvars secrets, that `auth_mode` matches `SANDBOX_AUTH_MODE`, the module scope, and that the run's state key is unused. Installs a Terraform version that satisfies the deployed `required_version` if the runner's doesn't (see [Terraform Version on the Runner](extras/configurations/rg-devops-iac/modules/github-runner/README.md#terraform-version-on-the-runner)). Purges runs older than `SANDBOX_RETAINED_DEPLOYMENTS` from the runner and the state backend. Signs in as the deployment identity, waits up to 5 minutes for the time-bound roles to take effect, and checks that the grant outlasts `SANDBOX_JOB_TIMEOUT_MINUTES`. |
+| `apply` | Rechecks the roles, then applies the saved plan from preflight. |
+| `unit-test` | Rechecks the roles, starts every sandbox VM, runs the unit and integration tests, and publishes the full JSON results, redacted the same way as the job log, as a workflow artifact, pass or fail. A failed upload doesn't fail the job; the results stay on the runner. |
+
+Things to know:
+
+- **New sandboxes only.** Each run uses its own state key, `sandboxes/<deployment id>/terraform.tfstate`. The workflow never updates, recovers or destroys a sandbox. Tear down manually.
+- **One run at a time.** Runs share a concurrency group, and an active apply isn't cancelled.
+- **Private logs.** Raw logs and plans stay on the runner. The job summary shows the stage results, the deployed commit and the sandbox resource group name after a successful apply. When `preflight` or `apply` fails with a Terraform error, each `Error:` block is also shown in full, in red in the job log, as an error annotation and in a caution alert in the job summary. Everything the runner publishes (status messages, progress, errors, annotations, the job summary and the unit-test evidence artifact) is redacted the same way: Microsoft Entra ID ids (tenant, client and object ids) and subscription ids are redacted, along with any other GUID. All tag values are redacted, and so are tag names other than the `project`, `costcenter` and `environment` names in the root `tags` design. Resource names and other details are kept for troubleshooting.
+- **Runner records.** Older runs are purged at preflight; see [Runner records](#runner-records).
+- **Retry.** **Re-run failed jobs** isn't supported for release PRs. Start a new manual run, or mark the release PR as a draft and ready again.
+
+#### Deploying several sandboxes
+
+For a class or hackathon, set `sandbox_count` on a manual run to deploy up to 20 identical sandboxes in parallel, with one approval. Each sandbox is independent, with its own deployment id `sandbox-<run id>-<n>`, state key `sandboxes/sandbox-<run id>-<n>/terraform.tfstate`, resource group and private records on the runner. All of them use the same `SANDBOX_TFVARS_HCL`. With a count of 1 the run works as described in [Workflow runs](#workflow-runs), with deployment id `sandbox-<run id>`.
+
+How it works:
+
+- **Preflight or apply only.** The tests use host-wide network state on the runner, such as the Virtual WAN point-to-site test's VPN tunnel and routes, so `unit-test` needs a count of 1. Release PRs always deploy one sandbox.
+- **Parallel processes in one job.** The `preflight` step checks the Terraform version and downloads the providers once, into a cache shared by the run. It then runs each sandbox's preflight in its own process, from its own copy of the source (a git worktree), starting one every 10 seconds. The `apply` step then applies every sandbox. The `Report stage results` step removes the source copies and the provider cache. A single-sandbox run uses the same kind of provider cache.
+- **Failures.** If any sandbox fails preflight, no sandbox is applied. During apply, a failed sandbox doesn't stop the others, but the job fails. Each failed sandbox gets an error annotation.
+- **Reporting.** The job log shows each sandbox's status lines prefixed with its deployment id, and a run-wide heartbeat every 2 minutes. The job summary has a table of every sandbox's resource group and stage results, with a details section per sandbox, including any Terraform errors.
+- **Shared limits.** All sandboxes share the job's timeout (`SANDBOX_JOB_TIMEOUT_MINUTES`, default 360 minutes), the just-in-time grant and the deployment identity's [Azure Resource Manager request limits](https://learn.microsoft.com/azure/azure-resource-manager/management/request-limits-and-throttling). Throttled requests are retried, so a larger run takes longer than a single sandbox.
+
+Plan capacity before the event. Figures are per sandbox with all base modules; fewer modules need less.
+
+| Resource | Per sandbox | Notes |
+| --- | --- | --- |
+| Runner memory | Up to 1.5 GB during plan and apply | The runner itself uses about 1 GB. A measured run with `vnet_app` and `mssql` used about 0.9 GB per sandbox, rising slowly during apply. |
+| Runner CPU | About 1 vCPU during preflight | `terraform init` and `plan` keep the CPU busy for about 5 minutes. Apply mostly waits on Azure and uses under 10%. Fewer vCPUs than sandboxes only slows preflight. |
+| Runner disk | About 40 MB kept per sandbox, plus a provider cache of about 730 MB removed at the end of the run. Records of runs older than `SANDBOX_RETAINED_DEPLOYMENTS` are purged at preflight | The default 30 GB Standard SSD is enough. Its bandwidth peaks briefly while the cache fills, which only slows preflight. |
+| Regional vCPUs | 10: 2 each for `adds1`, `jumpwin1` and `jumplinux1`, and 4 for `mssqlwin1` | 200 for 20 sandboxes. Check *Total Regional vCPUs* and the VM family quotas under the subscription's *Usage + quotas*, and request an increase if needed. |
+| Public IP addresses | 2 Standard | For Azure Firewall and Bastion. |
+| Cost | Dominated by Azure Firewall, the Virtual WAN hub and point-to-site gateway, and Bastion | Billed hourly whether or not the sandbox is used. Disable modules the event doesn't need, such as `vwan`, and tear down promptly. |
+
+Size the runner with the rg-devops-iac `vm_jumpbox_linux_size` variable before the event, apply rg-devops-iac, and size it back down afterwards:
+
+| Sandboxes | Runner size |
+| --- | --- |
+| Up to 2 | `Standard_D2ls_v6` (2 vCPUs, 4 GiB), the default |
+| Up to 8 | `Standard_D4s_v6` (4 vCPUs, 16 GiB) |
+| Up to 20 | `Standard_D8s_v6` (8 vCPUs, 32 GiB) |
+
+The sandbox VMs keep running after the run, unless an Azure Policy in the subscription shuts them down.
+
+To tear down, delete each sandbox's resource group, listed in the job summary, and its state blob. Once the run is older than `SANDBOX_RETAINED_DEPLOYMENTS` allows, preflight has already deleted its state blobs; only the resource groups remain. Run this on `jumplinux2`, from the `extras/configurations/rg-devops-iac` directory, signed in to Azure CLI with access to both:
+
+```bash
+RUN_ID=YOUR-RUN-ID-HERE
+COUNT=YOUR-SANDBOX-COUNT-HERE
+for rg in YOUR-RESOURCE-GROUP-NAMES-HERE; do az group delete --name "$rg" --yes --no-wait; done
+for n in $(seq 1 "$COUNT"); do ./scripts/delete-tfstate.sh --yes "sandboxes/sandbox-$RUN_ID-$n/terraform.tfstate"; done
+```
+
+With `mssql` enabled, also delete each sandbox's `grp-sql-admins-*` Microsoft Entra group. The group name ends with the same suffix as the sandbox's resource group.
+
+#### Runner power state jobs
+
+With `SANDBOX_AUTH_MODE` set to `oidc`, two GitHub-hosted jobs start `jumplinux2` after a deployment is approved and deallocate it afterwards. They sign in as the rg-devops-iac [runner power state identity](extras/configurations/rg-devops-iac/modules/github-runner/README.md#runner-power-state-identity) through the `sandbox-runner-power-state` environment.
+
+Add these secrets to `sandbox-runner-power-state`. They're secrets so they're masked in public run logs. Run the commands from the `extras/configurations/rg-devops-iac` directory:
+
+| Secret | Value |
+| --- | --- |
+| `RUNNER_POWER_STATE_CLIENT_ID` | `terraform output -json github_runner \| jq -r .power_state_identity_client_id` |
+| `AZURE_TENANT_ID` | The Microsoft Entra tenant id |
+| `RUNNER_VM_ID` | `terraform output -json resource_ids \| jq -r .virtual_machine_jumplinux2` |
+
+| Job | Runs when | Behavior |
+| --- | --- | --- |
+| `start_runner` | `SANDBOX_AUTH_MODE` is `oidc`, alongside the `sandbox` job | Waits up to 60 minutes for the deployment's approval; ends without starting anything if it's rejected, and cancels the run on timeout. Then starts `jumplinux2` if it's stopped or deallocated, and waits up to 20 minutes for the runner to pick up the `sandbox` job, cancelling the run if it doesn't. |
+| `stop_runner` | After the `sandbox` job, however it ended | Deallocates `jumplinux2` only if `start_runner` started it. A VM that was already running stays running. |
+
+Both jobs run [Invoke-RunnerPowerState.sh](extras/configurations/rg-devops-iac/modules/github-runner/scripts/Invoke-RunnerPowerState.sh) from the trusted workflow commit, never from the deployed branch. With `managed_identity`, the identity isn't created and both jobs are skipped; keep `jumplinux2` running. The environment and its secrets can stay in place for a later switch to `oidc`.
+
+#### Runner records
+
+Each deployment's private records (logs, plan, receipts and Terraform data) stay on `jumplinux2` in `~/.local/state/azuresandbox/deployments/<deployment id>/`. Terraform data links each provider to a per-run cache of about 730 MB, which the `Report stage results` step removes, so a deployment keeps about 40 MB. A run cancelled before that step leaves its cache behind until the run is purged.
+
+At preflight, the runner keeps the current run plus the `SANDBOX_RETAINED_DEPLOYMENTS` most recent previous runs (default `3`, range `1`-`10`), ordered by run id, and purges every older run:
+
+- A run is purged as a whole, including every sandbox of a multi-sandbox run.
+- Each purged deployment's state blob, `sandboxes/<deployment id>/terraform.tfstate`, is deleted from the backend first, breaking any leftover state lock. Only then are its records deleted, so a failure leaves them to retry on the next run. The `tfstate` container has no versioning or soft delete, so this is permanent.
+- Purging doesn't touch Azure resources. A sandbox that wasn't torn down keeps running; delete its resource group as described in [Deploying several sandboxes](#deploying-several-sandboxes).
+- Deployments recorded against another storage account or container are purged from the runner only, and reported, so their state blobs can be deleted manually with `delete-tfstate.sh`.
+- Entries in the folder that aren't deployment records are left in place, and reported.
+- Any error fails preflight.
+
+Preflight reports the result in the job log and the job summary, for example:
+
+```text
+preflight: runner records: kept the current run and 3 previous runs (SANDBOX_RETAINED_DEPLOYMENTS = 3); purged 2 runs: 3 deployments, 2 state blobs deleted, 2.3 GB freed.
+```
 
 ### Branch protection
 
@@ -154,13 +408,13 @@ The [deployment workflow](.github/workflows/sandbox-deployment.yml) signs in to 
 | Required reviewers | Owners, in `sandbox-deployment` and `sandbox-release-gate`. None in `sandbox-runner-power-state` |
 | **Allow administrators to bypass configured protection rules** | Off in `sandbox-release-gate`, so admins can't skip release deployment approval. On in `sandbox-deployment`, so an admin can start a manual deployment without approval |
 | Actions event policies | One per workflow file: `pull_request_target` and `workflow_dispatch` for `.github/workflows/sandbox-deployment.yml`, and `pull_request_target` for `.github/workflows/main-source-policy.yml`. No other workflow can use `pull_request_target`; see [`pull_request_target` security](#pull_request_target-security) |
-| Repository variable | `SANDBOX_AUTH_MODE`: `managed_identity` or `oidc`, matching `auth_mode` in `SANDBOX_TFVARS_HCL`. Runs fail without it, and the runner power state jobs run only with `oidc` |
-| Environment secrets | `SANDBOX_BACKEND_HCL` and `SANDBOX_TFVARS_HCL`, with `auth_mode = "managed_identity"` or `"oidc"`, in `sandbox-deployment` and `sandbox-release-gate`. With `oidc` only: `RUNNER_POWER_STATE_CLIENT_ID`, `AZURE_TENANT_ID` and `RUNNER_VM_ID` in `sandbox-runner-power-state` |
 | OIDC subject claim template | `use_default: false` with `include_claim_keys` `repository_owner_id`, `repository_id` and `context` |
 
-`sandbox-runner-power-state` is used by the `start_runner` and `stop_runner` jobs, which start the self-hosted runner virtual machine after a deployment is approved and deallocate it afterwards. It has no reviewers because `start_runner` waits for the deployment's own approval before it starts anything, and its identity can only read, start and deallocate that one virtual machine. Don't add it to `deployment_identity_github_environments`, and don't use it for any other job. See [Runner power state identity](extras/configurations/rg-devops-iac/modules/github-runner/README.md#runner-power-state-identity).
+The environments' variables and secrets are listed in [Workflow configuration](#workflow-configuration).
 
-Don't change the OIDC subject claim template. It changes the subject of every OIDC token the repository issues, and the federated credentials only accept this format. Check it with `gh api repos/Azure-Samples/azuresandbox/actions/oidc/customization/sub`. A new environment can't federate to the deployment identity until its name is added to `deployment_identity_github_environments` in rg-devops-iac. See the [rg-devops-iac deployment guide](extras/configurations/rg-devops-iac/modules/github-runner/README.md#deployment-identity).
+`sandbox-runner-power-state` is used by the [runner power state jobs](#runner-power-state-jobs), which start the self-hosted runner virtual machine after a deployment is approved and deallocate it afterwards. It has no reviewers because `start_runner` waits for the deployment's own approval before it starts anything, and its identity can only read, start and deallocate that one virtual machine. Don't add it to `deployment_identity_github_environments`, and don't use it for any other job. See [Runner Power State Identity](extras/configurations/rg-devops-iac/modules/github-runner/README.md#runner-power-state-identity).
+
+Don't change the OIDC subject claim template. It changes the subject of every OIDC token the repository issues, and the federated credentials only accept this format. Check it with `gh api repos/Azure-Samples/azuresandbox/actions/oidc/customization/sub`. A new environment can't federate to the deployment identity until its name is added to `deployment_identity_github_environments` in rg-devops-iac. See the [rg-devops-iac deployment guide](extras/configurations/rg-devops-iac/README.md#optional-deployment-identity).
 
 ### `pull_request_target` security
 
@@ -191,7 +445,7 @@ The `sandbox` job checks out the release candidate and runs its deployment scrip
 6. **Pinned SHA and recheck after approval.** The job checks out the head SHA recorded when the run started, never a branch name. Before checkout, it confirms that the PR is still open and ready, its head and base SHAs haven't changed, and this attempt still owns a passing `release-static-ci`. A push after approval stops the run before checkout, and the new commit starts a new run that needs its own approval.
 7. **No stored credentials and a limited token.** Checkout uses `persist-credentials: false`. The job's `GITHUB_TOKEN` has only `contents: read`, `pull-requests: read` and `statuses: read`, plus `id-token: write` for OIDC. It can't push, change PRs or publish statuses.
 8. **Statuses published separately.** Required statuses are published only by separate GitHub-hosted jobs that never run candidate code. They report success only when every stage succeeded and the JSON evidence passed. Anything missing, skipped or cancelled is reported as a failure.
-9. **Limited Azure access.** The deployment identity holds no standing Azure RBAC roles. The devops administrator grants time-bound roles before each run ([just-in-time deployment roles](extras/configurations/rg-devops-iac/modules/github-runner/README.md#just-in-time-deployment-roles)). A condition limits its role assignments to the sandbox's own roles, and its Microsoft Graph permissions are limited to those listed in [deployment identity permissions](extras/configurations/rg-devops-iac/modules/github-runner/README.md#deployment-identity-permissions). The workflow signs in with GitHub OIDC, and the identity's federated credentials trust only this repository's deployment environments, which admit only `main`.
+9. **Limited Azure access.** The deployment identity holds no standing Azure RBAC roles. The devops administrator grants time-bound roles before each run ([deployment roles](extras/configurations/rg-devops-iac/README.md#deployment-roles)). A condition limits its role assignments to the sandbox's own roles, and its Microsoft Graph permissions are limited to those listed in [Microsoft Graph permissions](extras/configurations/rg-devops-iac/README.md#microsoft-graph-permissions). The workflow signs in with GitHub OIDC, and the identity's federated credentials trust only this repository's deployment environments, which admit only `main`.
 10. **One deployment at a time.** The `sandbox` job uses a single concurrency group, so deployments run one after another on the self-hosted runner.
 
 #### Part 4: new patterns and mitigations
@@ -215,7 +469,7 @@ GitHub Security Lab's [Keeping your GitHub Actions and workflows secure Part 4: 
 These are accepted for now and reviewed with this section:
 
 - **Self-approval.** **Prevent self-review** is off in `sandbox-release-gate`, so the owner who starts a release run (for example, by marking the release PR ready) can also approve its deployment. The code itself still needed a code-owner review to reach `vnext`.
-- **Persistent self-hosted runner.** The runner is registered once rather than as an ephemeral runner. It keeps each run's private records (logs, plans and Terraform data) for troubleshooting. They're stored in the runner service account's home directory, so other users on the runner can't read them without `sudo`, and preflight purges runs older than `SANDBOX_RETAINED_DEPLOYMENTS` (default `3`); see [Runner records](extras/configurations/rg-devops-iac/modules/github-runner/README.md#runner-records). Integration tests run without `sudo`, except the VPN test, which runs a root-owned wrapper through passwordless `sudo`. The runner service account's `sudo` grant covers only two root-owned wrappers: the VPN tunnel wrapper, which accepts only an allowlisted OpenVPN configuration and manages that one tunnel, and the wrapper that installs a validated Terraform version. See [Root access for the vwan integration test](README.md#root-access-for-the-vwan-integration-test).
+- **Persistent self-hosted runner.** The runner is registered once rather than as an ephemeral runner. It keeps each run's private records (logs, plans and Terraform data) for troubleshooting. They're stored in the runner service account's home directory, so other users on the runner can't read them without `sudo`, and preflight purges runs older than `SANDBOX_RETAINED_DEPLOYMENTS` (default `3`); see [Runner records](#runner-records). Integration tests run without `sudo`, except the VPN test, which runs a root-owned wrapper through passwordless `sudo`. The runner service account's `sudo` grant covers only two root-owned wrappers: the VPN tunnel wrapper, which accepts only an allowlisted OpenVPN configuration and manages that one tunnel, and the wrapper that installs a validated Terraform version. See [Root access for the vwan integration test](README.md#root-access-for-the-vwan-integration-test).
 
 #### CodeQL verification
 

@@ -1,14 +1,6 @@
 #region data
 data "azurerm_client_config" "current" {}
 
-# Looks up the role definition ID (GUID) for each allow-listed role name.
-data "azurerm_role_definition" "deployment_identity_assignable" {
-  for_each = toset(local.deployment_identity_assignable_roles)
-
-  name  = each.value
-  scope = "/subscriptions/${var.subscription_id}"
-}
-
 # Looks up the numeric repository and owner ids used in the GitHub OIDC subjects, when they aren't set in variables.
 # The request is anonymous, because a token would be saved in state, so it works only for public repositories and is rate-limited.
 # For a private repository, set github_repository_id and github_repository_owner_id in terraform.tfvars.
@@ -31,26 +23,10 @@ data "http" "github_repository" {
 }
 #endregion
 
-#region deployment-identity
+#region deployment-identity-federated-credentials
 
-# User-assigned managed identity (UAMI) used by the Azure Sandbox configuration's azurerm, azapi and azuread providers.
-# The VM's (jumplinux2) system-assigned managed identity, not the UAMI, is used for the Terraform state backend.
-# The UAMI and its roles depend on the deployment_identity setting:
-# - "none" (default): no deployment UAMI is created.
-# - "managed_identity": the deployment UAMI is attached to jumplinux2 and used by Terraform running there, from a terminal or a GitHub Actions job on its self-hosted runner.
-# - "oidc": the deployment UAMI is NOT attached to jumplinux2. Instead, it is used by approved GitHub Actions jobs on jumplinux2's self-hosted runner through federated identity credentials.
-# In both modes it holds no standing Azure RBAC role. Before each apply, the operator grants time-bound Contributor and Role Based Access Control Administrator,
-# restricted by the allow-list ABAC condition (scripts/grant-jit-roles.sh).
-resource "azurerm_user_assigned_identity" "deployment" {
-  count = var.deployment_identity != "none" ? 1 : 0
-
-  name                = "${module.naming.names["user_assigned_identity"].name}-deployment"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  tags                = var.tags
-}
-
-# Trusts GitHub Actions OIDC tokens for the oidc deployment identity, one credential per subject in local.github_oidc_subjects.
+# Trusts GitHub Actions OIDC tokens for the deployment identity, which the root module creates, when deployment_identity is "oidc".
+# One credential per subject in local.github_oidc_subjects.
 # A workflow job can exchange its GitHub token for an Azure token only if the token's issuer, audience and subject exactly match a credential.
 # This limits sign-in to jobs from this repository that run in one of the allowed GitHub environments, with no stored secret.
 resource "azurerm_federated_identity_credential" "deployment_identity_github" {
@@ -60,7 +36,7 @@ resource "azurerm_federated_identity_credential" "deployment_identity_github" {
   audience                  = ["api://AzureADTokenExchange"]
   issuer                    = "https://token.actions.githubusercontent.com"
   subject                   = each.value
-  user_assigned_identity_id = azurerm_user_assigned_identity.deployment[0].id
+  user_assigned_identity_id = var.deployment_identity_id
 }
 #endregion
 
@@ -116,7 +92,7 @@ module "naming" {
 # The runner token is needed only when the runner is registered, so a missing token is a warning, not an error.
 check "github_runner_token" {
   assert {
-    condition     = !var.enable_github_runner || var.github_runner_token != ""
+    condition     = var.github_runner_token != ""
     error_message = "github_runner_token is empty. It is required to register the GitHub Actions runner (on first deployment or when github_runner_token_version changes): run 'source modules/github-runner/scripts/new-runner-registration-token.sh'. Ignore this warning if the runner is already registered."
   }
 }

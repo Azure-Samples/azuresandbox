@@ -9,20 +9,20 @@
 #   * Application.Read.All  reads the service principal added as a member.
 #
 # Works for any deployment identity: the service principal used with auth_mode = "client_secret", or the
-# user-assigned managed identity this configuration creates (deployment_identity = "managed_identity").
+# user-assigned managed identity this configuration creates (deployment_identity = "managed_identity" or "oidc").
 #
 # Must be run with Azure CLI signed in as a Microsoft Entra Privileged Role Administrator, the least privileged
 # role that can grant Microsoft Graph application permissions (Global Administrator also works). Azure RBAC
 # roles, including subscription Owner, cannot grant application permissions.
 #
-# Usage: ./modules/github-runner/scripts/grant-graph-permissions.sh [client-id-or-object-id]
+# Usage: ./scripts/grant-graph-permissions.sh [client-id-or-object-id]
 # The identity defaults to 'principal_id' in the 'deployment_identity' terraform output, which requires jq.
 # The script is idempotent: permissions that are already granted are skipped.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TERRAFORM_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+TERRAFORM_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 GRAPH_APP_ID="00000003-0000-0000-c000-000000000000"
 GRAPH_PERMISSIONS=("Group.Create" "GroupMember.Read.All" "User.Read.All" "Application.Read.All")
@@ -39,7 +39,7 @@ else
   IDENTITY=$(terraform -chdir="${TERRAFORM_DIR}" output -json deployment_identity 2>/dev/null | jq -r '.principal_id // empty') || IDENTITY=""
   if [[ -z "${IDENTITY}" ]]; then
     echo "Error: 'principal_id' in the 'deployment_identity' terraform output is empty."
-    echo "Set deployment_identity = \"managed_identity\" and run 'terraform apply', or pass the identity."
+    echo "Set deployment_identity = \"managed_identity\" or \"oidc\" and run 'terraform apply', or pass the identity."
     echo "Usage: $0 [client-id-or-object-id]"
     exit 1
   fi

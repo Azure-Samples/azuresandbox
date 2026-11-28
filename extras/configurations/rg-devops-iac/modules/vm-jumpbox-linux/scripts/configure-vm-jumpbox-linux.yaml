@@ -44,6 +44,7 @@ packages:
   - powershell
   - python3-pip
   - terraform
+  - yq
 
 # A full dist-upgrade is deliberately not performed at provisioning time. It is not required to
 # install the packages above, it makes provisioning depend on every package on the image being

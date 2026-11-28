@@ -2,6 +2,7 @@
 
 # Used to get the signed-in operator's object ID for role assignments
 data "azurerm_client_config" "current" {}
+
 #endregion
 
 #region key-vault
@@ -253,6 +254,26 @@ resource "azapi_update_resource" "log_analytics_disable_public_access" {
 }
 #endregion
 
+#region deployment-identity
+
+# User-assigned managed identity (UAMI) that Terraform configurations, such as Azure Sandbox, authenticate as for their providers.
+# The VM's (jumplinux2) system-assigned managed identity, not the UAMI, is used for the Terraform state backend.
+# The UAMI depends on the deployment_identity setting:
+# - "none" (default): no deployment UAMI is created.
+# - "managed_identity": the deployment UAMI is attached to jumplinux2 and used by Terraform running there, from a terminal or a GitHub Actions job on its self-hosted runner.
+# - "oidc": the deployment UAMI is NOT attached to jumplinux2. Instead, the github-runner module adds federated identity credentials so approved GitHub Actions jobs on jumplinux2's self-hosted runner can sign in as it.
+# In both modes it holds no standing Azure RBAC role. Before each apply, the devops administrator grants time-bound Contributor and Role Based Access Control Administrator,
+# restricted by an ABAC condition built from the Azure Sandbox scripts/deployment-identity-roles.yaml (scripts/grant-jit-roles.sh).
+resource "azurerm_user_assigned_identity" "deployment" {
+  count = var.deployment_identity != "none" ? 1 : 0
+
+  name                = "${module.naming.names["user_assigned_identity"].name}-deployment"
+  location            = azurerm_resource_group.this.location
+  resource_group_name = azurerm_resource_group.this.name
+  tags                = var.tags
+}
+#endregion
+
 #region modules
 module "naming" {
   source                 = "Azure/avm-utl-naming/azure"
@@ -273,7 +294,7 @@ module "vm_jumpbox_linux" {
   storage_account_id            = azurerm_storage_account.this.id
   subnet_id                     = azurerm_subnet.subnets[var.subnet_devops_name].id
   tags                          = var.tags
-  user_assigned_identity_ids    = var.deployment_identity == "managed_identity" ? [module.github_runner[0].deployment_identity_id] : []
+  user_assigned_identity_ids    = var.deployment_identity == "managed_identity" ? [azurerm_user_assigned_identity.deployment[0].id] : []
   vm_jumpbox_linux_size         = var.vm_jumpbox_linux_size
 
   # The VM needs the NAT gateway for outbound access during cloud-init, and its NIC must not be created while the
@@ -306,11 +327,11 @@ module "image_gallery" {
 
 module "github_runner" {
   source = "./modules/github-runner"
-  count  = var.enable_github_runner || var.deployment_identity != "none" ? 1 : 0
+  count  = var.enable_github_runner ? 1 : 0
 
   deployment_identity                     = var.deployment_identity
   deployment_identity_github_environments = var.deployment_identity_github_environments
-  enable_github_runner                    = var.enable_github_runner
+  deployment_identity_id                  = var.deployment_identity != "none" ? azurerm_user_assigned_identity.deployment[0].id : null
   github_repository_id                    = var.github_repository_id
   github_repository_owner_id              = var.github_repository_owner_id
   github_runner_labels                    = var.github_runner_labels
@@ -320,7 +341,6 @@ module "github_runner" {
   github_runner_url                       = var.github_runner_url
   location                                = azurerm_resource_group.this.location
   resource_group_name                     = azurerm_resource_group.this.name
-  subscription_id                         = var.subscription_id
   tags                                    = var.tags
   virtual_machine_id                      = module.vm_jumpbox_linux.virtual_machine_extensions_complete
   virtual_machine_name                    = module.vm_jumpbox_linux.resource_names["virtual_machine_jumplinux2"]

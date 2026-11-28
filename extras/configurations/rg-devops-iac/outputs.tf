@@ -11,6 +11,7 @@ output "resource_ids" {
       storage_account            = azurerm_storage_account.this.id
       virtual_network            = azurerm_virtual_network.this.id
     },
+    var.deployment_identity != "none" ? { deployment_identity = azurerm_user_assigned_identity.deployment[0].id } : {},
     length(module.github_runner) > 0 ? module.github_runner[0].resource_ids : {},
     var.enable_image_gallery ? module.image_gallery[0].resource_ids : {},
     module.vm_jumpbox_linux.resource_ids
@@ -30,15 +31,24 @@ output "resource_names" {
       storage_account            = azurerm_storage_account.this.name
       virtual_network            = azurerm_virtual_network.this.name
     },
+    var.deployment_identity != "none" ? { deployment_identity = azurerm_user_assigned_identity.deployment[0].name } : {},
     length(module.github_runner) > 0 ? module.github_runner[0].resource_names : {},
     var.enable_image_gallery ? module.image_gallery[0].resource_names : {},
     module.vm_jumpbox_linux.resource_names
   )
 }
 
-# The deployment identity, or null when var.deployment_identity is none. See the github-runner module's deployment_identity output.
+# The deployment identity, or null when var.deployment_identity is none.
+#   client_id:       Used as 'client_id' for Azure Sandbox applies with auth_mode = "managed_identity" or "oidc".
+#   github_subjects: The GitHub OIDC subjects accepted by its federated identity credentials, keyed by environment.
+#                    An empty map unless var.deployment_identity is oidc.
+#   principal_id:    The principal (object) id, used by grant-jit-roles.sh and grant-graph-permissions.sh.
 output "deployment_identity" {
-  value = length(module.github_runner) > 0 ? module.github_runner[0].deployment_identity : null
+  value = var.deployment_identity != "none" ? {
+    client_id       = azurerm_user_assigned_identity.deployment[0].client_id
+    github_subjects = length(module.github_runner) > 0 ? module.github_runner[0].github_subjects : {}
+    principal_id    = azurerm_user_assigned_identity.deployment[0].principal_id
+  } : null
 }
 
 # The GitHub Actions self-hosted runner, or null when var.enable_github_runner is false. See the github-runner module's github_runner output.

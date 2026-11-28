@@ -1,11 +1,22 @@
+# Valid combinations of deployment_identity and enable_github_runner:
+# - none, runner on or off:       no deployment identity is created.
+# - managed_identity, runner off: terminal applies on jumplinux2.
+# - managed_identity, runner on:  terminal applies, or the Sandbox deployment workflow with SANDBOX_AUTH_MODE = managed_identity.
+# - oidc, runner on:              the Sandbox deployment workflow with SANDBOX_AUTH_MODE = oidc.
+# oidc without the runner is rejected, because its federated identity credentials are created by the github-runner module.
 variable "deployment_identity" {
   type        = string
-  description = "The deployment identity to create for Azure Sandbox applies. Use none for no identity; managed_identity for an identity attached to the Linux virtual machine, with time-bound roles the devops administrator grants before each apply (auth_mode = \"managed_identity\"); or oidc for an identity that GitHub Actions workflows sign in as, with time-bound roles the devops administrator grants before each run (auth_mode = \"oidc\")."
+  description = "The deployment identity to create for Terraform applies, such as Azure Sandbox. Use none for no identity; managed_identity for an identity attached to the Linux virtual machine, with time-bound roles the devops administrator grants before each apply (auth_mode = \"managed_identity\"); or oidc for an identity that GitHub Actions workflows on the self-hosted runner sign in as, with time-bound roles the devops administrator grants before each run (auth_mode = \"oidc\"). oidc requires var.enable_github_runner."
   default     = "none"
 
   validation {
     condition     = contains(["none", "managed_identity", "oidc"], var.deployment_identity)
     error_message = "deployment_identity must be one of: none, managed_identity or oidc."
+  }
+
+  validation {
+    condition     = var.deployment_identity != "oidc" || var.enable_github_runner
+    error_message = "deployment_identity = \"oidc\" requires enable_github_runner = true. Its federated identity credentials and runner power state identity are used only by the Sandbox deployment workflow on the self-hosted runner."
   }
 }
 

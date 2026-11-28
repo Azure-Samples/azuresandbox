@@ -174,6 +174,7 @@ A variety of Terraform execution environments can be used to provision Azure San
     * Linux Distro: Ubuntu 26.04 LTS (Resolute Raccoon)
     * pip3 Python library package manager and the PyJWT Python library (pre-installed on Ubuntu 26.04)
     * git (pre-installed on Ubuntu 26.04)
+    * yq
     * Azure CLI
     * PowerShell 7.x
     * Az PowerShell Module
@@ -187,6 +188,7 @@ A variety of Terraform execution environments can be used to provision Azure San
   * PowerShell 7.x
   * Az PowerShell Module
   * Terraform
+  * yq
   * Visual Studio Code
 
 * **Azure Virtual Machine**: An Azure virtual machine (Windows or Linux) can be used to run Terraform. This may be your only option if your client device is managed by strict corporate security policies that restrict developer use cases. See [rg-devops-iac](./extras/configurations/rg-devops-iac/) in extras for a complete configuration that can be used as a Terraform execution environment, either interactive or automated as part of a DevOps pipeline. This configuration has been tested as a Linux Terraform execution environment for Azure Sandbox. If you build your own Azure Virtual Machine to use as a Terraform execution environment, the following software should be installed:
@@ -195,6 +197,7 @@ A variety of Terraform execution environments can be used to provision Azure San
   * PowerShell 7.x
   * Az PowerShell Module
   * Terraform
+  * yq
 
 * **Azure Cloud Shell**: Azure Cloud Shell is not recommended but can be used. Most of the software dependencies are pre-installed.
 
@@ -641,33 +644,8 @@ With `client_secret`, the **azure administrator** (see [Personas and Role Assign
   SUBSCRIPTION_ID=$(az account show --query id -o tsv) # the signed-in subscription
   SCOPE="/subscriptions/$SUBSCRIPTION_ID"
 
-  # Roles the sandbox assigns, grouped by module.
-  # Each role is listed once, under the first module that needs it.
-  ROLES=(
-    # vnet_shared
-    "Key Vault Secrets Officer"
-
-    # vnet_app
-    "Key Vault Secrets User"
-    "Monitoring Reader"
-    "Storage Account Contributor"
-    "Storage Blob Data Contributor"
-    "Storage Blob Data Reader"
-    "Storage File Data Privileged Contributor"
-
-    # vm_jumpbox_linux, vm_mssql_win, mssql, mysql, vwan: no additional roles
-
-    # avd (extra module)
-    "Desktop Virtualization User"
-    "Virtual Machine User Login"
-
-    # petstore (extra module)
-    "AcrPull"
-    "AcrPush"
-    "Monitoring Metrics Publisher"
-
-    # vnet_onprem (extra module): no additional roles
-  )
+  # Roles the sandbox assigns. Run from the root of a clone of this repository.
+  mapfile -t ROLES < <(yq -r '.[][]' scripts/deployment-identity-roles.yaml | awk '!seen[$0]++')
 
   # Look up each role's ID; the condition below needs IDs, not names
   ROLE_IDS=""
@@ -689,7 +667,7 @@ With `client_secret`, the **azure administrator** (see [Personas and Role Assign
     --condition "$CONDITION" --condition-version "2.0"
   ```
 
-  To add the condition in the Azure portal instead, use the **Constrain roles** template with every role in `ROLES`. See [Delegate Azure role assignment management to others with conditions](https://learn.microsoft.com/azure/role-based-access-control/delegate-role-assignments-portal) for more information.
+  When `scripts/deployment-identity-roles.yaml` changes, delete the assignment with `az role assignment delete --assignee "$SPN_APP_ID" --role "Role Based Access Control Administrator" --scope "$SCOPE"`, then run these commands again.
 
 * If you deploy modules that create security groups, the **entra administrator** must grant the service principal the Microsoft Graph application permissions it needs:
 
@@ -740,12 +718,12 @@ With `client_secret`, the **azure administrator** (see [Personas and Role Assign
 
 #### Managed Identity and OIDC
 
-`managed_identity` and `oidc` are designed for automated deployments by the Sandbox deployment workflow. The [rg-devops-iac](./extras/configurations/rg-devops-iac/modules/github-runner/README.md#deployment-identity) configuration creates the user-assigned managed identity and its supporting resources.
+`managed_identity` and `oidc` are designed for automated deployments by the Sandbox deployment workflow. The [rg-devops-iac](./extras/configurations/rg-devops-iac/README.md#optional-deployment-identity) configuration creates the user-assigned managed identity and its supporting resources.
 
-* **No standing roles.** Before each run or manual apply, the **azure administrator** (see [Personas and Role Assignments](#personas-and-role-assignments)) grants time-bound `Contributor` and `Role Based Access Control Administrator` with `grant-jit-roles.sh`, which applies the same ABAC condition as [Service Principal](#service-principal). See [Just-in-Time Deployment Roles](./extras/configurations/rg-devops-iac/modules/github-runner/README.md#just-in-time-deployment-roles).
+* **No standing roles.** Before each run or manual apply, the **azure administrator** (see [Personas and Role Assignments](#personas-and-role-assignments)) grants time-bound `Contributor` and `Role Based Access Control Administrator` with `grant-jit-roles.sh`, which applies the same ABAC condition as [Service Principal](#service-principal). See [Deployment Roles](./extras/configurations/rg-devops-iac/README.md#deployment-roles).
 * **Microsoft Graph.** If you deploy modules that create security groups, the **entra administrator** grants the application permissions with `grant-graph-permissions.sh`.
-* **`managed_identity`** works from a terminal on `jumplinux2` (the rg-devops-iac VM) or from the workflow on its self-hosted runner. `jumplinux2` must be running.
-* **`oidc`** works only inside a GitHub Actions job, never from a terminal.
+* **managed_identity** works from a terminal on `jumplinux2` (the rg-devops-iac VM) or from the workflow on its self-hosted runner.
+* **oidc** works only inside a GitHub Actions job, never from a terminal.
 * For a manual apply with `managed_identity`, add these lines to `terraform.tfvars`, using `client_id` from the rg-devops-iac `deployment_identity` output:
 
   ```hcl
@@ -892,6 +870,7 @@ The following cross-platform scripting technologies are used in this project:
 * **Bash**: Used for general-purpose scripting.
 * **Azure CLI**: Used by Terraform to sign in by default (`auth_mode = "azure_cli"`) and to connect to Azure resources from Bash scripts.
 * **Python 3** with **PyJWT**: Used by *bootstrap.sh* to look up the signed-in user's object ID.
+* **yq**: Used to process YAML files.
 
 #### Configuration Management Technologies
 
